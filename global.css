@@ -1,0 +1,31 @@
+body {
+    margin: 0;
+    line-height: normal;
+  }
+  
+  :root {
+    /* fonts */
+    --font-dm-sans: "DM Sans";
+  
+    /* font sizes */
+    --font-size-mini: 15px;
+    --font-size-lg: 18px;
+    --font-size-xl: 20px;
+    --font-size-21xl: 40px;
+  
+    /* Colors */
+    --color-white: #fff;
+    --color-black: #000;
+    --color-gray-100: #1e1e1e;
+    --color-lightseagreen: #40b298;
+    --color-forestgreen: #3dad4f;
+  
+    /* Border radiuses */
+    --br-10xs: 3px;
+    --br-lgi: 19px;
+
+  }
+  
+html {
+  scroll-behavior: smooth;
+}

@@ -1,0 +1,461 @@
+  .main-landing-page-child {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: #0b171a;
+    width: 1920px;
+    height: 2767px;
+  }
+  .emeraldcore-is-the {
+    margin: 0;
+  }
+  .emeraldcore-is-the-container {
+    position: absolute;
+    top: 1705px;
+    left: 521px;
+    font-size: var(--font-size-xl);
+    text-align: center;
+    display: inline-block;
+    width: 879px;
+  }
+  .about-iceemerald-1 {
+    position: absolute;
+    top: 1767px;
+    left: -390px;
+    width: 1920px;
+    height: 1080px;
+    object-fit: cover;
+  }
+  .emeraldcore {
+    position: absolute;
+    top: 1574px;
+    left: 835px;
+    background: linear-gradient(90deg, #94ff9e, #fff 57.5%, #bbffca);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .main-landing-page-item {
+    position: absolute;
+    top: 1648px;
+    left: 883px;
+    border-radius: var(--br-10xs);
+    background-color: var(--color-lightseagreen);
+    width: 155px;
+    height: 10px;
+  }
+  .header-page-1 {
+    position: absolute;
+    top: -70px; /* Adjust the top position accordingly */
+    left: 0; /* Adjust the left position accordingly */
+    width: 1920px;
+    height: 1078px;
+    object-fit: cover;
+    opacity: 1; /* Ensure opacity is set to 1 if you want it fully visible */
+  }
+  .emeraldnetwork {
+    position: absolute;
+    top: 313px;
+    left: 778px;
+    font-size: 45px;
+    background: linear-gradient(90deg, #e1ffe4, #fff 59%, #b0ffb8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .welcome-to-the-container {
+    position: absolute;
+    top: 390px;
+    left: 545px;
+    font-size: 23px;
+    text-align: center;
+    display: inline-block;
+    width: 830px;
+    text-shadow: 0 4px 17.6px #000;
+  }
+  .emeraldnetwork1 {
+    position: absolute;
+    top: 2px;
+    left: 51px;
+    font-size: var(--font-size-lg);
+    font-family: var(--font-dm-sans);
+    color: var(--color-white);
+    text-align: left;
+  }
+  .emeraldnetwork-reworked-1 {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 28px;
+    height: 27px;
+    object-fit: cover;
+  }
+  .navbar-emeraldnetwork {
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+    background-color: transparent;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 197px;
+    height: 27px;
+  }
+  .navbar-app-child {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 10px;
+    background-color: var(--color-forestgreen);
+    width: 98px;
+    height: 31px;
+  }
+  .apps {
+    position: absolute;
+    top: 5px;
+    left: 30px;
+    font-size: var(--font-size-mini);
+    font-family: var(--font-dm-sans);
+    color: var(--color-white);
+    text-align: left;
+  }
+  .navbar-app {
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+    background-color: transparent;
+    position: absolute;
+    top: 0;
+    left: 942px;
+    width: 98px;
+    height: 31px;
+  }
+  .about,
+  .portofolio {
+    position: absolute;
+    top: 0;
+    left: 104px;
+  }
+  .portofolio {
+    left: 0;
+  }
+  .navbar,
+  .navbar-small-apps {
+    position: absolute;
+    top: 5px;
+    left: 756px;
+    width: 149px;
+    height: 20px;
+  }
+  .navbar {
+    top: 34px;
+    left: 440px;
+    width: 1040px;
+    height: 31px;
+    font-size: var(--font-size-mini);
+  }
+  .header-started-child {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: var(--br-lgi);
+    background-color: var(--color-forestgreen);
+    width: 204.5px;
+    height: 39px;
+  }
+  .get-started {
+    position: absolute;
+    top: 9px;
+    left: 34px;
+    font-size: var(--font-size-mini);
+    letter-spacing: 0.06em;
+    display: inline-block;
+    font-family: var(--font-dm-sans);
+    color: var(--color-white);
+    text-align: center;
+    width: 135.9px;
+    height: 17.4px;
+  }
+  .header-started,
+  .header-started1 {
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+    background-color: transparent;
+    position: absolute;
+    top: 502px;
+    left: 858px;
+    width: 204.5px;
+    height: 39px;
+  }
+  .header-started1 {
+    top: 2376px;
+    left: 1275px;
+  }
+  .about-emeraldnetwork-1 {
+    position: absolute;
+    top: 615px;
+    left: 306px;
+    width: 1920px;
+    height: 1080px;
+    object-fit: cover;
+  }
+  .about-emeraldnetwork {
+    position: absolute;
+    top: 1030px;
+    left: 439px;
+    background: linear-gradient(90deg, #fff 37%, #c4ffd1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .main-landing-page-inner {
+    position: absolute;
+    top: 1106px;
+    left: 439px;
+    border-radius: var(--br-10xs);
+    background-color: var(--color-lightseagreen);
+    width: 155px;
+    height: 10px;
+  }
+  .emeraldnetwork-is-a-container {
+    position: absolute;
+    top: 1155px;
+    left: 439px;
+    font-size: var(--font-size-xl);
+    display: inline-block;
+    width: 589px;
+  }
+  .about-iceemerald,
+  .iceemerald-is-someone-container {
+    position: absolute;
+    display: inline-block;
+    text-align: right;
+  }
+  .iceemerald-is-someone-container {
+    top: 2243px;
+    left: 890px;
+    font-size: var(--font-size-xl);
+    width: 590px;
+  }
+  .about-iceemerald {
+    top: 2123px;
+    left: 1010px;
+    background: linear-gradient(90deg, #8affa4, #fff 44%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    width: 469px;
+  }
+  .rectangle-div {
+    position: absolute;
+    top: 2194px;
+    left: 1325px;
+    border-radius: var(--br-10xs);
+    background-color: var(--color-lightseagreen);
+    width: 155px;
+    height: 10px;
+  }
+  .white-background {
+    position: absolute;
+    top: 2767px;
+    left: 0;
+    background-color: #efefef;
+    width: 1920px;
+    height: 1035px;
+  }
+  .why-title {
+    position: absolute;
+    top: 2980px;
+    left: 739px;
+    color: var(--color-gray-100);
+  }
+  .why-emeraldnetwork-1 {
+    position: absolute;
+    top: 2971px;
+    left: 414px;
+    width: 1194px;
+    height: 671px;
+    object-fit: cover;
+  }
+  .comparing-emeraldcore-with {
+    position: absolute;
+    top: 3530px;
+    left: 519px;
+    font-size: var(--font-size-mini);
+    color: #636363;
+  }
+  .main-landing-page-child1,
+  .main-landing-page-child2 {
+    position: absolute;
+    top: 4085px;
+    left: 883px;
+    border-radius: var(--br-10xs);
+    background-color: var(--color-lightseagreen);
+    width: 155px;
+    height: 10px;
+  }
+  .main-landing-page-child2 {
+    top: 3052px;
+  }
+  .why-title1,
+  .why-title2 {
+    position: absolute;
+    top: 4016px;
+    left: 738px;
+    color: var(--color-gray-100);
+  }
+  .why-title2 {
+    top: 4131px;
+    left: 606px;
+    font-size: var(--font-size-xl);
+    text-align: center;
+  }
+  .network-apps-1 {
+    position: absolute;
+    top: 4249px;
+    left: 350px;
+    width: 1230px;
+    height: 691px;
+    object-fit: cover;
+  }
+  .footer-base-child {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background-color: #f1f1f1;
+    width: 1920px;
+    height: 244px;
+  }
+  .footer-base-item {
+    position: absolute;
+    top: 182.4px;
+    left: 439px;
+    max-height: 100%;
+    width: 1039px;
+  }
+  .emeraldnetwork2 {
+    position: absolute;
+    top: 2px;
+    left: 51px;
+  }
+  .navbar-emeraldnetwork1 {
+    position: absolute;
+    top: 56px;
+    left: 440px;
+    width: 197px;
+    height: 27px;
+    font-size: var(--font-size-lg);
+  }
+  .back-to-top,
+  .emeraldnetwork-is-a-container1 {
+    position: absolute;
+    top: 97px;
+    left: 440px;
+  }
+  .back-to-top {
+    top: 189px;
+    left: 1776px;
+  }
+  .status-in-development {
+    position: absolute;
+    top: 200px;
+    left: 481px;
+  }
+  .emeraldnetwork-iceemerald-2024 {
+    position: absolute;
+    top: 199px;
+    left: 1226px;
+  }
+  .footer-base,
+  .footer-base-inner {
+    position: absolute;
+    top: 200px;
+    left: 445px;
+    width: 19px;
+    height: 19px;
+  }
+  .footer-base {
+    top: 0;
+    left: 0;
+    width: 1920px;
+    height: 244px;
+  }
+  .iceemerald23gmailcom {
+    position: absolute;
+    top: 7px;
+    left: 0;
+  }
+  .mail-icon-vector-0-1 {
+    position: absolute;
+    top: 0;
+    left: 197px;
+    width: 34px;
+    height: 34px;
+    object-fit: cover;
+  }
+  .gmail-button {
+    text-decoration: none;
+    position: absolute;
+    top: 52px;
+    left: 1249px;
+    width: 231px;
+    height: 34px;
+    color: inherit;
+  }
+  .youtube-logo-black-1-icon {
+    position: absolute;
+    top: 1px;
+    left: 96px;
+    width: 31px;
+    height: 17px;
+    object-fit: cover;
+  }
+  .youtube-button {
+    text-decoration: none;
+    position: absolute;
+    top: 92px;
+    left: 1351px;
+    width: 127px;
+    height: 20px;
+    color: inherit;
+  }
+  .iceemerald23 {
+    position: absolute;
+    top: 8px;
+    left: 0;
+  }
+  .instagram-logo-instagram-icon- {
+    position: absolute;
+    top: 0;
+    left: 111px;
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+  }
+  .instagram-button {
+    text-decoration: none;
+    position: absolute;
+    top: 118px;
+    left: 1334px;
+    width: 147px;
+    height: 36px;
+    color: inherit;
+  }
+  .footer {
+    position: absolute;
+    top: 5098px;
+    left: 0;
+    width: 1920px;
+    height: 244px;
+    font-size: var(--font-size-mini);
+    color: var(--color-black);
+  }
+  .main-landing-page {
+    width: 100%;
+    position: relative;
+    background-color: var(--color-white);
+    height: 5342px;
+    overflow: hidden;
+    text-align: left;
+    font-size: var(--font-size-21xl);
+    color: var(--color-white);
+    font-family: var(--font-dm-sans);
+  }
+  
