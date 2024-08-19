@@ -16,6 +16,18 @@
     />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.0/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.0/ScrollToPlugin.min.js"></script>
+    <script>
+    function scrollToSection(sectionId) {
+       var section = document.getElementById(sectionId);
+       if (section) {
+           var offsetTop = section.offsetTop + 100;
+           window.scrollTo({
+               top: offsetTop,
+               behavior: 'smooth' // Optional: Smooth scrolling behavior
+           });
+       }
+    }
+    </script>
 
   </head>
   <body>
