@@ -1,4 +1,27 @@
-  .main-landing-page-child {
+ /* Styles for screens smaller than 768px */
+@media (max-width: 767px) {
+  .main-landing-page {
+    /* Adjust styles for smaller screens */
+    font-size: var(--font-size-18xl);
+  }
+}
+
+/* Styles for screens between 768px and 1023px */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .main-landing-page {
+    /* Adjust styles for medium screens */
+    font-size: var(--font-size-21xl);
+  }
+}
+
+/* Styles for screens larger than 1023px */
+@media (min-width: 1024px) {
+  .main-landing-page {
+    /* Adjust styles for larger screens */
+    font-size: var(--font-size-24xl);
+  }
+}
+ .main-landing-page-child {
     position: absolute;
     top: 0;
     left: 0;
