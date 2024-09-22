@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Play Multiple Sounds</title>
+</head>
+<body>
+    <button id="playSound1">Suara Hutan</button>
+    <button id="playSound2">Play Sound 2</button>
+    <button id="playSound3">Play Sound 3</button>
+
+    <audio id="sound1" src="./music/forest.m4a"></audio>
+    <audio id="sound2" src="./music/sound2.m4a"></audio>
+    <audio id="sound3" src="./music/sound3.m4a"></audio>
+
+    <script>
+        document.getElementById('playSound1').addEventListener('click', function() {
+            document.getElementById('sound1').play();
+        });
+
+        document.getElementById('playSound2').addEventListener('click', function() {
+            document.getElementById('sound2').play();
+        });
+
+        document.getElementById('playSound3').addEventListener('click', function() {
+            document.getElementById('sound3').play();
+        });
+    </script>
+</body>
+</html>
