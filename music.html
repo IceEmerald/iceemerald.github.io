@@ -3,20 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Play YouTube Videos</title>
+    <title>Play and Stop Multiple Sounds</title>
 </head>
 <body>
-    <button onclick="playVideo('VVxrH8mUWyGc')">Suara Hutan</button>
-    <button onclick="playVideo('VIDEO_ID_2')">Play Video 2</button>
-    <button onclick="playVideo('VIDEO_ID_3')">Play Video 3</button>
+    <button id="playSound1">Suara Hutan</button>
+    <button id="stopSound1">Stop Suara Hutan</button>
+    <button id="playSound2">Lagu Santai</button>
+    <button id="stopSound2">Stop Lagu Santai</button>
 
-    <iframe id="youtubePlayer" width="560" height="315" src="" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    <audio id="sound1" src="./music/forest.mp3"></audio>
+    <audio id="sound2" src="./music/calmsong.m4a"></audio>
 
     <script>
-        function playVideo(videoId) {
-            var player = document.getElementById('youtubePlayer');
-            player.src = 'https://www.youtube.com/embed/' + videoId + '?autoplay=1';
-        }
+        document.getElementById('playSound1').addEventListener('click', function() {
+            document.getElementById('sound1').play();
+        });
+        document.getElementById('stopSound1').addEventListener('click', function() {
+            document.getElementById('sound1').pause();
+            document.getElementById('sound1').currentTime = 0;
+        });
+
+        document.getElementById('playSound2').addEventListener('click', function() {
+            document.getElementById('sound2').play();
+        });
+        document.getElementById('stopSound2').addEventListener('click', function() {
+            document.getElementById('sound2').pause();
+            document.getElementById('sound2').currentTime = 0;
+        });
     </script>
 </body>
 </html>
