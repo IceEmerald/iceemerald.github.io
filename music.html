@@ -10,9 +10,12 @@
     <button id="stopSound1">Stop Suara Hutan</button>
     <button id="playSound2">Lagu Santai</button>
     <button id="stopSound2">Stop Lagu Santai</button>
+    <button id="playSound3">Lagu Sedih</button>
+    <button id="stopSound3">Stop Lagu Sedih</button>
 
     <audio id="sound1" src="./music/forest.mp3"></audio>
     <audio id="sound2" src="./music/calmsong.m4a"></audio>
+    <audio id="sound3" src="./music/sad.m4a"></audio>
 
     <script>
         document.getElementById('playSound1').addEventListener('click', function() {
@@ -29,6 +32,14 @@
         document.getElementById('stopSound2').addEventListener('click', function() {
             document.getElementById('sound2').pause();
             document.getElementById('sound2').currentTime = 0;
+        });
+
+        document.getElementById('playSound3').addEventListener('click', function() {
+            document.getElementById('sound3').play();
+        });
+        document.getElementById('stopSound3').addEventListener('click', function() {
+            document.getElementById('sound3').pause();
+            document.getElementById('sound3').currentTime = 0;
         });
     </script>
 </body>
