@@ -3,44 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Play and Stop Multiple Sounds</title>
+    <title>EmeraldNetwork | Music Player ( TEMP )</title>
+    <link rel="icon" type="image/png" href="public/emeraldnetwork-icon.png">
 </head>
 <body>
-    <button id="playSound1">Suara Hutan</button>
-    <button id="stopSound1">Stop Suara Hutan</button>
-    <button id="playSound2">Lagu Santai</button>
-    <button id="stopSound2">Stop Lagu Santai</button>
-    <button id="playSound3">Lagu Sedih</button>
-    <button id="stopSound3">Stop Lagu Sedih</button>
+    <audio id="Lagu Santai" src="./music/calmsong.m4a" loop=""></audio>
+    <audio id="Suara Hutan" src="/music/forest.mp3" loop=""></audio>
+    <audio id="Lagu Sedih" src="./music/sad.m4a" loop=""></audio>
+    <audio id="Lagu Nostalgia" src="./music/chillmorning.mp3" loop=""></audio>
+    <div class="container">
+        <p>Acoustic</p>
+        <div class="circle paused">
+            <span class="circle__btn">
+                <i class="fa-solid fa-play" name="play"></i>
+                <i class="fa-solid fa-pause" name="pause"></i>
+            </span>
+            <span class="circle__back-1"></span>
+            <span class="circle__back-2"></span>
+        </div>
+    </div>
+    <div class="container">
+        <p>Funky</p>
+        <div class="circle paused">
+            <span class="circle__btn">
+                <i class="fa-solid fa-play" name="play"></i>
+                <i class="fa-solid fa-pause" name="pause"></i>
+            </span>
+            <span class="circle__back-1"></span>
+            <span class="circle__back-2"></span>
+        </div>
+    </div>
+    <div class="container">
+        <p>Blues</p>
+        <div class="circle paused">
+            <span class="circle__btn">
+                <i class="fa-solid fa-play" name="play"></i>
+                <i class="fa-solid fa-pause" name="pause"></i>
+            </span>
+            <span class="circle__back-1"></span>
+            <span class="circle__back-2"></span>
+        </div>
+    </div>
+    <div class="container">
+        <p>House</p>
+        <div class="circle paused">
+            <span class="circle__btn">
+                <i class="fa-solid fa-play" name="play"></i>
+                <i class="fa-solid fa-pause" name="pause"></i>
+            </span>
+            <span class="circle__back-1"></span>
+            <span class="circle__back-2"></span>
+        </div>
+    </div>
 
-    <audio id="sound1" src="./music/forest.mp3"></audio>
-    <audio id="sound2" src="./music/calmsong.m4a"></audio>
-    <audio id="sound3" src="./music/sad.m4a"></audio>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600&display=swap');
+
+:root {
+    font-size: 100%;
+    --primary: oklch(58.63% 0.227 281.34);
+    --white: oklch(100% 0 0);
+    --greyLight-1: oklch(93.77% 0.015 257.2);
+    --greyLight-2: oklch(85.86% 0.033 270.41);
+    --greyLight-3: oklch(83.4% 0.041 269.92);
+
+    --shadow: .3rem .3rem .6rem var(--greyLight-2),
+             -.2rem -.2rem .5rem var(--white);
+    --inner-shadow: inset .2rem .2rem .5rem var(--greyLight-2),
+                    inset -.2rem -.2rem .5rem var(--white);
+    --radial-gradient: radial-gradient(ellipse at center, var(--white) 0%, var(--greyLight-1) 100%);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--greyLight-1);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    margin: 0;
+}
+
+.container {
+    display: flex;
+    flex-direction:column;
+    align-items: center;
+    justify-content: center;
+    margin: 1rem;
+    padding: 1rem;
+}
+
+.container p {
+    transform: translateY(-2.7rem);
+    color: var(--greyLight-3);
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.circle {
+    width: 7rem;
+    height: 100%;
+    justify-self: center;
+    display: grid;
+    grid-template-rows: 1fr;
+    justify-items: center;
+    align-items: center;
+}
+
+.circle__btn {
+    grid-row: 1 / 2;
+    grid-column: 1 / 2;
+    width: 6rem;
+    height: 6rem;
+    display: flex;
+    margin: .6rem;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    font-size: 2.5rem;
+    text-align: center;
+    color: var(--primary);
+    z-index: 300;
+    background-color: var(--greyLight-1);
+    background: var(--greyLight-1);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    position: relative;
+}
+
+.circle__btn.shadow {
+    box-shadow: var(--inner-shadow);
+}
+
+.circle__btn .fa-play {
+    position: absolute;
+    transform: translateX(4px);
+    opacity: 0;
+    transition: all 200ms linear;
+}
+
+.circle__btn .fa-play.visibility {
+    opacity: 1;
+}
+
+.circle__btn .fa-pause {
+    position: absolute;
+    transition: all 200ms linear;
+}
+
+.circle__btn .fa-pause.visibility {
+    opacity: 0;
+}
+
+.circle.paused .circle__back-1,
+.circle.paused .circle__back-2 {
+    animation-play-state: paused;
+    filter: opacity(0%);
+    transition: filter 2000ms ease;
+}
+
+.circle.paused .circle__btn .fa-play {
+    opacity: 1;
+}
+
+.circle.paused .circle__btn .fa-pause {
+    opacity: 0;
+}
+
+.circle__back-1,
+.circle__back-2 {
+    grid-row: 1 / 2;
+    grid-column: 1 / 2;
+    width: 6rem;
+    height: 6rem;
+    border-radius: 50%;
+    filter: blur(1px);
+    z-index: 100;
+}
+
+.circle__back-1 {
+    box-shadow: .4rem .4rem .8rem var(--greyLight-2),
+        -.4rem -.4rem .8rem var(--white);
+    background: linear-gradient(to bottom right, var(--greyLight-2) 0%, var(--white) 100%);
+    animation: 2s linear infinite waves;
+}
+
+.circle__back-2 {
+    box-shadow: .4rem .4rem .8rem var(--greyLight-2),
+        -.4rem -.4rem .8rem var(--white);
+    animation: 2s linear 1s infinite waves;
+}
+
+@keyframes waves {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+@media screen and (max-width: 440px) {
+    body {
+        flex-wrap: wrap;
+    }
+    .container {
+        margin: 1rem;
+        padding: 1rem;
+    }
+    
+    .container p {
+        transform: translateY(-2rem);
+        font-size: .9rem;
+    }
+
+    .circle {
+        width: 6rem;
+    }
+        
+    .circle__btn {
+        width: 5rem;
+        height: 5rem;
+        font-size: 2rem;
+    }
+
+    .circle__btn .fa-play {
+        transform: translateX(2px);
+    }
+
+    .circle__back-1,
+    .circle__back-2 {
+    width: 5rem;
+    height: 5rem;
+    }
+}   
+
+@media screen and (min-width: 441px) and (max-width: 740px) {
+
+    body {
+        flex-wrap: wrap;
+    }
+    .container {
+        margin: 1rem;
+        padding: 1rem;
+    }
+    
+    .container p {
+        transform: translateY(-2rem);
+        font-size: .9rem;
+    }
+
+    .circle {
+        width: 6rem;
+    }
+        
+    .circle__btn {
+        width: 5rem;
+        height: 5rem;
+        font-size: 2rem;
+    }
+
+    .circle__btn .fa-play {
+        transform: translateX(2px);
+    }
+
+    .circle__back-1,
+    .circle__back-2 {
+    width: 5rem;
+    height: 5rem;
+    }
+}
+    </style>
 
     <script>
-        document.getElementById('playSound1').addEventListener('click', function() {
-            document.getElementById('sound1').play();
-        });
-        document.getElementById('stopSound1').addEventListener('click', function() {
-            document.getElementById('sound1').pause();
-            document.getElementById('sound1').currentTime = 0;
-        });
+        const sounds = ['acoustic', 'funky', 'blues', 'house']
+const playBtns = document.querySelectorAll('.circle__btn')
+const circles = document.querySelectorAll('.circle')
+let lastClickedIndex = -1
 
-        document.getElementById('playSound2').addEventListener('click', function() {
-            document.getElementById('sound2').play();
-        });
-        document.getElementById('stopSound2').addEventListener('click', function() {
-            document.getElementById('sound2').pause();
-            document.getElementById('sound2').currentTime = 0;
-        });
+playBtns.forEach(function (playBtn, index) {
+    playBtn.addEventListener('click', function (e) {
+        e.preventDefault()
+        stopSongs()
+        if (lastClickedIndex === index) {
+            playBtn.classList.remove('shadow')
+            circles[index].classList.add('paused')
+            lastClickedIndex = -1
+        } else {
+            playBtns.forEach(btn => btn.classList.remove('shadow'))
+            circles.forEach(circle => circle.classList.add('paused'))
 
-        document.getElementById('playSound3').addEventListener('click', function() {
-            document.getElementById('sound3').play();
-        });
-        document.getElementById('stopSound3').addEventListener('click', function() {
-            document.getElementById('sound3').pause();
-            document.getElementById('sound3').currentTime = 0;
-        });
+            playBtn.classList.toggle('shadow')
+            circles[index].classList.toggle('paused')
+
+            lastClickedIndex = index
+
+            const sound = sounds[index]
+            stopSongs()
+            document.getElementById(sound).play()
+        }
+    })
+})
+
+function stopSongs() {
+    sounds.forEach(sound => {
+        const song = document.getElementById(sound)
+        song.pause()
+        song.currentTime = 0
+    })
+}
     </script>
 </body>
 </html>
