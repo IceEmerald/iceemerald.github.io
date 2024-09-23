@@ -12,7 +12,7 @@
     <audio id="Lagu Sedih" src="./music/sad.m4a" loop=""></audio>
     <audio id="Lagu Nostalgia" src="./music/chillmorning.mp3" loop=""></audio>
     <div class="container">
-        <p>Acoustic</p>
+        <p>Santai</p>
         <div class="circle paused">
             <span class="circle__btn">
                 <i class="fa-solid fa-play" name="play"></i>
@@ -23,7 +23,7 @@
         </div>
     </div>
     <div class="container">
-        <p>Funky</p>
+        <p>Hutan</p>
         <div class="circle paused">
             <span class="circle__btn">
                 <i class="fa-solid fa-play" name="play"></i>
@@ -34,7 +34,7 @@
         </div>
     </div>
     <div class="container">
-        <p>Blues</p>
+        <p>Sedih</p>
         <div class="circle paused">
             <span class="circle__btn">
                 <i class="fa-solid fa-play" name="play"></i>
@@ -45,7 +45,7 @@
         </div>
     </div>
     <div class="container">
-        <p>House</p>
+        <p>Nostalgia</p>
         <div class="circle paused">
             <span class="circle__btn">
                 <i class="fa-solid fa-play" name="play"></i>
@@ -291,42 +291,41 @@ body {
     </style>
 
     <script>
-        const sounds = ['acoustic', 'funky', 'blues', 'house']
-const playBtns = document.querySelectorAll('.circle__btn')
-const circles = document.querySelectorAll('.circle')
-let lastClickedIndex = -1
+        const sounds = ['Lagu Santai', 'Suara Hutan', 'Lagu Sedih', 'Lagu Nostalgia'];
+const playBtns = document.querySelectorAll('.circle__btn');
+const circles = document.querySelectorAll('.circle');
+let lastClickedIndex = -1;
 
 playBtns.forEach(function (playBtn, index) {
     playBtn.addEventListener('click', function (e) {
-        e.preventDefault()
-        stopSongs()
+        e.preventDefault();
         if (lastClickedIndex === index) {
-            playBtn.classList.remove('shadow')
-            circles[index].classList.add('paused')
-            lastClickedIndex = -1
+            playBtn.classList.remove('shadow');
+            circles[index].classList.add('paused');
+            document.getElementById(sounds[index]).pause(); // Stop sound
+            lastClickedIndex = -1;
         } else {
-            playBtns.forEach(btn => btn.classList.remove('shadow'))
-            circles.forEach(circle => circle.classList.add('paused'))
+            stopSongs();
+            playBtns.forEach(btn => btn.classList.remove('shadow'));
+            circles.forEach(circle => circle.classList.add('paused'));
 
-            playBtn.classList.toggle('shadow')
-            circles[index].classList.toggle('paused')
+            playBtn.classList.add('shadow');
+            circles[index].classList.remove('paused');
 
-            lastClickedIndex = index
-
-            const sound = sounds[index]
-            stopSongs()
-            document.getElementById(sound).play()
+            document.getElementById(sounds[index]).play(); // Play sound
+            lastClickedIndex = index;
         }
-    })
-})
+    });
+});
 
 function stopSongs() {
     sounds.forEach(sound => {
-        const song = document.getElementById(sound)
-        song.pause()
-        song.currentTime = 0
-    })
+        const song = document.getElementById(sound);
+        song.pause();
+        song.currentTime = 0;
+    });
 }
+
     </script>
 </body>
 </html>
