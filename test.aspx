@@ -1,0 +1,241 @@
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmeraldNetwork</title>
+  <meta name="description" content="Welcome to the EmeraldNetwork website, home to applications or files created by IceEmerald and developed with love.">
+  <!-- Add GeistSans font from CDN -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <!-- Favicon (replace with your actual favicon.ico in the root or images folder) -->
+  <link rel="icon" type="image/x-icon" href="/assets/favicon.png">
+<style>@font-face {
+            font-family: 'Open Sans Regular';
+            font-style: normal;
+            font-weight: 400;
+            src: url('chrome-extension://gkkdmjjodidppndkbkhhknakbeflbomf/fonts/open_sans/open-sans-v18-latin-regular.woff');
+        }</style><style>@font-face {
+            font-family: 'Open Sans Bold';
+            font-style: normal;
+            font-weight: 800;
+            src: url('chrome-extension://gkkdmjjodidppndkbkhhknakbeflbomf/fonts/open_sans/OpenSans-Bold.woff');
+        }</style><style>@font-face {
+            font-family: 'Open Sans ExtraBold';
+            font-style: normal;
+            font-weight: 800;
+            src: url('chrome-extension://gkkdmjjodidppndkbkhhknakbeflbomf/fonts/open_sans/open-sans-v18-latin-800.woff');
+        }</style></head>
+<body>
+      <header class="navbar sticky-top">
+          <div class="container nav-container">
+              <a href="index.html" class="logo">
+                  <!-- Briefcase SVG Icon -->
+                  <img href="index.html" src="assets/favicon.png" width="30" height="30" viewbox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16">
+                  <span href="index.html" class="logo-text">EmeraldNetwork</span>
+              </path></rect></a>
+              <nav class="nav-links">
+                  <a href="index.html#about">About</a>
+                  <a href="index.html#apps">Apps</a>
+
+              </nav>
+          </div>
+      </header>
+
+                      <style>
+                          html, body {
+                              height: 100%;
+                              margin: 0;
+                              overflow: hidden;  /* This disables the scrolling */
+                            }
+
+                          .iframe-container {
+                            height: calc(100vh - 60px); /* Full height minus navbar */
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                          }
+
+                          .iframe-container iframe {
+                              width: 100%;
+                              height: 100%;
+                              border: none;
+                            }
+
+                      </style>
+                      <div class="iframe-container" style="display: flex; justify-content: center; align-items: center;">
+                          <iframe style="border: none;" src="https://docs.google.com/document/d/18p06vFuEtu14fY4QK5RiH8B9imLXfuLDNxA7EK8yjLs/edit?usp=sharing"></iframe>
+                      </div>
+
+  <script>
+
+      document.addEventListener('DOMContentLoaded', () => {
+          // Intersection Observer for Section Animations
+          const animatedSections = document.querySelectorAll('.animate-on-scroll:not(.no-animation)');
+          if ('IntersectionObserver' in window) {
+              const observer = new IntersectionObserver((entries, observerInstance) => {
+                  entries.forEach(entry => {
+                      if (entry.isIntersecting) {
+                          entry.target.classList.add('visible');
+                      } else {
+                          // If the element is NOT intersecting (scrolled out of view)
+                          // Remove the 'visible' class so the animation can replay when it comes back
+                          entry.target.classList.remove('visible');
+                      }
+                  });
+              }, { threshold: 0.25 });
+
+              animatedSections.forEach(section => {
+                  observer.observe(section);
+              });
+          } else {
+              // Fallback for browsers that don't support IntersectionObserver
+              animatedSections.forEach(section => {
+                  section.classList.add('visible');
+              });
+          }
+
+          // Smooth scrolling for anchor links
+          document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+              anchor.addEventListener('click', function (e) {
+                  const hrefValue = this.getAttribute('href');
+                  // Ensure hrefValue is not null, is longer than just "#", and actually starts with "#"
+                  if (hrefValue && hrefValue.length > 1 && hrefValue.startsWith('#')) {
+                      try {
+                          const targetElement = document.querySelector(hrefValue);
+                          if (targetElement) {
+                              e.preventDefault(); // Prevent default jump only if we are handling the scroll
+                              targetElement.scrollIntoView({
+                                  behavior: 'smooth'
+                              });
+                              history.pushState(null, null, hrefValue); // <-- Add this line
+                          }
+                          // If targetElement is null (ID not found), default browser behavior will occur.
+                      } catch (error) {
+                          // Log error if querySelector fails for some malformed href (e.g., "#invalid-char!")
+                          console.error("Failed to process smooth scroll for selector:", hrefValue, error);
+                      }
+                  }
+                  // For href="#" (like logo links), or if hrefValue is not a valid ID selector,
+                  // let default browser behavior occur (e.g., scroll to top or navigate).
+              });
+          });
+
+          // Set current year in footer
+          const currentYearSpan = document.getElementById('current-year');
+          if (currentYearSpan) {
+              currentYearSpan.textContent = new Date().getFullYear().toString();
+          }
+      });
+
+
+  </script>
+
+                           <script>
+                               // --- Configuration ---
+                               const SENSITIVITY = 0.125; // How much the wheel influences velocity. Higher = more responsive.
+                               const FRICTION = 0.95;  // How quickly the scroll slows down. Closer to 1 = more "slippery". (0.8 - 0.98 are good values)
+                               const MIN_VELOCITY = 0.1; // Below this speed, scrolling stops.
+
+                               // --- State Variables ---
+                               let currentScrollY = window.pageYOffset; // Our virtual scroll position
+                               let velocityY = 0; // Current scroll speed
+                               let isWheeling = false; // Flag to track if a wheel event is active
+                               let animationFrameId = null; // To store the requestAnimationFrame ID
+
+                               // --- Main Scroll Logic ---
+                               function smoothScroll() {
+                                   // Apply velocity to our virtual scroll position
+                                   currentScrollY += velocityY;
+
+                                   // Apply friction to slow down
+                                   velocityY *= FRICTION;
+
+                                   // Clamp scroll position to document bounds
+                                   // Recalculate maxScroll each time in case document height changes (e.g., main/apps toggle)
+                                   const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+                                   currentScrollY = Math.max(0, Math.min(currentScrollY, maxScroll));
+
+                                   // Perform the actual scroll
+                                   window.scrollTo(0, currentScrollY);
+
+                                   // If velocity is significant, continue animation
+                                   if (Math.abs(velocityY) > MIN_VELOCITY) {
+                                       animationFrameId = requestAnimationFrame(smoothScroll);
+                                   } else {
+                                       velocityY = 0; // Ensure velocity is zero when stopped
+                                       isWheeling = false; // Reset wheeling flag
+                                       animationFrameId = null; // Clear animation frame ID
+                                   }
+                               }
+
+                               // --- Event Listener for Mouse Wheel ---
+                               window.addEventListener('wheel', function(event) {
+                                   // Do not apply slippery scroll if the event target is inside an element that should scroll normally
+                                   // Example: if you have a <textarea> or a div with its own overflow: scroll.
+                                   // For now, we assume global slippery scroll. Add specific checks here if needed.
+                                   // e.g., if (event.target.closest('.normal-scroll-container')) return;
+
+                                   event.preventDefault(); // Prevent default browser scrolling
+
+                                   // If not already animating, sync currentScrollY with actual scroll position
+                                   if (!isWheeling || animationFrameId === null) { // Added check for animationFrameId
+                                        currentScrollY = window.pageYOffset;
+                                   }
+
+                                   isWheeling = true;
+
+                                   // Add to existing velocity for a "flick" effect
+                                   velocityY += event.deltaY * SENSITIVITY;
+
+                                   // Ensure velocity doesn't get excessively large
+                                   velocityY = Math.max(-150, Math.min(velocityY, 150)); // Clamp velocity
+
+                                   // Start the animation if it's not already running
+                                   if (!animationFrameId) {
+                                       animationFrameId = requestAnimationFrame(smoothScroll);
+                                   }
+                               }, { passive: false }); // passive: false is needed for preventDefault()
+
+                               // Initialize currentScrollY on load
+                               window.addEventListener('load', () => {
+                                   currentScrollY = window.pageYOffset;
+                               });
+
+                               // If the window is resized, or content visibility changes impacting scroll height
+                               window.addEventListener('resize', () => {
+                                   // Re-sync scroll position and stop any ongoing animation
+                                   currentScrollY = window.pageYOffset; 
+                                   if (animationFrameId) {
+                                       cancelAnimationFrame(animationFrameId);
+                                       animationFrameId = null;
+                                   }
+                                   velocityY = 0;
+                                   isWheeling = false; 
+                                   // No need to restart animation here, it will restart on the next wheel event
+                               });
+
+                               // It might be beneficial to also re-initialize/stop scroll on your custom 'apps' toggle
+                               // to ensure scroll state is clean. For example, by dispatching a resize event or calling
+                               // the resize handler's logic.
+                               // Example: If you have a function that toggles views:
+                               // function toggleView() { ...; window.dispatchEvent(new Event('resize')); }
+                               // Or more directly:
+                               // function onToggleView() {
+                               //     currentScrollY = window.pageYOffset;
+                               //     if (animationFrameId) {
+                               //         cancelAnimationFrame(animationFrameId);
+                               //         animationFrameId = null;
+                               //     }
+                               //     velocityY = 0;
+                               //     isWheeling = false;
+                               // }
+                               // And call onToggleView() when you switch between 'main' and 'apps'.
+                               // For now, the existing resize listener should handle most abrupt changes if the viewport/scrollHeight changes.
+
+                           </script>
+
+
+
+
+</body></html>
