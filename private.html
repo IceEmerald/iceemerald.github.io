@@ -147,12 +147,10 @@
                             const passwordInput = document.getElementById('code-input');
 
                             if (password === 'Ice@autodispenser') {
-                              window.location.href = '/autodispenser.html';
+                            const currentCode = sessionStorage.getItem('emerald_access_code');
+                            window.location.href = `/autodispenser?code=${currentCode}`;
                             } else if (password === 'Ice@businessday') {
-                              window.location.href = '/businessday.html';
-                            } else if (password === 'EmeraldNetwork.test') {
-                              const currentCode = sessionStorage.getItem('emerald_access_code');
-                              window.location.href = `/test.aspx?code=${currentCode}`;
+                              window.location.href = '/businessday';
                             } else {
                               passwordInput.classList.add('error-input', 'shake');
                               setTimeout(() => {
