@@ -164,12 +164,33 @@
                         flex-wrap: wrap;
                       "
                     >
-                    <img class="animate-on-scroll hover-zoom hover-img" src="assets/why/why1.png">
-                    <img class="animate-on-scroll hover-zoom hover-img" src="assets/why/why2.png">
-                    <img class="animate-on-scroll hover-zoom hover-img" src="assets/why/why3.png">
+                        <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
+                          <img 
+                            src="assets/why/why1.png" 
+                            class="hover-zoom hover-img" 
+                            style="width: 100%;"
+                            alt="">
+                        </div>
+
+                        <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
+                          <img 
+                            src="assets/why/why2.png" 
+                            class="hover-zoom hover-img" 
+                            style="width: 100%;"
+                            alt="">
+                        </div>
+
+                        <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
+                          <img 
+                            src="assets/why/why3.png" 
+                            class="hover-zoom hover-img" 
+                            style="width: 100%;"
+                            alt="">
+                        </div>
+
                     </div>
                     <div style="margin-bottom: 2rem;"></div>
-                    <h5 class="animate-on-scroll" style="text-align: center;">* Comparing EmeraldCore with others and the results prove that EmeraldCore has faster and more efficient performance.</h5>
+                    <h4 class="animate-on-scroll" style="text-align: center;">* Comparing EmeraldCore with others and the results prove that EmeraldCore has faster and more efficient performance.</h4>
                 </div>
                 <div style="margin-bottom: 4rem;"></div>
             </section>
@@ -188,21 +209,54 @@
                         <div style="margin-bottom: 5rem;"></div>
                     </div>
                     <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
-                        <div class="animate-on-scroll">
-                        <img class="hover-zoom hover-img" src="assets/trust/trust1.png" style="max-width: 350px;">
-                        </div>
-                        <div class="animate-on-scroll">
-                        <img class="hover-zoom hover-img" src="assets/trust/trust2.png" style="max-width: 350px;">
-                        </div>
-                        <div class="animate-on-scroll">
-                        <img class="hover-zoom hover-img" src="assets/trust/trust3.png" style="max-width: 350px;">
-                        </div>
-                        <div class="animate-on-scroll">
-                        <img class="hover-zoom hover-img" src="assets/trust/trust4.png" style="max-width: 350px;">
-                        </div>
-                        <div class="animate-on-scroll">
-                        <img class="hover-zoom hover-img" src="assets/trust/trust5.png" style="max-width: 350px;">
-                        </div>
+                            <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <img 
+                                    src="assets/trust/trust1.png" 
+                                    class="hover-zoom hover-img" 
+                                    style="width: 100%;"
+                                    alt="">
+                                </div>
+
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <img 
+                                    src="assets/trust/trust2.png" 
+                                    class="hover-zoom hover-img" 
+                                    style="width: 100%;"
+                                    alt="">
+                                </div>
+
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <img 
+                                    src="assets/trust/trust3.png" 
+                                    class="hover-zoom hover-img" 
+                                    style="width: 100%;"
+                                    alt="">
+                                </div>
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                 <img 
+                                    src="assets/trust/trust4.png" 
+                                    class="hover-zoom hover-img" 
+                                    style="width: 100%;"
+                                    alt="">
+                                </div>
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                <img 
+                                    src="assets/trust/trust5.png" 
+                                    class="hover-zoom hover-img" 
+                                    style="width: 100%;"
+                                    alt="">
+                                </div>
+                    </div>
+                    <div style="align-items: center; justify-content: center; display: flex">
+                    <div class="animate-on-scroll hero-buttons" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
+                        <a href="private.html" class="button button-outline">
+                            Private Access
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                                <polyline points="12 5 19 12 12 19"/>
+                            </svg>
+                        </a>
+                    </div>
                     </div>
                     <div class="animate-on-scroll">
                         <div style="margin-bottom: 3rem;"></div>
@@ -214,7 +268,8 @@
         </main>
 
                         <div class="aboutice">
-                            <div style="margin-bottom: 10rem"></div>
+                            <div class="show-desktop-only" style="margin-bottom: 10rem"></div>
+                            <div class="show-phone-only" style="margin-bottom: 5rem"></div>
                             <section style="position: relative;" class="animate-on-scroll">
                               <!-- ICEBACK (bottom) -->
                               <div
@@ -510,56 +565,40 @@
     </script>
 
                              <script>
-                             document.addEventListener('DOMContentLoaded', () => {
-                               const appsLinks = document.querySelectorAll('.aboutice-link');
-                               const mainEl = document.querySelector('main');
-                               const appsEl = document.querySelector('.aboutice');
-                               const allNavLinks = document.querySelectorAll('a[href^="#"]');
+                                 document.addEventListener('DOMContentLoaded', () => {
+                                    const appsLinks = document.querySelectorAll('.aboutice-link');
+                                    const mainEl = document.querySelector('main');
+                                    const appsEl = document.querySelector('.aboutice');
+                                    const allNavLinks = document.querySelectorAll('a[href^="#"]');
 
-                                 const fadeOut = (el, done) => {
-                                   el.style.transition = 'opacity 0.5s ease';
-                                   el.style.opacity = '0';
-                                   el.addEventListener('transitionend', function handler() {
-                                     el.removeEventListener('transitionend', handler);
-                                     done();
-                                   });
-                                 };
+                                      const fadeOut = (el, done) => {
+                                        el.style.transition = 'opacity 0.5s ease';
+                                        el.style.opacity = '0';
+                                        el.addEventListener('transitionend', function handler() {
+                                          el.removeEventListener('transitionend', handler);
+                                          done();
+                                        });
+                                      };
 
-                                 const fadeIn = (el, done) => {
-                                   el.style.display = 'block';
-                                   el.offsetHeight; // Force reflow to apply transition
-                                   el.style.transition = 'opacity 0.5s ease';
-                                   el.style.opacity = '1';
+                                      const fadeIn = (el, done) => {
+                                        el.style.display = 'block';
+                                        el.offsetHeight; // Force reflow to apply transition
+                                        el.style.transition = 'opacity 0.5s ease';
+                                        el.style.opacity = '1';
 
-                                   if (done) {
-                                     el.addEventListener('transitionend', function handler() {
-                                       el.removeEventListener('transitionend', handler);
-                                       done();
-                                     });
-                                   }
-                                 };
+                                        // Add the scroll functionality inside the fade-in callback
+                                        if (done) {
+                                          el.addEventListener('transitionend', function handler() {
+                                            el.removeEventListener('transitionend', handler);
+                                            done();
 
-
-                                 allNavLinks.forEach(link => {
-                                   link.addEventListener('click', (e) => {
-                                     e.preventDefault(); // Prevent default anchor behavior
-
-                                     let repeatScroll = true;
-
-                                     // Force scrolling to top
-                                     const interval = setInterval(() => {
-                                       if (repeatScroll) {
-                                         window.scrollTo(0, 0); // Immediate scroll to top, no animation
-                                       }
-                                     }, 10); // Every 10ms for stronger enforcement
-
-                                     // Stop after 1.5 seconds
-                                     setTimeout(() => {
-                                       repeatScroll = false;
-                                       clearInterval(interval);
-                                     }, 1500);
-                                   });
-                                 });
+                                            // Scroll to the top of the element after the fade-in finishes
+                                            window.scrollTo({
+                                              top: el.getBoundingClientRect().top + window.scrollY - 500, // Adjust the offset to compensate for the fixed navbar (if any)
+                                            });
+                                          });
+                                        }
+                                      };
 
 
 

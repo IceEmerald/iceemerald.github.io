@@ -159,7 +159,7 @@ body {
 }
 
 /* Headings & Paragraphs (from globals.css) */
-h1, h2, h3, h4, h5, h5 {
+h1, h2, h3, h4, h5, h6 {
     font-weight: 600; /* font-semibold */
     letter-spacing: -0.025em; /* tracking-tight */
     color: var(--foreground);
@@ -173,6 +173,10 @@ h2 {
 }
 h3 {
     font-size: 1.5rem; /* text-2xl */
+}
+h4 {
+    font-weight: 500;
+    color: var(--muted-foreground);
 }
 p {
     line-height: 1.75; /* leading-relaxed */
