@@ -29,6 +29,9 @@ document.getElementById('redirect-form').addEventListener('submit', function(e) 
   } else if (password === 'Ice@us') {
       const currentCode = sessionStorage.getItem('emerald_access_code');
       window.location.href = `/asaj.html?code=${currentCode}`;
+  } else if (password === 'Ice@businessday') {
+      const currentCode = sessionStorage.getItem('emerald_access_code');
+      window.location.href = `/businessday.html?code=${currentCode}`;
   } else {
     passwordInput.classList.add('error-input', 'shake');
     setTimeout(() => {
