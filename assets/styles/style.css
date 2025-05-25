@@ -1,5 +1,114 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
 
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+
+@media (max-width: 1000px) {
+  /* Hide dropdown menu on mobile */
+  .dropdown-content {
+    display: none !important;
+  }
+
+    .dropdownsvg {
+        display: none !important;
+      }
+
+  /* Keep the Apps link (dropdown-button) fully visible and clickable */
+  .dropdown-button {
+    pointer-events: auto;  /* enable click */
+  }
+
+  /* Disable hover styles on dropdown-button to avoid confusion */
+  .dropdown-button:hover {
+    background: transparent;
+  }
+
+  /* Also prevent the dropdown from showing on hover */
+  .dropdown:hover .dropdown-content {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(-10px) !important;
+  }
+}
+
+
+
+  .dropdown-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 8px 12px;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: background 0.3s ease;
+  }
+
+  .dropdown-button svg {
+    width: 25px;
+    height: 25px;
+    fill: var(--foreground);
+    transition: transform 0.3s ease;
+  }
+
+  .dropdown:hover .dropdown-button svg {
+    transform: rotate(180deg);
+  }
+
+  .dropdown-content {
+    position: absolute;
+    top: 100%;
+    left: -5rem;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    overflow: hidden;
+    min-width: 300px;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+  }
+
+.dropdown .dropdown-content {
+  /* keep all your styles */
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.dropdown.show .dropdown-content {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.dropdown .dropdown-button svg {
+  transition: transform 0.3s ease;
+  fill: var(--foreground);
+}
+
+.dropdown.show .dropdown-button svg {
+  transform: rotate(180deg);
+}
+
+
+  .dropdown-content a {
+    display: block;
+    padding: 12px 16px;
+    color: white;
+    text-decoration: none;
+    transition: background 0.2s ease;
+  }
+
+  .dropdown-content a:hover {
+    background: rgb(217, 217, 217, 0.2);
+  }
 
 /* Basic Reset & Body Styles */
 * {
@@ -8,6 +117,28 @@
     box-sizing: border-box;
     border-color: var(--border); /* From Tailwind base */
 }
+
+html, body {
+  cursor: url('/assets/images/maincursor.png'), auto;
+}
+
+button, a, [role="button"], .clickable {
+  cursor: url('/assets/images/clickcursor.png') 0 0, pointer !important;
+}
+
+/* Fullscreen overlay */
+  #overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.85); /* semi-transparent black */
+    z-index: 9999;
+    display: none; /* hidden initially */
+    transition: opacity 0.3s ease;
+  }
+
 
 .gradient-text {
       font-size: 3rem; /* Adjust the font size as needed */
@@ -57,7 +188,7 @@ body {
 }
 
 .hover-img {
-    cursor: url('/assets/cursor.png'), pointer; /* Custom cursor */
+    cursor: url('/assets/images/cursor.png'), pointer; /* Custom cursor */
 }
 
 .hover-img:hover {
@@ -111,14 +242,14 @@ body {
     --secondary-foreground: #383838; /* Dark Blue */
     --muted: hsl(214, 30%, 90%);
     --muted-foreground: #383838; /* Muted Dark Blue/Gray */
-    --accent: #2BD059; /* Dark Green */
+    --accent: #239a4d; /* Dark Green */
     --accent-foreground: hsl(0, 0%, 100%); /* White */
     --destructive: hsl(0, 84.2%, 60.2%);
     --destructive-foreground: hsl(0, 0%, 98%);
     --border: hsl(214, 25%, 85%); /* Border gray */
     --input: hsl(214, 25%, 85%);
     --ring: #2BD059; /* Dark Green for focus ring */
-    --radius: 0.5rem;
+    --radius: 5rem;
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -393,90 +524,46 @@ p.animate-on-scroll {
   }
 }
 
-
 .slider {
-  background: white;
-  height: 100px;
+  height: 6vh; /* height relative to viewport height */
   margin: auto;
   overflow: hidden;
   position: relative;
-  width: 100%;
+  width: 90vw; /* almost full viewport width */
   max-width: 1000px;
-}
-
-/* Show 4 slides (4 x 250px = 1000px) */
-@media (min-width: 1000px) {
-  .slider {
-    width: 1000px;
-  }
-}
-
-/* Show 3 slides (3 x 250px = 750px) */
-@media (max-width: 999px) and (min-width: 751px) {
-  .slider {
-    width: 750px;
-  }
-}
-
-/* Show 2 slides (2 x 250px = 500px) */
-@media (max-width: 750px) and (min-width: 501px) {
-  .slider {
-    width: 500px;
-  }
-
-    .slide {
-        width: 10%
-    }
-}
-
-/* Show 1 slide (1 x 250px = 250px) */
-@media (max-width: 500px) {
-  .slider {
-    width: 250px;
-  }
+  mask-image: linear-gradient(to right, transparent, black 20%, black 80%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 20%, black 80%, transparent);
 }
 
 .slider::before,
 .slider::after {
-  background: linear-gradient(to right, white 0%, rgba(255, 255, 255, 0) 100%);
   content: "";
-  height: 100px;
   position: absolute;
-  width: 10%;
+  top: 0;
+  width: 10vw; /* relative width for gradient edges */
+  max-width: 100px;
+  height: 100%;
   z-index: 2;
   pointer-events: none;
 }
 
-.slider::after {
-  right: 0;
-  top: 0;
-  transform: rotateZ(180deg);
-}
-
 .slider::before {
   left: 0;
-  top: 0;
+  mask-image: linear-gradient(to right, black 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 0%, transparent 100%);
+}
+
+.slider::after {
+  right: 0;
+  mask-image: linear-gradient(to left, black 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to left, black 0%, transparent 100%);
 }
 
 .slide-track {
   display: flex;
   width: max-content;
-  animation: scroll 40s linear infinite;
-}
-
-.slide {
-  height: 50px;
-  width: 25%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.25rem;
-  font-weight: bold;
-  color: #566571;
-  background: white;
-  margin: 0 5px;
-  border-radius: 10px;
-  flex-shrink: 0;
+  gap: 0; /* no gap to keep slides tight */
+  animation: scroll 60s linear infinite;
 }
 
 @keyframes scroll {
@@ -485,6 +572,37 @@ p.animate-on-scroll {
   }
   100% {
     transform: translateX(-50%);
+  }
+}
+
+.slide {
+  width: 18vw; /* slide width relative to viewport width */
+  max-width: 180px; /* max width to avoid oversized slides */
+  height: 2vh; /* slide height relative to viewport */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #566571;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* Media queries for smaller screens */
+@media (max-width: 600px) {
+  .slider {
+    height: 15vh; /* slightly taller on small devices */
+    width: 95vw;
+  }
+  .slider::before,
+  .slider::after {
+    width: 15vw;
+  }
+  .slide {
+    width: 30vw; /* wider slides on small screen */
+    height: 8vh;
+    font-size: 1rem;
   }
 }
 
@@ -561,26 +679,27 @@ p.animate-on-scroll {
     }
 }
 
-/* Button Styles */
 .button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem; /* gap-2 */
-    padding: 0.75rem 1.5rem; /* size lg: h-11 px-8 (approx) */
-    border-radius: var(--radius); /* rounded-md */
-    font-size: 0.875rem; /* text-sm */
-    font-weight: 500; /* font-medium */
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 500;
     text-decoration: none;
     cursor: pointer;
     transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-    background-color: var(--primary);
-    color: var(--primary-foreground);
+    background-color: var(--accent); /* Green */
+    color: var(--accent-foreground); /* White */
     border: 1px solid transparent;
 }
 
 .button:hover {
-    background-color: hsl(var(--primary-hsl-values), 0.9); /* hover:bg-primary/90 */
+    background-color: #197138; /* A darker green */
+}
+
 }
 .button svg {
     width: 1.25rem; height: 1.25rem; /* h-5 w-5 */
@@ -656,7 +775,7 @@ p.animate-on-scroll {
     height: 3rem;
     border: 1px solid var(--input);
     background-color: transparent;
-    border-radius: var(--radius);
+    border-radius: 0.5rem;
     color: var(--muted-foreground);
     transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
@@ -706,13 +825,13 @@ p.animate-on-scroll {
     height: 2.5rem;
     background: none;
     border: none;
-    border-radius: var(--radius);
+    border-radius: 0.5rem;
     color: var(--muted-foreground);
     text-decoration: none;
     transition: color 0.2s, background-color 0.2s;
 }
 .social-icon-button-footer:hover {
-    color: var(--primary);
+    color: #e8e8e8;
     background-color: var(--accent);
 }
 .social-icon-button-footer svg {
