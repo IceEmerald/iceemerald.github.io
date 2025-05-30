@@ -12,14 +12,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/styles/style.css" />
     <!-- Favicon (replace with your actual favicon.ico in the root or images folder) -->
-    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.png">
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
 </head>
 <body>
         <header class="navbar sticky-top">
             <div class="navcontainer nav-container">
                 <a href="index.html" class="logo">
                     <!-- Briefcase SVG Icon -->
-                    <img href="index.html" src="assets/images/favicon.png" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
+                    <img href="index.html" src="assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
                     <span href="/" class="logo-text">EmeraldNetwork</span>
                 </a>
                         <nav class="nav-links">
@@ -52,7 +52,7 @@
               id="notfound"
               class="section about-section animate-on-scroll"
               style="
-                background-image: url('/assets/images/aurora.png');
+                background-image: url('/assets/images/aurora.webp');
                 background-size: cover;
                 background-position: center center;
                 background-attachment: fixed;
@@ -168,10 +168,10 @@
 
                             if (password === 'Ice@autodispenser') {
                             const currentCode = sessionStorage.getItem('emerald_access_code');
-                            window.location.href = `/autodispenser.html?code=${currentCode}`;
-                            } else if (password === 'Ice@u') {
+                            window.location.href = `/private/autodispenser.html?code=${currentCode}`;
+                            } else if (password === 'Ice@youtube') {
                                 const currentCode = sessionStorage.getItem('emerald_access_code');
-                                window.location.href = `/asaj.html?code=${currentCode}`;
+                                window.location.href = `youtube.com/iceemerald?code=${currentCode}`;
                             } else {
                               passwordInput.classList.add('error-input', 'shake');
                               setTimeout(() => {
