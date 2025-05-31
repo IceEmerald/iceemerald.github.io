@@ -1,10 +1,30 @@
-entrypoint="index.html"
-hidden=[".config"]
-modules = ["web:v2-20230623-0b7a606"]
+entrypoint = "index.html"
+modules = ["nodejs-20", "web"]
 
 [nix]
-channel = "stable-23_11"
+channel = "stable-24_11"
+packages = ["static-web-server"]
 
 [deployment]
 publicDir = "/"
 deploymentTarget = "static"
+
+[workflows]
+runButton = "Serve Static Site"
+
+[[workflows.workflow]]
+name = "Serve Static Site"
+author = 11815258
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx http-server . -p 5000 -o"
+
+[[ports]]
+localPort = 80
+externalPort = 80
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
