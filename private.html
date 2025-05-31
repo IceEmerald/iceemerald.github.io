@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork</title>
+    <meta name="description" content="Welcome to the EmeraldNetwork website, home to applications or files created by IceEmerald and developed with love.">
+    <!-- Add GeistSans font from CDN -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles/style.css" />
+    <!-- Favicon (replace with your actual favicon.ico in the root or images folder) -->
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+</head>
+<body>
+        <header class="navbar sticky-top">
+            <div class="navcontainer nav-container">
+                <a href="index.html" class="logo">
+                    <!-- Briefcase SVG Icon -->
+                    <img href="index.html" src="assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
+                    <span href="/" class="logo-text">EmeraldNetwork</span>
+                </a>
+                        <nav class="nav-links">
+                          <a href="/">Home</a>
+
+                          <div class="dropdown">
+                            <a href="index.html#apps" class="dropdown-button">
+                              <span>Apps</span>
+                                <svg class="dropdownsvg" viewBox="-2.4 -2.4 28.80 28.80" xmlns="http://www.w3.org/2000/svg" fill="#222222">
+                                  <g>
+                                    <path fill="none" d="M0 0h24v24H0z"></path>
+                                    <path d="M12 15l-4.243-4.243 1.415-1.414L12 12.172l2.828-2.829 1.415 1.414z"></path>
+                                  </g>
+                                </svg>
+                            </a>
+                            <div class="dropdown-content">
+                              <a href="discordserver.html">EmeraldNetwork Discord Server</a>
+                              <a href="minecraftserver.html">EmeraldNetwork Minecraft Server</a>
+                              <a href="emeraldessentialsplugin.html">EmeraldEssentials Minecraft Plugin</a>
+                              <a href="discordemeraldbot.html">EmeraldBot Discord Bot</a>
+                            </div>
+                          </div>
+                        </nav>
+            </div>
+        </header>
+
+        <main>
+            <!-- Hero Section -->
+            <section
+              id="notfound"
+              class="section about-section animate-on-scroll"
+              style="
+                background-image: url('/assets/images/aurora.webp');
+                background-size: cover;
+                background-position: center center;
+                background-attachment: fixed;
+                min-height: 93vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+              "
+            >
+                <div class="container hero-container" style="transform: translateY(-15%); display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 45vh; text-align: center;">
+                    <div class="notfound-content">
+                        <div class="show-phone-only" style="margin-bottom: 10rem"></div>
+                        <h2 style="
+                          background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a);
+                          -webkit-background-clip: text;
+                          -webkit-text-fill-color: transparent;
+                          background-clip: text;
+                          text-fill-color: transparent;
+                        " class="animate-on-scroll">Access Private EmeraldNetwork Content</h2>
+                        <p style="margin-top: 1.25rem; margin-bottom: 1.75rem;">You are attempting to access protected sections of EmeraldNetwork containing sensitive content and resources. Access is strictly controlled and requires a valid, designated access code. Kindly enter your assigned code into the input field to authenticate your access and proceed to view the secured materials available within this part of the network.</p>
+                        <form id="redirect-form" style="display: flex; flex-direction: column; align-items: center;">
+                            <div style="margin-bottom: 5rem;"></div>
+                          <input id="code-input" placeholder="Enter code" required style="
+                            padding: 0.75rem;
+                            width: 100%;
+                            max-width: 300px;
+                            border: 1px solid #ccc;
+                            border-radius: 8px;
+                            margin-bottom: 1rem;
+                            font-size: 1rem;
+                            background-color: #FFFFFF;
+                            color: #000000;
+                            outline: none;
+                              transition: border-color 0.3s; /* Smooth transition for border color */
+                          "/>
+                            <div style="margin-bottom: 1rem;"></div>
+                          <button type="submit" class="button">Submit</button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="container footer-container">
+                <p>&copy; <span id="current-year"></span> EmeraldNetwork - IceEmerald</p>
+                <div class="footer-social-links">
+                     <a href="https://youtube.com/iceemerald" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="YouTube">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2A29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58z"></path>
+                             <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon>
+                         </svg>
+                     </a>
+
+                     <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                             <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                             <line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/>
+                         </svg>
+                     </a>
+                     <a href="mailto:iceemerald23@gmail.com" class="social-icon-button-footer" aria-label="Email">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        </footer>
+                        <style>
+                          .error-input {
+                            border-color: red !important;
+                            border-width: 2px;
+                          }
+
+                          @keyframes shake {
+                            0% { transform: translateX(0); }
+                            25% { transform: translateX(-3px); }
+                            50% { transform: translateX(5px); }
+                            75% { transform: translateX(-3px); }
+                            100% { transform: translateX(0); }
+                          }
+
+                          .shake {
+                            animation: shake 0.3s;
+                          }
+                        </style>
+
+                        <script>
+                          let emeraldAccessCode = '';
+
+                          function generateAccessCode(length = 128) {
+                            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                            let token = '';
+                            for (let i = 0; i < length; i++) {
+                              token += chars.charAt(Math.floor(Math.random() * chars.length));
+                            }
+                            return token;
+                          }
+
+                          function updateAccessCode() {
+                            emeraldAccessCode = generateAccessCode();
+                            sessionStorage.setItem('emerald_access_code', emeraldAccessCode);
+                          }
+
+                          // Initial code setup and auto-refresh every 30s
+                          updateAccessCode();
+                          setInterval(updateAccessCode, 5000);
+
+                          document.getElementById('redirect-form').addEventListener('submit', function(e) {
+                            e.preventDefault();
+                            const password = document.getElementById('code-input').value;
+                            const passwordInput = document.getElementById('code-input');
+
+                            if (password === 'Ice@autodispenser') {
+                            const currentCode = sessionStorage.getItem('emerald_access_code');
+                            window.location.href = `/private/autodispenser.html?code=${currentCode}`;
+                            } else if (password === 'Ice@youtube') {
+                                const currentCode = sessionStorage.getItem('emerald_access_code');
+                                window.location.href = `youtube.com/iceemerald?code=${currentCode}`;
+                            } else {
+                              passwordInput.classList.add('error-input', 'shake');
+                              setTimeout(() => {
+                                passwordInput.classList.remove('shake');
+                                passwordInput.classList.remove('error-input');
+                              }, 1000);
+                            }
+                          });
+                        </script>
+
+                        <script src="assets/scripts/animationvisible.js"></script>
+                             <script src="assets/scripts/scrollice.js"></script>
+                        <script src="assets/scripts/dropdown.js"></script>
+
+</body>
+</html>

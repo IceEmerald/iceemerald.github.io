@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@replit/vite-plugin-cartographer": "^0.2.7"
+  }
+}
