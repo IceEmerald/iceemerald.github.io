@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if ('IntersectionObserver' in window) {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        if (entry.intersectionRatio > 0.1) {
+        if (entry.intersectionRatio > 0.05) {
           setTimeout(() => {
             entry.target.classList.add('visible');
           }, 100); // 0.5 second delay
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }, {
-      threshold: [0, 0.1]
+      threshold: [0, 0.05]
     });
 
     animatedSections.forEach(section => {

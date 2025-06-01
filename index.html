@@ -7,7 +7,7 @@
     <meta name="description" content="Welcome to the EmeraldNetwork website, home to applications or files created by IceEmerald and developed with love.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="assets/styles/style.css" />
+    <link rel="stylesheet" href="/assets/styles/style.css" />
     <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
 </head>
 <body>
@@ -19,12 +19,11 @@
         <header class="navbar sticky-top">
             <div class="navcontainer nav-container">
                 <a href="#" class="logo">
-                    <img href="#" src="assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
+                    <img href="#" src="/assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
                     <span href="#" class="logo-text">EmeraldNetwork</span>
                 </a>
                         <nav class="nav-links">
                           <a href="#about">About</a>
-
                           <div class="dropdown">
                             <a href="#apps" class="dropdown-button">
                               <span>Apps</span>
@@ -36,16 +35,92 @@
                                 </svg>
                             </a>
                             <div class="dropdown-content">
-                                <a href="discordserver.html">EmeraldNetwork Discord Server</a>
-                                  <a href="minecraftserver.html">EmeraldNetwork Minecraft Server</a>
-                                  <a href="emeraldessentialsplugin.html">EmeraldEssentials Minecraft Plugin</a>
-                                  <a href="discordemeraldbot.html">EmeraldBot Discord Bot</a>
+                                <a href="discordserver">EmeraldNetwork Discord Server</a>
+                                  <a href="minecraftserver">EmeraldNetwork Minecraft Server</a>
+                                  <a href="emeraldessentialsplugin">EmeraldEssentials Minecraft Plugin</a>
+                                  <a href="discordemeraldbot">EmeraldBot Discord Bot</a>
                             </div>
                           </div>
                         </nav>
             </div>
         </header>
 
+
+                      <div id="custom-context-menu" class="rightclick-menu">
+                        <div class="context-section">
+                          <span class="context-title">🔧 Tools</span>
+                          <a onclick="copyTextContent()">Copy Text</a>
+                          <a onclick="copyPageLink()">Copy Page Link</a>
+                          <a onclick="showElementInfo()">Show Element Info</a>
+                        </div>
+                      </div>
+
+                      <div id="custom-toast" class="custom-toast"></div>
+
+                        <style>
+                            .modal {
+                              position: fixed;
+                              inset: 0; /* shorthand for top: 0; left: 0; right: 0; bottom: 0; */
+                              background-color: rgba(0, 0, 0, 0.6);
+                              display: flex;
+                              justify-content: center;
+                              align-items: center;
+                              z-index: 1000;
+                              overflow-y: auto;
+                            }
+
+                            .modal-content {
+                              background-color: #ffffff;
+                              padding: 20px 30px;
+                              border-radius: 15px;
+                              text-align: center;
+                              box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+                              width: 100%;
+                              max-width: 600px;
+                              box-sizing: border-box;
+                            }
+                          </style>
+
+                        <!-- Modal -->
+                        <div class="modal" id="popupModal">
+                            <div class="show-phone-only container">
+                          <div class="modal-content">
+                            <h3 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a);
+                                  -webkit-background-clip: text;
+                                  -webkit-text-fill-color: transparent;
+                                  background-clip: text;
+                                  text-fill-color: transparent;
+                                margin-bottom: 1rem;">Notice</h3>
+                              <p style="margin-bottom: 1rem;">EmeraldNetwork does not celebrate Pride Month.</p>
+                              <p style="margin-bottom: 1rem;">We respect everyone’s right to their own beliefs, but this platform chooses not to engage in or promote any Pride-related themes.</p>
+                              <p style="margin-bottom: 1rem;"> Thank you for your understanding.</p></p>
+                            <button class="button" onclick="closeModal()">OK</button>
+                          </div>
+                            </div>
+
+                            <div class="show-desktop-only">
+                                  <div class="modal-content">
+                                    <h3 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a);
+                                          -webkit-background-clip: text;
+                                          -webkit-text-fill-color: transparent;
+                                          background-clip: text;
+                                          text-fill-color: transparent;
+                                        margin-bottom: 1rem;">Notice</h3>
+                                      <p style="margin-bottom: 1rem;">EmeraldNetwork does not celebrate Pride Month.</p>
+                                      <p style="margin-bottom: 1rem;">We respect everyone’s right to their own beliefs, but this platform chooses not to engage in or promote any Pride-related themes.</p>
+                                      <p style="margin-bottom: 1rem;"> Thank you for your understanding.</p></p>
+                                    <button class="button" onclick="closeModal()">OK</button>
+                                  </div>
+                                    </div>
+                        </div>
+
+                        <script>
+                          function closeModal() {
+                            document.getElementById("popupModal").style.display = "none";
+                          }
+                        </script>
+
+                        
         <main>
             <section id="hero" class="section about-section" style="position: relative; overflow: hidden;">
 
@@ -111,7 +186,7 @@
                     <div style=" display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap;">
                         <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
                           <img 
-                            src="assets/images/why/why1.webp" 
+                            src="/assets/images/why/why1.webp" 
                             class="hover-zoom hover-img" 
                             style="width: 100%;"
                             alt="">
@@ -119,7 +194,7 @@
 
                         <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
                           <img 
-                            src="assets/images/why/why2.webp" 
+                            src="/assets/images/why/why2.webp" 
                             class="hover-zoom hover-img" 
                             style="width: 100%;"
                             alt="">
@@ -127,7 +202,7 @@
 
                         <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
                           <img 
-                            src="assets/images/why/why3.webp" 
+                            src="/assets/images/why/why3.webp" 
                             class="hover-zoom hover-img" 
                             style="width: 100%;"
                             alt="">
@@ -148,7 +223,7 @@
                         <p>EmeraldNetwork is a growing ecosystem built by IceEmerald, designed to deliver innovative, user-friendly solutions like EmeraldEssentials — all tailored for performance, reliability, and community empowerment.</p>
                     </div>
                     <div class="animate-on-scroll about-image-container">
-                        <img class="show-desktop-only hover-zoom" src="assets/images/aboutemeraldnet.webp" style="max-width: 400px; height: auto;" data-ai-hint="work desk technology">
+                        <img class="show-desktop-only hover-zoom" src="/assets/images/aboutemeraldnet.webp" style="max-width: 400px; height: auto;">
                     </div>
                 </div>
             </section>
@@ -159,7 +234,7 @@
             <section id="about" style="background-color: #F8F8F8" class="section about-section">
                 <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8rem;">
                     <div class="animate-on-scroll about-image-container">
-                        <img class="show-desktop-only hover-zoom" src="assets/images/ice.webp" style="max-width: 380px; height: auto;" data-ai-hint="work desk technology">
+                        <img class="show-desktop-only hover-zoom" src="/assets/images/ice.webp" style="max-width: 380px; height: auto;">
                     </div>
                     <div class="animate-on-scroll about-content">
                         <h2 style="background: linear-gradient(-90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">About IceEmerald</h2>
@@ -193,49 +268,54 @@
                     </div>
                     <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
                             <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                              <a href="emeraldessentialsplugin">
                                   <img 
-                                    src="assets/images/trust/trust1.webp" 
+                                    src="/assets/images/trust/trust1.webp" 
                                     class="hover-zoom hover-img" 
                                     style="width: 100%;"
                                     alt="">
+                                </a>
                                 </div>
-
                                 <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
-                                  <a href="discordemeraldbot.html">
+                                  <a href="discordemeraldbot">
                                     <img 
-                                      src="assets/images/trust/trust2.webp" 
+                                      src="/assets/images/trust/trust2.webp" 
                                       class="hover-zoom hover-img" 
                                       style="width: 100%;" 
                                       alt="">
                                   </a>
                                 </div>
-
-
                                 <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <a href="discordserver">
                                   <img 
-                                    src="assets/images/trust/trust3.webp" 
+                                    src="/assets/images/trust/trust3.webp" 
                                     class="hover-zoom hover-img" 
                                     style="width: 100%;"
                                     alt="">
+                                  </a>
                                 </div>
                                 <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <a href="minecraftserver">
                                  <img 
-                                    src="assets/images/trust/trust4.webp" 
+                                    src="/assets/images/trust/trust4.webp" 
                                     class="hover-zoom hover-img" 
                                     style="width: 100%;"
                                     alt="">
+                                  </a>
                                 </div>
                                 <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <a href="#apps">
                                 <img 
-                                    src="assets/images/trust/trust5.webp" 
+                                    src="/assets/images/trust/trust5.webp" 
                                     class="hover-zoom hover-img" 
                                     style="width: 100%;"
                                     alt="">
+                                  </a>
                                 </div>
                     </div>
                     <div style="align-items: center; justify-content: center; display: flex">
                     <div class="animate-on-scroll hero-buttons" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
-                        <a href="private.html" class="button button-outline">
+                        <a href="private" class="button button-outline">
                             Private Access
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -295,14 +375,20 @@
                               <div class="container hero-container" style="position: relative; z-index: 2;">
                                 <div class="hero-content">
                                   <div class="show-phone-only" style="margin-bottom: 10rem"></div>
-
-                                  <h1 style="font-size: 3.5rem;" class="hero-text gradient-text">About IceEmerald</h1>
+                                    <h1 style="
+                                      background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a);
+                                      -webkit-background-clip: text;
+                                      -webkit-text-fill-color: transparent;
+                                      background-clip: text;
+                                      text-fill-color: transparent;
+                                    font-size: 3.25rem;
+                                    " class="animate-on-scroll">About IceEmerald</h1>
                                   <p>
                                     IceEmerald is a creative catboy and content creator, founder of EmeraldNetwork — a platform for apps, Minecraft plugins, Discord bots, and more. Blending playful charm with technical skill, he also shares videos, art, and stories on YouTube and Instagram.
                                   </p>
                                 </div>
                                 <div class="hero-image-container">
-                                  <img class="show-desktop-only hover-zoom" src="assets/images/ice.webp" style="max-width: 300px; height: auto;" data-ai-hint="work desk technology">
+                                  <img class="show-desktop-only hover-zoom" src="/assets/images/ice.webp" style="max-width: 300px; height: auto;">
                                 </div>
                               </div>
                             </section>
@@ -483,10 +569,11 @@
                 </div>
             </div>
         </footer>                  
-    <script src="assets/scripts/animationvisible.js"></script>
-    <script src="assets/scripts/aboutice.js"></script>
-    <script src="assets/scripts/scrollice.js"></script>
-     <script src="assets/scripts/dropdown.js"></script>
+    <script src="/assets/scripts/animationvisible.js"></script>
+    <script src="/assets/scripts/aboutice.js"></script>
+    <script src="/assets/scripts/scrollice.js"></script>
+     <script src="/assets/scripts/dropdown.js"></script>
+    <script src="/assets/scripts/rightclick.js"></script>
 
 </body>
 </html>

@@ -10,23 +10,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/styles/style.css" />
+    <link rel="stylesheet" href="/assets/styles/style.css" />
     <!-- Favicon (replace with your actual favicon.ico in the root or images folder) -->
     <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
 </head>
 <body>
         <header class="navbar sticky-top">
             <div class="navcontainer nav-container">
-                <a href="index.html" class="logo">
+                <a href="/" class="logo">
                     <!-- Briefcase SVG Icon -->
-                    <img href="index.html" src="assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
+                    <img href="/" src="/assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
                     <span href="/" class="logo-text">EmeraldNetwork</span>
                 </a>
                         <nav class="nav-links">
                           <a href="/">Home</a>
 
                           <div class="dropdown">
-                            <a href="index.html#apps" class="dropdown-button">
+                            <a href="/#apps" class="dropdown-button">
                               <span>Apps</span>
                                 <svg class="dropdownsvg" viewBox="-2.4 -2.4 28.80 28.80" xmlns="http://www.w3.org/2000/svg" fill="#222222">
                                   <g>
@@ -36,10 +36,10 @@
                                 </svg>
                             </a>
                             <div class="dropdown-content">
-                              <a href="discordserver.html">EmeraldNetwork Discord Server</a>
-                              <a href="minecraftserver.html">EmeraldNetwork Minecraft Server</a>
-                              <a href="emeraldessentialsplugin.html">EmeraldEssentials Minecraft Plugin</a>
-                              <a href="discordemeraldbot.html">EmeraldBot Discord Bot</a>
+                              <a href="discordserver">EmeraldNetwork Discord Server</a>
+                              <a href="minecraftserver">EmeraldNetwork Minecraft Server</a>
+                              <a href="emeraldessentialsplugin">EmeraldEssentials Minecraft Plugin</a>
+                              <a href="discordemeraldbot">EmeraldBot Discord Bot</a>
                             </div>
                           </div>
                         </nav>
@@ -168,7 +168,7 @@
 
                             if (password === 'Ice@autodispenser') {
                             const currentCode = sessionStorage.getItem('emerald_access_code');
-                            window.location.href = `/private/autodispenser.html?code=${currentCode}`;
+                            window.location.href = `/private/autodispenser?code=${currentCode}`;
                             } else if (password === 'Ice@youtube') {
                                 const currentCode = sessionStorage.getItem('emerald_access_code');
                                 window.location.href = `youtube.com/iceemerald?code=${currentCode}`;
@@ -182,9 +182,9 @@
                           });
                         </script>
 
-                        <script src="assets/scripts/animationvisible.js"></script>
-                             <script src="assets/scripts/scrollice.js"></script>
-                        <script src="assets/scripts/dropdown.js"></script>
+                        <script src="/assets/scripts/animationvisible.js"></script>
+                             <script src="/assets/scripts/scrollice.js"></script>
+                        <script src="/assets/scripts/dropdown.js"></script>
 
 </body>
 </html>

@@ -18,7 +18,7 @@
           const storedCode = sessionStorage.getItem('emerald_access_code');
 
           if (!codeFromUrl || !storedCode || codeFromUrl !== storedCode) {
-            window.location.href = '/private.html'; // main page URL
+            window.location.href = '/private'; // main page URL
           }
         })();
       </script>
