@@ -28,6 +28,66 @@
         }
 
     </style>
+
+    <style>
+        .modal {
+          position: fixed;
+          inset: 0; /* shorthand for top: 0; left: 0; right: 0; bottom: 0; */
+          background-color: rgba(0, 0, 0, 0.6);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+          overflow-y: auto;
+        }
+
+        .modal-content {
+          background-color: #ffffff;
+          padding: 20px 30px;
+          border-radius: 15px;
+          text-align: center;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+          width: 100%;
+          max-width: 600px;
+          box-sizing: border-box;
+        }
+      </style>
+
+    <!-- Modal -->
+    <div class="modal" id="popupModal">
+        <div class="show-phone-only container">
+      <div class="modal-content">
+        <h3 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a);
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              background-clip: text;
+              text-fill-color: transparent;
+            margin-bottom: 1rem;">Notice</h3>
+          <p style="margin-bottom: 1rem;">EmeraldBot is now under repair, downtime may occur and your settings will be lost after the bot restarts. Sorry for the inconvenience.</p>
+        <button class="button" onclick="closeModal()">OK</button>
+      </div>
+        </div>
+
+        <div class="show-desktop-only">
+              <div class="modal-content">
+                <h3 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a);
+                      -webkit-background-clip: text;
+                      -webkit-text-fill-color: transparent;
+                      background-clip: text;
+                      text-fill-color: transparent;
+                    margin-bottom: 1rem;">Notice</h3>
+                  <p style="margin-bottom: 1rem;">EmeraldBot is now under repair, downtime may occur and your settings will be lost after the bot restarts. Sorry for the inconvenience.</p>
+                <button class="button" onclick="closeModal()">OK</button>
+              </div>
+                </div>
+    </div>
+
+    <script>
+      function closeModal() {
+        document.getElementById("popupModal").style.display = "none";
+      }
+    </script>
+    
         <header style="background-color: rgba(32, 32, 32, 0.4); border-bottom: 1px solid #313131 !important;" class="navbar sticky-top">
             <div class="navcontainer nav-container">
                 <a href="/" class="logo">
