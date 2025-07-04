@@ -229,7 +229,7 @@ html, body {
   cursor: url('/assets/images/maincursor.png'), auto;
 }
 
-button, a, [role="button"], .clickable {
+button, a, li, ul, [role="button"], .clickable {
   cursor: url('/assets/images/clickcursor.png') 0 0, pointer !important;
 }
 
