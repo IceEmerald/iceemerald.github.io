@@ -1,6 +1,6 @@
 // --- Configuration ---
- const SENSITIVITY = 0.125; // How much the wheel influences velocity. Higher = more responsive.
- const FRICTION = 0.95;  // How quickly the scroll slows down. Closer to 1 = more "slippery".
+ const SENSITIVITY = 0.15; // How much the wheel influences velocity. Higher = more responsive.
+ const FRICTION = 0.85;  // How quickly the scroll slows down. Closer to 1 = more "slippery".
  const MIN_VELOCITY = 0.1; // Below this speed, scrolling stops.
 
  // --- State Variables ---
