@@ -28,6 +28,29 @@ class NotesApp {
             const stored = localStorage.getItem('emeraldnotes_data');
             if (stored) {
                 this.notes = JSON.parse(stored);
+
+                // Legacy content migration: convert old placeholder HTML
+                this.notes.forEach(note => {
+                    if (note.content && typeof note.content === 'string') {
+                        // Remove legacy placeholder content
+                        if (note.content.trim() === '<p>Start typing your note here...</p>' ||
+                            note.content.trim() === 'Start typing your note here...') {
+                            note.content = '';
+                        }
+
+                        // Clean up other legacy empty patterns
+                        const legacyEmptyPatterns = [
+                            '<div>\u00A0</div>',
+                            '<p>\u00A0</p>',
+                            '<div>&nbsp;</div>',
+                            '<p>&nbsp;</p>'
+                        ];
+
+                        if (legacyEmptyPatterns.includes(note.content.trim())) {
+                            note.content = '';
+                        }
+                    }
+                });
             }
         } catch (error) {
             console.error('Error loading notes from storage:', error);
@@ -105,6 +128,7 @@ class NotesApp {
         if (textEditor) {
             textEditor.addEventListener('input', () => {
                 if (this.currentNoteId) {
+                    this.updatePlaceholderState(textEditor);
                     this.updateNoteContent();
                 }
             });
@@ -120,11 +144,21 @@ class NotesApp {
             });
         });
 
+        // Prevent losing focus on editor when clicking dropdown items and color swatches
+        document.querySelectorAll('.ms-dropdown-item, .color-swatch').forEach(element => {
+            element.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            });
+        });
+
         // Setup Microsoft Office-style dropdowns
         this.setupMSDropdowns();
 
         // Setup custom right-click context menu
         this.setupCustomContextMenu();
+
+        // Setup editor placeholder behavior
+        this.setupEditorPlaceholder();
 
         // Setup sidebar toggle functionality
         this.setupSidebarToggle();
@@ -196,7 +230,10 @@ class NotesApp {
         // Handle paste events
         editor.addEventListener('paste', (e) => {
             // Allow default paste behavior
-            setTimeout(() => this.updateNoteContent(), 10);
+            setTimeout(() => {
+                this.updatePlaceholderState(editor);
+                this.updateNoteContent();
+            }, 10);
         });
     }
 
@@ -231,11 +268,40 @@ class NotesApp {
         });
     }
 
-    // Execute formatting command
+    // Execute formatting command with modern implementations
     executeCommand(command, value = null) {
         document.getElementById('textEditor').focus();
 
         try {
+            // Handle modern clipboard operations
+            if (command === 'cut') {
+                this.modernCut();
+                return;
+            }
+            if (command === 'copy') {
+                this.modernCopy();
+                return;
+            }
+            if (command === 'paste') {
+                this.modernPaste();
+                return;
+            }
+
+            // Handle modern text formatting
+            if (command === 'fontSize') {
+                this.modernFontSize(value);
+                return;
+            }
+            if (command === 'foreColor') {
+                this.modernTextColor(value);
+                return;
+            }
+            if (command === 'hiliteColor') {
+                this.modernHighlightColor(value);
+                return;
+            }
+
+            // Fall back to execCommand for other commands (bold, italic, etc.)
             if (value) {
                 document.execCommand(command, false, value);
             } else {
@@ -248,31 +314,118 @@ class NotesApp {
         this.updateNoteContent();
     }
 
-    // Update button states based on current selection
+    // Update button states based on current selection with span-based styling support
     updateButtonStates() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        // Handle traditional execCommand-based formatting
         const commands = ['bold', 'italic', 'underline', 'justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList'];
 
         commands.forEach(command => {
             const btn = document.querySelector(`[data-command="${command}"]`);
             if (btn) {
-                const isActive = document.queryCommandState(command);
-                btn.classList.toggle('active', isActive);
+                try {
+                    const isActive = document.queryCommandState(command);
+                    btn.classList.toggle('active', isActive);
+                } catch (error) {
+                    // Fallback: check for styling in the DOM
+                    btn.classList.remove('active');
+                }
             }
         });
 
-        // Update font family and size
-        try {
-            const fontName = document.queryCommandValue('fontName');
-            const fontSize = document.queryCommandValue('fontSize');
+        // Update font styling based on actual DOM inspection
+        this.updateFontStateFromDOM();
+    }
 
-            if (fontName) {
-                document.getElementById('fontFamily').value = fontName.replace(/['"]/g, '');
+    // Update font dropdowns based on actual DOM styling at cursor position
+    updateFontStateFromDOM() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        const range = selection.getRangeAt(0);
+        let currentNode = range.commonAncestorContainer;
+
+        // If text node, get parent element
+        if (currentNode.nodeType === Node.TEXT_NODE) {
+            currentNode = currentNode.parentElement;
+        }
+
+        // Traverse up the DOM to find styling
+        let fontFamily = '';
+        let fontSize = '';
+        let textColor = '';
+        let backgroundColor = '';
+
+        // Start from the current node and traverse up
+        let element = currentNode;
+        while (element && element !== document.getElementById('textEditor')) {
+            const styles = window.getComputedStyle(element);
+
+            // Get font family
+            if (!fontFamily && styles.fontFamily && styles.fontFamily !== 'inherit') {
+                fontFamily = styles.fontFamily.replace(/['"]/g, '');
             }
-            if (fontSize) {
-                document.getElementById('fontSize').value = fontSize;
+
+            // Get font size (look for explicit styling, not inherited)
+            if (!fontSize && element.style && element.style.fontSize) {
+                fontSize = element.style.fontSize.replace('px', '');
             }
-        } catch (error) {
-            // Ignore errors in getting command values
+
+            // Get text color (look for explicit styling)
+            if (!textColor && element.style && element.style.color) {
+                textColor = element.style.color;
+            }
+
+            // Get background color (look for explicit styling)
+            if (!backgroundColor && element.style && element.style.backgroundColor) {
+                backgroundColor = element.style.backgroundColor;
+            }
+
+            element = element.parentElement;
+        }
+
+        // Update font family dropdown
+        const fontFamilyDropdown = document.getElementById('fontFamilyDropdown');
+        if (fontFamilyDropdown && fontFamily) {
+            const valueSpan = fontFamilyDropdown.querySelector('.dropdown-value');
+            if (valueSpan) {
+                // Find matching option
+                const matchingItem = fontFamilyDropdown.querySelector(`[data-value="${fontFamily}"]`);
+                if (matchingItem) {
+                    valueSpan.textContent = matchingItem.dataset.label || matchingItem.textContent;
+                }
+            }
+        }
+
+        // Update font size dropdown
+        const fontSizeDropdown = document.getElementById('fontSizeDropdown');
+        if (fontSizeDropdown && fontSize) {
+            const valueSpan = fontSizeDropdown.querySelector('.dropdown-value');
+            if (valueSpan) {
+                valueSpan.textContent = fontSize + 'px';
+            }
+        }
+
+        // Update font color dropdown
+        const fontColorDropdown = document.getElementById('fontColorDropdown');
+        if (fontColorDropdown && textColor) {
+            const colorPreview = fontColorDropdown.querySelector('.color-preview');
+            if (colorPreview) {
+                colorPreview.style.background = textColor;
+                colorPreview.setAttribute('data-color', textColor);
+            }
+        }
+
+        // Update highlight color dropdown
+        const highlightColorDropdown = document.getElementById('highlightColorDropdown');
+        if (highlightColorDropdown && backgroundColor) {
+            const colorPreview = highlightColorDropdown.querySelector('.color-preview');
+            if (colorPreview) {
+                colorPreview.style.background = backgroundColor;
+                colorPreview.setAttribute('data-color', backgroundColor);
+            }
         }
     }
 
@@ -323,7 +476,7 @@ class NotesApp {
         const note = {
             id: this.generateId(),
             title: 'Untitled Note',
-            content: '<p>Start typing your note here...</p>',
+            content: '',
             createdAt: new Date().toISOString(),
             modifiedAt: new Date().toISOString()
         };
@@ -368,11 +521,7 @@ class NotesApp {
 
             if (colorPreview) {
                 colorPreview.style.background = currentColor;
-                if (currentColor === '#ffffff') {
-                    colorPreview.style.border = '1px solid #ccc';
-                } else {
-                    colorPreview.style.border = 'none';
-                }
+                colorPreview.setAttribute('data-color', currentColor);
             }
 
             if (dropdownValue) {
@@ -417,7 +566,14 @@ class NotesApp {
     updateNoteContent() {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (note) {
-            note.content = document.getElementById('textEditor').innerHTML;
+            const textEditor = document.getElementById('textEditor');
+            const content = textEditor.innerHTML.trim();
+            // Use unified empty detection logic
+            if (this.isEditorEmpty(textEditor)) {
+                note.content = '';
+            } else {
+                note.content = content;
+            }
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
             this.debouncedSave();
@@ -616,13 +772,211 @@ class NotesApp {
 
     // Insert link
     insertLink() {
-        const url = prompt('Enter URL:', 'https://');
-        const text = prompt('Enter link text:', 'Link');
+        this.showLinkModal();
+    }
 
-        if (url && text) {
-            const linkHTML = `<a href="${this.escapeHtml(url)}" target="_blank">${this.escapeHtml(text)}</a>`;
-            this.executeCommand('insertHTML', linkHTML);
-        }
+    // Show custom link creation modal
+    showLinkModal() {
+        const modal = document.getElementById('linkModal');
+        const cancelBtn = document.getElementById('linkModalCancel');
+        const createBtn = document.getElementById('linkModalCreate');
+        const urlInput = document.getElementById('linkUrl');
+        const textInput = document.getElementById('linkText');
+
+        if (!modal) return;
+
+        // Save current editor selection
+        this.saveSelection();
+
+        // Show modal
+        modal.classList.add('show');
+
+        // Reset inputs and validation
+        urlInput.value = 'https://';
+        textInput.value = '';
+        createBtn.disabled = true;
+
+        // Focus first input and select all text
+        setTimeout(() => {
+            urlInput.focus();
+            urlInput.select();
+        }, 100);
+
+        // URL validation function
+        const validateUrl = (url) => {
+            if (!url || url.trim() === '' || url.trim() === 'https://') {
+                return { valid: false, message: '' };
+            }
+
+            url = url.trim();
+
+            // Auto-prepend https:// if no protocol is present
+            if (!url.match(/^[a-z][a-z0-9+.-]*:/i)) {
+                url = 'https://' + url;
+                urlInput.value = url;
+            }
+
+            // Check for dangerous schemes
+            const dangerousSchemes = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:'];
+            const urlLower = url.toLowerCase();
+
+            for (const scheme of dangerousSchemes) {
+                if (urlLower.startsWith(scheme)) {
+                    return { 
+                        valid: false, 
+                        message: 'Unsafe URL scheme detected. Please use http://, https://, or mailto:' 
+                    };
+                }
+            }
+
+            // Allow only safe protocols
+            const safeProtocols = /^(https?|mailto):/i;
+            if (!safeProtocols.test(url)) {
+                return { 
+                    valid: false, 
+                    message: 'Only HTTP, HTTPS, and mailto URLs are allowed' 
+                };
+            }
+
+            // Basic URL format validation
+            try {
+                if (url.startsWith('mailto:')) {
+                    // Simple email validation for mailto links
+                    const email = url.substring(7);
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(email)) {
+                        return { 
+                            valid: false, 
+                            message: 'Invalid email address for mailto link' 
+                        };
+                    }
+                } else {
+                    // Validate HTTP/HTTPS URLs
+                    const urlObj = new URL(url);
+                    if (!urlObj.hostname) {
+                        return { 
+                            valid: false, 
+                            message: 'Invalid URL format' 
+                        };
+                    }
+                }
+                return { valid: true, message: '', url: url };
+            } catch (error) {
+                return { 
+                    valid: false, 
+                    message: 'Invalid URL format' 
+                };
+            }
+        };
+
+        // Show validation feedback
+        const showValidationFeedback = (input, message, isValid) => {
+            let feedback = input.parentNode.querySelector('.validation-feedback');
+
+            if (!feedback) {
+                feedback = document.createElement('div');
+                feedback.className = 'validation-feedback';
+                input.parentNode.appendChild(feedback);
+            }
+
+            feedback.textContent = message;
+            feedback.className = `validation-feedback ${isValid ? 'valid' : 'invalid'}`;
+            feedback.style.display = message ? 'block' : 'none';
+        };
+
+        // Clear validation feedback
+        const clearValidationFeedback = (input) => {
+            const feedback = input.parentNode.querySelector('.validation-feedback');
+            if (feedback) {
+                feedback.style.display = 'none';
+            }
+        };
+
+        // Update create button state
+        const updateCreateButton = () => {
+            const url = urlInput.value.trim();
+            const text = textInput.value.trim();
+            const validation = validateUrl(url);
+
+            createBtn.disabled = !(validation.valid && text && text.trim() !== '');
+
+            if (url && url !== 'https://') {
+                if (validation.valid) {
+                    showValidationFeedback(urlInput, 'Valid URL', true);
+                } else {
+                    showValidationFeedback(urlInput, validation.message, false);
+                }
+            } else {
+                clearValidationFeedback(urlInput);
+            }
+        };
+
+        // Handle cancel
+        const handleCancel = () => {
+            modal.classList.remove('show');
+            cancelBtn.removeEventListener('click', handleCancel);
+            createBtn.removeEventListener('click', handleCreate);
+            modal.removeEventListener('click', handleBackdropClick);
+            document.removeEventListener('keydown', handleEscape);
+            urlInput.removeEventListener('keydown', handleEnter);
+            textInput.removeEventListener('keydown', handleEnter);
+            urlInput.removeEventListener('input', updateCreateButton);
+            textInput.removeEventListener('input', updateCreateButton);
+
+            // Restore editor selection and focus
+            this.restoreSelection();
+        };
+
+        // Handle create
+        const handleCreate = () => {
+            const url = urlInput.value.trim();
+            const text = textInput.value.trim();
+            const validation = validateUrl(url);
+
+            if (validation.valid && text && text.trim() !== '') {
+                // Restore selection before inserting link
+                this.restoreSelection();
+
+                const safeUrl = validation.url || url;
+                const linkHTML = `<a href="${this.escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(text)}</a>`;
+                this.executeCommand('insertHTML', linkHTML);
+                handleCancel();
+            }
+        };
+
+        // Handle backdrop click
+        const handleBackdropClick = (e) => {
+            if (e.target === modal) {
+                handleCancel();
+            }
+        };
+
+        // Handle escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                handleCancel();
+            }
+        };
+
+        // Handle enter key in inputs
+        const handleEnter = (e) => {
+            if (e.key === 'Enter' && !createBtn.disabled) {
+                handleCreate();
+            }
+        };
+
+        // Add event listeners
+        cancelBtn.addEventListener('click', handleCancel);
+        createBtn.addEventListener('click', handleCreate);
+        modal.addEventListener('click', handleBackdropClick);
+        document.addEventListener('keydown', handleEscape);
+        urlInput.addEventListener('keydown', handleEnter);
+        textInput.addEventListener('keydown', handleEnter);
+        urlInput.addEventListener('input', updateCreateButton);
+        textInput.addEventListener('input', updateCreateButton);
+
+        // Initial validation
+        updateCreateButton();
     }
 
     // Zoom in
@@ -832,6 +1186,8 @@ class NotesApp {
             items.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    e.preventDefault();
+
                     const value = item.dataset.value;
                     const label = item.dataset.label || item.textContent;
 
@@ -845,30 +1201,43 @@ class NotesApp {
                     const colorPreview = btn.querySelector('.color-preview');
                     if (colorPreview && value) {
                         colorPreview.style.background = value;
+                        colorPreview.setAttribute('data-color', value);
                         if (value === 'transparent') {
                             colorPreview.style.border = '1px solid #ccc';
-                        } else {
-                            colorPreview.style.border = 'none';
+                            colorPreview.removeAttribute('data-color');
                         }
                     }
 
-                    // Execute the appropriate command
-                    this.restoreSelection();
-
-                    if (dropdown.id === 'fontFamilyDropdown') {
-                        this.executeCommand('fontName', value);
-                    } else if (dropdown.id === 'fontSizeDropdown') {
-                        this.executeCommand('fontSize', value);
-                    } else if (dropdown.id === 'fontColorDropdown') {
-                        this.executeCommand('foreColor', value);
-                    } else if (dropdown.id === 'highlightColorDropdown') {
-                        this.executeCommand('hiliteColor', value);
-                    } else if (dropdown.id === 'noteColorDropdown') {
-                        this.updateNoteColor(value);
-                    }
-
-                    // Close dropdown
+                    // Close dropdown first to prevent interference
                     dropdown.classList.remove('active');
+                    btn.setAttribute('aria-expanded', 'false');
+
+                    // Execute the appropriate command with improved selection handling
+                    setTimeout(() => {
+                        // Ensure editor has focus before restoring selection
+                        const editor = document.getElementById('textEditor');
+                        if (editor) {
+                            editor.focus();
+                        }
+
+                        // Restore selection and execute command
+                        this.restoreSelection();
+
+                        if (dropdown.id === 'fontFamilyDropdown') {
+                            this.executeCommand('fontName', value);
+                        } else if (dropdown.id === 'fontSizeDropdown') {
+                            this.executeCommand('fontSize', value);
+                        } else if (dropdown.id === 'fontColorDropdown') {
+                            this.executeCommand('foreColor', value);
+                        } else if (dropdown.id === 'highlightColorDropdown') {
+                            this.executeCommand('hiliteColor', value);
+                        } else if (dropdown.id === 'noteColorDropdown') {
+                            this.updateNoteColor(value);
+                        }
+
+                        // Update button states to reflect changes
+                        this.updateButtonStates();
+                    }, 10);
                 });
             });
         });
@@ -1018,7 +1387,7 @@ class NotesApp {
                 const textEditor = document.getElementById('textEditor');
                 if (noteTitle) noteTitle.value = '';
                 if (textEditor) {
-                    textEditor.innerHTML = '<p>Start typing your note here...</p>';
+                    textEditor.innerHTML = '';
                     textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
                 }
             }
@@ -1139,6 +1508,473 @@ class NotesApp {
             svg.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>';
             toggleBtn.title = 'Collapse Sidebar';
         }
+    }
+
+    // Comprehensive empty detection for contenteditable
+    isEditorEmpty(editor) {
+        const content = editor.innerHTML.trim();
+        const textContent = editor.textContent.trim();
+
+        // First check for meaningful HTML elements that should never be considered empty
+        const meaningfulElements = content.match(/<(img|table|audio|video|iframe|embed|object|canvas|svg)[^>]*>/gi);
+        if (meaningfulElements && meaningfulElements.length > 0) {
+            return false; // Content contains meaningful media elements
+        }
+
+        // Check for lists with content
+        const listMatches = content.match(/<(ul|ol)[^>]*>[\s\S]*?<\/(ul|ol)>/gi);
+        if (listMatches) {
+            // Check if lists have actual content beyond empty <li> tags
+            const hasListContent = listMatches.some(list => {
+                const listTextContent = list.replace(/<[^>]*>/g, '').trim();
+                return listTextContent !== '';
+            });
+            if (hasListContent) {
+                return false;
+            }
+        }
+
+        // Check for truly empty or whitespace-only text content
+        if (textContent === '' || textContent === '\u00A0') { // includes &nbsp;
+            return true;
+        }
+
+        // Check for common empty HTML patterns
+        const emptyPatterns = [
+            '', '<br>', '<div></div>', '<p></p>', 
+            '<div><br></div>', '<p><br></p>',
+            '<div>\u00A0</div>', '<p>\u00A0</p>',
+            '<p>Start typing your note here...</p>', // legacy placeholder
+            '<ul></ul>', '<ol></ol>', // empty lists
+            '<ul><li></li></ul>', '<ol><li></li></ol>' // lists with empty items
+        ];
+
+        return emptyPatterns.includes(content);
+    }
+
+    // Update placeholder state based on content (non-destructive)
+    updatePlaceholderState(editor) {
+        if (this.isEditorEmpty(editor)) {
+            editor.setAttribute('data-empty', 'true');
+        } else {
+            editor.removeAttribute('data-empty');
+        }
+    }
+
+    // Setup editor placeholder behavior
+    setupEditorPlaceholder() {
+        const textEditor = document.getElementById('textEditor');
+        if (!textEditor) return;
+
+        // Note: Input events are handled in setupEventListeners() to avoid duplication
+        // Only add placeholder-specific event handlers here
+
+        // Handle focus events
+        textEditor.addEventListener('focus', () => {
+            this.updatePlaceholderState(textEditor);
+        });
+
+        // Handle blur events
+        textEditor.addEventListener('blur', () => {
+            this.updatePlaceholderState(textEditor);
+        });
+
+        // Handle keydown for delete operations (immediate placeholder update)
+        textEditor.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                setTimeout(() => {
+                    this.updatePlaceholderState(textEditor);
+                }, 0);
+            }
+        });
+
+        // Initial state
+        this.updatePlaceholderState(textEditor);
+    }
+
+    // Modern clipboard operations with rich HTML formatting support
+    async modernCut() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        const range = selection.getRangeAt(0);
+        const selectedText = range.toString();
+
+        if (selectedText) {
+            try {
+                // Get both HTML and plain text content
+                const htmlContent = this.getSelectedHtml();
+                const plainText = selectedText;
+
+                // Use modern clipboard API with both formats
+                const clipboardItems = [new ClipboardItem({
+                    'text/html': new Blob([htmlContent], { type: 'text/html' }),
+                    'text/plain': new Blob([plainText], { type: 'text/plain' })
+                })];
+
+                await navigator.clipboard.write(clipboardItems);
+                range.deleteContents();
+                this.updateNoteContent();
+            } catch (error) {
+                console.warn('Modern clipboard failed, using fallback:', error);
+                // Fallback to execCommand if clipboard API fails
+                try {
+                    document.execCommand('cut');
+                    this.updateNoteContent();
+                } catch (execError) {
+                    console.error('Cut operation failed:', execError);
+                }
+            }
+        }
+    }
+
+    async modernCopy() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        const selectedText = selection.toString();
+
+        if (selectedText) {
+            try {
+                // Get both HTML and plain text content
+                const htmlContent = this.getSelectedHtml();
+                const plainText = selectedText;
+
+                // Use modern clipboard API with both formats
+                const clipboardItems = [new ClipboardItem({
+                    'text/html': new Blob([htmlContent], { type: 'text/html' }),
+                    'text/plain': new Blob([plainText], { type: 'text/plain' })
+                })];
+
+                await navigator.clipboard.write(clipboardItems);
+            } catch (error) {
+                console.warn('Modern clipboard failed, using fallback:', error);
+                // Fallback to execCommand if clipboard API fails
+                try {
+                    document.execCommand('copy');
+                } catch (execError) {
+                    console.error('Copy operation failed:', execError);
+                }
+            }
+        }
+    }
+
+    async modernPaste() {
+        try {
+            // Try to read HTML content first, fallback to plain text
+            const clipboardItems = await navigator.clipboard.read();
+
+            for (const item of clipboardItems) {
+                if (item.types.includes('text/html')) {
+                    const htmlBlob = await item.getType('text/html');
+                    const htmlText = await htmlBlob.text();
+                    if (htmlText) {
+                        this.insertHtmlAtSelection(htmlText);
+                        this.updateNoteContent();
+                        return;
+                    }
+                }
+
+                if (item.types.includes('text/plain')) {
+                    const textBlob = await item.getType('text/plain');
+                    const plainText = await textBlob.text();
+                    if (plainText) {
+                        this.insertTextAtSelection(plainText);
+                        this.updateNoteContent();
+                        return;
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Modern clipboard read failed, trying readText fallback:', error);
+
+            // Second fallback: try readText for plain text
+            try {
+                const plainText = await navigator.clipboard.readText();
+                if (plainText) {
+                    this.insertTextAtSelection(plainText);
+                    this.updateNoteContent();
+                    return;
+                }
+            } catch (readTextError) {
+                console.warn('ReadText fallback failed, using execCommand:', readTextError);
+            }
+
+            // Final fallback to execCommand if both clipboard APIs fail
+            try {
+                document.execCommand('paste');
+                this.updateNoteContent();
+            } catch (execError) {
+                console.error('All paste methods failed:', execError);
+            }
+        }
+    }
+
+    // Modern font size implementation with collapsed selection support
+    modernFontSize(size) {
+        // Restore saved selection to handle dropdown focus loss
+        this.restoreSelection();
+
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        const range = selection.getRangeAt(0);
+
+        if (range.collapsed) {
+            // Handle collapsed selection by creating a styled span for subsequent typing
+            const span = document.createElement('span');
+            span.style.fontSize = size + 'px';
+            span.className = 'temp-formatting';
+            span.innerHTML = '&#8203;'; // Zero-width space to maintain selection
+
+            range.insertNode(span);
+
+            // Position cursor after the span
+            range.setStartAfter(span);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            // Set up a listener to apply formatting to subsequent typing
+            this.setupTempFormatting(span, { fontSize: size + 'px' });
+        } else {
+            // Handle text selection
+            const span = document.createElement('span');
+            span.style.fontSize = size + 'px';
+
+            try {
+                const contents = range.extractContents();
+                span.appendChild(contents);
+                range.insertNode(span);
+
+                // Maintain selection on the formatted content
+                range.selectNodeContents(span);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } catch (error) {
+                console.error('Error applying font size:', error);
+                document.execCommand('fontSize', false, size);
+            }
+        }
+    }
+
+    // Modern text color implementation with collapsed selection support
+    modernTextColor(color) {
+        // Restore saved selection to handle dropdown focus loss
+        this.restoreSelection();
+
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        const range = selection.getRangeAt(0);
+
+        if (range.collapsed) {
+            // Handle collapsed selection
+            const span = document.createElement('span');
+            span.style.color = color;
+            span.className = 'temp-formatting';
+            span.innerHTML = '&#8203;'; // Zero-width space
+
+            range.insertNode(span);
+
+            // Position cursor after the span
+            range.setStartAfter(span);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            // Set up formatting for subsequent typing
+            this.setupTempFormatting(span, { color: color });
+        } else {
+            // Handle text selection
+            const span = document.createElement('span');
+            span.style.color = color;
+
+            try {
+                const contents = range.extractContents();
+                span.appendChild(contents);
+                range.insertNode(span);
+
+                // Maintain selection on the formatted content
+                range.selectNodeContents(span);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } catch (error) {
+                console.error('Error applying text color:', error);
+                document.execCommand('foreColor', false, color);
+            }
+        }
+    }
+
+    // Modern highlight color implementation with collapsed selection support
+    modernHighlightColor(color) {
+        // Restore saved selection to handle dropdown focus loss
+        this.restoreSelection();
+
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        const range = selection.getRangeAt(0);
+
+        if (range.collapsed) {
+            // Handle collapsed selection
+            const span = document.createElement('span');
+            span.style.backgroundColor = color;
+            span.className = 'temp-formatting';
+            span.innerHTML = '&#8203;'; // Zero-width space
+
+            range.insertNode(span);
+
+            // Position cursor after the span
+            range.setStartAfter(span);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            // Set up formatting for subsequent typing
+            this.setupTempFormatting(span, { backgroundColor: color });
+        } else {
+            // Handle text selection
+            const span = document.createElement('span');
+            span.style.backgroundColor = color;
+
+            try {
+                const contents = range.extractContents();
+                span.appendChild(contents);
+                range.insertNode(span);
+
+                // Maintain selection on the formatted content
+                range.selectNodeContents(span);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } catch (error) {
+                console.error('Error applying highlight color:', error);
+                document.execCommand('hiliteColor', false, color);
+            }
+        }
+    }
+
+    // Utility method to insert text at current selection
+    insertTextAtSelection(text) {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+
+        // Move cursor to end of inserted text
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    // Get selected HTML content with formatting
+    getSelectedHtml() {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return '';
+
+        const range = selection.getRangeAt(0);
+        const clonedSelection = range.cloneContents();
+        const div = document.createElement('div');
+        div.appendChild(clonedSelection);
+        return div.innerHTML;
+    }
+
+    // Insert HTML content at current selection
+    insertHtmlAtSelection(html) {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+
+        // Sanitize the HTML before inserting
+        const sanitizedHtml = this.sanitizeHtml(html);
+
+        // Create a document fragment from the HTML
+        const fragment = document.createRange().createContextualFragment(sanitizedHtml);
+        range.insertNode(fragment);
+
+        // Move cursor to end of inserted content
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    // Set up temporary formatting for subsequent typing at collapsed selection
+    setupTempFormatting(span, styles) {
+        const editor = document.getElementById('textEditor');
+
+        // Store the current styles for next character input
+        this.tempFormattingStyles = styles;
+        this.tempFormattingSpan = span;
+
+        // Set up one-time event handler for next input
+        const handleInput = (e) => {
+            if (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') {
+                // Apply formatting to the newly typed content
+                const range = window.getSelection().getRangeAt(0);
+                const textNode = range.startContainer;
+
+                if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                    // Wrap the newly typed text in a span with the formatting
+                    const newSpan = document.createElement('span');
+                    Object.assign(newSpan.style, this.tempFormattingStyles);
+
+                    // Replace the temp span with the new formatted span
+                    if (this.tempFormattingSpan && this.tempFormattingSpan.parentNode) {
+                        this.tempFormattingSpan.parentNode.replaceChild(newSpan, this.tempFormattingSpan);
+                        newSpan.appendChild(textNode);
+
+                        // Position cursor after the formatted text
+                        const newRange = document.createRange();
+                        newRange.setStartAfter(newSpan);
+                        newRange.collapse(true);
+                        const selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+                    }
+                }
+
+                // Clean up
+                this.tempFormattingStyles = null;
+                this.tempFormattingSpan = null;
+                editor.removeEventListener('input', handleInput);
+            }
+        };
+
+        editor.addEventListener('input', handleInput, { once: true });
+
+        // Also clean up if user moves cursor or clicks elsewhere
+        const cleanupHandler = () => {
+            if (this.tempFormattingSpan && this.tempFormattingSpan.parentNode) {
+                // Remove empty temp span
+                const parent = this.tempFormattingSpan.parentNode;
+                parent.removeChild(this.tempFormattingSpan);
+
+                // Normalize the parent to merge adjacent text nodes
+                if (parent.normalize) {
+                    parent.normalize();
+                }
+            }
+            this.tempFormattingStyles = null;
+            this.tempFormattingSpan = null;
+            editor.removeEventListener('input', handleInput);
+            editor.removeEventListener('click', cleanupHandler);
+            editor.removeEventListener('keydown', cleanupHandler);
+        };
+
+        // Clean up on click or arrow keys
+        editor.addEventListener('click', cleanupHandler, { once: true });
+        editor.addEventListener('keydown', (e) => {
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+                cleanupHandler();
+            }
+        }, { once: true });
     }
 }
 
