@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork</title>
+    <meta name="description" content="Welcome to the EmeraldNetwork website, home to applications or files created by IceEmerald and developed with love.">
+    <!-- Add GeistSans font from CDN -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles/style.css" />
+    <!-- Favicon (replace with your actual favicon.ico in the root or images folder) -->
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+</head>
+<body style="background-color: #1a1a1a;">
+
+    <style>
+        /* width */
+        ::-webkit-scrollbar {
+          width: 10px; /* Thinner scrollbar */
+        }
+
+        /* Track */
+        ::-webkit-scrollbar-track {
+         background: #1a1a1a;
+        }
+
+    </style>
+
+    
+        <header style="background-color: rgba(32, 32, 32, 0.4); border-bottom: 1px solid #313131 !important;" class="navbar sticky-top">
+            <div class="navcontainer nav-container">
+                <a href="/" class="logo">
+                    <!-- Briefcase SVG Icon -->
+                    <img href="/" src="/assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
+                    <span href="/" style="color: #f0f0f0" class="logo-text">EmeraldNetwork</span>
+                </a>
+                        <nav class="nav-links">
+                          <a style="color: #f0f0f0" href="https://discord.com/oauth2/authorize?client_id=1197553424724660254&permissions=275364670576&integration_type=0&scope=bot">Invite</a>
+                            <a style="color: #f0f0f0" href="#commands">Commands</a>
+                            <div class="dropdownsvg">
+                         <a style="color: #f0f0f0" href="#support">Support</a>
+                            </div>
+                        </nav>
+            </div>
+        </header>
+
+                        <div id="custom-context-menu" class="rightclick-menu">
+                            <div class="context-section">
+                              <span class="context-title">🔧 Tools</span>
+                              <a onclick="copyTextContent()">Copy Text</a>
+                              <a onclick="copyPageLink()">Copy Page Link</a>
+                              <a onclick="showElementInfo()">Show Element Info</a>
+                            </div>
+                          </div>
+
+                          <div id="custom-toast" class="custom-toast"></div>
+
+        <main>
+            <section id="about" class="section about-section">
+                <div class="container hero-container" style="position: relative; z-index: 2;">
+                    <div class="animate-on-scroll hero-content">
+                      <div style="margin-bottom: 1rem"></div>
+
+                        <h1 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">EmeraldBot</h1>
+                      <p style="color: #D2D2D2;">
+                          Your ultimate all-in-one Discord bot — featuring one of the best moderation systems, high-quality music playback, and a host of unique, powerful features designed to elevate your server experience.
+                      </p>
+                        <div>
+                            <a href="#benefits" class="button" style="margin-right: 15px;">
+                                Get Started
+                            </a>
+                            <a style="color: #FFFFFF;" href="https://discord.com/oauth2/authorize?client_id=1197553424724660254&permissions=275364670576&integration_type=0&scope=bot" rel="noopener noreferrer" class="aboutice-link button button-outline">
+                                Invite
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                    <polyline points="12 5 19 12 12 19"/>
+                                </svg>
+                            </a>
+                        </div>
+
+                    </div>
+                    <div class="animate-on-scroll hero-image-container">
+                      <img class="show-desktop-only hover-zoom hover-img" src="/assets/images/favicon.webp" style="max-width: 300px; height: auto;">
+                    </div>
+                  </div>
+                <div style="margin-bottom: 3rem"></div>
+            </section>
+
+            <div class="animate-on-scroll" style="text-align: center; justify-content: center; align-items: center; overflow-x: hidden;">
+                <img 
+                    class="hover-img" 
+                    src="assets/images/discordemeraldnetwork.webp" 
+                    style="width: 80%; min-width: 700px; height: auto;"
+                >
+            </div>
+            <div style="margin-bottom: 5rem;"></div>
+
+            <section id="benefits" style="background-color: #252525" class="section about-section">
+              <div style="margin-bottom: 5rem;"></div>
+              <h2 class="animate-on-scroll" style="
+                background: linear-gradient(90deg, #e3e3e3, #b0b0b0, #737373);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                text-fill-color: transparent;
+                text-align: center;
+                width: 100%;
+                display: block;
+                margin: 0 auto;
+              ">
+                Why EmeraldBot?
+              </h2>
+
+              <div style="margin-bottom: 5rem;"></div>
+
+              <div class="container about-container" style="display: flex; align-items: stretch; justify-content: space-between; gap: 2rem; flex-direction: row-reverse;">
+                <div class="animate-on-scroll about-content" style="flex: 1;">
+                  <div style="margin-top: 5rem;"></div>
+                  <h2 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">Advanced Moderation</h2>
+                  <p style="color: #D2D2D2;">Keep your server safe with powerful tools like banned word management, voice locks, chat locks, and automatic role assignments. EmeraldBot puts you in full control of your community.</p>
+                </div>
+                <div class="animate-on-scroll about-image-container" style="overflow: hidden;">
+                  <img class="hover-zoom" src="/assets/images/discordemeraldbot/advmod.webp" style="max-width: 400px; height: auto;">
+                </div>
+              </div>
+            </section>
+
+            <section id="about" style="background-color: #252525" class="section about-section">
+              <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8rem;">
+                <div class="animate-on-scroll about-image-container" style="overflow: visible; flex-shrink: 0; max-width: 400px;">
+                  <img class="hover-zoom" src="/assets/images/discordemeraldbot/utility.webp" style="width: 100%; height: auto;">
+                </div>
+                <div class="animate-on-scroll about-content">
+                  <h2 style="background: linear-gradient(-90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">Smart Utilities</h2>
+                  <p style="color: #D2D2D2;">From AFK status to birthday reminders and even a calculator, EmeraldBot helps your members stay organized, informed, and connected—effortlessly.</p>
+                </div>
+              </div>
+            </section>
+
+            <section id="benefits" style="background-color: #252525" class="section about-section">
+              <div class="container about-container" style="display: flex; align-items: stretch; justify-content: space-between; gap: 2rem; flex-direction: row-reverse;">
+                <div class="animate-on-scroll about-content" style="flex: 1;">
+                  <div style="margin-top: 5rem;"></div>
+                  <h2 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">Informative & Insightful</h2>
+                  <p style="color: #D2D2D2;">Whether you’re checking user info, server stats, or latency, EmeraldBot provides rich information with simple commands like e!userinfo, e!serverinfo, and more.</p>
+                </div>
+                <div class="animate-on-scroll about-image-container" style="overflow: hidden;">
+                  <img class="hover-zoom" src="/assets/images/discordemeraldbot/info.webp" style="max-width: 400px; height: auto;">
+                </div>
+              </div>
+            </section>
+
+            <section id="about" style="background-color: #252525" class="section about-section">
+              <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8rem;">
+                <div class="animate-on-scroll about-image-container" style="overflow: visible; flex-shrink: 0; max-width: 400px;">
+                  <img class="hover-zoom" src="/assets/images/discordemeraldbot/fun.webp" style="width: 100%; height: auto;">
+                </div>
+                <div class="animate-on-scroll about-content">
+                  <h2 style="background: linear-gradient(-90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">Engaging & Fun</h2>
+                  <p style="color: #D2D2D2;">Lighten up the atmosphere with mini-games like rock-paper-scissors, dice rolls, and music player. EmeraldBot adds personality and playfulness to any server.</p>
+                </div>
+              </div>
+            </section>
+
+
+            <section id="commands" class="section">
+                <div class="container">
+                    <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
+                        <h2 class="animate-on-scroll" style="
+                              background: linear-gradient(90deg, #e3e3e3, #b0b0b0, #737373);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
+                              background-clip: text;
+                              text-fill-color: transparent;
+                              text-align: center;
+                              width: 100%;
+                              display: block;
+                            ">
+                              Commands
+                            </h2>
+                        <p style="color: #D2D2D2">Explore EmeraldBot's full command list. Whether you're moderating, managing, or just having fun, there's a command for every purpose.</p>
+                        <div style="margin-bottom: 5rem;"></div>
+                        <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+                            <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                <a href="discordemeraldbotcmds#utility">
+                                 <img 
+                                    src="/assets/images/discordemeraldbot/utilitycmd.webp" 
+                                    class="hover-zoom" 
+                                    style="width: 100%;"
+                                    alt="">
+                                    </a>
+                                </div>
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                    <a href="discordemeraldbotcmds#info">
+                                <img 
+                                    src="/assets/images/discordemeraldbot/infocmd.webp" 
+                                    class="hover-zoom" 
+                                    style="width: 100%;"
+                                    alt="">
+                                    </a>
+                                </div>
+                              <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                              <a href="discordemeraldbotcmds#moderation">
+                                <img 
+                                  src="/assets/images/discordemeraldbot/modcmd.webp" 
+                                  class="hover-zoom" 
+                                  style="width: 100%;" 
+                                  alt="">
+                              </a>
+                            </div>
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                    <a href="discordemeraldbotcmds#fun">
+                                      <img 
+                                        src="/assets/images/discordemeraldbot/funcmd.webp" 
+                                        class="hover-zoom" 
+                                        style="width: 100%;"
+                                        alt="">
+                                    </a>
+                                    </div>
+                            <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                              <a href="discordemeraldbotcmds#music">
+                                <img 
+                                  src="/assets/images/discordemeraldbot/musiccmd.webp" 
+                                  class="hover-zoom" 
+                                  style="width: 100%;" 
+                                  alt="">
+                              </a>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 5rem;"></div>
+                    </div>
+                    <div class="animate-on-scroll">
+                        <div style="margin-bottom: 3rem;"></div>
+                        <div style="margin-bottom: 5rem;"></div>
+                    </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <section style="background-color:#252525;" id="support" class="section">
+                <div class="container">
+                    <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
+                        <h2 class="animate-on-scroll" style="
+                              background: linear-gradient(90deg, #e3e3e3, #b0b0b0, #737373);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
+                              background-clip: text;
+                              text-fill-color: transparent;
+                              text-align: center;
+                              width: 100%;
+                              display: block;
+                            ">
+                              Support
+                            </h2>
+                        <p style="color: #D2D2D2">Have questions? Get support on the EmeraldNetwork Discord server!</p>
+                        <div style="margin-bottom: 2rem;"></div>
+                        <div style="align-items: center; justify-content: center; display: flex">
+                            <div class="animate-on-scroll hero-buttons" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
+                                <a style="color:white;" href="https://discord.gg/CQqZ34T8Jn" class="button button-outline">
+                                    Join Discord Server!
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                        <polyline points="12 5 19 12 12 19"/>
+                                    </svg>
+                                </a>
+                            </div>
+                            </div>
+                    </div>
+                    <div class="animate-on-scroll">
+                        <div style="margin-bottom: 5rem;"></div>
+                    </div>
+                    </div>
+                </div>
+            </section>
+
+            <section style="background-color: #252525; 
+                            background-image: url('/assets/images/discordemeraldbot/grounddiscordemeraldbot.webp'); 
+                            background-repeat: no-repeat; 
+                            background-position: center center; 
+                            background-size: auto; 
+                            background-attachment: local;" 
+                     class="section">
+                <div class="container">
+                    <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
+                        <h3 class="animate-on-scroll" style="
+                              background: linear-gradient(-90deg, #a0a0a0, #FFFFFF, #a0a0a0);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
+                              background-clip: text;
+                              text-fill-color: transparent;
+                              text-align: center;
+                              width: 100%;
+                              display: block;
+                            ">
+                            Level up your Discord server with EmeraldBot
+                        </h3>
+                        <div style="margin-bottom: 2rem;"></div>
+                        <div style="align-items: center; justify-content: center; display: flex">
+                            <div class="animate-on-scroll hero-buttons" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
+                                <a style="color:white;" href="https://discord.com/oauth2/authorize?client_id=1197553424724660254&permissions=275364670576&integration_type=0&scope=bot" class="button">
+                                    Invite
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                        <polyline points="12 5 19 12 12 19"/>
+                                    </svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="animate-on-scroll">
+                        <div style="margin-bottom: 4rem;"></div>
+                    </div>
+                </div>
+            </section>
+
+
+
+
+
+
+        </main>
+
+                        <footer style="background-color: #2A2A2A; border-top: 1px solid #313131 !important;" class="footer">
+                            <div class="container footer-container">
+                                <p style="color: #D2D2D2;">&copy; <span id="current-year"></span> EmeraldNetwork - IceEmerald</p>
+                                <div class="footer-social-links">
+                                    <a href="https://youtube.com/iceemerald" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="YouTube">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D2D2D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2A29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58z"/>
+                                            <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"/>
+                                        </svg>
+                                    </a>
+
+                                    <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D2D2D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                                            <line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/>
+                                        </svg>
+                                    </a>
+                                    <a href="mailto:iceemerald23@gmail.com" class="social-icon-button-footer" aria-label="Email">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D2D2D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect width="20" height="16" x="2" y="4" rx="2"/>
+                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
+                        </footer>
+
+    <script src="/assets/scripts/animationvisible.js"></script>
+                             <script src="/assets/scripts/scrollice.js"></script>
+                        <script src="/assets/scripts/dropdown.js"></script>
+                        <script src="/assets/scripts/rightclick.js"></script>
+
+
+</body>
+</html>

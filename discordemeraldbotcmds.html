@@ -1,0 +1,284 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork</title>
+    <meta name="description" content="Welcome to the EmeraldNetwork website, home to applications or files created by IceEmerald and developed with love.">
+    <!-- Add GeistSans font from CDN -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles/style.css" />
+    <!-- Favicon (replace with your actual favicon.ico in the root or images folder) -->
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+</head>
+<body style="background-color: #1a1a1a;">
+
+    <style>
+        /* width */
+        ::-webkit-scrollbar {
+          width: 10px; /* Thinner scrollbar */
+        }
+
+        /* Track */
+        ::-webkit-scrollbar-track {
+         background: #1a1a1a;
+        }
+
+    </style>
+
+
+        <header style="background-color: rgba(32, 32, 32, 0.4); border-bottom: 1px solid #313131 !important;" class="navbar sticky-top">
+            <div class="navcontainer nav-container">
+                <a href="/" class="logo">
+                    <!-- Briefcase SVG Icon -->
+                    <img href="/" src="/assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
+                    <span href="/" style="color: #f0f0f0" class="logo-text">EmeraldNetwork</span>
+                </a>
+                        <nav class="nav-links">
+                          <a style="color: #f0f0f0" href="https://discord.com/oauth2/authorize?client_id=1197553424724660254&permissions=275364670576&integration_type=0&scope=bot">Invite</a>
+                            <a style="color: #f0f0f0" href="discordemeraldbot">Back</a>
+                        </nav>
+            </div>
+        </header>
+
+                        <div id="custom-context-menu" class="rightclick-menu">
+                            <div class="context-section">
+                              <span class="context-title">🔧 Tools</span>
+                              <a onclick="copyTextContent()">Copy Text</a>
+                              <a onclick="copyPageLink()">Copy Page Link</a>
+                              <a onclick="showElementInfo()">Show Element Info</a>
+                            </div>
+                          </div>
+
+                          <div id="custom-toast" class="custom-toast"></div>
+
+    <main>
+        <div style="margin-bottom: 5rem;"></div>
+        <div style="margin-bottom: 5rem;"></div>
+        
+        <section class="container command-docs">
+          <div class="sidebar">
+            <ul>
+              <li onclick="showCategory('utility')" class="active">Utility</li>
+              <li onclick="showCategory('info')">Info</li>
+              <li onclick="showCategory('moderation')">Moderation</li>
+              <li onclick="showCategory('fun')">Fun</li>
+              <li onclick="showCategory('music')">Music</li>
+            </ul>
+          </div>
+
+          <div class="command-content">
+            <!-- Utility Commands -->
+            <table class="command-table category utility visible">
+              <thead>
+                <tr>
+                  <th>Command</th>
+                  <th>Description</th>
+                  <th>Usage</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td class="green">e!setbirthday</td><td>Set your birthday</td><td>e!setbirthday &lt;dd/mm/yyyy | dd/mm&gt;</td></tr>
+                <tr><td class="green">e!removebirthday</td><td>Remove your birthday</td><td>e!removebirthday</td></tr>
+                <tr><td class="green">e!nextbirthday</td><td>Check whose birthday is next</td><td>e!nextbirthday</td></tr>
+                <tr><td class="green">e!afk</td><td>Set AFK status</td><td>e!afk [reason]</td></tr>
+                <tr><td class="green">e!poll</td><td>Create a poll</td><td>e!poll &lt;question&gt;</td></tr>
+                <tr><td class="green">e!voiceprivate</td><td>Toggle voice private mode</td><td>e!voiceprivate</td></tr>
+                <tr><td class="green">e!calc</td><td>Solve math problems</td><td>e!calc &lt;expression&gt;</td></tr>
+                <tr><td class="green">e!ai</td><td>Chat with EmeraldBot</td><td>e!ai &lt;prompt&gt;</td></tr>
+                <tr><td class="green">e!resetai</td><td>Reset EmeraldBot memories</td><td>e!resetai</td></tr>
+              </tbody>
+            </table>
+
+            <!-- Info Commands -->
+            <table class="command-table category info">
+              <thead>
+                <tr><th>Command</th><th>Description</th><th>Usage</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="green">e!banwordlist</td><td>View the banned word list on user</td><td>e!banwordlist &lt;user&gt;</td></tr>
+                <tr><td class="green">e!help</td><td>Show help menu</td><td>e!help</td></tr>
+                <tr><td class="green">e!ping</td><td>Check bot's latency</td><td>e!ping</td></tr>
+                <tr><td class="green">e!roleinfo</td><td>Get details about a role</td><td>e!roleinfo &lt;role&gt;</td></tr>
+                <tr><td class="green">e!serverinfo</td><td>Show server details</td><td>e!serverinfo</td></tr>
+                <tr><td class="green">e!avatar</td><td>Show a user's avatar</td><td>e!avatar [user]</td></tr>
+                <tr><td class="green">e!userinfo</td><td>View a user's information</td><td>e!userinfo [user]</td></tr>
+              </tbody>
+            </table>
+
+              <!-- Moderation Commands -->
+              <table class="command-table category moderation">
+                <thead>
+                  <tr><th>Command</th><th>Description</th><th>Usage</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="green">e!banworduser</td><td>Ban users from saying specific words.</td><td>e!banworduser &lt;user&gt; &lt;bannedword&gt;</td></tr>
+                  <tr><td class="green">e!unbanworduser</td><td>Allow banned words again.</td><td>e!unbanworduser &lt;user&gt;</td></tr>
+                  <tr><td class="green">e!renamerole</td><td>Rename a role.</td><td>e!renamerole &lt;role&gt; &lt;newname&gt;</td></tr>
+                  <tr><td class="green">e!autorole</td><td>Assign roles to new members.</td><td>e!autorole &lt;enable | disable&gt; &lt;role&gt;</td></tr>
+                  <tr><td class="green">e!mute</td><td>Mute a user.</td><td>e!mute &lt;user&gt; [reason]</td></tr>
+                  <tr><td class="green">e!unmute</td><td>Unmute a user.</td><td>e!unmute &lt;user&gt;</td></tr>
+                  <tr><td class="green">e!chatmod</td><td>Toggle chat moderation.</td><td>e!chatmod</td></tr>
+                  <tr><td class="green">e!voicekick</td><td>Kick a user from voice channels.</td><td>e!voicekick &lt;user&gt;</td></tr>
+                  <tr><td class="green">e!purge</td><td>Delete multiple messages.</td><td>e!purge &lt;amount&gt;</td></tr>
+                  <tr><td class="green">e!voicelock</td><td>Lock voice channels.</td><td>e!voicelock</td></tr>
+                  <tr><td class="green">e!chatlock</td><td>Lock text channels.</td><td>e!chatlock</td></tr>
+                  <tr><td class="green">e!log</td><td>Log server events.</td><td>e!log &lt;enable | disable&gt; &lt;channel&gt;</td></tr>
+                  <tr><td class="green">e!joinleave</td><td>Create welcome and goodbye messages.</td><td>e!joinleave &lt;enable | disable&gt; &lt;channel&gt;</td></tr>
+                </tbody>
+              </table>
+
+              <!-- Fun Commands -->
+              <table class="command-table category fun">
+                <thead>
+                  <tr><th>Command</th><th>Description</th><th>Usage</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="green">e!coinflip</td><td>Flip a coin.</td><td>e!coinflip</td></tr>
+                  <tr><td class="green">e!dice</td><td>Roll a six-sided dice.</td><td>e!dice</td></tr>
+                  <tr><td class="green">e!say</td><td>Repeat your message.</td><td>e!say &lt;text&gt;</td></tr>
+                  <tr><td class="green">e!rps</td><td>Play rock-paper-scissors.</td><td>e!rps</td></tr>
+                </tbody>
+              </table>
+
+            <!-- Music Commands -->
+            <table class="command-table category music">
+              <thead>
+                <tr><th>Command</th><th>Description</th><th>Usage</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="green">e!play</td><td>Play a song or playlist.</td><td>e!play &lt;query | url&gt;</td></tr>
+                <tr><td class="green">e!skip</td><td>Skip the current song or multiple songs.</td><td>e!skip [amount]</td></tr>
+                <tr><td class="green">e!stop</td><td>Stop playback and clear the queue.</td><td>e!stop</td></tr>
+                <tr><td class="green">e!pause</td><td>Pause the current playback.</td><td>e!pause</td></tr>
+                <tr><td class="green">e!resume</td><td>Resume the paused song.</td><td>e!resume</td></tr>
+                <tr><td class="green">e!queue</td><td>Show the current music queue.</td><td>e!queue [page]</td></tr>
+                <tr><td class="green">e!nowplaying</td><td>Display the currently playing track.</td><td>e!nowplaying</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div style="margin-bottom: 15rem;"></div>
+        <div style="margin-bottom: 5rem;"></div>
+
+
+
+
+        <script>
+        function showCategory(cat) {
+          // Hide all categories
+          document.querySelectorAll('.command-table').forEach(table => table.classList.remove('visible'));
+
+          // Show the selected category
+          const table = document.querySelector(`.command-table.${cat}`);
+          if (table) table.classList.add('visible');
+
+          // Highlight active menu
+          document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+          document.querySelectorAll('.sidebar li').forEach(li => {
+            if (li.textContent.toLowerCase() === cat) {
+              li.classList.add('active');
+            }
+          });
+        }
+
+        // ✅ Auto-activate based on hash in URL
+        window.addEventListener('DOMContentLoaded', () => {
+          const hash = window.location.hash.replace('#', '').toLowerCase();
+          if (hash) {
+            showCategory(hash);
+          } else {
+            showCategory('utility'); // fallback/default section
+          }
+        });
+        </script>
+
+
+
+      <section style="background-color: #252525; 
+                      background-image: url('/assets/images/discordemeraldbot/grounddiscordemeraldbot.webp'); 
+                      background-repeat: no-repeat; 
+                      background-position: center center; 
+                      background-size: auto; 
+                      background-attachment: local;" 
+               class="section">
+          <div class="container">
+              <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
+                  <h3 class="animate-on-scroll" style="
+                        background: linear-gradient(-90deg, #a0a0a0, #FFFFFF, #a0a0a0);
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        background-clip: text;
+                        text-fill-color: transparent;
+                        text-align: center;
+                        width: 100%;
+                        display: block;
+                      ">
+                      Level up your Discord server with EmeraldBot
+                  </h3>
+                  <div style="margin-bottom: 2rem;"></div>
+                  <div style="align-items: center; justify-content: center; display: flex">
+                      <div class="animate-on-scroll hero-buttons" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
+                          <a style="color:white;" href="https://discord.com/oauth2/authorize?client_id=1197553424724660254&permissions=275364670576&integration_type=0&scope=bot" class="button">
+                              Invite
+                              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                  <line x1="5" y1="12" x2="19" y2="12"/>
+                                  <polyline points="12 5 19 12 12 19"/>
+                              </svg>
+                          </a>
+                      </div>
+                  </div>
+              </div>
+              <div class="animate-on-scroll">
+                  <div style="margin-bottom: 4rem;"></div>
+              </div>
+          </div>
+      </section>
+
+
+
+
+
+
+        </main>
+
+                        <footer style="background-color: #2A2A2A; border-top: 1px solid #313131 !important;" class="footer">
+                            <div class="container footer-container">
+                                <p style="color: #D2D2D2;">&copy; <span id="current-year"></span> EmeraldNetwork - IceEmerald</p>
+                                <div class="footer-social-links">
+                                    <a href="https://youtube.com/iceemerald" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="YouTube">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D2D2D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2A29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58z"/>
+                                            <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"/>
+                                        </svg>
+                                    </a>
+
+                                    <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D2D2D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                                            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                                            <line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/>
+                                        </svg>
+                                    </a>
+                                    <a href="mailto:iceemerald23@gmail.com" class="social-icon-button-footer" aria-label="Email">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D2D2D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect width="20" height="16" x="2" y="4" rx="2"/>
+                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
+                        </footer>
+
+    <script src="/assets/scripts/animationvisible.js"></script>
+                             <script src="/assets/scripts/scrollice.js"></script>
+                        <script src="/assets/scripts/dropdown.js"></script>
+                        <script src="/assets/scripts/rightclick.js"></script>
+
+
+</body>
+</html>

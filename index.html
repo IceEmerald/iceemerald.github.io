@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork</title>
+    <meta name="description" content="Welcome to the EmeraldNetwork website, home to applications or files created by IceEmerald and developed with love.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="/assets/styles/style.css" />
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+</head>
+<body>
+
+    <!--
+        Welcome to the EmeraldNetwork Website!
+    -->
+
+        <header class="navbar sticky-top">
+            <div class="navcontainer nav-container">
+                <a href="#" class="logo">
+                    <img href="#" src="/assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
+                    <span href="#" class="logo-text">EmeraldNetwork</span>
+                </a>
+                        <nav class="nav-links">
+                          <a href="#about">About</a>
+                          <div class="dropdown">
+                            <a href="#apps" class="dropdown-button">
+                              <span>Apps</span>
+                                <svg class="dropdownsvg" viewBox="-2.4 -2.4 28.80 28.80" xmlns="http://www.w3.org/2000/svg" fill="#222222">
+                                  <g>
+                                    <path fill="none" d="M0 0h24v24H0z"></path>
+                                    <path d="M12 15l-4.243-4.243 1.415-1.414L12 12.172l2.828-2.829 1.415 1.414z"></path>
+                                  </g>
+                                </svg>
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="discordserver">EmeraldNetwork Discord Server</a>
+                                  <a href="minecraftserver">EmeraldNetwork Minecraft Server</a>
+                                  <a href="emeraldessentialsplugin">EmeraldEssentials Minecraft Plugin</a>
+                                  <a href="discordemeraldbot">EmeraldBot Discord Bot</a>
+                            </div>
+                          </div>
+                        </nav>
+            </div>
+        </header>
+
+
+                      <div id="custom-context-menu" class="rightclick-menu">
+                        <div class="context-section">
+                          <span class="context-title">🔧 Tools</span>
+                          <a onclick="copyTextContent()">Copy Text</a>
+                          <a onclick="copyPageLink()">Copy Page Link</a>
+                          <a onclick="showElementInfo()">Show Element Info</a>
+                        </div>
+                      </div>
+
+                      <div id="custom-toast" class="custom-toast"></div>
+
+                        
+        <main>
+            <section id="hero" class="section about-section" style="position: relative; overflow: hidden;">
+
+              <!-- Background div with image, full size and behind -->
+              <div 
+                class="hero-background" 
+                style="
+                  position: absolute;
+                  top: 0; left: 0; right: 0; bottom: 0;
+                  background-image: url('/assets/images/emeraldnetback.webp');
+                  background-size: cover;
+                  background-position: center center;
+                  z-index: -1;
+                  ">
+              </div>
+
+              <!-- Content for phone -->
+              <div class="show-phone-only">
+                <div class="hover-zoom animate-on-scroll" 
+                     style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 0;">
+                </div>
+                <div class="animate-on-scroll container hero-container" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 40vh; text-align: center;">
+                  <div class="hero-content">
+                    <h1 class="animate-on-scroll" style="background: linear-gradient(90deg, #808080, #5a5a5a, #3a3a3a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">EmeraldNetwork</h1>
+                    <p>Welcome to the EmeraldNetwork website, home to applications or files created by IceEmerald and developed with love.</p>
+                    <div style="margin-bottom: 3rem;"></div>
+                    <div style="margin-bottom: 3rem;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Content for desktop -->
+              <div class="show-desktop-only">
+                <div class="hover-zoom animate-on-scroll" 
+                     style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 0;">
+                </div>
+                <div class="animate-on-scroll container hero-container" 
+                     style="display: flex; flex-direction: column; justify-content: center; align-items: flex-start; min-height: 40vh; text-align: left; padding-left: 1rem;">
+                  <div class="hero-content" style="max-width: none; margin-left: 0; padding-left: 0;">
+                    <h1 class="animate-on-scroll" style="font-size: 3.5rem; background: linear-gradient(90deg, #808080, #5a5a5a, #3a3a3a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; margin-left: 0;">
+                      EmeraldNetwork
+                    </h1>
+
+                    <p style="max-width: 600px; text-align: left; line-height: 1.6; margin-left: 0;">
+                      Welcome to the EmeraldNetwork website,<br>
+                      home to applications or files created by IceEmerald<br>
+                      and developed with love.
+                    </p>
+
+                    <div style="margin-bottom: 3rem;"></div>
+                    <div style="margin-bottom: 3rem;"></div>
+                  </div>
+                </div>
+              </div>
+
+            </section>
+    
+            <section id="benefits" class="section">
+                <div class="container">
+                    <div class="section-header" style="margin-top: 3rem;">
+                        <h2 class="animate-on-scroll" style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">Why EmeraldNetwork?</h2>
+                    </div>
+                    <div style=" display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
+                          <img 
+                            src="/assets/images/why/why1.webp" 
+                            class="hover-zoom hover-img" 
+                            style="width: 100%;"
+                            alt="">
+                        </div>
+
+                        <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
+                          <img 
+                            src="/assets/images/why/why2.webp" 
+                            class="hover-zoom hover-img" 
+                            style="width: 100%;"
+                            alt="">
+                        </div>
+
+                        <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
+                          <img 
+                            src="/assets/images/why/why3.webp" 
+                            class="hover-zoom hover-img" 
+                            style="width: 100%;"
+                            alt="">
+                        </div>
+
+                    </div>
+                    <div style="margin-bottom: 2rem;"></div>
+                    <h4 class="animate-on-scroll" style="text-align: center;">*Based on performance tests comparing EmeraldCore with other common backend infrastructures.</h4>
+                </div>
+                <div style="margin-bottom: 4rem;"></div>
+            </section>
+
+            <section id="about" style="background-color: #F8F8F8" class="section about-section">
+                <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 2rem; flex-direction: row-reverse;">
+                    <div class="animate-on-scroll about-content" style="flex: 1;">
+                        <div style="margin-top: 5rem;"></div>
+                        <h2 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">About EmeraldNetwork</h2>
+                        <p>EmeraldNetwork is a growing ecosystem built by IceEmerald, designed to deliver innovative, user-friendly solutions like EmeraldEssentials — all tailored for performance, reliability, and community empowerment.</p>
+                    </div>
+                    <div class="animate-on-scroll about-image-container">
+                        <img class="show-desktop-only hover-zoom" src="/assets/images/aboutemeraldnet.webp" style="max-width: 400px; height: auto;">
+                    </div>
+                </div>
+            </section>
+
+            <div id="white-cover"></div>
+
+
+            <section id="about" style="background-color: #F8F8F8" class="section about-section">
+                <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8rem;">
+                    <div class="animate-on-scroll about-image-container">
+                        <img class="show-desktop-only hover-zoom" src="/assets/images/ice.webp" style="max-width: 380px; height: auto;">
+                    </div>
+                    <div class="animate-on-scroll about-content">
+                        <h2 style="background: linear-gradient(-90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">About IceEmerald</h2>
+                        <p>IceEmerald is a creative catboy and content creator, founder of EmeraldNetwork — a platform for apps, Minecraft plugins, Discord bots, and more. Blending playful charm with technical skill, he also shares videos, art, and stories on YouTube and Instagram.</p>
+                        <div class="animate-on-scroll hero-buttons" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
+                            <a href="#aboutice" rel="noopener noreferrer" class="aboutice-link button button-outline">
+                                Learn More
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                    <polyline points="12 5 19 12 12 19"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-bottom: 4rem;"></div>
+            </section>
+
+            <section style="background-image: url('/assets/images/trustbackground.webp');" id="apps" class="section">
+                <div class="container">
+                    <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
+                            <h2 style="
+                              background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
+                              background-clip: text;
+                              text-fill-color: transparent;
+                            ">Trusted by 35.000+ People</h2>
+                        <p>EmeraldNetwork was founded by IceEmerald with the aim of creating a comfortable and easy-to-use place or apps for everyone.</p>
+                        <div style="margin-bottom: 5rem;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+                            <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                              <a href="emeraldessentialsplugin">
+                                  <img 
+                                    src="/assets/images/trust/trust1.webp" 
+                                    class="hover-zoom" 
+                                    style="width: 100%;"
+                                    alt="">
+                                </a>
+                                </div>
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <a href="discordemeraldbot">
+                                    <img 
+                                      src="/assets/images/trust/trust2.webp" 
+                                      class="hover-zoom" 
+                                      style="width: 100%;" 
+                                      alt="">
+                                  </a>
+                                </div>
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <a href="https://discord.gg/CQqZ34T8Jn">
+                                  <img 
+                                    src="/assets/images/trust/trust3.webp" 
+                                    class="hover-zoom" 
+                                    style="width: 100%;"
+                                    alt="">
+                                  </a>
+                                </div>
+                                <div class="animate-on-scroll" style="max-width: 350px; overflow: hidden;">
+                                  <a href="minecraftserver">
+                                 <img 
+                                    src="/assets/images/trust/trust4.webp" 
+                                    class="hover-zoom" 
+                                    style="width: 100%;"
+                                    alt="">
+                                  </a>
+                                </div>
+                    </div>
+                    <div class="animate-on-scroll">
+                        <div style="margin-bottom: 3rem;"></div>
+                        <div style="margin-bottom: 5rem;"></div>
+                    </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="container footer-container">
+                <p>&copy; <span id="current-year"></span> EmeraldNetwork - IceEmerald</p>
+                <div class="footer-social-links">
+                     <a href="https://youtube.com/iceemerald" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="YouTube">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2A29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58z"></path>
+                             <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon>
+                         </svg>
+                     </a>
+
+                     <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                             <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                             <line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/>
+                         </svg>
+                     </a>
+                     <a href="mailto:iceemerald23@gmail.com" class="social-icon-button-footer" aria-label="Email">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        </footer>                  
+    <script src="/assets/scripts/animationvisible.js"></script>
+    <script src="/assets/scripts/scrollice.js"></script>
+     <script src="/assets/scripts/dropdown.js"></script>
+    <script src="/assets/scripts/rightclick.js"></script>
+
+</body>
+</html>
