@@ -956,7 +956,6 @@
 .new-note-btn:focus,
 .action-btn:focus,
 .welcome-btn:focus {
-    outline: 2px solid #0078d4;
     outline-offset: 2px;
 }
 
