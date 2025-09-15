@@ -14,7 +14,7 @@
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: #fafafa;
+    background: #F5F5F5;
     overflow: hidden;
     cursor: url('/assets/images/maincursor.png'), auto;
 }
@@ -312,7 +312,6 @@
 
 .sidebar-header {
     padding: 20px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     display: flex;
     justify-content: space-between;
     align-items: center;
