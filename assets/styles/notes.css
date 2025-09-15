@@ -14,7 +14,7 @@
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: #f0f0f0;
+    background: #fafafa;
     overflow: hidden;
     cursor: url('/assets/images/maincursor.png'), auto;
 }
