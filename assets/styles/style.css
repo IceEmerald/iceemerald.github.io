@@ -546,19 +546,19 @@ body {
 
 /* Track */
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0); /* Solid white background */
+  background: #f1f1f1;
 }
 
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  background: rgba(43, 208, 89, 0.6); /* Green #2BD059 with transparency */
+  background: #c1c1c1;
   border-radius: 10px;
 }
 
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(43, 208, 89, 1); /* Fully opaque green on hover */
+  background: #a8a8a8;
 }
 
 
