@@ -14,7 +14,7 @@
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafb 50%, #e8f5e8 100%);
+    background: #ffffff;
     overflow: hidden;
     cursor: url('/assets/images/maincursor.png'), auto;
 }
@@ -123,14 +123,14 @@
     background: rgba(255, 255, 255, 0.95);
     display: flex;
     justify-content: center;
-    max-width: 1200px;
+    max-width: 1900px;
     margin: 0 auto;
 }
 
 .ribbon-panel {
     display: none;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     flex-wrap: wrap;
     justify-content: center;
 }
@@ -195,8 +195,7 @@
     background: rgba(255, 255, 255, 0.9);
     border-color: rgba(35, 154, 77, 0.3);
     color: rgba(44, 62, 80, 1);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .ribbon-btn.active {
@@ -347,7 +346,6 @@
     background: rgba(35, 154, 77, 0.1);
     border-color: rgba(35, 154, 77, 0.3);
     color: rgba(35, 154, 77, 0.8);
-    transform: translateY(-1px);
 }
 
 .sidebar-header h3 {
@@ -370,7 +368,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     order: 2;
@@ -379,7 +376,6 @@
 
 .new-note-btn:hover {
     background: #197138;
-    transform: translateY(-1px);
 }
 
 .notes-list {
@@ -399,55 +395,14 @@
     position: relative;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
-    transform: translateY(0);
-}
-
-.note-item[data-color="#ffffff"],
-.note-item:not([data-color]) {
-    background: rgba(255, 255, 255, 0.95);
-    box-shadow: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
-.note-item[data-color]:not([data-color="#ffffff"]) {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(0, 0, 0, 0.08);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
 }
 
 .note-item:hover {
-    transform: translateY(-3px);
     background: rgba(255, 255, 255, 1);
 }
 
-.note-item[data-color]:not([data-color="#ffffff"]):hover {
-    border-color: rgba(35, 154, 77, 0.4);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), 0 8px 28px rgba(35, 154, 77, 0.15);
-}
-
-.note-item:not([data-color]):hover,
-.note-item[data-color="#ffffff"]:hover {
-    border-color: rgba(0, 0, 0, 0.15);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08);
-}
-
 .note-item.active {
-    transform: translateY(-1px);
-}
-
-.note-item[data-color]:not([data-color="#ffffff"]).active {
-    border-color: #239a4d;
-    background: rgba(35, 154, 77, 0.08);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 6px 20px rgba(35, 154, 77, 0.25);
-}
-
-.note-item:not([data-color]).active,
-.note-item[data-color="#ffffff"].active {
-    border-color: rgba(35, 154, 77, 0.5);
-    background: rgba(35, 154, 77, 0.05);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 6px 16px rgba(35, 154, 77, 0.15);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.025), 0 4px 12px rgba(0, 0, 0, 0.025);
 }
 
 .note-item-title {
@@ -505,6 +460,8 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-radius: 0 12px 0 0;
+    position: relative;
+    z-index: 100;
 }
 
 .note-title {
@@ -517,6 +474,10 @@
     outline: none;
     padding: 8px 0;
     font-family: 'DM Sans', sans-serif;
+    max-width: 80%; /* Prevents overflow */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Adds ellipsis if text overflows */
+    white-space: nowrap; /* Prevents text from wrapping */
 }
 
 .note-title::placeholder {
@@ -539,14 +500,15 @@
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    height: 48px;
+    box-sizing: border-box;
 }
 
 .action-btn:hover {
     background: rgba(220, 53, 69, 0.2);
     border-color: #dc3545;
     color: #dc3545;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    box-shadow: 0 2px 6px rgba(220, 53, 69, 0.2);
 }
 
 .editor-content {
@@ -554,6 +516,8 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    position: relative;
+    z-index: 1;
 }
 
 .text-editor {
@@ -691,7 +655,6 @@
     align-items: center;
     gap: 12px;
     margin: 0 auto;
-    transition: all 0.2s ease;
     font-weight: 600;
     font-family: 'DM Sans', sans-serif;
     backdrop-filter: blur(8px);
@@ -700,7 +663,6 @@
 
 .welcome-btn:hover {
     background: #197138;
-    transform: translateY(-2px);
 }
 
 /* Responsive Design */
@@ -724,6 +686,7 @@
     }
 }
 
+@media (max-width: 768px) {
     .ribbon-group {
         margin-right: 8px;
         padding-right: 8px;
@@ -884,6 +847,10 @@
 #noteColorDropdown .ms-dropdown-btn {
     min-width: 100px;
     justify-content: flex-start;
+    padding: 12px 24px 12px 12px;
+    height: 48px;
+    border-radius: 8px;
+    box-sizing: border-box;
 }
 
 #noteColorDropdown .dropdown-value {
@@ -905,7 +872,7 @@
 .ms-dropdown-btn:hover {
     background: rgba(255, 255, 255, 0.95);
     border-color: rgba(35, 154, 77, 0.3);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 .ms-dropdown.active .ms-dropdown-btn:after {
@@ -923,7 +890,7 @@
     border-radius: 8px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
     min-width: 180px;
-    z-index: 9999;
+    z-index: 10000;
     display: none;
     overflow: hidden;
     margin-top: 4px;
@@ -1031,7 +998,7 @@
 .new-note-btn:focus,
 .action-btn:focus,
 .welcome-btn:focus {
-    outline-offset: 2px;
+    outline-offset: 0px;
 }
 
 .font-family:focus,
@@ -1079,13 +1046,12 @@
     max-width: 400px;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transform: scale(0.9) translateY(20px);
     transition: all 0.3s ease;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .delete-modal.show .delete-modal-content {
-    transform: scale(1) translateY(0);
+    /* No transform needed */
 }
 
 .delete-modal-header {
@@ -1096,7 +1062,7 @@
 .delete-modal-icon {
     width: 48px;
     height: 48px;
-    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    background: #ee5a52;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1153,14 +1119,13 @@
 }
 
 .delete-modal-btn-delete {
-    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    background: #ee5a52;
     color: white;
     border: 1px solid rgba(238, 90, 82, 0.3);
 }
 
 .delete-modal-btn-delete:hover {
-    background: linear-gradient(135deg, #ff5252, #e53935);
-    transform: translateY(-1px);
+    background: #e53935;
     box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
 }
 
@@ -1197,13 +1162,12 @@
     max-width: 400px;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transform: scale(0.9) translateY(20px);
     transition: all 0.3s ease;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .table-modal.show .table-modal-content {
-    transform: scale(1) translateY(0);
+    /* No transform needed */
 }
 
 .table-modal-header {
@@ -1214,7 +1178,7 @@
 .table-modal-icon {
     width: 48px;
     height: 48px;
-    background: linear-gradient(135deg, #239a4d, #1e8e3e);
+    background: #239a4d;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1299,14 +1263,13 @@
 }
 
 .table-modal-btn-create {
-    background: linear-gradient(135deg, #239a4d, #1e8e3e);
+    background: #239a4d;
     color: white;
     border: 1px solid rgba(30, 142, 62, 0.3);
 }
 
 .table-modal-btn-create:hover {
-    background: linear-gradient(135deg, #1e8e3e, #1a7938);
-    transform: translateY(-1px);
+    background: #1e8e3e;
     box-shadow: 0 4px 12px rgba(35, 154, 77, 0.4);
 }
 
@@ -1343,13 +1306,12 @@
     max-width: 400px;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transform: scale(0.9) translateY(20px);
     transition: all 0.3s ease;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .link-modal.show .link-modal-content {
-    transform: scale(1) translateY(0);
+    /* No transform needed */
 }
 
 .link-modal-header {
@@ -1360,7 +1322,7 @@
 .link-modal-icon {
     width: 48px;
     height: 48px;
-    background: linear-gradient(135deg, #007acc, #005fa3);
+    background: #005fa3;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1445,13 +1407,13 @@
 }
 
 .link-modal-btn-create {
-    background: linear-gradient(135deg, #007acc, #005fa3);
+    background: #005fa3;
     color: white;
     border: 1px solid rgba(0, 95, 163, 0.3);
 }
 
 .link-modal-btn-create:hover {
-    background: linear-gradient(135deg, #005fa3, #004d87);
+    background: #005fa3;
 }
 
 .link-modal-btn-create:disabled {

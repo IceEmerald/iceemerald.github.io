@@ -1040,8 +1040,8 @@ class NotesApp {
     sanitizeHtml(html) {
         if (!html) return '';
 
-        const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'b', 'i', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span'];
-        const allowedAttributes = ['style'];
+        const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'b', 'i', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a'];
+        const allowedAttributes = ['style', 'href', 'target', 'rel'];
 
         try {
             const div = document.createElement('div');
@@ -1069,10 +1069,23 @@ class NotesApp {
                 const attributes = Array.from(element.attributes);
                 attributes.forEach(attr => {
                     const attrName = attr.name.toLowerCase();
+                    const attrValue = attr.value.toLowerCase();
+
+                    // Allow href for anchor tags if it's a safe URL
+                    if (attrName === 'href' && tagName === 'a') {
+                        // Check for safe protocols
+                        if (attrValue.startsWith('http://') || 
+                            attrValue.startsWith('https://') || 
+                            attrValue.startsWith('mailto:')) {
+                            return; // Keep safe href attributes
+                        }
+                    }
+
                     if (attrName.startsWith('on') || 
                         attrName.includes('javascript:') || 
-                        attrName === 'src' || 
-                        attrName === 'href' || 
+                        attrValue.includes('javascript:') ||
+                        (attrName === 'src') || 
+                        (attrName === 'href' && tagName !== 'a') ||
                         !allowedAttributes.includes(attrName)) {
                         element.removeAttribute(attr.name);
                     }
