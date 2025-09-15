@@ -272,7 +272,7 @@
 /* Sidebar Style */
 .sidebar {
     width: 320px;
-    background: rgba(255, 255, 255, 1);
+    background: rgba(255, 255, 255, 0);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     display: flex;
