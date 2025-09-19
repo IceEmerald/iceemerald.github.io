@@ -278,6 +278,14 @@
     <script src="/assets/scripts/scrollice.js"></script>
      <script src="/assets/scripts/dropdown.js"></script>
     <script src="/assets/scripts/rightclick.js"></script>
+                        <script>
+                          if ("serviceWorker" in navigator) {
+                            navigator.serviceWorker.register("/assets/scripts/sw.js").then(() => {
+                              console.log("Service Worker registered!");
+                            });
+                          }
+                        </script>
+
 
 </body>
 </html>
