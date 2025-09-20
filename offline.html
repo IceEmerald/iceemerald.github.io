@@ -54,11 +54,15 @@
                 <div class="container hero-container" style="transform: translateY(-15%); display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 45vh; text-align: center;">
                     <div class="notfound-content">
                         <div class="animate-on-scroll about-image-container">
-                            <div style="margin-top: 18rem;"></div>
-                            <img class="show-desktop-only" src="/assets/images/404.webp" style="max-width: 700px; height: auto;" data-ai-hint="work desk technology">
+                            <div style="margin-top: 17rem;"></div>
+                            <img class="show-desktop-only" src="/assets/images/nointernet.webp" style="max-width: 700px; height: auto;" data-ai-hint="work desk technology">
                         </div>
                         <h1 class="show-phone-only" style="color:#8D0000; text-align: center;">404</h1>
-                        <p style="text-align: center;">No Internet.</p>
+                        <p style="text-align: center;">You are not connected to the internet.</p>
+                        <div style="margin-top: 1rem;"></div>
+                        <a href="#" id="reloadBtn" class="button">
+                            Reload
+                        </a>
                         <div style="margin-top: 12rem;"></div>
                     </div>
                 </div>
@@ -93,6 +97,12 @@
     <script src="/assets/scripts/animationvisible.js"></script>
                              <script src="/assets/scripts/scrollice.js"></script>
                         <script src="/assets/scripts/dropdown.js"></script>
+                        <script>
+                            document.getElementById("reloadBtn").addEventListener("click", (e) => {
+                              e.preventDefault();
+                              location.reload(); // reloads the current page
+                            });
+                          </script>
 
 
 </body>
