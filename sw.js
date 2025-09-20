@@ -6,7 +6,10 @@ const ASSETS_TO_CACHE = [
   "./assets/styles/style.css",  
   "./assets/images/nointernet.webp", 
   "./assets/images/favicon.webp",
-  "./assets/scripts/"
+  "./assets/scripts/animationvisible.js",
+  "./assets/scripts/scrollice.js",
+  "./assets/scripts/dropdown.js",
+  "./assets/scripts/rightclick.js"
 ];
 
 self.addEventListener("install", (event) => {
