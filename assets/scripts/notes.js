@@ -1997,7 +1997,6 @@ class NotesApp {
     // Show export modal with share link
     exportNoteAsLink() {
         if (!this.currentNoteId) {
-            alert('Please select a note to export');
             return;
         }
 
@@ -2046,20 +2045,16 @@ class NotesApp {
                 try {
                     if (navigator.clipboard && window.isSecureContext) {
                         navigator.clipboard.writeText(exportLink.value).then(() => {
-                            alert('Share link copied! Others can open it to import this note.');
                             exportModal.classList.remove('show');
                         }).catch(() => {
                             document.execCommand('copy');
-                            alert('Link copied! Share it with others.');
                             exportModal.classList.remove('show');
                         });
                     } else {
                         document.execCommand('copy');
-                        alert('Link copied! Share it with others.');
                         exportModal.classList.remove('show');
                     }
                 } catch (e) {
-                    alert('Could not copy. Please select and copy manually.');
                 }
                 cancelBtn.removeEventListener('click', handleCancel);
                 copyBtn.removeEventListener('click', handleCopy);
@@ -2069,7 +2064,6 @@ class NotesApp {
             copyBtn.addEventListener('click', handleCopy);
         } catch (error) {
             console.error('Error encoding note:', error);
-            alert('Failed to create share link. Your note may be too large.');
         }
     }
 
@@ -2103,8 +2097,6 @@ class NotesApp {
 
             // Clean URL (remove import parameter)
             window.history.replaceState({}, document.title, window.location.pathname);
-
-            alert('Note imported successfully!');
         } catch (error) {
             console.error('Error importing note:', error);
             // Silently fail if not a valid import link
