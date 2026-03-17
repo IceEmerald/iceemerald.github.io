@@ -1108,6 +1108,121 @@
 }
 
 /* =============================================
+   NAVBAR ALWAYS ON TOP
+   Ensure the sticky navbar sits above the
+   sliding sidebar panel and all overlays
+   ============================================= */
+.navbar.sticky-top {
+    z-index: 3000 !important;
+}
+
+/* =============================================
+   MOBILE PERFORMANCE OPTIMISATIONS (≤ 1023px)
+   Kill backdrop-filter, transition:all, and
+   anything that triggers GPU compositing stutter
+   ============================================= */
+@media (max-width: 1023px) {
+
+    /* ── Kill all backdrop-filter on mobile — the #1 cause of stutter ── */
+    .notes-app,
+    .notes-header,
+    .ribbon,
+    .ribbon-btn,
+    .sidebar,
+    .sidebar-toggle,
+    .sidebar-header,
+    .new-note-btn,
+    .note-item,
+    .editor-area,
+    .editor-header,
+    .action-btn,
+    .ms-dropdown-btn,
+    .ms-dropdown-menu,
+    .mobile-more-panel,
+    .custom-context-menu,
+    .welcome-btn,
+    .font-family,
+    .font-size,
+    .sidebar-backdrop,
+    .delete-modal-content,
+    .table-modal-content,
+    .link-modal-content {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    /* ── Replace all expensive backgrounds with solid equivalents ── */
+    .ribbon                 { background: #ffffff; }
+    .ribbon-content         { background: #ffffff; }
+    .editor-area            { background: #f9fafb; }
+    .editor-header          { background: #ffffff; }
+    .ms-dropdown-menu       { background: #ffffff; }
+    .mobile-more-panel      { background: #ffffff; }
+    .note-item              { background: #ffffff; }
+
+    /* ── Simplify or remove box-shadows (expensive to repaint) ── */
+    .ribbon                 { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .editor-area            { box-shadow: none; }
+    .note-item              { box-shadow: none !important; }
+    .note-item.active       { box-shadow: 0 0 0 2px rgba(35,154,77,0.25) !important; }
+    .ribbon-btn             { box-shadow: none !important; }
+    .action-btn             { box-shadow: none !important; }
+    .ms-dropdown-menu       { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+    .mobile-more-panel      { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+
+    /* ── Replace transition:all with explicit fast properties ── */
+    .ribbon-btn,
+    .action-btn,
+    .sidebar-toggle,
+    .new-note-btn,
+    .mobile-more-btn,
+    .ms-dropdown-btn,
+    .note-item,
+    .ribbon-tab {
+        transition: background-color 0.15s ease, color 0.15s ease,
+                    border-color 0.15s ease !important;
+    }
+
+    /* ── Sidebar slide: GPU-composited only, will-change primes the layer ── */
+    .sidebar {
+        will-change: transform;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        background: #ffffff !important;
+        box-shadow: none;
+    }
+
+    .sidebar.mobile-open {
+        box-shadow: 3px 0 20px rgba(0,0,0,0.15);
+    }
+
+    /* Backdrop: simple fade, no blur */
+    .sidebar-backdrop {
+        background: rgba(0,0,0,0.4) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    /* ── Promote scroll containers to own compositor layer ── */
+    .notes-list,
+    .text-editor {
+        transform: translateZ(0);
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
+    /* ── Stop note-item hover animations on touch (no hover on mobile anyway) ── */
+    .note-item:hover {
+        background: #ffffff;
+        transform: none;
+    }
+
+    /* ── Remove animation from backdrop — just show instantly ── */
+    .sidebar-backdrop.visible {
+        animation: none;
+    }
+}
+
+/* =============================================
    UTILITY CLASSES
    ============================================= */
 .hidden {
