@@ -113,6 +113,10 @@ class NotesApp {
         const deleteNoteBtn = document.getElementById('deleteNoteBtn');
         if (deleteNoteBtn) deleteNoteBtn.addEventListener('click', () => this.deleteCurrentNote());
 
+        // Export note button
+        const exportNoteBtn = document.getElementById('exportNoteBtn');
+        if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
+
         // Note title input
         const noteTitle = document.getElementById('noteTitle');
         if (noteTitle) {
@@ -1989,11 +1993,81 @@ class NotesApp {
             }
         }, { once: true });
     }
+    // Export current note as shareable link
+    exportNoteAsLink() {
+        if (!this.currentNoteId) {
+            alert('Please select a note to export');
+            return;
+        }
+
+        const note = this.notes.find(n => n.id === this.currentNoteId);
+        if (!note) return;
+
+        // Create export object
+        const exportObj = {
+            title: note.title,
+            content: note.content,
+            color: note.color || '#ffffff'
+        };
+
+        // Encode to base64 for URL safety
+        const encoded = btoa(encodeURIComponent(JSON.stringify(exportObj)));
+        
+        // Create share link
+        const shareLink = `${window.location.origin}${window.location.pathname}?import=${encoded}`;
+        
+        // Copy to clipboard and show notification
+        navigator.clipboard.writeText(shareLink).then(() => {
+            alert('Share link copied to clipboard!\nOthers can open this link to import the note.');
+        }).catch(() => {
+            alert('Share link:\n' + shareLink);
+        });
+    }
+
+    // Import note from URL parameter
+    importNoteFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const importData = params.get('import');
+
+        if (!importData) return;
+
+        try {
+            // Decode from base64
+            const decoded = decodeURIComponent(atob(importData));
+            const importObj = JSON.parse(decoded);
+
+            // Create new note with imported content
+            const newNote = {
+                id: this.generateId(),
+                title: `Imported: ${importObj.title || 'Untitled'}`,
+                content: importObj.content || '',
+                color: importObj.color || '#ffffff',
+                createdAt: new Date().toISOString(),
+                modifiedAt: new Date().toISOString()
+            };
+
+            // Add to notes
+            this.notes.unshift(newNote);
+            this.selectNote(newNote.id);
+            this.renderNotesList();
+            this.saveNotesToStorage();
+
+            // Clean URL (remove import parameter)
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            alert('Note imported successfully!');
+        } catch (error) {
+            console.error('Error importing note:', error);
+            alert('Error importing note. Invalid link.');
+        }
+    }
 }
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.notesApp = new NotesApp();
+    // Check for import on page load
+    window.notesApp.importNoteFromUrl();
 });
 
 // Auto-save before page unload
