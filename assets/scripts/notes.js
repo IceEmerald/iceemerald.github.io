@@ -2009,12 +2009,10 @@ class NotesApp {
         if (!note) return;
 
         try {
-            // Generate short ID and store in localStorage
-            const id = Math.random().toString(36).substr(2, 8);
-            const exports = JSON.parse(localStorage.getItem('nexp') || '{}');
-            exports[id] = {t:note.title,c:note.content,e:Date.now()+30*86400000};
-            localStorage.setItem('nexp', JSON.stringify(exports));
-            const shareLink = `${window.location.origin}${window.location.pathname}?e=${id}`;
+            // Create compressed share link for friends
+            const data = JSON.stringify({t:note.title,c:note.content});
+            const compressed = btoa(encodeURIComponent(data));
+            const shareLink = `${window.location.origin}${window.location.pathname}?s=${compressed}`;
             
             // Show modal with the link
             const exportModal = document.getElementById('exportModal');
@@ -2072,37 +2070,74 @@ class NotesApp {
     // Import note from URL parameter
     importNoteFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        const id = params.get('e');
+        const compressed = params.get('s');
 
-        if (!id) return;
+        if (!compressed) return;
 
         try {
-            const exports = JSON.parse(localStorage.getItem('nexp') || '{}');
-            const exp = exports[id];
-            if (!exp || Date.now() > exp.e) return;
-            const importObj = exp;
+            const decoded = decodeURIComponent(atob(compressed));
+            const importObj = JSON.parse(decoded);
 
-            // Create new note with imported content
+            const title = importObj.t || 'Untitled';
             const newNote = {
                 id: this.generateId(),
-                title: `Imported: ${importObj.t || 'Untitled'}`,
+                title: title,
                 content: importObj.c || '',
                 color: '#ffffff',
                 createdAt: new Date().toISOString(),
                 modifiedAt: new Date().toISOString()
             };
 
-            // Add to notes
             this.notes.unshift(newNote);
             this.selectNote(newNote.id);
             this.renderNotesList();
             this.saveNotesToStorage();
 
-            // Clean URL (remove import parameter)
             window.history.replaceState({}, document.title, window.location.pathname);
+            
+            this.showImportModal(title);
         } catch (error) {
             console.error('Error importing note:', error);
-            // Silently fail if not a valid import link
+        }
+    }
+
+    // Show import success modal
+    showImportModal(noteTitle) {
+        const modal = document.getElementById('importModal');
+        if (!modal) {
+            // Create modal if doesn't exist
+            const newModal = document.createElement('div');
+            newModal.id = 'importModal';
+            newModal.className = 'link-modal';
+            newModal.innerHTML = `
+                <div class="link-modal-content">
+                    <div class="link-modal-header">
+                        <div class="link-modal-icon">📥</div>
+                        <h3 class="link-modal-title">Note Imported</h3>
+                    </div>
+                    <div class="link-modal-body">
+                        <p style="margin:0;font-size:14px;">Added to your collection: <strong>${noteTitle}</strong></p>
+                    </div>
+                    <div class="link-modal-actions">
+                        <button class="link-modal-btn link-modal-btn-cancel" id="importModalCancel">Cancel</button>
+                        <button class="link-modal-btn link-modal-btn-create" id="importModalContinue">Continue</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(newModal);
+            const cancelBtn = document.getElementById('importModalCancel');
+            const continueBtn = document.getElementById('importModalContinue');
+            if (cancelBtn) cancelBtn.addEventListener('click', () => newModal.classList.remove('show'));
+            if (continueBtn) continueBtn.addEventListener('click', () => newModal.classList.remove('show'));
+            setTimeout(() => newModal.classList.add('show'), 10);
+        } else {
+            modal.classList.add('show');
+            setTimeout(() => {
+                const cancelBtn = document.getElementById('importModalCancel');
+                const continueBtn = document.getElementById('importModalContinue');
+                if (cancelBtn) cancelBtn.onclick = () => modal.classList.remove('show');
+                if (continueBtn) continueBtn.onclick = () => modal.classList.remove('show');
+            }, 10);
         }
     }
 }
