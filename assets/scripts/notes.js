@@ -197,46 +197,7 @@ class NotesApp {
             editorHeader.insertBefore(backBtn, editorHeader.firstChild);
         }
 
-        // Inject mobile Edit FAB button into editor area
-        const editorArea = document.querySelector('.editor-area');
-        if (editorArea && !document.getElementById('mobileEditBtn')) {
-            const editBtn = document.createElement('button');
-            editBtn.id = 'mobileEditBtn';
-            editBtn.className = 'mobile-edit-btn';
-            editBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit`;
-            editBtn.addEventListener('click', () => {
-                const editor = document.getElementById('textEditor');
-                if (editor) {
-                    editor.focus();
-                    // place cursor at end
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    range.selectNodeContents(editor);
-                    range.collapse(false);
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                }
-                document.querySelector('.notes-app').classList.add('editing-mode');
-            });
-            editorArea.appendChild(editBtn);
-        }
 
-        // Exit editing-mode when editor loses focus on mobile
-        const textEditor = document.getElementById('textEditor');
-        if (textEditor) {
-            textEditor.addEventListener('blur', () => {
-                if (this.isMobile()) {
-                    setTimeout(() => {
-                        document.querySelector('.notes-app').classList.remove('editing-mode');
-                    }, 200);
-                }
-            });
-            textEditor.addEventListener('focus', () => {
-                if (this.isMobile()) {
-                    document.querySelector('.notes-app').classList.add('editing-mode');
-                }
-            });
-        }
 
         // Inject swipe hint strip
         if (!document.getElementById('swipeHint')) {
