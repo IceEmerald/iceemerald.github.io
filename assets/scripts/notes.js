@@ -117,6 +117,16 @@ class NotesApp {
         const exportNoteBtn = document.getElementById('exportNoteBtn');
         if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
 
+        // Export modal buttons
+        const exportModalCancel = document.getElementById('exportModalCancel');
+        const exportModalCopy = document.getElementById('exportModalCopy');
+        if (exportModalCancel) exportModalCancel.addEventListener('click', () => this.closeExportModal());
+        if (exportModalCopy) exportModalCopy.addEventListener('click', () => this.copyExportLink());
+
+        // Import modal button
+        const importModalOk = document.getElementById('importModalOk');
+        if (importModalOk) importModalOk.addEventListener('click', () => this.closeImportModal());
+
         // Note title input
         const noteTitle = document.getElementById('noteTitle');
         if (noteTitle) {
@@ -1993,10 +2003,10 @@ class NotesApp {
             }
         }, { once: true });
     }
-    // Export current note as shareable link
+    // Show export modal with share link
     exportNoteAsLink() {
         if (!this.currentNoteId) {
-            alert('Please select a note to export');
+            this.showImportModal('Error', 'Please select a note to export');
             return;
         }
 
@@ -2011,17 +2021,93 @@ class NotesApp {
         };
 
         // Encode to base64 for URL safety
-        const encoded = btoa(encodeURIComponent(JSON.stringify(exportObj)));
+        try {
+            const encoded = btoa(encodeURIComponent(JSON.stringify(exportObj)));
+            const shareLink = `${window.location.origin}${window.location.pathname}?import=${encoded}`;
+            
+            // Show modal with the link
+            const exportModal = document.getElementById('exportModal');
+            const exportLink = document.getElementById('exportLink');
+            if (exportModal && exportLink) {
+                exportLink.value = shareLink;
+                exportLink.select();
+                exportModal.style.display = 'flex';
+            }
+        } catch (error) {
+            console.error('Error encoding note:', error);
+            this.showImportModal('Error', 'Failed to create share link. Your note may be too large.');
+        }
+    }
+
+    // Copy export link to clipboard
+    copyExportLink() {
+        const exportLink = document.getElementById('exportLink');
+        if (!exportLink) return;
+
+        try {
+            // Try modern clipboard API first
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(exportLink.value).then(() => {
+                    this.showImportModal('Success', 'Share link copied to clipboard!\n\nOthers can open this link to import the note to their collection.');
+                    this.closeExportModal();
+                }).catch(err => {
+                    // Fallback to execCommand
+                    this.fallbackCopyToClipboard(exportLink);
+                });
+            } else {
+                // Use fallback method
+                this.fallbackCopyToClipboard(exportLink);
+            }
+        } catch (error) {
+            console.error('Copy error:', error);
+            this.showImportModal('Error', 'Could not copy link. Please try selecting and copying manually.');
+        }
+    }
+
+    // Fallback clipboard copy using execCommand
+    fallbackCopyToClipboard(element) {
+        try {
+            element.select();
+            const success = document.execCommand('copy');
+            if (success) {
+                this.showImportModal('Success', 'Share link copied to clipboard!\n\nOthers can open this link to import the note to their collection.');
+                this.closeExportModal();
+            } else {
+                throw new Error('execCommand failed');
+            }
+        } catch (error) {
+            console.error('Fallback copy error:', error);
+            this.showImportModal('Error', 'Could not copy link. Please try selecting and copying manually.');
+        }
+    }
+
+    // Close export modal
+    closeExportModal() {
+        const exportModal = document.getElementById('exportModal');
+        if (exportModal) {
+            exportModal.style.display = 'none';
+        }
+    }
+
+    // Show import modal
+    showImportModal(title, message) {
+        const importModal = document.getElementById('importModal');
+        const importTitle = document.getElementById('importModalTitle');
+        const importMessage = document.getElementById('importModalMessage');
         
-        // Create share link
-        const shareLink = `${window.location.origin}${window.location.pathname}?import=${encoded}`;
-        
-        // Copy to clipboard and show notification
-        navigator.clipboard.writeText(shareLink).then(() => {
-            alert('Share link copied to clipboard!\nOthers can open this link to import the note.');
-        }).catch(() => {
-            alert('Share link:\n' + shareLink);
-        });
+        if (importModal && importTitle && importMessage) {
+            importTitle.textContent = title;
+            importMessage.textContent = message;
+            importModal.style.display = 'flex';
+        }
+    }
+
+    // Close import modal
+    closeImportModal() {
+        const importModal = document.getElementById('importModal');
+        if (importModal) {
+            importModal.style.display = 'none';
+        }
     }
 
     // Import note from URL parameter
@@ -2055,10 +2141,10 @@ class NotesApp {
             // Clean URL (remove import parameter)
             window.history.replaceState({}, document.title, window.location.pathname);
 
-            alert('Note imported successfully!');
+            this.showImportModal('Note Imported', 'The note has been successfully imported and added to your collection!');
         } catch (error) {
             console.error('Error importing note:', error);
-            alert('Error importing note. Invalid link.');
+            this.showImportModal('Import Error', 'Failed to import note. The link may be invalid or corrupted.');
         }
     }
 }
