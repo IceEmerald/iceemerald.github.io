@@ -117,15 +117,6 @@ class NotesApp {
         const exportNoteBtn = document.getElementById('exportNoteBtn');
         if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
 
-        // Export modal buttons
-        const exportModalCancel = document.getElementById('exportModalCancel');
-        const exportModalCopy = document.getElementById('exportModalCopy');
-        if (exportModalCancel) exportModalCancel.addEventListener('click', () => this.closeExportModal());
-        if (exportModalCopy) exportModalCopy.addEventListener('click', () => this.copyExportLink());
-
-        // Import modal button
-        const importModalOk = document.getElementById('importModalOk');
-        if (importModalOk) importModalOk.addEventListener('click', () => this.closeImportModal());
 
         // Note title input
         const noteTitle = document.getElementById('noteTitle');
@@ -2006,114 +1997,86 @@ class NotesApp {
     // Show export modal with share link
     exportNoteAsLink() {
         if (!this.currentNoteId) {
-            this.showImportModal('Error', 'Please select a note to export');
+            alert('Please select a note to export');
             return;
         }
 
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
 
-        // Create export object
+        // Create minimal export object (title + content only to keep link short)
         const exportObj = {
-            title: note.title,
-            content: note.content,
-            color: note.color || '#ffffff'
+            t: note.title,
+            c: note.content
         };
 
         // Encode to base64 for URL safety
         try {
             const encoded = btoa(encodeURIComponent(JSON.stringify(exportObj)));
-            const shareLink = `${window.location.origin}${window.location.pathname}?import=${encoded}`;
+            const shareLink = `${window.location.origin}${window.location.pathname}?i=${encoded}`;
             
             // Show modal with the link
             const exportModal = document.getElementById('exportModal');
             const exportLink = document.getElementById('exportLink');
-            if (exportModal && exportLink) {
-                exportLink.value = shareLink;
+            const cancelBtn = document.getElementById('exportModalCancel');
+            const copyBtn = document.getElementById('exportModalCopy');
+
+            if (!exportModal) return;
+
+            // Save selection
+            this.saveSelection();
+
+            // Show modal
+            exportModal.classList.add('show');
+
+            // Set link value
+            exportLink.value = shareLink;
+            exportLink.select();
+
+            // Handle cancel
+            const handleCancel = () => {
+                exportModal.classList.remove('show');
+                cancelBtn.removeEventListener('click', handleCancel);
+                copyBtn.removeEventListener('click', handleCopy);
+            };
+
+            // Handle copy
+            const handleCopy = () => {
                 exportLink.select();
-                exportModal.style.display = 'flex';
-            }
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(exportLink.value).then(() => {
+                            alert('Share link copied! Others can open it to import this note.');
+                            exportModal.classList.remove('show');
+                        }).catch(() => {
+                            document.execCommand('copy');
+                            alert('Link copied! Share it with others.');
+                            exportModal.classList.remove('show');
+                        });
+                    } else {
+                        document.execCommand('copy');
+                        alert('Link copied! Share it with others.');
+                        exportModal.classList.remove('show');
+                    }
+                } catch (e) {
+                    alert('Could not copy. Please select and copy manually.');
+                }
+                cancelBtn.removeEventListener('click', handleCancel);
+                copyBtn.removeEventListener('click', handleCopy);
+            };
+
+            cancelBtn.addEventListener('click', handleCancel);
+            copyBtn.addEventListener('click', handleCopy);
         } catch (error) {
             console.error('Error encoding note:', error);
-            this.showImportModal('Error', 'Failed to create share link. Your note may be too large.');
-        }
-    }
-
-    // Copy export link to clipboard
-    copyExportLink() {
-        const exportLink = document.getElementById('exportLink');
-        if (!exportLink) return;
-
-        try {
-            // Try modern clipboard API first
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(exportLink.value).then(() => {
-                    this.showImportModal('Success', 'Share link copied to clipboard!\n\nOthers can open this link to import the note to their collection.');
-                    this.closeExportModal();
-                }).catch(err => {
-                    // Fallback to execCommand
-                    this.fallbackCopyToClipboard(exportLink);
-                });
-            } else {
-                // Use fallback method
-                this.fallbackCopyToClipboard(exportLink);
-            }
-        } catch (error) {
-            console.error('Copy error:', error);
-            this.showImportModal('Error', 'Could not copy link. Please try selecting and copying manually.');
-        }
-    }
-
-    // Fallback clipboard copy using execCommand
-    fallbackCopyToClipboard(element) {
-        try {
-            element.select();
-            const success = document.execCommand('copy');
-            if (success) {
-                this.showImportModal('Success', 'Share link copied to clipboard!\n\nOthers can open this link to import the note to their collection.');
-                this.closeExportModal();
-            } else {
-                throw new Error('execCommand failed');
-            }
-        } catch (error) {
-            console.error('Fallback copy error:', error);
-            this.showImportModal('Error', 'Could not copy link. Please try selecting and copying manually.');
-        }
-    }
-
-    // Close export modal
-    closeExportModal() {
-        const exportModal = document.getElementById('exportModal');
-        if (exportModal) {
-            exportModal.style.display = 'none';
-        }
-    }
-
-    // Show import modal
-    showImportModal(title, message) {
-        const importModal = document.getElementById('importModal');
-        const importTitle = document.getElementById('importModalTitle');
-        const importMessage = document.getElementById('importModalMessage');
-        
-        if (importModal && importTitle && importMessage) {
-            importTitle.textContent = title;
-            importMessage.textContent = message;
-            importModal.style.display = 'flex';
-        }
-    }
-
-    // Close import modal
-    closeImportModal() {
-        const importModal = document.getElementById('importModal');
-        if (importModal) {
-            importModal.style.display = 'none';
+            alert('Failed to create share link. Your note may be too large.');
         }
     }
 
     // Import note from URL parameter
     importNoteFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        const importData = params.get('import');
+        const importData = params.get('i');
 
         if (!importData) return;
 
@@ -2125,9 +2088,9 @@ class NotesApp {
             // Create new note with imported content
             const newNote = {
                 id: this.generateId(),
-                title: `Imported: ${importObj.title || 'Untitled'}`,
-                content: importObj.content || '',
-                color: importObj.color || '#ffffff',
+                title: `Imported: ${importObj.t || 'Untitled'}`,
+                content: importObj.c || '',
+                color: '#ffffff',
                 createdAt: new Date().toISOString(),
                 modifiedAt: new Date().toISOString()
             };
@@ -2141,10 +2104,10 @@ class NotesApp {
             // Clean URL (remove import parameter)
             window.history.replaceState({}, document.title, window.location.pathname);
 
-            this.showImportModal('Note Imported', 'The note has been successfully imported and added to your collection!');
+            alert('Note imported successfully!');
         } catch (error) {
             console.error('Error importing note:', error);
-            this.showImportModal('Import Error', 'Failed to import note. The link may be invalid or corrupted.');
+            // Silently fail if not a valid import link
         }
     }
 }
