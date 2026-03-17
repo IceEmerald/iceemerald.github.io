@@ -2009,10 +2009,11 @@ class NotesApp {
         if (!note) return;
 
         try {
-            // Create compressed share link for friends
+            // Create URL-safe base64 link (works on all devices/browsers)
             const data = JSON.stringify({t:note.title,c:note.content});
-            const compressed = btoa(encodeURIComponent(data));
-            const shareLink = `${window.location.origin}${window.location.pathname}?s=${compressed}`;
+            const utf8 = unescape(encodeURIComponent(data));
+            const b64 = btoa(utf8).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            const shareLink = `${window.location.origin}${window.location.pathname}?s=${b64}`;
             
             // Show modal with the link
             const exportModal = document.getElementById('exportModal');
@@ -2070,19 +2071,22 @@ class NotesApp {
     // Import note from URL parameter
     importNoteFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        const compressed = params.get('s');
+        const b64 = params.get('s');
 
-        if (!compressed) return;
+        if (!b64) return;
 
         try {
-            const decoded = decodeURIComponent(atob(compressed));
-            const importObj = JSON.parse(decoded);
+            // Decode URL-safe base64 back to standard, then decode
+            const standard = b64.replace(/-/g, '+').replace(/_/g, '/');
+            const padded = standard + '='.repeat((4 - standard.length % 4) % 4);
+            const utf8 = atob(padded);
+            const data = JSON.parse(decodeURIComponent(escape(utf8)));
 
-            const title = importObj.t || 'Untitled';
+            const title = data.t || 'Untitled';
             const newNote = {
                 id: this.generateId(),
                 title: title,
-                content: importObj.c || '',
+                content: data.c || '',
                 color: '#ffffff',
                 createdAt: new Date().toISOString(),
                 modifiedAt: new Date().toISOString()
@@ -2093,9 +2097,11 @@ class NotesApp {
             this.renderNotesList();
             this.saveNotesToStorage();
 
+            // Clean the URL
             window.history.replaceState({}, document.title, window.location.pathname);
-            
-            this.showImportModal(title);
+
+            // Show modal after short delay to let DOM settle
+            setTimeout(() => this.showImportModal(title), 150);
         } catch (error) {
             console.error('Error importing note:', error);
         }
@@ -2104,41 +2110,19 @@ class NotesApp {
     // Show import success modal
     showImportModal(noteTitle) {
         const modal = document.getElementById('importModal');
-        if (!modal) {
-            // Create modal if doesn't exist
-            const newModal = document.createElement('div');
-            newModal.id = 'importModal';
-            newModal.className = 'link-modal';
-            newModal.innerHTML = `
-                <div class="link-modal-content">
-                    <div class="link-modal-header">
-                        <div class="link-modal-icon">📥</div>
-                        <h3 class="link-modal-title">Note Imported</h3>
-                    </div>
-                    <div class="link-modal-body">
-                        <p style="margin:0;font-size:14px;">Added to your collection: <strong>${noteTitle}</strong></p>
-                    </div>
-                    <div class="link-modal-actions">
-                        <button class="link-modal-btn link-modal-btn-cancel" id="importModalCancel">Cancel</button>
-                        <button class="link-modal-btn link-modal-btn-create" id="importModalContinue">Continue</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(newModal);
-            const cancelBtn = document.getElementById('importModalCancel');
-            const continueBtn = document.getElementById('importModalContinue');
-            if (cancelBtn) cancelBtn.addEventListener('click', () => newModal.classList.remove('show'));
-            if (continueBtn) continueBtn.addEventListener('click', () => newModal.classList.remove('show'));
-            setTimeout(() => newModal.classList.add('show'), 10);
-        } else {
-            modal.classList.add('show');
-            setTimeout(() => {
-                const cancelBtn = document.getElementById('importModalCancel');
-                const continueBtn = document.getElementById('importModalContinue');
-                if (cancelBtn) cancelBtn.onclick = () => modal.classList.remove('show');
-                if (continueBtn) continueBtn.onclick = () => modal.classList.remove('show');
-            }, 10);
-        }
+        const message = document.getElementById('importModalMessage');
+        const cancelBtn = document.getElementById('importModalCancel');
+        const continueBtn = document.getElementById('importModalContinue');
+
+        if (!modal || !message) return;
+
+        message.innerHTML = `Added to your collection: <strong>${noteTitle}</strong>`;
+
+        modal.classList.add('show');
+
+        const close = () => modal.classList.remove('show');
+        if (cancelBtn) cancelBtn.onclick = close;
+        if (continueBtn) continueBtn.onclick = close;
     }
 }
 
