@@ -288,13 +288,22 @@
     flex-direction: column;
     flex-shrink: 0;
     border-radius: 12px 0 0 12px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Animate width only — not "all", to avoid fighting other properties */
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
 }
 
 .sidebar.collapsed {
     width: 60px;
     min-width: 60px;
+}
+
+/* Fade out inner content smoothly */
+.sidebar-header h3,
+.sidebar .notes-list,
+.sidebar .new-note-btn {
+    transition: opacity 0.2s ease;
 }
 
 .sidebar.collapsed .sidebar-header h3,

@@ -275,8 +275,9 @@ class NotesApp {
             const dy = touch.clientY - this.touchStartY;
             const dt = Date.now() - this.touchStartTime;
 
-            // Reset any inline transform first
+            // Always restore CSS transition and clear inline transform/transition
             const sidebar = document.querySelector('.sidebar');
+            sidebar.style.transition = '';
             sidebar.style.transform = '';
 
             const THRESHOLD = 50;         // minimum px to trigger action
@@ -1354,9 +1355,6 @@ class NotesApp {
             const isCollapsed = sidebar.classList.contains('collapsed');
             localStorage.setItem('sidebarCollapsed', isCollapsed.toString());
             this.updateToggleIcon(toggleBtn, isCollapsed);
-            void sidebar.offsetWidth;
-            toggleBtn.style.opacity = '1';
-            toggleBtn.style.pointerEvents = 'auto';
         });
 
         const savedState = localStorage.getItem('sidebarCollapsed');
