@@ -68,7 +68,9 @@
     animation: pulse 1.5s ease-in-out infinite;
 }
 
-/* Ribbon Styles */
+/* =============================================
+   RIBBON STYLES (Desktop)
+   ============================================= */
 .ribbon {
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(16px);
@@ -88,6 +90,8 @@
     background: rgba(248, 250, 252, 0.8);
     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
     padding: 0;
+    border-radius: 12px 12px 0 0;
+    overflow: hidden;
 }
 
 .ribbon-tab {
@@ -125,6 +129,7 @@
     justify-content: center;
     max-width: 1900px;
     margin: 0 auto;
+    border-radius: 0 0 12px 12px;
 }
 
 .ribbon-panel {
@@ -262,14 +267,18 @@
     -webkit-backdrop-filter: blur(8px);
 }
 
-/* Main Content Layout */
+/* =============================================
+   MAIN CONTENT LAYOUT
+   ============================================= */
 .main-content {
     display: flex;
     flex: 1;
     overflow: hidden;
 }
 
-/* Sidebar Style */
+/* =============================================
+   SIDEBAR (Desktop)
+   ============================================= */
 .sidebar {
     width: 320px;
     background: rgba(255, 255, 255, 0);
@@ -432,7 +441,9 @@
     font-weight: 500;
 }
 
-/* Editor Area Styles */
+/* =============================================
+   EDITOR AREA STYLES
+   ============================================= */
 .editor-area {
     flex: 1;
     display: flex;
@@ -472,10 +483,10 @@
     outline: none;
     padding: 8px 0;
     font-family: 'DM Sans', sans-serif;
-    max-width: 80%; /* Prevents overflow */
+    max-width: 80%;
     overflow: hidden;
-    text-overflow: ellipsis; /* Adds ellipsis if text overflows */
-    white-space: nowrap; /* Prevents text from wrapping */
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .note-title::placeholder {
@@ -485,6 +496,7 @@
 .editor-actions {
     display: flex;
     gap: 8px;
+    align-items: center;
 }
 
 .action-btn {
@@ -507,6 +519,16 @@
     border-color: #dc3545;
     color: #dc3545;
     box-shadow: 0 2px 6px rgba(220, 53, 69, 0.2);
+}
+
+/* Mobile-only back button — hidden on desktop */
+.mobile-back-btn {
+    display: none;
+}
+
+/* Mobile-only edit button — hidden on desktop */
+.mobile-edit-btn {
+    display: none;
 }
 
 .editor-content {
@@ -663,88 +685,425 @@
     background: #197138;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .sidebar {
-        width: 100%;
-        position: absolute;
-        left: -100%;
-        z-index: 1000;
-        transition: left 0.3s, width 0.3s;
-    }
+/* =============================================
+   MOBILE & TABLET RESPONSIVE (≤ 1023px)
+   ============================================= */
+@media (max-width: 1023px) {
 
-    .sidebar.open {
-        left: 0;
-    }
-
-    .sidebar.collapsed:not(.open) {
-        width: 60px;
-        left: 0;
+    /* --- Layout: single-panel, no left margin --- */
+    .notes-app {
+        overflow: hidden;
         position: relative;
     }
-}
 
-@media (max-width: 768px) {
-    .ribbon-group {
-        margin-right: 8px;
-        padding-right: 8px;
+    .main-content {
+        position: relative;
+        overflow: hidden;
     }
 
-    .ribbon-controls {
-        gap: 2px;
+    /* --- Ribbon: compact, no tab system, just a slim toolbar row --- */
+    .ribbon {
+        margin: 8px;
+        border-radius: 10px; /* preserve corners */
     }
 
-    .ribbon-btn {
-        min-width: 40px;
-        padding: 4px 6px;
-    }
-
-    .ribbon-btn span {
+    /* Hide tab bar entirely on mobile */
+    .ribbon-tabs {
         display: none;
     }
 
-    .font-family {
-        width: 100px;
+    /* Always show the single flat panel */
+    .ribbon-panel {
+        display: none !important;
     }
 
-    .font-size {
-        width: 50px;
-    }
-
-    .notes-header {
-        padding: 8px 12px;
-    }
-
-    .text-editor {
-        padding: 16px;
-    }
-}
-
-@media (max-width: 480px) {
+    /* Replace full ribbon with a compact mobile toolbar */
     .ribbon-content {
-        padding: 8px;
+        padding: 8px 12px;
+        min-height: unset;
+        border-radius: 10px;
+        justify-content: flex-start;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
     }
 
-    .ribbon-group {
-        margin-right: 4px;
-        padding-right: 4px;
+    .ribbon-content::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Mobile ribbon: single scrollable row of essential buttons */
+    .mobile-ribbon-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+        width: 100%;
+    }
+
+    .mobile-ribbon-row .ribbon-btn {
+        min-width: 40px;
+        padding: 8px;
+        flex-direction: row;
+        gap: 0;
+        flex-shrink: 0;
+        border-radius: 8px;
+    }
+
+    .mobile-ribbon-row .ribbon-btn span {
+        display: none; /* icon only on mobile */
+    }
+
+    .mobile-ribbon-divider {
+        width: 1px;
+        height: 28px;
+        background: rgba(0, 0, 0, 0.1);
+        flex-shrink: 0;
+        margin: 0 2px;
+    }
+
+    /* More overflow menu button */
+    .mobile-more-btn {
+        min-width: 40px;
+        padding: 8px;
+        background: rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(44, 62, 80, 0.8);
+        flex-shrink: 0;
+        font-size: 16px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+    .mobile-more-btn:hover,
+    .mobile-more-btn.active {
+        background: rgba(35, 154, 77, 0.15);
+        border-color: #239a4d;
+        color: #239a4d;
+    }
+
+    /* More dropdown panel */
+    .mobile-more-panel {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+        z-index: 5000;
+        padding: 8px;
+        min-width: 220px;
+    }
+
+    .mobile-more-panel.open {
+        display: block;
+        animation: dropdownFadeIn 0.2s ease;
+    }
+
+    .mobile-more-panel .ms-dropdown {
+        margin-bottom: 4px;
+    }
+
+    .mobile-more-panel .ms-dropdown-btn {
+        width: 100%;
+        min-width: unset;
+    }
+
+    /* Wrapper for the ribbon toolbar to allow relative positioning for more panel */
+    .ribbon-content-wrapper {
+        position: relative;
+        width: 100%;
+        display: flex;
+        align-items: center;
+    }
+
+    /* --- SIDEBAR: full-screen panel, slides in from left --- */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 85vw;
+        max-width: 340px;
+        height: 100%;
+        z-index: 2000;
+        transform: translateX(-100%);
+        transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 0 16px 16px 0;
+        box-shadow: none;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        /* override collapsed styles on mobile */
+        overflow: visible;
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: 4px 0 40px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Collapsed state has no effect on mobile — always use mobile-open */
+    .sidebar.collapsed {
+        width: 85vw;
+        max-width: 340px;
+        min-width: unset;
+    }
+
+    .sidebar.collapsed .sidebar-header h3,
+    .sidebar.collapsed .notes-list,
+    .sidebar.collapsed .new-note-btn {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .sidebar.collapsed .sidebar-header {
+        justify-content: space-between;
+        flex-direction: row;
+        padding: 20px;
+        gap: 12px;
+    }
+
+    /* Sidebar header close button on mobile */
+    .sidebar-header {
+        border-radius: 0 16px 0 0;
+    }
+
+    /* Backdrop overlay when sidebar is open */
+    .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1999;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        animation: fadeIn 0.2s ease;
+    }
+
+    .sidebar-backdrop.visible {
+        display: block;
+    }
+
+    /* --- EDITOR AREA: full width, no left margin gap --- */
+    .editor-area {
+        margin: 0 8px 8px 8px;
+        border-radius: 10px;
+        width: calc(100% - 16px);
+        flex: 1;
     }
 
     .editor-header {
         padding: 12px 16px;
+        border-radius: 10px 10px 0 0;
+        gap: 8px;
     }
 
     .note-title {
-        font-size: 20px;
+        font-size: 18px;
+        max-width: 55%;
     }
 
+    .editor-actions {
+        gap: 6px;
+    }
+
+    .action-btn {
+        padding: 8px;
+        height: 40px;
+        width: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Hide note color dropdown label text on mobile to save space */
+    #noteColorDropdown .dropdown-value {
+        display: none;
+    }
+
+    #noteColorDropdown .ms-dropdown-btn {
+        min-width: unset;
+        padding: 8px;
+        height: 40px;
+        width: 40px;
+        justify-content: center;
+    }
+
+    #noteColorDropdown .ms-dropdown-btn::after {
+        display: none;
+    }
+
+    /* --- MOBILE BACK BUTTON: shown as ← in editor header --- */
+    .mobile-back-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        color: rgba(44, 62, 80, 0.7);
+        flex-shrink: 0;
+        transition: all 0.2s ease;
+    }
+
+    .mobile-back-btn:hover {
+        background: rgba(35, 154, 77, 0.1);
+        border-color: rgba(35, 154, 77, 0.3);
+        color: #239a4d;
+    }
+
+    /* --- MOBILE EDIT BUTTON: shown at bottom of editor --- */
+    .mobile-edit-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: #239a4d;
+        color: white;
+        border: none;
+        border-radius: 50px;
+        padding: 14px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        font-family: 'DM Sans', sans-serif;
+        box-shadow: 0 4px 20px rgba(35, 154, 77, 0.4);
+        cursor: pointer;
+        z-index: 200;
+        transition: all 0.2s ease;
+    }
+
+    .mobile-edit-btn:hover {
+        background: #197138;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(35, 154, 77, 0.5);
+    }
+
+    .mobile-edit-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Hide edit button when editor is in focus / editing mode */
+    .notes-app.editing-mode .mobile-edit-btn {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(8px);
+    }
+
+    /* Swipe hint indicator at left edge */
+    .swipe-hint {
+        position: fixed;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 48px;
+        background: rgba(35, 154, 77, 0.3);
+        border-radius: 0 4px 4px 0;
+        z-index: 100;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    /* Text editor smaller padding on mobile */
     .text-editor {
-        padding: 12px;
-        font-size: 16px;
+        padding: 16px;
+        font-size: 15px;
+    }
+
+    .text-editor:empty:before,
+    .text-editor[data-empty="true"]:before {
+        top: 16px;
+        left: 16px;
+    }
+
+    /* Welcome screen on mobile */
+    .welcome-screen {
+        padding: 20px;
+    }
+
+    .welcome-content h2 {
+        font-size: 22px;
+    }
+
+    .welcome-content p {
+        font-size: 14px;
+    }
+
+    /* MS dropdowns in more panel — full width */
+    .mobile-more-panel .ms-dropdown {
+        display: block;
+        width: 100%;
+    }
+
+    .mobile-more-panel .ms-dropdown-btn {
+        width: 100%;
+        border-radius: 8px;
+    }
+
+    .mobile-more-panel .ms-dropdown-menu {
+        min-width: 100%;
+    }
+
+    /* Ribbon wrapper position */
+    .ribbon {
+        position: relative;
     }
 }
 
-/* Utility Classes */
+/* =============================================
+   SMALL PHONE EXTRAS (≤ 480px)
+   ============================================= */
+@media (max-width: 480px) {
+    .ribbon {
+        margin: 6px;
+        border-radius: 8px;
+    }
+
+    .ribbon-content {
+        padding: 6px 10px;
+    }
+
+    .editor-area {
+        margin: 0 6px 6px 6px;
+        border-radius: 8px;
+    }
+
+    .note-title {
+        font-size: 16px;
+        max-width: 45%;
+    }
+
+    .mobile-edit-btn {
+        bottom: 16px;
+        right: 16px;
+        padding: 12px 16px;
+        font-size: 13px;
+    }
+
+    .sidebar {
+        width: 92vw;
+    }
+}
+
+/* =============================================
+   UTILITY CLASSES
+   ============================================= */
 .hidden {
     display: none !important;
 }
@@ -761,7 +1120,9 @@
     border: 0;
 }
 
-/* Animations */
+/* =============================================
+   ANIMATIONS
+   ============================================= */
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -772,7 +1133,9 @@
     50% { opacity: 0.6; }
 }
 
-/* Microsoft Office Style Dropdown */
+/* =============================================
+   MICROSOFT OFFICE STYLE DROPDOWNS
+   ============================================= */
 .ms-dropdown {
     position: relative;
     display: inline-block;
@@ -798,7 +1161,6 @@
     align-items: center;
 }
 
-/* Color preview styling with color-based effects */
 .color-preview {
     width: 12px;
     height: 12px;
@@ -810,38 +1172,31 @@
     position: relative;
 }
 
-/* Color-based shadow and outline effects */
 .color-preview[data-color="#ffffff"] {
     border: 1px solid #ccc;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(35, 154, 77, 0.3), 0 1px 3px rgba(35, 154, 77, 0.2);
 }
-
 .color-preview[data-color="#ffe4e1"] {
     border: 1px solid rgba(255, 182, 193, 0.4);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(255, 182, 193, 0.4), 0 1px 3px rgba(255, 182, 193, 0.3);
 }
-
 .color-preview[data-color="#e6f3ff"] {
     border: 1px solid rgba(135, 206, 250, 0.4);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(135, 206, 250, 0.4), 0 1px 3px rgba(135, 206, 250, 0.3);
 }
-
 .color-preview[data-color="#e8f5e8"] {
     border: 1px solid rgba(144, 238, 144, 0.4);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(144, 238, 144, 0.4), 0 1px 3px rgba(144, 238, 144, 0.3);
 }
-
 .color-preview[data-color="#fff9e6"] {
     border: 1px solid rgba(255, 255, 224, 0.4);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(255, 255, 224, 0.4), 0 1px 3px rgba(255, 255, 224, 0.3);
 }
-
 .color-preview[data-color="#f3e6ff"] {
     border: 1px solid rgba(221, 160, 221, 0.4);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(221, 160, 221, 0.4), 0 1px 3px rgba(221, 160, 221, 0.3);
 }
 
-/* Dropdown button alignment improvements */
 #noteColorDropdown .ms-dropdown-btn {
     min-width: 100px;
     justify-content: flex-start;
@@ -922,21 +1277,17 @@
 }
 
 @keyframes dropdownFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .fade-in {
     animation: fadeIn 0.3s ease-in-out;
 }
 
-/* Custom Right-Click Context Menu */
+/* =============================================
+   CUSTOM RIGHT-CLICK CONTEXT MENU
+   ============================================= */
 .custom-context-menu {
     position: fixed;
     background: rgba(255, 255, 255, 0.98);
@@ -991,7 +1342,9 @@
     animation: slideInFromLeft 0.3s ease-out;
 }
 
-/* Focus States */
+/* =============================================
+   FOCUS STATES
+   ============================================= */
 .ribbon-btn:focus,
 .new-note-btn:focus,
 .action-btn:focus,
@@ -1011,13 +1364,13 @@
     box-shadow: none;
 }
 
-/* Custom Delete Dialog Modal */
+/* =============================================
+   MODALS
+   ============================================= */
 .delete-modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1044,12 +1397,7 @@
     max-width: 400px;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
     border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.delete-modal.show .delete-modal-content {
-    /* No transform needed */
 }
 
 .delete-modal-header {
@@ -1058,8 +1406,7 @@
 }
 
 .delete-modal-icon {
-    width: 48px;
-    height: 48px;
+    width: 48px; height: 48px;
     background: #ee5a52;
     border-radius: 50%;
     display: flex;
@@ -1127,13 +1474,11 @@
     box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
 }
 
-/* Custom Table Creation Modal */
+/* Table Modal */
 .table-modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1146,10 +1491,7 @@
     transition: all 0.3s ease;
 }
 
-.table-modal.show {
-    opacity: 1;
-    visibility: visible;
-}
+.table-modal.show { opacity: 1; visibility: visible; }
 
 .table-modal-content {
     background: rgba(255, 255, 255, 0.98);
@@ -1160,22 +1502,13 @@
     max-width: 400px;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.table-modal.show .table-modal-content {
-    /* No transform needed */
-}
-
-.table-modal-header {
-    text-align: center;
-    margin-bottom: 20px;
-}
+.table-modal-header { text-align: center; margin-bottom: 20px; }
 
 .table-modal-icon {
-    width: 48px;
-    height: 48px;
+    width: 48px; height: 48px;
     background: #239a4d;
     border-radius: 50%;
     display: flex;
@@ -1194,13 +1527,9 @@
     font-family: 'DM Sans', sans-serif;
 }
 
-.table-modal-body {
-    margin-bottom: 24px;
-}
+.table-modal-body { margin-bottom: 24px; }
 
-.table-input-group {
-    margin-bottom: 16px;
-}
+.table-input-group { margin-bottom: 16px; }
 
 .table-input-group label {
     display: block;
@@ -1271,13 +1600,11 @@
     box-shadow: 0 4px 12px rgba(35, 154, 77, 0.4);
 }
 
-/* Link Modal Styles */
+/* Link Modal */
 .link-modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1290,10 +1617,7 @@
     transition: all 0.3s ease;
 }
 
-.link-modal.show {
-    opacity: 1;
-    visibility: visible;
-}
+.link-modal.show { opacity: 1; visibility: visible; }
 
 .link-modal-content {
     background: rgba(255, 255, 255, 0.98);
@@ -1304,22 +1628,13 @@
     max-width: 400px;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.link-modal.show .link-modal-content {
-    /* No transform needed */
-}
-
-.link-modal-header {
-    text-align: center;
-    margin-bottom: 20px;
-}
+.link-modal-header { text-align: center; margin-bottom: 20px; }
 
 .link-modal-icon {
-    width: 48px;
-    height: 48px;
+    width: 48px; height: 48px;
     background: #005fa3;
     border-radius: 50%;
     display: flex;
@@ -1338,13 +1653,9 @@
     font-family: 'DM Sans', sans-serif;
 }
 
-.link-modal-body {
-    margin-bottom: 24px;
-}
+.link-modal-body { margin-bottom: 24px; }
 
-.link-input-group {
-    margin-bottom: 16px;
-}
+.link-input-group { margin-bottom: 16px; }
 
 .link-input-group label {
     display: block;
@@ -1410,9 +1721,7 @@
     border: 1px solid rgba(0, 95, 163, 0.3);
 }
 
-.link-modal-btn-create:hover {
-    background: #005fa3;
-}
+.link-modal-btn-create:hover { background: #004d87; }
 
 .link-modal-btn-create:disabled {
     background: rgba(108, 117, 125, 0.3);
@@ -1425,7 +1734,7 @@
     background: rgba(108, 117, 125, 0.3);
 }
 
-/* Validation feedback styling */
+/* Validation feedback */
 .validation-feedback {
     font-size: 12px;
     font-family: 'DM Sans', sans-serif;
@@ -1449,18 +1758,9 @@
     border: 1px solid rgba(220, 53, 69, 0.2);
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-4px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Custom Scrollbars */
+/* =============================================
+   CUSTOM SCROLLBARS
+   ============================================= */
 .notes-list::-webkit-scrollbar,
 .text-editor::-webkit-scrollbar {
     width: 8px;
@@ -1483,7 +1783,9 @@
     background: #a8a8a8;
 }
 
-/* Print Styles */
+/* =============================================
+   PRINT STYLES
+   ============================================= */
 @media print {
     .notes-header,
     .ribbon,
@@ -1492,13 +1794,9 @@
         display: none !important;
     }
 
-    .main-content {
-        display: block;
-    }
+    .main-content { display: block; }
 
-    .editor-area {
-        width: 100% !important;
-    }
+    .editor-area { width: 100% !important; }
 
     .text-editor {
         padding: 0 !important;

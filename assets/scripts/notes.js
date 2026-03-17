@@ -11,13 +11,11 @@ async function compressToUrl(str) {
     const arr = new Uint8Array(buf);
     let binary = '';
     for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
-    // URL-safe base64: replace + with -, / with _, strip trailing =
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 // Decompress a URL-safe token back to the original string
 async function decompressFromUrl(token) {
-    // Restore standard base64 from URL-safe form
     const b64 = token.replace(/-/g, '+').replace(/_/g, '/');
     const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
     const binary = atob(padded);
@@ -39,7 +37,16 @@ class NotesApp {
         this.isInitialized = false;
         this.savedSelection = null;
 
-        // Initialize the app
+        // Mobile state
+        this.isMobile = () => window.innerWidth <= 1023;
+        this.sidebarOpen = false;
+
+        // Touch / swipe state
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.touchStartTime = 0;
+        this.isSwiping = false;
+
         this.init();
     }
 
@@ -47,36 +54,32 @@ class NotesApp {
         this.loadNotesFromStorage();
         this.setupEventListeners();
         this.setupRibbon();
+        this.setupMobileRibbon();
         this.setupTextEditor();
         this.renderNotesList();
         this.showWelcomeScreenIfNeeded();
+        this.setupMobileUI();
+        this.setupSwipeGesture();
         this.isInitialized = true;
     }
 
-    // Load notes from localStorage
+    // ─── Storage ────────────────────────────────────────────────────────────────
+
     loadNotesFromStorage() {
         try {
             const stored = localStorage.getItem('emeraldnotes_data');
             if (stored) {
                 this.notes = JSON.parse(stored);
-
-                // Legacy content migration: convert old placeholder HTML
                 this.notes.forEach(note => {
                     if (note.content && typeof note.content === 'string') {
-                        // Remove legacy placeholder content
                         if (note.content.trim() === '<p>Start typing your note here...</p>' ||
                             note.content.trim() === 'Start typing your note here...') {
                             note.content = '';
                         }
-
-                        // Clean up other legacy empty patterns
                         const legacyEmptyPatterns = [
-                            '<div>\u00A0</div>',
-                            '<p>\u00A0</p>',
-                            '<div>&nbsp;</div>',
-                            '<p>&nbsp;</p>'
+                            '<div>\u00A0</div>', '<p>\u00A0</p>',
+                            '<div>&nbsp;</div>', '<p>&nbsp;</p>'
                         ];
-
                         if (legacyEmptyPatterns.includes(note.content.trim())) {
                             note.content = '';
                         }
@@ -89,7 +92,6 @@ class NotesApp {
         }
     }
 
-    // Save notes to localStorage
     saveNotesToStorage() {
         try {
             localStorage.setItem('emeraldnotes_data', JSON.stringify(this.notes));
@@ -100,13 +102,10 @@ class NotesApp {
         }
     }
 
-    // Show save indicator
     showSaveIndicator(status) {
         const indicator = document.getElementById('saveIndicator');
         const text = indicator.querySelector('.save-text');
-
         indicator.className = 'save-indicator';
-
         switch (status) {
             case 'saving':
                 indicator.classList.add('saving');
@@ -121,45 +120,33 @@ class NotesApp {
         }
     }
 
-    // Debounced save function
     debouncedSave() {
         this.showSaveIndicator('saving');
-        if (this.saveTimeout) {
-            clearTimeout(this.saveTimeout);
-        }
-        this.saveTimeout = setTimeout(() => {
-            this.saveNotesToStorage();
-        }, 1000);
+        if (this.saveTimeout) clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(() => this.saveNotesToStorage(), 1000);
     }
 
-    // Setup event listeners
+    // ─── Event Listeners ────────────────────────────────────────────────────────
+
     setupEventListeners() {
-        // New note buttons
         const newNoteBtn = document.getElementById('newNoteBtn');
         const welcomeNewNoteBtn = document.getElementById('welcomeNewNoteBtn');
         if (newNoteBtn) newNoteBtn.addEventListener('click', () => this.createNewNote());
         if (welcomeNewNoteBtn) welcomeNewNoteBtn.addEventListener('click', () => this.createNewNote());
 
-        // Delete note button
         const deleteNoteBtn = document.getElementById('deleteNoteBtn');
         if (deleteNoteBtn) deleteNoteBtn.addEventListener('click', () => this.deleteCurrentNote());
 
-        // Export note button
         const exportNoteBtn = document.getElementById('exportNoteBtn');
         if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
 
-
-        // Note title input
         const noteTitle = document.getElementById('noteTitle');
         if (noteTitle) {
             noteTitle.addEventListener('input', (e) => {
-                if (this.currentNoteId) {
-                    this.updateNoteTitle(e.target.value);
-                }
+                if (this.currentNoteId) this.updateNoteTitle(e.target.value);
             });
         }
 
-        // Text editor changes
         const textEditor = document.getElementById('textEditor');
         if (textEditor) {
             textEditor.addEventListener('input', () => {
@@ -170,39 +157,451 @@ class NotesApp {
             });
         }
 
-        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
 
-        // Prevent losing focus on editor when clicking specific ribbon buttons only
-        document.querySelectorAll('.ribbon-btn, .ribbon-tab').forEach(element => {
-            element.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-            });
+        document.querySelectorAll('.ribbon-btn, .ribbon-tab').forEach(el => {
+            el.addEventListener('mousedown', (e) => e.preventDefault());
         });
 
-        // Prevent losing focus on editor when clicking dropdown items and color swatches
-        document.querySelectorAll('.ms-dropdown-item, .color-swatch').forEach(element => {
-            element.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-            });
+        document.querySelectorAll('.ms-dropdown-item, .color-swatch').forEach(el => {
+            el.addEventListener('mousedown', (e) => e.preventDefault());
         });
 
-        // Setup Microsoft Office-style dropdowns
         this.setupMSDropdowns();
-
-        // Setup custom right-click context menu
         this.setupCustomContextMenu();
-
-        // Setup editor placeholder behavior
         this.setupEditorPlaceholder();
-
-        // Setup sidebar toggle functionality
         this.setupSidebarToggle();
     }
 
-    // Setup ribbon functionality
+    // ─── Mobile UI ──────────────────────────────────────────────────────────────
+
+    setupMobileUI() {
+        // Inject backdrop element for sidebar overlay
+        if (!document.getElementById('sidebarBackdrop')) {
+            const backdrop = document.createElement('div');
+            backdrop.id = 'sidebarBackdrop';
+            backdrop.className = 'sidebar-backdrop';
+            backdrop.addEventListener('click', () => this.closeMobileSidebar());
+            document.querySelector('.notes-app').appendChild(backdrop);
+        }
+
+        // Inject mobile back button into editor header
+        const editorHeader = document.querySelector('.editor-header');
+        if (editorHeader && !document.getElementById('mobileBackBtn')) {
+            const backBtn = document.createElement('button');
+            backBtn.id = 'mobileBackBtn';
+            backBtn.className = 'mobile-back-btn';
+            backBtn.title = 'Back to Notes';
+            backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`;
+            backBtn.addEventListener('click', () => this.openMobileSidebar());
+            editorHeader.insertBefore(backBtn, editorHeader.firstChild);
+        }
+
+        // Inject mobile Edit FAB button into editor area
+        const editorArea = document.querySelector('.editor-area');
+        if (editorArea && !document.getElementById('mobileEditBtn')) {
+            const editBtn = document.createElement('button');
+            editBtn.id = 'mobileEditBtn';
+            editBtn.className = 'mobile-edit-btn';
+            editBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit`;
+            editBtn.addEventListener('click', () => {
+                const editor = document.getElementById('textEditor');
+                if (editor) {
+                    editor.focus();
+                    // place cursor at end
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    range.selectNodeContents(editor);
+                    range.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+                document.querySelector('.notes-app').classList.add('editing-mode');
+            });
+            editorArea.appendChild(editBtn);
+        }
+
+        // Exit editing-mode when editor loses focus on mobile
+        const textEditor = document.getElementById('textEditor');
+        if (textEditor) {
+            textEditor.addEventListener('blur', () => {
+                if (this.isMobile()) {
+                    setTimeout(() => {
+                        document.querySelector('.notes-app').classList.remove('editing-mode');
+                    }, 200);
+                }
+            });
+            textEditor.addEventListener('focus', () => {
+                if (this.isMobile()) {
+                    document.querySelector('.notes-app').classList.add('editing-mode');
+                }
+            });
+        }
+
+        // Inject swipe hint strip
+        if (!document.getElementById('swipeHint')) {
+            const hint = document.createElement('div');
+            hint.id = 'swipeHint';
+            hint.className = 'swipe-hint';
+            document.querySelector('.notes-app').appendChild(hint);
+        }
+    }
+
+    openMobileSidebar() {
+        if (!this.isMobile()) return;
+        const sidebar = document.querySelector('.sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        sidebar.classList.add('mobile-open');
+        backdrop.classList.add('visible');
+        this.sidebarOpen = true;
+    }
+
+    closeMobileSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+        sidebar.classList.remove('mobile-open');
+        backdrop.classList.remove('visible');
+        this.sidebarOpen = false;
+    }
+
+    // ─── Swipe Gesture ──────────────────────────────────────────────────────────
+
+    setupSwipeGesture() {
+        const app = document.querySelector('.notes-app');
+
+        app.addEventListener('touchstart', (e) => {
+            if (!this.isMobile()) return;
+            const touch = e.touches[0];
+            this.touchStartX = touch.clientX;
+            this.touchStartY = touch.clientY;
+            this.touchStartTime = Date.now();
+            this.isSwiping = false;
+        }, { passive: true });
+
+        app.addEventListener('touchmove', (e) => {
+            if (!this.isMobile()) return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - this.touchStartX;
+            const dy = touch.clientY - this.touchStartY;
+
+            // Only track horizontal swipes (more horizontal than vertical)
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+                this.isSwiping = true;
+            }
+
+            // If sidebar is open, drag it closed with the finger
+            if (this.sidebarOpen && this.isSwiping && dx < 0) {
+                const sidebar = document.querySelector('.sidebar');
+                const clampedDx = Math.max(dx, -sidebar.offsetWidth);
+                sidebar.style.transform = `translateX(${clampedDx}px)`;
+            }
+        }, { passive: true });
+
+        app.addEventListener('touchend', (e) => {
+            if (!this.isMobile()) return;
+            const touch = e.changedTouches[0];
+            const dx = touch.clientX - this.touchStartX;
+            const dy = touch.clientY - this.touchStartY;
+            const dt = Date.now() - this.touchStartTime;
+
+            // Reset any inline transform first
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.style.transform = '';
+
+            const THRESHOLD = 50;         // minimum px to trigger action
+            const MAX_VERTICAL = 80;      // maximum vertical drift allowed
+            const MAX_TIME = 600;         // maximum ms for swipe
+
+            const isHorizontalSwipe =
+                Math.abs(dx) > THRESHOLD &&
+                Math.abs(dy) < MAX_VERTICAL &&
+                dt < MAX_TIME;
+
+            if (!isHorizontalSwipe) return;
+
+            if (dx > 0 && !this.sidebarOpen) {
+                // Swipe right — open sidebar only if swipe starts near left edge (first 40px)
+                if (this.touchStartX < 40 || this.touchStartX < window.innerWidth * 0.15) {
+                    this.openMobileSidebar();
+                }
+            } else if (dx < 0 && this.sidebarOpen) {
+                // Swipe left — close sidebar
+                this.closeMobileSidebar();
+            }
+        }, { passive: true });
+    }
+
+    // ─── Mobile Ribbon ──────────────────────────────────────────────────────────
+
+    setupMobileRibbon() {
+        // Only runs if we are on mobile; re-checks on resize
+        this.buildMobileRibbon();
+        window.addEventListener('resize', () => {
+            this.buildMobileRibbon();
+        });
+    }
+
+    buildMobileRibbon() {
+        const ribbonContent = document.querySelector('.ribbon-content');
+        if (!ribbonContent) return;
+
+        if (!this.isMobile()) {
+            // Restore desktop ribbon — remove mobile row if it exists
+            const mobileRow = document.getElementById('mobileRibbonRow');
+            if (mobileRow) mobileRow.remove();
+            const morePanel = document.getElementById('mobileMorePanel');
+            if (morePanel) morePanel.remove();
+            return;
+        }
+
+        // Already built
+        if (document.getElementById('mobileRibbonRow')) return;
+
+        // Build the mobile ribbon row
+        const row = document.createElement('div');
+        row.id = 'mobileRibbonRow';
+        row.className = 'mobile-ribbon-row';
+
+        // Essential buttons: Bold, Italic, Underline | Bullet, Number | Align L/C/R | More⋯
+        const essentials = [
+            { command: 'bold', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>`, title: 'Bold' },
+            { command: 'italic', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>`, title: 'Italic' },
+            { command: 'underline', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>`, title: 'Underline' },
+        ];
+
+        const div1 = document.createElement('div');
+        div1.className = 'mobile-ribbon-divider';
+
+        const secondary = [
+            { command: 'insertUnorderedList', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`, title: 'Bullet List' },
+            { command: 'insertOrderedList', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>`, title: 'Numbered List' },
+        ];
+
+        const div2 = document.createElement('div');
+        div2.className = 'mobile-ribbon-divider';
+
+        const tertiary = [
+            { command: 'justifyLeft', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>`, title: 'Align Left' },
+            { command: 'justifyCenter', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>`, title: 'Center' },
+        ];
+
+        // Build buttons
+        [...essentials].forEach(({ command, icon, title }) => {
+            const btn = document.createElement('button');
+            btn.className = 'ribbon-btn format-btn';
+            btn.dataset.command = command;
+            btn.title = title;
+            btn.innerHTML = icon;
+            btn.addEventListener('mousedown', (e) => e.preventDefault());
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.executeCommand(command);
+                this.updateButtonStates();
+            });
+            row.appendChild(btn);
+        });
+
+        row.appendChild(div1);
+        [...secondary].forEach(({ command, icon, title }) => {
+            const btn = document.createElement('button');
+            btn.className = 'ribbon-btn format-btn';
+            btn.dataset.command = command;
+            btn.title = title;
+            btn.innerHTML = icon;
+            btn.addEventListener('mousedown', (e) => e.preventDefault());
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.executeCommand(command);
+                this.updateButtonStates();
+            });
+            row.appendChild(btn);
+        });
+
+        row.appendChild(div2);
+        [...tertiary].forEach(({ command, icon, title }) => {
+            const btn = document.createElement('button');
+            btn.className = 'ribbon-btn format-btn';
+            btn.dataset.command = command;
+            btn.title = title;
+            btn.innerHTML = icon;
+            btn.addEventListener('mousedown', (e) => e.preventDefault());
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.executeCommand(command);
+                this.updateButtonStates();
+            });
+            row.appendChild(btn);
+        });
+
+        // Spacer
+        const spacer = document.createElement('div');
+        spacer.style.flex = '1';
+        row.appendChild(spacer);
+
+        // More ⋯ button
+        const moreBtn = document.createElement('button');
+        moreBtn.className = 'mobile-more-btn';
+        moreBtn.id = 'mobileMoreBtn';
+        moreBtn.title = 'More options';
+        moreBtn.textContent = '⋯';
+        row.appendChild(moreBtn);
+
+        // More panel (font, colors)
+        const morePanel = document.createElement('div');
+        morePanel.className = 'mobile-more-panel';
+        morePanel.id = 'mobileMorePanel';
+        morePanel.innerHTML = `
+            <div style="padding:4px 0 8px;font-size:11px;font-weight:600;color:rgba(44,62,80,0.5);text-transform:uppercase;letter-spacing:0.5px;">Font</div>
+            <div id="mobileFontFamilyDropdown" class="ms-dropdown" style="margin-bottom:6px;">
+                <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
+                    <span class="dropdown-value">Arial</span>
+                </button>
+                <div class="ms-dropdown-menu">
+                    <div class="ms-dropdown-item" data-value="Arial">Arial</div>
+                    <div class="ms-dropdown-item" data-value="Helvetica">Helvetica</div>
+                    <div class="ms-dropdown-item" data-value="Times New Roman">Times New Roman</div>
+                    <div class="ms-dropdown-item" data-value="Georgia">Georgia</div>
+                    <div class="ms-dropdown-item" data-value="Verdana">Verdana</div>
+                    <div class="ms-dropdown-item" data-value="Courier New">Courier New</div>
+                </div>
+            </div>
+            <div id="mobileFontSizeDropdown" class="ms-dropdown" style="margin-bottom:6px;">
+                <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
+                    <span class="dropdown-value">12</span>
+                </button>
+                <div class="ms-dropdown-menu">
+                    <div class="ms-dropdown-item" data-value="10">10</div>
+                    <div class="ms-dropdown-item" data-value="12">12</div>
+                    <div class="ms-dropdown-item" data-value="14">14</div>
+                    <div class="ms-dropdown-item" data-value="16">16</div>
+                    <div class="ms-dropdown-item" data-value="18">18</div>
+                    <div class="ms-dropdown-item" data-value="20">20</div>
+                    <div class="ms-dropdown-item" data-value="24">24</div>
+                    <div class="ms-dropdown-item" data-value="28">28</div>
+                    <div class="ms-dropdown-item" data-value="32">32</div>
+                    <div class="ms-dropdown-item" data-value="36">36</div>
+                    <div class="ms-dropdown-item" data-value="48">48</div>
+                </div>
+            </div>
+            <div style="padding:4px 0 8px;font-size:11px;font-weight:600;color:rgba(44,62,80,0.5);text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;">Color</div>
+            <div id="mobileFontColorDropdown" class="ms-dropdown" style="margin-bottom:6px;">
+                <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
+                    <span class="color-preview" style="background:#000000;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>
+                    <span class="dropdown-value">Text Color</span>
+                </button>
+                <div class="ms-dropdown-menu">
+                    <div class="ms-dropdown-item" data-value="#000000" data-label="Black"><span class="color-preview" style="background:#000000;width:12px;height:12px;border-radius:2px;"></span> Black</div>
+                    <div class="ms-dropdown-item" data-value="#FF0000" data-label="Red"><span class="color-preview" style="background:#FF0000;width:12px;height:12px;border-radius:2px;"></span> Red</div>
+                    <div class="ms-dropdown-item" data-value="#0000FF" data-label="Blue"><span class="color-preview" style="background:#0000FF;width:12px;height:12px;border-radius:2px;"></span> Blue</div>
+                    <div class="ms-dropdown-item" data-value="#008000" data-label="Green"><span class="color-preview" style="background:#008000;width:12px;height:12px;border-radius:2px;"></span> Green</div>
+                    <div class="ms-dropdown-item" data-value="#800080" data-label="Purple"><span class="color-preview" style="background:#800080;width:12px;height:12px;border-radius:2px;"></span> Purple</div>
+                </div>
+            </div>
+            <div id="mobileHighlightDropdown" class="ms-dropdown">
+                <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
+                    <span class="color-preview" style="background:#FFFF00;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>
+                    <span class="dropdown-value">Highlight</span>
+                </button>
+                <div class="ms-dropdown-menu">
+                    <div class="ms-dropdown-item" data-value="#FFFF00" data-label="Yellow"><span class="color-preview" style="background:#FFFF00;width:12px;height:12px;border-radius:2px;"></span> Yellow</div>
+                    <div class="ms-dropdown-item" data-value="#90EE90" data-label="Light Green"><span class="color-preview" style="background:#90EE90;width:12px;height:12px;border-radius:2px;"></span> Light Green</div>
+                    <div class="ms-dropdown-item" data-value="#FFB6C1" data-label="Light Pink"><span class="color-preview" style="background:#FFB6C1;width:12px;height:12px;border-radius:2px;"></span> Light Pink</div>
+                    <div class="ms-dropdown-item" data-value="#ADD8E6" data-label="Light Blue"><span class="color-preview" style="background:#ADD8E6;width:12px;height:12px;border-radius:2px;"></span> Light Blue</div>
+                    <div class="ms-dropdown-item" data-value="transparent" data-label="None"><span class="color-preview" style="background:transparent;width:12px;height:12px;border:1px solid #ccc;border-radius:2px;"></span> None</div>
+                </div>
+            </div>
+        `;
+
+        // Position more panel relative to ribbon
+        const ribbonEl = document.querySelector('.ribbon');
+        ribbonEl.style.position = 'relative';
+        ribbonEl.appendChild(morePanel);
+
+        // Toggle more panel
+        moreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.saveSelection();
+            morePanel.classList.toggle('open');
+            moreBtn.classList.toggle('active');
+        });
+
+        // Close more panel on outside click
+        document.addEventListener('click', (e) => {
+            if (!moreBtn.contains(e.target) && !morePanel.contains(e.target)) {
+                morePanel.classList.remove('open');
+                moreBtn.classList.remove('active');
+            }
+        });
+
+        // Wire up mobile more panel dropdowns
+        const mobileFontFamily = morePanel.querySelector('#mobileFontFamilyDropdown');
+        const mobileFontSize = morePanel.querySelector('#mobileFontSizeDropdown');
+        const mobileFontColor = morePanel.querySelector('#mobileFontColorDropdown');
+        const mobileHighlight = morePanel.querySelector('#mobileHighlightDropdown');
+
+        this.wireMobileDropdown(mobileFontFamily, (value) => {
+            this.restoreSelection();
+            this.executeCommand('fontName', value);
+        });
+        this.wireMobileDropdown(mobileFontSize, (value) => {
+            this.restoreSelection();
+            this.executeCommand('fontSize', value);
+        });
+        this.wireMobileDropdown(mobileFontColor, (value) => {
+            this.restoreSelection();
+            this.executeCommand('foreColor', value);
+        });
+        this.wireMobileDropdown(mobileHighlight, (value) => {
+            this.restoreSelection();
+            this.executeCommand('hiliteColor', value);
+        });
+
+        ribbonContent.appendChild(row);
+    }
+
+    wireMobileDropdown(dropdownEl, onSelect) {
+        if (!dropdownEl) return;
+        const btn = dropdownEl.querySelector('.ms-dropdown-btn');
+        const menu = dropdownEl.querySelector('.ms-dropdown-menu');
+        const items = dropdownEl.querySelectorAll('.ms-dropdown-item');
+
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.saveSelection();
+            document.querySelectorAll('.ms-dropdown.active').forEach(d => {
+                if (d !== dropdownEl) d.classList.remove('active');
+            });
+            dropdownEl.classList.toggle('active');
+        });
+
+        items.forEach(item => {
+            item.addEventListener('mousedown', (e) => e.preventDefault());
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const value = item.dataset.value;
+                const label = item.dataset.label || item.textContent.trim();
+                const valueSpan = btn.querySelector('.dropdown-value');
+                if (valueSpan) valueSpan.textContent = label;
+                const colorPreview = btn.querySelector('.color-preview');
+                if (colorPreview && value) {
+                    colorPreview.style.background = value;
+                }
+                dropdownEl.classList.remove('active');
+                setTimeout(() => {
+                    const editor = document.getElementById('textEditor');
+                    if (editor) editor.focus();
+                    onSelect(value);
+                    this.updateButtonStates();
+                }, 10);
+            });
+        });
+    }
+
+    // ─── Ribbon Setup (Desktop) ─────────────────────────────────────────────────
+
     setupRibbon() {
-        // Tab switching
         document.querySelectorAll('.ribbon-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 const tabName = e.target.dataset.tab;
@@ -210,7 +609,6 @@ class NotesApp {
             });
         });
 
-        // Format buttons
         document.querySelectorAll('.format-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -220,9 +618,6 @@ class NotesApp {
             });
         });
 
-        // Legacy font controls are now handled by MS-style dropdowns in setupMSDropdowns()
-
-        // Clipboard operations
         const cutBtn = document.getElementById('cutBtn');
         const copyBtn = document.getElementById('copyBtn');
         const pasteBtn = document.getElementById('pasteBtn');
@@ -230,30 +625,25 @@ class NotesApp {
         if (copyBtn) copyBtn.addEventListener('click', () => this.executeCommand('copy'));
         if (pasteBtn) pasteBtn.addEventListener('click', () => this.executeCommand('paste'));
 
-        // Insert operations
         const insertTableBtn = document.getElementById('insertTableBtn');
         const insertLinkBtn = document.getElementById('insertLinkBtn');
         if (insertTableBtn) insertTableBtn.addEventListener('click', () => this.insertTable());
         if (insertLinkBtn) insertLinkBtn.addEventListener('click', () => this.insertLink());
 
-        // Zoom operations
         const zoomInBtn = document.getElementById('zoomInBtn');
         const zoomOutBtn = document.getElementById('zoomOutBtn');
         if (zoomInBtn) zoomInBtn.addEventListener('click', () => this.zoomIn());
         if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => this.zoomOut());
     }
 
-    // Setup text editor
+    // ─── Text Editor ────────────────────────────────────────────────────────────
+
     setupTextEditor() {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
 
-        // Enable normal scroll wheel (prevent scrollice interference)
-        editor.addEventListener('wheel', (e) => {
-            e.stopPropagation();
-        }, false);
+        editor.addEventListener('wheel', (e) => e.stopPropagation(), false);
 
-        // Update button states when selection changes
         editor.addEventListener('mouseup', () => {
             this.saveSelection();
             this.updateButtonStates();
@@ -263,14 +653,9 @@ class NotesApp {
             this.updateButtonStates();
         });
 
-        // Save selection when editor loses focus
-        editor.addEventListener('blur', () => {
-            this.saveSelection();
-        });
+        editor.addEventListener('blur', () => this.saveSelection());
 
-        // Handle paste events
         editor.addEventListener('paste', (e) => {
-            // Allow default paste behavior
             setTimeout(() => {
                 this.updatePlaceholderState(editor);
                 this.updateNoteContent();
@@ -278,7 +663,6 @@ class NotesApp {
         });
     }
 
-    // Save current selection
     saveSelection() {
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
@@ -286,7 +670,6 @@ class NotesApp {
         }
     }
 
-    // Restore saved selection
     restoreSelection() {
         if (this.savedSelection) {
             const selection = window.getSelection();
@@ -296,53 +679,26 @@ class NotesApp {
         }
     }
 
-    // Switch ribbon tab
     switchRibbonTab(tabName) {
-        // Update tab buttons
         document.querySelectorAll('.ribbon-tab').forEach(tab => {
             tab.classList.toggle('active', tab.dataset.tab === tabName);
         });
-
-        // Update panels
         document.querySelectorAll('.ribbon-panel').forEach(panel => {
             panel.classList.toggle('active', panel.dataset.panel === tabName);
         });
     }
 
-    // Execute formatting command with modern implementations
     executeCommand(command, value = null) {
         document.getElementById('textEditor').focus();
 
         try {
-            // Handle modern clipboard operations
-            if (command === 'cut') {
-                this.modernCut();
-                return;
-            }
-            if (command === 'copy') {
-                this.modernCopy();
-                return;
-            }
-            if (command === 'paste') {
-                this.modernPaste();
-                return;
-            }
+            if (command === 'cut') { this.modernCut(); return; }
+            if (command === 'copy') { this.modernCopy(); return; }
+            if (command === 'paste') { this.modernPaste(); return; }
+            if (command === 'fontSize') { this.modernFontSize(value); return; }
+            if (command === 'foreColor') { this.modernTextColor(value); return; }
+            if (command === 'hiliteColor') { this.modernHighlightColor(value); return; }
 
-            // Handle modern text formatting
-            if (command === 'fontSize') {
-                this.modernFontSize(value);
-                return;
-            }
-            if (command === 'foreColor') {
-                this.modernTextColor(value);
-                return;
-            }
-            if (command === 'hiliteColor') {
-                this.modernHighlightColor(value);
-                return;
-            }
-
-            // Fall back to execCommand for other commands (bold, italic, etc.)
             if (value) {
                 document.execCommand(command, false, value);
             } else {
@@ -355,164 +711,101 @@ class NotesApp {
         this.updateNoteContent();
     }
 
-    // Update button states based on current selection with span-based styling support
     updateButtonStates() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
 
-        // Handle traditional execCommand-based formatting
         const commands = ['bold', 'italic', 'underline', 'justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList'];
-
         commands.forEach(command => {
-            const btn = document.querySelector(`[data-command="${command}"]`);
-            if (btn) {
+            const btns = document.querySelectorAll(`[data-command="${command}"]`);
+            btns.forEach(btn => {
                 try {
-                    const isActive = document.queryCommandState(command);
-                    btn.classList.toggle('active', isActive);
-                } catch (error) {
-                    // Fallback: check for styling in the DOM
-                    btn.classList.remove('active');
-                }
-            }
+                    btn.classList.toggle('active', document.queryCommandState(command));
+                } catch { btn.classList.remove('active'); }
+            });
         });
 
-        // Update font styling based on actual DOM inspection
         this.updateFontStateFromDOM();
     }
 
-    // Update font dropdowns based on actual DOM styling at cursor position
     updateFontStateFromDOM() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
 
         const range = selection.getRangeAt(0);
         let currentNode = range.commonAncestorContainer;
+        if (currentNode.nodeType === Node.TEXT_NODE) currentNode = currentNode.parentElement;
 
-        // If text node, get parent element
-        if (currentNode.nodeType === Node.TEXT_NODE) {
-            currentNode = currentNode.parentElement;
-        }
-
-        // Traverse up the DOM to find styling
-        let fontFamily = '';
-        let fontSize = '';
-        let textColor = '';
-        let backgroundColor = '';
-
-        // Start from the current node and traverse up
+        let fontFamily = '', fontSize = '', textColor = '', backgroundColor = '';
         let element = currentNode;
+
         while (element && element !== document.getElementById('textEditor')) {
             const styles = window.getComputedStyle(element);
-
-            // Get font family
-            if (!fontFamily && styles.fontFamily && styles.fontFamily !== 'inherit') {
+            if (!fontFamily && styles.fontFamily && styles.fontFamily !== 'inherit')
                 fontFamily = styles.fontFamily.replace(/['"]/g, '');
-            }
-
-            // Get font size (look for explicit styling, not inherited)
-            if (!fontSize && element.style && element.style.fontSize) {
+            if (!fontSize && element.style && element.style.fontSize)
                 fontSize = element.style.fontSize.replace('px', '');
-            }
-
-            // Get text color (look for explicit styling)
-            if (!textColor && element.style && element.style.color) {
+            if (!textColor && element.style && element.style.color)
                 textColor = element.style.color;
-            }
-
-            // Get background color (look for explicit styling)
-            if (!backgroundColor && element.style && element.style.backgroundColor) {
+            if (!backgroundColor && element.style && element.style.backgroundColor)
                 backgroundColor = element.style.backgroundColor;
-            }
-
             element = element.parentElement;
         }
 
-        // Update font family dropdown
         const fontFamilyDropdown = document.getElementById('fontFamilyDropdown');
         if (fontFamilyDropdown && fontFamily) {
             const valueSpan = fontFamilyDropdown.querySelector('.dropdown-value');
             if (valueSpan) {
-                // Find matching option
                 const matchingItem = fontFamilyDropdown.querySelector(`[data-value="${fontFamily}"]`);
-                if (matchingItem) {
-                    valueSpan.textContent = matchingItem.dataset.label || matchingItem.textContent;
-                }
+                if (matchingItem) valueSpan.textContent = matchingItem.dataset.label || matchingItem.textContent;
             }
         }
 
-        // Update font size dropdown
         const fontSizeDropdown = document.getElementById('fontSizeDropdown');
         if (fontSizeDropdown && fontSize) {
             const valueSpan = fontSizeDropdown.querySelector('.dropdown-value');
-            if (valueSpan) {
-                valueSpan.textContent = fontSize + 'px';
-            }
+            if (valueSpan) valueSpan.textContent = fontSize + 'px';
         }
 
-        // Update font color dropdown
         const fontColorDropdown = document.getElementById('fontColorDropdown');
         if (fontColorDropdown && textColor) {
             const colorPreview = fontColorDropdown.querySelector('.color-preview');
-            if (colorPreview) {
-                colorPreview.style.background = textColor;
-                colorPreview.setAttribute('data-color', textColor);
-            }
+            if (colorPreview) { colorPreview.style.background = textColor; colorPreview.setAttribute('data-color', textColor); }
         }
 
-        // Update highlight color dropdown
         const highlightColorDropdown = document.getElementById('highlightColorDropdown');
         if (highlightColorDropdown && backgroundColor) {
             const colorPreview = highlightColorDropdown.querySelector('.color-preview');
-            if (colorPreview) {
-                colorPreview.style.background = backgroundColor;
-                colorPreview.setAttribute('data-color', backgroundColor);
-            }
+            if (colorPreview) { colorPreview.style.background = backgroundColor; colorPreview.setAttribute('data-color', backgroundColor); }
         }
     }
 
-    // Handle keyboard shortcuts
+    // ─── Keyboard Shortcuts ──────────────────────────────────────────────────────
+
     handleKeyboardShortcuts(e) {
         if (e.ctrlKey || e.metaKey) {
             switch (e.key.toLowerCase()) {
-                case 'n':
-                    e.preventDefault();
-                    this.createNewNote();
-                    break;
-                case 's':
-                    e.preventDefault();
-                    this.saveNotesToStorage();
-                    break;
+                case 'n': e.preventDefault(); this.createNewNote(); break;
+                case 's': e.preventDefault(); this.saveNotesToStorage(); break;
                 case 'b':
-                    if (this.isEditorFocused()) {
-                        e.preventDefault();
-                        this.executeCommand('bold');
-                        this.updateButtonStates();
-                    }
+                    if (this.isEditorFocused()) { e.preventDefault(); this.executeCommand('bold'); this.updateButtonStates(); }
                     break;
                 case 'i':
-                    if (this.isEditorFocused()) {
-                        e.preventDefault();
-                        this.executeCommand('italic');
-                        this.updateButtonStates();
-                    }
+                    if (this.isEditorFocused()) { e.preventDefault(); this.executeCommand('italic'); this.updateButtonStates(); }
                     break;
                 case 'u':
-                    if (this.isEditorFocused()) {
-                        e.preventDefault();
-                        this.executeCommand('underline');
-                        this.updateButtonStates();
-                    }
+                    if (this.isEditorFocused()) { e.preventDefault(); this.executeCommand('underline'); this.updateButtonStates(); }
                     break;
             }
         }
     }
 
-    // Check if editor is focused
     isEditorFocused() {
         return document.getElementById('textEditor').contains(document.activeElement);
     }
 
-    // Create new note
+    // ─── Notes CRUD ──────────────────────────────────────────────────────────────
+
     createNewNote() {
         const note = {
             id: this.generateId(),
@@ -527,25 +820,24 @@ class NotesApp {
         this.renderNotesList();
         this.debouncedSave();
 
-        // Focus on title for editing
         setTimeout(() => {
             const titleInput = document.getElementById('noteTitle');
             titleInput.select();
         }, 100);
+
+        // On mobile, close sidebar after selecting/creating a note
+        if (this.isMobile()) this.closeMobileSidebar();
     }
 
-    // Select a note
     selectNote(noteId) {
         const note = this.notes.find(n => n.id === noteId);
         if (!note) return;
 
         this.currentNoteId = noteId;
 
-        // Update UI
         document.getElementById('noteTitle').value = note.title;
         document.getElementById('textEditor').innerHTML = this.sanitizeHtml(note.content);
 
-        // Update editor background color based on note color
         const textEditor = document.getElementById('textEditor');
         if (note.color && note.color !== '#ffffff') {
             textEditor.style.backgroundColor = note.color;
@@ -553,46 +845,32 @@ class NotesApp {
             textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
         }
 
-        // Update note color dropdown to show current color
         const noteColorDropdown = document.getElementById('noteColorDropdown');
         if (noteColorDropdown) {
             const colorPreview = noteColorDropdown.querySelector('.color-preview');
             const dropdownValue = noteColorDropdown.querySelector('.dropdown-value');
             const currentColor = note.color || '#ffffff';
-
-            if (colorPreview) {
-                colorPreview.style.background = currentColor;
-                colorPreview.setAttribute('data-color', currentColor);
-            }
-
+            if (colorPreview) { colorPreview.style.background = currentColor; colorPreview.setAttribute('data-color', currentColor); }
             if (dropdownValue) {
-                // Find the matching color label
                 const colorItem = noteColorDropdown.querySelector(`[data-value="${currentColor}"]`);
-                if (colorItem) {
-                    dropdownValue.textContent = colorItem.dataset.label || 'Default';
-                } else {
-                    dropdownValue.textContent = 'Default';
-                }
+                dropdownValue.textContent = colorItem ? (colorItem.dataset.label || 'Default') : 'Default';
             }
         }
 
-        // Update active state in notes list
         document.querySelectorAll('.note-item').forEach(item => {
             item.classList.toggle('active', item.dataset.noteId === noteId);
         });
 
-        // Hide welcome screen and show editor
         document.getElementById('welcomeScreen').classList.add('hidden');
         document.querySelector('.editor-header').style.display = 'flex';
         document.querySelector('.editor-content').style.display = 'flex';
 
-        // Focus editor
-        setTimeout(() => {
-            document.getElementById('textEditor').focus();
-        }, 100);
+        // On mobile, close sidebar when a note is selected
+        if (this.isMobile()) this.closeMobileSidebar();
+
+        setTimeout(() => document.getElementById('textEditor').focus(), 100);
     }
 
-    // Update note title
     updateNoteTitle(title) {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (note) {
@@ -603,101 +881,88 @@ class NotesApp {
         }
     }
 
-    // Update note content
     updateNoteContent() {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (note) {
             const textEditor = document.getElementById('textEditor');
             const content = textEditor.innerHTML.trim();
-            // Use unified empty detection logic
-            if (this.isEditorEmpty(textEditor)) {
-                note.content = '';
-            } else {
-                note.content = content;
-            }
+            note.content = this.isEditorEmpty(textEditor) ? '' : content;
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
             this.debouncedSave();
         }
     }
 
-    // Delete current note
     deleteCurrentNote() {
         if (!this.currentNoteId) return;
 
-        if (confirm('Are you sure you want to delete this note?')) {
-            this.notes = this.notes.filter(n => n.id !== this.currentNoteId);
-            this.currentNoteId = null;
+        const currentNote = this.notes.find(n => n.id === this.currentNoteId);
+        if (!currentNote) return;
+
+        const title = currentNote.title || 'Untitled Note';
+        this.showDeleteModal(title, () => {
+            const currentIndex = this.notes.findIndex(n => n.id === this.currentNoteId);
+            this.notes = this.notes.filter(note => note.id !== this.currentNoteId);
+
+            if (this.notes.length > 0) {
+                const nextIndex = currentIndex < this.notes.length ? currentIndex : this.notes.length - 1;
+                this.selectNote(this.notes[nextIndex].id);
+            } else {
+                this.currentNoteId = null;
+                this.showWelcomeScreenIfNeeded();
+                const noteTitle = document.getElementById('noteTitle');
+                const textEditor = document.getElementById('textEditor');
+                if (noteTitle) noteTitle.value = '';
+                if (textEditor) { textEditor.innerHTML = ''; textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)'; }
+            }
+
+            this.saveNotesToStorage();
             this.renderNotesList();
-            this.showWelcomeScreenIfNeeded();
-            this.debouncedSave();
-        }
-    }
-
-    // Render notes list
-    renderNotesList() {
-        const notesList = document.getElementById('notesList');
-        notesList.innerHTML = '';
-
-        this.notes.forEach(note => {
-            const noteElement = this.createNoteListItem(note);
-            notesList.appendChild(noteElement);
         });
     }
 
-    // Create note list item
+    renderNotesList() {
+        const notesList = document.getElementById('notesList');
+        notesList.innerHTML = '';
+        this.notes.forEach(note => notesList.appendChild(this.createNoteListItem(note)));
+    }
+
     createNoteListItem(note) {
         const div = document.createElement('div');
         div.className = 'note-item';
         div.dataset.noteId = note.id;
+        if (note.id === this.currentNoteId) div.classList.add('active');
 
-        if (note.id === this.currentNoteId) {
-            div.classList.add('active');
-        }
-
-        // Apply note color and shadow if set
         if (note.color && note.color !== '#ffffff') {
             div.style.backgroundColor = note.color;
             div.style.borderColor = note.color;
-
-            // Apply colored shadow effect
             const shadowColor = this.hexToRgba(note.color, 0.3);
             div.style.boxShadow = `0 4px 16px ${shadowColor}`;
-
-            // Enhanced shadow on hover
-            div.addEventListener('mouseenter', () => {
-                const hoverShadowColor = this.hexToRgba(note.color, 0.4);
-                div.style.boxShadow = `0 8px 24px ${hoverShadowColor}`;
-            });
-
-            div.addEventListener('mouseleave', () => {
-                const shadowColor = this.hexToRgba(note.color, 0.3);
-                div.style.boxShadow = `0 4px 16px ${shadowColor}`;
-            });
+            div.addEventListener('mouseenter', () => { div.style.boxShadow = `0 8px 24px ${this.hexToRgba(note.color, 0.4)}`; });
+            div.addEventListener('mouseleave', () => { div.style.boxShadow = `0 4px 16px ${this.hexToRgba(note.color, 0.3)}`; });
         }
 
-        // Extract plain text for preview
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = note.content;
         const plainText = tempDiv.textContent || tempDiv.innerText || '';
         const preview = plainText.substring(0, 150);
-
-        // Format date
         const date = new Date(note.modifiedAt);
-        const formattedDate = this.formatDate(date);
 
         div.innerHTML = `
             <div class="note-item-title">${this.escapeHtml(note.title)}</div>
             <div class="note-item-preview">${this.escapeHtml(preview)}${preview.length === 150 ? '...' : ''}</div>
-            <div class="note-item-date">${formattedDate}</div>
+            <div class="note-item-date">${this.formatDate(date)}</div>
         `;
 
-        div.addEventListener('click', () => this.selectNote(note.id));
+        div.addEventListener('click', () => {
+            this.selectNote(note.id);
+            // Close sidebar on mobile when note is tapped
+            if (this.isMobile()) this.closeMobileSidebar();
+        });
 
         return div;
     }
 
-    // Show welcome screen if no notes
     showWelcomeScreenIfNeeded() {
         const hasNotes = this.notes.length > 0;
         const welcomeScreen = document.getElementById('welcomeScreen');
@@ -713,328 +978,160 @@ class NotesApp {
             editorHeader.style.display = 'none';
             editorContent.style.display = 'none';
             this.currentNoteId = null;
+
+            // On mobile with no notes, auto-open sidebar
+            if (this.isMobile()) this.openMobileSidebar();
         }
     }
 
-    // Insert table
-    insertTable() {
-        this.showTableModal();
-    }
+    // ─── Insert Operations ──────────────────────────────────────────────────────
 
-    // Show custom table creation modal
+    insertTable() { this.showTableModal(); }
+    insertLink() { this.showLinkModal(); }
+
     showTableModal() {
         const modal = document.getElementById('tableModal');
         const cancelBtn = document.getElementById('tableModalCancel');
         const createBtn = document.getElementById('tableModalCreate');
         const rowsInput = document.getElementById('tableRows');
         const colsInput = document.getElementById('tableCols');
-
         if (!modal) return;
-
-        // Show modal
         modal.classList.add('show');
-
-        // Focus first input
         setTimeout(() => rowsInput.focus(), 100);
 
-        // Handle cancel
-        const handleCancel = () => {
+        const cleanup = () => {
             modal.classList.remove('show');
-            cancelBtn.removeEventListener('click', handleCancel);
+            cancelBtn.removeEventListener('click', cleanup);
             createBtn.removeEventListener('click', handleCreate);
-            modal.removeEventListener('click', handleBackdropClick);
+            modal.removeEventListener('click', handleBackdrop);
             document.removeEventListener('keydown', handleEscape);
         };
-
-        // Handle create
         const handleCreate = () => {
             const rows = parseInt(rowsInput.value);
             const cols = parseInt(colsInput.value);
-
-            if (rows && cols && rows > 0 && cols > 0) {
-                this.createTable(rows, cols);
-                handleCancel();
-            }
+            if (rows && cols && rows > 0 && cols > 0) { this.createTable(rows, cols); cleanup(); }
         };
+        const handleBackdrop = (e) => { if (e.target === modal) cleanup(); };
+        const handleEscape = (e) => { if (e.key === 'Escape') cleanup(); };
+        const handleEnter = (e) => { if (e.key === 'Enter') handleCreate(); };
 
-        // Handle backdrop click
-        const handleBackdropClick = (e) => {
-            if (e.target === modal) {
-                handleCancel();
-            }
-        };
-
-        // Handle escape key
-        const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                handleCancel();
-            }
-        };
-
-        // Handle enter key in inputs
-        const handleEnter = (e) => {
-            if (e.key === 'Enter') {
-                handleCreate();
-            }
-        };
-
-        // Add event listeners
-        cancelBtn.addEventListener('click', handleCancel);
+        cancelBtn.addEventListener('click', cleanup);
         createBtn.addEventListener('click', handleCreate);
-        modal.addEventListener('click', handleBackdropClick);
+        modal.addEventListener('click', handleBackdrop);
         document.addEventListener('keydown', handleEscape);
         rowsInput.addEventListener('keydown', handleEnter);
         colsInput.addEventListener('keydown', handleEnter);
     }
 
-    // Create table with specified dimensions
     createTable(rows, cols) {
         let tableHTML = '<table>';
-
-        // Create header row
         tableHTML += '<tr>';
-        for (let j = 0; j < cols; j++) {
-            tableHTML += '<th>Header ' + (j + 1) + '</th>';
-        }
+        for (let j = 0; j < cols; j++) tableHTML += '<th>Header ' + (j + 1) + '</th>';
         tableHTML += '</tr>';
-
-        // Create data rows
         for (let i = 1; i < rows; i++) {
             tableHTML += '<tr>';
-            for (let j = 0; j < cols; j++) {
-                tableHTML += '<td>Cell ' + i + ',' + (j + 1) + '</td>';
-            }
+            for (let j = 0; j < cols; j++) tableHTML += '<td>Cell ' + i + ',' + (j + 1) + '</td>';
             tableHTML += '</tr>';
         }
         tableHTML += '</table>';
-
         this.executeCommand('insertHTML', tableHTML);
     }
 
-    // Insert link
-    insertLink() {
-        this.showLinkModal();
-    }
-
-    // Show custom link creation modal
     showLinkModal() {
         const modal = document.getElementById('linkModal');
         const cancelBtn = document.getElementById('linkModalCancel');
         const createBtn = document.getElementById('linkModalCreate');
         const urlInput = document.getElementById('linkUrl');
         const textInput = document.getElementById('linkText');
-
         if (!modal) return;
-
-        // Save current editor selection
         this.saveSelection();
-
-        // Show modal
         modal.classList.add('show');
-
-        // Reset inputs and validation
         urlInput.value = 'https://';
         textInput.value = '';
         createBtn.disabled = true;
+        setTimeout(() => { urlInput.focus(); urlInput.select(); }, 100);
 
-        // Focus first input and select all text
-        setTimeout(() => {
-            urlInput.focus();
-            urlInput.select();
-        }, 100);
-
-        // URL validation function
         const validateUrl = (url) => {
-            if (!url || url.trim() === '' || url.trim() === 'https://') {
-                return { valid: false, message: '' };
-            }
-
+            if (!url || url.trim() === '' || url.trim() === 'https://') return { valid: false, message: '' };
             url = url.trim();
-
-            // Auto-prepend https:// if no protocol is present
-            if (!url.match(/^[a-z][a-z0-9+.-]*:/i)) {
-                url = 'https://' + url;
-                urlInput.value = url;
-            }
-
-            // Check for dangerous schemes
+            if (!url.match(/^[a-z][a-z0-9+.-]*:/i)) { url = 'https://' + url; urlInput.value = url; }
             const dangerousSchemes = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:'];
-            const urlLower = url.toLowerCase();
-
             for (const scheme of dangerousSchemes) {
-                if (urlLower.startsWith(scheme)) {
-                    return { 
-                        valid: false, 
-                        message: 'Unsafe URL scheme detected. Please use http://, https://, or mailto:' 
-                    };
-                }
+                if (url.toLowerCase().startsWith(scheme))
+                    return { valid: false, message: 'Unsafe URL scheme. Use http://, https://, or mailto:' };
             }
-
-            // Allow only safe protocols
-            const safeProtocols = /^(https?|mailto):/i;
-            if (!safeProtocols.test(url)) {
-                return { 
-                    valid: false, 
-                    message: 'Only HTTP, HTTPS, and mailto URLs are allowed' 
-                };
-            }
-
-            // Basic URL format validation
+            if (!/^(https?|mailto):/i.test(url)) return { valid: false, message: 'Only HTTP, HTTPS, and mailto URLs allowed' };
             try {
                 if (url.startsWith('mailto:')) {
-                    // Simple email validation for mailto links
-                    const email = url.substring(7);
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (!emailRegex.test(email)) {
-                        return { 
-                            valid: false, 
-                            message: 'Invalid email address for mailto link' 
-                        };
-                    }
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(url.substring(7)))
+                        return { valid: false, message: 'Invalid email address' };
                 } else {
-                    // Validate HTTP/HTTPS URLs
                     const urlObj = new URL(url);
-                    if (!urlObj.hostname) {
-                        return { 
-                            valid: false, 
-                            message: 'Invalid URL format' 
-                        };
-                    }
+                    if (!urlObj.hostname) return { valid: false, message: 'Invalid URL format' };
                 }
-                return { valid: true, message: '', url: url };
-            } catch (error) {
-                return { 
-                    valid: false, 
-                    message: 'Invalid URL format' 
-                };
-            }
+                return { valid: true, message: '', url };
+            } catch { return { valid: false, message: 'Invalid URL format' }; }
         };
 
-        // Show validation feedback
-        const showValidationFeedback = (input, message, isValid) => {
+        const showFeedback = (input, message, isValid) => {
             let feedback = input.parentNode.querySelector('.validation-feedback');
-
-            if (!feedback) {
-                feedback = document.createElement('div');
-                feedback.className = 'validation-feedback';
-                input.parentNode.appendChild(feedback);
-            }
-
+            if (!feedback) { feedback = document.createElement('div'); feedback.className = 'validation-feedback'; input.parentNode.appendChild(feedback); }
             feedback.textContent = message;
             feedback.className = `validation-feedback ${isValid ? 'valid' : 'invalid'}`;
             feedback.style.display = message ? 'block' : 'none';
         };
 
-        // Clear validation feedback
-        const clearValidationFeedback = (input) => {
-            const feedback = input.parentNode.querySelector('.validation-feedback');
-            if (feedback) {
-                feedback.style.display = 'none';
-            }
-        };
-
-        // Update create button state
-        const updateCreateButton = () => {
+        const updateBtn = () => {
             const url = urlInput.value.trim();
             const text = textInput.value.trim();
-            const validation = validateUrl(url);
-
-            createBtn.disabled = !(validation.valid && text && text.trim() !== '');
-
-            if (url && url !== 'https://') {
-                if (validation.valid) {
-                    showValidationFeedback(urlInput, 'Valid URL', true);
-                } else {
-                    showValidationFeedback(urlInput, validation.message, false);
-                }
-            } else {
-                clearValidationFeedback(urlInput);
-            }
+            const v = validateUrl(url);
+            createBtn.disabled = !(v.valid && text);
+            if (url && url !== 'https://') showFeedback(urlInput, v.message || (v.valid ? 'Valid URL' : ''), v.valid);
+            else { const f = urlInput.parentNode.querySelector('.validation-feedback'); if (f) f.style.display = 'none'; }
         };
 
-        // Handle cancel
-        const handleCancel = () => {
+        const cleanup = () => {
             modal.classList.remove('show');
-            cancelBtn.removeEventListener('click', handleCancel);
+            cancelBtn.removeEventListener('click', cleanup);
             createBtn.removeEventListener('click', handleCreate);
-            modal.removeEventListener('click', handleBackdropClick);
-            document.removeEventListener('keydown', handleEscape);
-            urlInput.removeEventListener('keydown', handleEnter);
-            textInput.removeEventListener('keydown', handleEnter);
-            urlInput.removeEventListener('input', updateCreateButton);
-            textInput.removeEventListener('input', updateCreateButton);
-
-            // Restore editor selection and focus
+            urlInput.removeEventListener('input', updateBtn);
+            textInput.removeEventListener('input', updateBtn);
             this.restoreSelection();
         };
-
-        // Handle create
         const handleCreate = () => {
             const url = urlInput.value.trim();
             const text = textInput.value.trim();
-            const validation = validateUrl(url);
-
-            if (validation.valid && text && text.trim() !== '') {
-                // Restore selection before inserting link
+            const v = validateUrl(url);
+            if (v.valid && text) {
                 this.restoreSelection();
-
-                const safeUrl = validation.url || url;
-                const linkHTML = `<a href="${this.escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(text)}</a>`;
-                this.executeCommand('insertHTML', linkHTML);
-                handleCancel();
+                this.executeCommand('insertHTML', `<a href="${this.escapeHtml(v.url || url)}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(text)}</a>`);
+                cleanup();
             }
         };
 
-        // Handle backdrop click
-        const handleBackdropClick = (e) => {
-            if (e.target === modal) {
-                handleCancel();
-            }
-        };
-
-        // Handle escape key
-        const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                handleCancel();
-            }
-        };
-
-        // Handle enter key in inputs
-        const handleEnter = (e) => {
-            if (e.key === 'Enter' && !createBtn.disabled) {
-                handleCreate();
-            }
-        };
-
-        // Add event listeners
-        cancelBtn.addEventListener('click', handleCancel);
+        cancelBtn.addEventListener('click', cleanup);
         createBtn.addEventListener('click', handleCreate);
-        modal.addEventListener('click', handleBackdropClick);
-        document.addEventListener('keydown', handleEscape);
-        urlInput.addEventListener('keydown', handleEnter);
-        textInput.addEventListener('keydown', handleEnter);
-        urlInput.addEventListener('input', updateCreateButton);
-        textInput.addEventListener('input', updateCreateButton);
-
-        // Initial validation
-        updateCreateButton();
+        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cleanup(); });
+        urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !createBtn.disabled) handleCreate(); });
+        textInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !createBtn.disabled) handleCreate(); });
+        urlInput.addEventListener('input', updateBtn);
+        textInput.addEventListener('input', updateBtn);
+        updateBtn();
     }
 
-    // Zoom in
     zoomIn() {
         const editor = document.getElementById('textEditor');
-        const currentSize = parseFloat(getComputedStyle(editor).fontSize);
-        editor.style.fontSize = (currentSize * 1.1) + 'px';
+        editor.style.fontSize = (parseFloat(getComputedStyle(editor).fontSize) * 1.1) + 'px';
     }
 
-    // Zoom out
     zoomOut() {
         const editor = document.getElementById('textEditor');
-        const currentSize = parseFloat(getComputedStyle(editor).fontSize);
-        editor.style.fontSize = (currentSize * 0.9) + 'px';
+        editor.style.fontSize = (parseFloat(getComputedStyle(editor).fontSize) * 0.9) + 'px';
     }
 
-    // Utility functions
+    // ─── Utility ─────────────────────────────────────────────────────────────────
+
     generateId() {
         return 'note_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
@@ -1046,16 +1143,10 @@ class NotesApp {
         const minutes = Math.floor(seconds / 60);
         const hours = Math.floor(minutes / 60);
         const days = Math.floor(hours / 24);
-
-        if (days > 0) {
-            return date.toLocaleDateString();
-        } else if (hours > 0) {
-            return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
-        } else if (minutes > 0) {
-            return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
-        } else {
-            return 'Just now';
-        }
+        if (days > 0) return date.toLocaleDateString();
+        if (hours > 0) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+        if (minutes > 0) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+        return 'Just now';
     }
 
     escapeHtml(text) {
@@ -1064,75 +1155,41 @@ class NotesApp {
         return div.innerHTML;
     }
 
-    // Convert hex color to RGBA with opacity for shadows
     hexToRgba(hex, opacity) {
-        // Remove # if present
         hex = hex.replace('#', '');
-
-        // Parse hex values
         const r = parseInt(hex.substring(0, 2), 16);
         const g = parseInt(hex.substring(2, 4), 16);
         const b = parseInt(hex.substring(4, 6), 16);
-
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     }
 
-    // Sanitize HTML content to prevent XSS
     sanitizeHtml(html) {
         if (!html) return '';
-
-        const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'b', 'i', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a'];
+        const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'b', 'i', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a', 'table', 'tr', 'td', 'th'];
         const allowedAttributes = ['style', 'href', 'target', 'rel'];
-
         try {
             const div = document.createElement('div');
             div.innerHTML = html;
-
-            // Remove all script tags and dangerous elements
-            const dangerousElements = div.querySelectorAll('script, iframe, object, embed, form, input, button, link, meta');
-            dangerousElements.forEach(element => element.remove());
-
-            // Process all remaining elements
-            const allElements = div.querySelectorAll('*');
-            allElements.forEach(element => {
+            div.querySelectorAll('script, iframe, object, embed, form, input, button, link, meta').forEach(el => el.remove());
+            div.querySelectorAll('*').forEach(element => {
                 const tagName = element.tagName.toLowerCase();
-
-                // Remove elements not in allowed list
                 if (!allowedTags.includes(tagName)) {
-                    // Replace with span to preserve content
                     const span = document.createElement('span');
                     span.innerHTML = element.innerHTML;
                     element.parentNode.replaceChild(span, element);
                     return;
                 }
-
-                // Remove dangerous attributes
-                const attributes = Array.from(element.attributes);
-                attributes.forEach(attr => {
+                Array.from(element.attributes).forEach(attr => {
                     const attrName = attr.name.toLowerCase();
                     const attrValue = attr.value.toLowerCase();
-
-                    // Allow href for anchor tags if it's a safe URL
                     if (attrName === 'href' && tagName === 'a') {
-                        // Check for safe protocols
-                        if (attrValue.startsWith('http://') || 
-                            attrValue.startsWith('https://') || 
-                            attrValue.startsWith('mailto:')) {
-                            return; // Keep safe href attributes
-                        }
+                        if (attrValue.startsWith('http://') || attrValue.startsWith('https://') || attrValue.startsWith('mailto:')) return;
                     }
-
-                    if (attrName.startsWith('on') || 
-                        attrName.includes('javascript:') || 
-                        attrValue.includes('javascript:') ||
-                        (attrName === 'src') || 
-                        (attrName === 'href' && tagName !== 'a') ||
-                        !allowedAttributes.includes(attrName)) {
+                    if (attrName.startsWith('on') || attrName.includes('javascript:') || attrValue.includes('javascript:') ||
+                        attrName === 'src' || (attrName === 'href' && tagName !== 'a') || !allowedAttributes.includes(attrName)) {
                         element.removeAttribute(attr.name);
                     }
                 });
-
-                // Clean style attribute specifically
                 if (element.hasAttribute('style')) {
                     const style = element.getAttribute('style');
                     if (style && (style.includes('javascript:') || style.includes('expression(') || style.includes('@import'))) {
@@ -1140,25 +1197,22 @@ class NotesApp {
                     }
                 }
             });
-
             return div.innerHTML;
         } catch (error) {
-            console.error('Error sanitizing HTML:', error);
-            // Fallback to text content only
             const div = document.createElement('div');
             div.textContent = html;
             return div.innerHTML;
         }
     }
 
-    // Setup Microsoft Office-style dropdowns
+    // ─── MS Dropdowns ────────────────────────────────────────────────────────────
+
     setupMSDropdowns() {
         document.querySelectorAll('.ms-dropdown').forEach(dropdown => {
             const btn = dropdown.querySelector('.ms-dropdown-btn');
             const menu = dropdown.querySelector('.ms-dropdown-menu');
             const items = dropdown.querySelectorAll('.ms-dropdown-item');
 
-            // Set up ARIA attributes
             btn.setAttribute('aria-expanded', 'false');
             btn.setAttribute('aria-haspopup', 'listbox');
             menu.setAttribute('role', 'listbox');
@@ -1168,135 +1222,61 @@ class NotesApp {
                 item.id = `dropdown-item-${dropdown.id}-${index}`;
             });
 
-            // Toggle dropdown on button click
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-
-                // Save selection before dropdown interaction
                 this.saveSelection();
-
-                // Close other dropdowns
-                document.querySelectorAll('.ms-dropdown.active').forEach(otherDropdown => {
-                    if (otherDropdown !== dropdown) {
-                        otherDropdown.classList.remove('active');
-                        otherDropdown.querySelector('.ms-dropdown-btn').setAttribute('aria-expanded', 'false');
-                    }
+                document.querySelectorAll('.ms-dropdown.active').forEach(other => {
+                    if (other !== dropdown) { other.classList.remove('active'); other.querySelector('.ms-dropdown-btn').setAttribute('aria-expanded', 'false'); }
                 });
-
-                // Toggle this dropdown
                 const isActive = dropdown.classList.toggle('active');
                 btn.setAttribute('aria-expanded', isActive);
-
-                if (isActive) {
-                    // Focus first item
-                    const firstItem = items[0];
-                    if (firstItem) {
-                        firstItem.focus();
-                    }
-                }
+                if (isActive && items[0]) items[0].focus();
             });
 
-            // Keyboard navigation
             btn.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    btn.click();
-                } else if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    btn.click();
-                }
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
+                else if (e.key === 'ArrowDown') { e.preventDefault(); btn.click(); }
             });
 
-            // Handle keyboard navigation within dropdown
             items.forEach((item, index) => {
                 item.addEventListener('keydown', (e) => {
-                    switch (e.key) {
-                        case 'ArrowDown':
-                            e.preventDefault();
-                            const nextItem = items[index + 1] || items[0];
-                            nextItem.focus();
-                            break;
-                        case 'ArrowUp':
-                            e.preventDefault();
-                            const prevItem = items[index - 1] || items[items.length - 1];
-                            prevItem.focus();
-                            break;
-                        case 'Enter':
-                        case ' ':
-                            e.preventDefault();
-                            item.click();
-                            break;
-                        case 'Escape':
-                            e.preventDefault();
-                            dropdown.classList.remove('active');
-                            btn.setAttribute('aria-expanded', 'false');
-                            btn.focus();
-                            break;
-                    }
+                    if (e.key === 'ArrowDown') { e.preventDefault(); (items[index + 1] || items[0]).focus(); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); (items[index - 1] || items[items.length - 1]).focus(); }
+                    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.click(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); dropdown.classList.remove('active'); btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
                 });
             });
 
-            // Handle item selection
             items.forEach(item => {
                 item.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-
+                    e.stopPropagation(); e.preventDefault();
                     const value = item.dataset.value;
                     const label = item.dataset.label || item.textContent;
-
-                    // Update button display
                     const valueSpan = btn.querySelector('.dropdown-value');
-                    if (valueSpan) {
-                        valueSpan.textContent = label;
-                    }
-
-                    // Update color preview if present
+                    if (valueSpan) valueSpan.textContent = label;
                     const colorPreview = btn.querySelector('.color-preview');
                     if (colorPreview && value) {
                         colorPreview.style.background = value;
                         colorPreview.setAttribute('data-color', value);
-                        if (value === 'transparent') {
-                            colorPreview.style.border = '1px solid #ccc';
-                            colorPreview.removeAttribute('data-color');
-                        }
+                        if (value === 'transparent') { colorPreview.style.border = '1px solid #ccc'; colorPreview.removeAttribute('data-color'); }
                     }
-
-                    // Close dropdown first to prevent interference
                     dropdown.classList.remove('active');
                     btn.setAttribute('aria-expanded', 'false');
-
-                    // Execute the appropriate command with improved selection handling
                     setTimeout(() => {
-                        // Ensure editor has focus before restoring selection
                         const editor = document.getElementById('textEditor');
-                        if (editor) {
-                            editor.focus();
-                        }
-
-                        // Restore selection and execute command
+                        if (editor) editor.focus();
                         this.restoreSelection();
-
-                        if (dropdown.id === 'fontFamilyDropdown') {
-                            this.executeCommand('fontName', value);
-                        } else if (dropdown.id === 'fontSizeDropdown') {
-                            this.executeCommand('fontSize', value);
-                        } else if (dropdown.id === 'fontColorDropdown') {
-                            this.executeCommand('foreColor', value);
-                        } else if (dropdown.id === 'highlightColorDropdown') {
-                            this.executeCommand('hiliteColor', value);
-                        } else if (dropdown.id === 'noteColorDropdown') {
-                            this.updateNoteColor(value);
-                        }
-
-                        // Update button states to reflect changes
+                        if (dropdown.id === 'fontFamilyDropdown') this.executeCommand('fontName', value);
+                        else if (dropdown.id === 'fontSizeDropdown') this.executeCommand('fontSize', value);
+                        else if (dropdown.id === 'fontColorDropdown') this.executeCommand('foreColor', value);
+                        else if (dropdown.id === 'highlightColorDropdown') this.executeCommand('hiliteColor', value);
+                        else if (dropdown.id === 'noteColorDropdown') this.updateNoteColor(value);
                         this.updateButtonStates();
                     }, 10);
                 });
             });
         });
 
-        // Close dropdowns when clicking outside
         document.addEventListener('click', () => {
             document.querySelectorAll('.ms-dropdown.active').forEach(dropdown => {
                 dropdown.classList.remove('active');
@@ -1305,686 +1285,355 @@ class NotesApp {
         });
     }
 
-    // Setup custom right-click context menu
+    // ─── Context Menu ────────────────────────────────────────────────────────────
+
     setupCustomContextMenu() {
         const contextMenu = document.getElementById('customContextMenu');
         const textEditor = document.getElementById('textEditor');
-
         if (!contextMenu || !textEditor) return;
 
-        // Show context menu on right-click
         textEditor.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-
-            // Save selection
             this.saveSelection();
-
-            // Position context menu
-            const x = e.pageX;
-            const y = e.pageY;
-
-            contextMenu.style.left = x + 'px';
-            contextMenu.style.top = y + 'px';
+            contextMenu.style.left = e.pageX + 'px';
+            contextMenu.style.top = e.pageY + 'px';
             contextMenu.style.display = 'block';
-
-            // Adjust position if menu goes off screen
             const rect = contextMenu.getBoundingClientRect();
-            if (rect.right > window.innerWidth) {
-                contextMenu.style.left = (x - rect.width) + 'px';
-            }
-            if (rect.bottom > window.innerHeight) {
-                contextMenu.style.top = (y - rect.height) + 'px';
-            }
+            if (rect.right > window.innerWidth) contextMenu.style.left = (e.pageX - rect.width) + 'px';
+            if (rect.bottom > window.innerHeight) contextMenu.style.top = (e.pageY - rect.height) + 'px';
         });
 
-        // Handle context menu item clicks
         contextMenu.addEventListener('click', (e) => {
             const item = e.target.closest('.context-menu-item');
             if (!item) return;
-
-            const action = item.dataset.action;
-
-            // Restore selection before executing command
             this.restoreSelection();
-
-            switch (action) {
-                case 'copy':
-                    this.executeCommand('copy');
-                    break;
-                case 'paste':
-                    this.executeCommand('paste');
-                    break;
-                case 'bold':
-                    this.executeCommand('bold');
-                    this.updateButtonStates();
-                    break;
-                case 'italic':
-                    this.executeCommand('italic');
-                    this.updateButtonStates();
-                    break;
-                case 'underline':
-                    this.executeCommand('underline');
-                    this.updateButtonStates();
-                    break;
-                case 'selectAll':
-                    this.executeCommand('selectAll');
-                    break;
+            switch (item.dataset.action) {
+                case 'copy': this.executeCommand('copy'); break;
+                case 'paste': this.executeCommand('paste'); break;
+                case 'bold': this.executeCommand('bold'); this.updateButtonStates(); break;
+                case 'italic': this.executeCommand('italic'); this.updateButtonStates(); break;
+                case 'underline': this.executeCommand('underline'); this.updateButtonStates(); break;
+                case 'selectAll': this.executeCommand('selectAll'); break;
             }
-
-            // Hide context menu
             contextMenu.style.display = 'none';
         });
 
-        // Hide context menu on click outside
-        document.addEventListener('click', (e) => {
-            if (!contextMenu.contains(e.target)) {
-                contextMenu.style.display = 'none';
-            }
-        });
-
-        // Hide context menu on scroll
-        document.addEventListener('scroll', () => {
-            contextMenu.style.display = 'none';
-        });
+        document.addEventListener('click', (e) => { if (!contextMenu.contains(e.target)) contextMenu.style.display = 'none'; });
+        document.addEventListener('scroll', () => { contextMenu.style.display = 'none'; });
     }
 
-    // Update note color
+    // ─── Note Color ──────────────────────────────────────────────────────────────
+
     updateNoteColor(color) {
         if (!this.currentNoteId) return;
-
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
-
         note.color = color;
         this.debouncedSave();
         this.renderNotesList();
-
-        // Update editor background
         const textEditor = document.getElementById('textEditor');
         if (textEditor) {
-            if (color === '#ffffff') {
-                textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
-            } else {
-                textEditor.style.backgroundColor = color;
-            }
+            textEditor.style.backgroundColor = color === '#ffffff' ? 'rgba(255, 255, 255, 0.5)' : color;
         }
     }
 
-    // Delete current note
-    deleteCurrentNote() {
-        if (!this.currentNoteId) return;
+    // ─── Delete Modal ────────────────────────────────────────────────────────────
 
-        const currentNote = this.notes.find(n => n.id === this.currentNoteId);
-        if (!currentNote) return;
-
-        const title = currentNote.title || 'Untitled Note';
-        this.showDeleteModal(title, () => {
-            // Find the index of current note to determine next note
-            const currentIndex = this.notes.findIndex(n => n.id === this.currentNoteId);
-
-            // Remove note from array
-            this.notes = this.notes.filter(note => note.id !== this.currentNoteId);
-
-            // Select next note or show welcome screen
-            if (this.notes.length > 0) {
-                // Select the next note, or previous if we deleted the last one
-                const nextIndex = currentIndex < this.notes.length ? currentIndex : this.notes.length - 1;
-                const nextNote = this.notes[nextIndex];
-                this.selectNote(nextNote.id);
-            } else {
-                // No notes left, clear current note and show welcome screen
-                this.currentNoteId = null;
-                this.showWelcomeScreenIfNeeded();
-
-                // Clear editor
-                const noteTitle = document.getElementById('noteTitle');
-                const textEditor = document.getElementById('textEditor');
-                if (noteTitle) noteTitle.value = '';
-                if (textEditor) {
-                    textEditor.innerHTML = '';
-                    textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
-                }
-            }
-
-            // Save changes
-            this.saveNotesToStorage();
-
-            // Update notes list
-            this.renderNotesList();
-        });
-    }
-
-    // Show custom delete confirmation modal
     showDeleteModal(noteTitle, onConfirm) {
         const modal = document.getElementById('deleteModal');
         const message = document.getElementById('deleteModalMessage');
         const cancelBtn = document.getElementById('deleteModalCancel');
         const confirmBtn = document.getElementById('deleteModalConfirm');
-
-        // Update modal message
         message.textContent = `Are you sure you want to delete "${noteTitle}"? This action cannot be undone.`;
-
-        // Show modal
         modal.classList.add('show');
 
-        // Handle cancel
-        const handleCancel = () => {
+        const cleanup = () => {
             modal.classList.remove('show');
-            cancelBtn.removeEventListener('click', handleCancel);
+            cancelBtn.removeEventListener('click', cleanup);
             confirmBtn.removeEventListener('click', handleConfirm);
-            modal.removeEventListener('click', handleBackdropClick);
+            modal.removeEventListener('click', handleBackdrop);
             document.removeEventListener('keydown', handleEscape);
         };
+        const handleConfirm = () => { cleanup(); onConfirm(); };
+        const handleBackdrop = (e) => { if (e.target === modal) cleanup(); };
+        const handleEscape = (e) => { if (e.key === 'Escape') cleanup(); };
 
-        // Handle confirm
-        const handleConfirm = () => {
-            modal.classList.remove('show');
-            cancelBtn.removeEventListener('click', handleCancel);
-            confirmBtn.removeEventListener('click', handleConfirm);
-            modal.removeEventListener('click', handleBackdropClick);
-            document.removeEventListener('keydown', handleEscape);
-            onConfirm();
-        };
-
-        // Handle backdrop click
-        const handleBackdropClick = (e) => {
-            if (e.target === modal) {
-                handleCancel();
-            }
-        };
-
-        // Handle escape key
-        const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                handleCancel();
-            }
-        };
-
-        // Add event listeners
-        cancelBtn.addEventListener('click', handleCancel);
+        cancelBtn.addEventListener('click', cleanup);
         confirmBtn.addEventListener('click', handleConfirm);
-        modal.addEventListener('click', handleBackdropClick);
+        modal.addEventListener('click', handleBackdrop);
         document.addEventListener('keydown', handleEscape);
     }
 
-    // Setup sidebar toggle functionality
+    // ─── Sidebar Toggle (Desktop) ────────────────────────────────────────────────
+
     setupSidebarToggle() {
         const toggleBtn = document.getElementById('sidebarToggle');
         const sidebar = document.querySelector('.sidebar');
-
         if (!toggleBtn || !sidebar) return;
 
         toggleBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
 
-            // Toggle the collapsed class
+            if (this.isMobile()) {
+                // On mobile, toggle acts as open/close
+                if (this.sidebarOpen) this.closeMobileSidebar();
+                else this.openMobileSidebar();
+                return;
+            }
+
             sidebar.classList.toggle('collapsed');
-
-            // Store the collapsed state in localStorage
             const isCollapsed = sidebar.classList.contains('collapsed');
             localStorage.setItem('sidebarCollapsed', isCollapsed.toString());
-
-            // Update toggle button icon
             this.updateToggleIcon(toggleBtn, isCollapsed);
-
-            // Force a reflow to ensure CSS changes are applied
             void sidebar.offsetWidth;
-
-            // Ensure the toggle button remains visible and clickable
             toggleBtn.style.opacity = '1';
             toggleBtn.style.pointerEvents = 'auto';
         });
 
-        // Restore collapsed state from localStorage
         const savedState = localStorage.getItem('sidebarCollapsed');
-        if (savedState === 'true') {
+        if (savedState === 'true' && !this.isMobile()) {
             sidebar.classList.add('collapsed');
             this.updateToggleIcon(toggleBtn, true);
         }
 
-        // Always ensure toggle button is visible and clickable
         toggleBtn.style.opacity = '1';
         toggleBtn.style.pointerEvents = 'auto';
     }
 
-    // Update the toggle button icon based on collapsed state
     updateToggleIcon(toggleBtn, isCollapsed) {
         const svg = toggleBtn.querySelector('svg');
         if (!svg) return;
-
         if (isCollapsed) {
-            // Show expand icon (arrow pointing right)
             svg.innerHTML = '<line x1="9" y1="18" x2="15" y2="12"/><line x1="9" y1="6" x2="15" y2="12"/>';
             toggleBtn.title = 'Expand Sidebar';
         } else {
-            // Show collapse icon (hamburger menu)
             svg.innerHTML = '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>';
             toggleBtn.title = 'Collapse Sidebar';
         }
     }
 
-    // Comprehensive empty detection for contenteditable
+    // ─── Editor Empty Detection ──────────────────────────────────────────────────
+
     isEditorEmpty(editor) {
         const content = editor.innerHTML.trim();
         const textContent = editor.textContent.trim();
-
-        // First check for meaningful HTML elements that should never be considered empty
         const meaningfulElements = content.match(/<(img|table|audio|video|iframe|embed|object|canvas|svg)[^>]*>/gi);
-        if (meaningfulElements && meaningfulElements.length > 0) {
-            return false; // Content contains meaningful media elements
-        }
-
-        // Check for lists with content
+        if (meaningfulElements && meaningfulElements.length > 0) return false;
         const listMatches = content.match(/<(ul|ol)[^>]*>[\s\S]*?<\/(ul|ol)>/gi);
-        if (listMatches) {
-            // Check if lists have actual content beyond empty <li> tags
-            const hasListContent = listMatches.some(list => {
-                const listTextContent = list.replace(/<[^>]*>/g, '').trim();
-                return listTextContent !== '';
-            });
-            if (hasListContent) {
-                return false;
-            }
-        }
-
-        // Check for truly empty or whitespace-only text content
-        if (textContent === '' || textContent === '\u00A0') { // includes &nbsp;
-            return true;
-        }
-
-        // Check for common empty HTML patterns
-        const emptyPatterns = [
-            '', '<br>', '<div></div>', '<p></p>', 
-            '<div><br></div>', '<p><br></p>',
-            '<div>\u00A0</div>', '<p>\u00A0</p>',
-            '<p>Start typing your note here...</p>', // legacy placeholder
-            '<ul></ul>', '<ol></ol>', // empty lists
-            '<ul><li></li></ul>', '<ol><li></li></ol>' // lists with empty items
-        ];
-
+        if (listMatches && listMatches.some(list => list.replace(/<[^>]*>/g, '').trim() !== '')) return false;
+        if (textContent === '' || textContent === '\u00A0') return true;
+        const emptyPatterns = ['', '<br>', '<div></div>', '<p></p>', '<div><br></div>', '<p><br></p>', '<div>\u00A0</div>', '<p>\u00A0</p>', '<p>Start typing your note here...</p>', '<ul></ul>', '<ol></ol>', '<ul><li></li></ul>', '<ol><li></li></ol>'];
         return emptyPatterns.includes(content);
     }
 
-    // Update placeholder state based on content (non-destructive)
     updatePlaceholderState(editor) {
-        if (this.isEditorEmpty(editor)) {
-            editor.setAttribute('data-empty', 'true');
-        } else {
-            editor.removeAttribute('data-empty');
-        }
+        if (this.isEditorEmpty(editor)) editor.setAttribute('data-empty', 'true');
+        else editor.removeAttribute('data-empty');
     }
 
-    // Setup editor placeholder behavior
     setupEditorPlaceholder() {
         const textEditor = document.getElementById('textEditor');
         if (!textEditor) return;
-
-        // Note: Input events are handled in setupEventListeners() to avoid duplication
-        // Only add placeholder-specific event handlers here
-
-        // Handle focus events
-        textEditor.addEventListener('focus', () => {
-            this.updatePlaceholderState(textEditor);
-        });
-
-        // Handle blur events
-        textEditor.addEventListener('blur', () => {
-            this.updatePlaceholderState(textEditor);
-        });
-
-        // Handle keydown for delete operations (immediate placeholder update)
+        textEditor.addEventListener('focus', () => this.updatePlaceholderState(textEditor));
+        textEditor.addEventListener('blur', () => this.updatePlaceholderState(textEditor));
         textEditor.addEventListener('keydown', (e) => {
-            if (e.key === 'Backspace' || e.key === 'Delete') {
-                setTimeout(() => {
-                    this.updatePlaceholderState(textEditor);
-                }, 0);
-            }
+            if (e.key === 'Backspace' || e.key === 'Delete')
+                setTimeout(() => this.updatePlaceholderState(textEditor), 0);
         });
-
-        // Initial state
         this.updatePlaceholderState(textEditor);
     }
 
-    // Modern clipboard operations with rich HTML formatting support
+    // ─── Clipboard ───────────────────────────────────────────────────────────────
+
     async modernCut() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const range = selection.getRangeAt(0);
         const selectedText = range.toString();
-
         if (selectedText) {
             try {
-                // Get both HTML and plain text content
-                const htmlContent = this.getSelectedHtml();
-                const plainText = selectedText;
-
-                // Use modern clipboard API with both formats
-                const clipboardItems = [new ClipboardItem({
-                    'text/html': new Blob([htmlContent], { type: 'text/html' }),
-                    'text/plain': new Blob([plainText], { type: 'text/plain' })
-                })];
-
-                await navigator.clipboard.write(clipboardItems);
+                await navigator.clipboard.write([new ClipboardItem({
+                    'text/html': new Blob([this.getSelectedHtml()], { type: 'text/html' }),
+                    'text/plain': new Blob([selectedText], { type: 'text/plain' })
+                })]);
                 range.deleteContents();
                 this.updateNoteContent();
-            } catch (error) {
-                console.warn('Modern clipboard failed, using fallback:', error);
-                // Fallback to execCommand if clipboard API fails
-                try {
-                    document.execCommand('cut');
-                    this.updateNoteContent();
-                } catch (execError) {
-                    console.error('Cut operation failed:', execError);
-                }
-            }
+            } catch { try { document.execCommand('cut'); this.updateNoteContent(); } catch (err) { console.error('Cut failed:', err); } }
         }
     }
 
     async modernCopy() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const selectedText = selection.toString();
-
         if (selectedText) {
             try {
-                // Get both HTML and plain text content
-                const htmlContent = this.getSelectedHtml();
-                const plainText = selectedText;
-
-                // Use modern clipboard API with both formats
-                const clipboardItems = [new ClipboardItem({
-                    'text/html': new Blob([htmlContent], { type: 'text/html' }),
-                    'text/plain': new Blob([plainText], { type: 'text/plain' })
-                })];
-
-                await navigator.clipboard.write(clipboardItems);
-            } catch (error) {
-                console.warn('Modern clipboard failed, using fallback:', error);
-                // Fallback to execCommand if clipboard API fails
-                try {
-                    document.execCommand('copy');
-                } catch (execError) {
-                    console.error('Copy operation failed:', execError);
-                }
-            }
+                await navigator.clipboard.write([new ClipboardItem({
+                    'text/html': new Blob([this.getSelectedHtml()], { type: 'text/html' }),
+                    'text/plain': new Blob([selectedText], { type: 'text/plain' })
+                })]);
+            } catch { try { document.execCommand('copy'); } catch (err) { console.error('Copy failed:', err); } }
         }
     }
 
     async modernPaste() {
         try {
-            // Try to read HTML content first, fallback to plain text
-            const clipboardItems = await navigator.clipboard.read();
-
-            for (const item of clipboardItems) {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
                 if (item.types.includes('text/html')) {
-                    const htmlBlob = await item.getType('text/html');
-                    const htmlText = await htmlBlob.text();
-                    if (htmlText) {
-                        this.insertHtmlAtSelection(htmlText);
-                        this.updateNoteContent();
-                        return;
-                    }
+                    const html = await (await item.getType('text/html')).text();
+                    if (html) { this.insertHtmlAtSelection(html); this.updateNoteContent(); return; }
                 }
-
                 if (item.types.includes('text/plain')) {
-                    const textBlob = await item.getType('text/plain');
-                    const plainText = await textBlob.text();
-                    if (plainText) {
-                        this.insertTextAtSelection(plainText);
-                        this.updateNoteContent();
-                        return;
-                    }
+                    const text = await (await item.getType('text/plain')).text();
+                    if (text) { this.insertTextAtSelection(text); this.updateNoteContent(); return; }
                 }
             }
-        } catch (error) {
-            console.warn('Modern clipboard read failed, trying readText fallback:', error);
-
-            // Second fallback: try readText for plain text
+        } catch {
             try {
-                const plainText = await navigator.clipboard.readText();
-                if (plainText) {
-                    this.insertTextAtSelection(plainText);
-                    this.updateNoteContent();
-                    return;
-                }
-            } catch (readTextError) {
-                console.warn('ReadText fallback failed, using execCommand:', readTextError);
-            }
-
-            // Final fallback to execCommand if both clipboard APIs fail
-            try {
-                document.execCommand('paste');
-                this.updateNoteContent();
-            } catch (execError) {
-                console.error('All paste methods failed:', execError);
+                const text = await navigator.clipboard.readText();
+                if (text) { this.insertTextAtSelection(text); this.updateNoteContent(); return; }
+            } catch {
+                try { document.execCommand('paste'); this.updateNoteContent(); } catch (err) { console.error('Paste failed:', err); }
             }
         }
     }
 
-    // Modern font size implementation with collapsed selection support
     modernFontSize(size) {
-        // Restore saved selection to handle dropdown focus loss
         this.restoreSelection();
-
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const range = selection.getRangeAt(0);
-
         if (range.collapsed) {
-            // Handle collapsed selection by creating a styled span for subsequent typing
             const span = document.createElement('span');
             span.style.fontSize = size + 'px';
             span.className = 'temp-formatting';
-            span.innerHTML = '&#8203;'; // Zero-width space to maintain selection
-
+            span.innerHTML = '&#8203;';
             range.insertNode(span);
-
-            // Position cursor after the span
             range.setStartAfter(span);
             range.collapse(true);
             selection.removeAllRanges();
             selection.addRange(range);
-
-            // Set up a listener to apply formatting to subsequent typing
             this.setupTempFormatting(span, { fontSize: size + 'px' });
         } else {
-            // Handle text selection
             const span = document.createElement('span');
             span.style.fontSize = size + 'px';
-
             try {
-                const contents = range.extractContents();
-                span.appendChild(contents);
+                span.appendChild(range.extractContents());
                 range.insertNode(span);
-
-                // Maintain selection on the formatted content
                 range.selectNodeContents(span);
                 selection.removeAllRanges();
                 selection.addRange(range);
-            } catch (error) {
-                console.error('Error applying font size:', error);
-                document.execCommand('fontSize', false, size);
-            }
+            } catch { document.execCommand('fontSize', false, size); }
         }
     }
 
-    // Modern text color implementation with collapsed selection support
     modernTextColor(color) {
-        // Restore saved selection to handle dropdown focus loss
         this.restoreSelection();
-
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const range = selection.getRangeAt(0);
-
         if (range.collapsed) {
-            // Handle collapsed selection
             const span = document.createElement('span');
             span.style.color = color;
             span.className = 'temp-formatting';
-            span.innerHTML = '&#8203;'; // Zero-width space
-
+            span.innerHTML = '&#8203;';
             range.insertNode(span);
-
-            // Position cursor after the span
             range.setStartAfter(span);
             range.collapse(true);
             selection.removeAllRanges();
             selection.addRange(range);
-
-            // Set up formatting for subsequent typing
-            this.setupTempFormatting(span, { color: color });
+            this.setupTempFormatting(span, { color });
         } else {
-            // Handle text selection
             const span = document.createElement('span');
             span.style.color = color;
-
             try {
-                const contents = range.extractContents();
-                span.appendChild(contents);
+                span.appendChild(range.extractContents());
                 range.insertNode(span);
-
-                // Maintain selection on the formatted content
                 range.selectNodeContents(span);
                 selection.removeAllRanges();
                 selection.addRange(range);
-            } catch (error) {
-                console.error('Error applying text color:', error);
-                document.execCommand('foreColor', false, color);
-            }
+            } catch { document.execCommand('foreColor', false, color); }
         }
     }
 
-    // Modern highlight color implementation with collapsed selection support
     modernHighlightColor(color) {
-        // Restore saved selection to handle dropdown focus loss
         this.restoreSelection();
-
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const range = selection.getRangeAt(0);
-
         if (range.collapsed) {
-            // Handle collapsed selection
             const span = document.createElement('span');
             span.style.backgroundColor = color;
             span.className = 'temp-formatting';
-            span.innerHTML = '&#8203;'; // Zero-width space
-
+            span.innerHTML = '&#8203;';
             range.insertNode(span);
-
-            // Position cursor after the span
             range.setStartAfter(span);
             range.collapse(true);
             selection.removeAllRanges();
             selection.addRange(range);
-
-            // Set up formatting for subsequent typing
             this.setupTempFormatting(span, { backgroundColor: color });
         } else {
-            // Handle text selection
             const span = document.createElement('span');
             span.style.backgroundColor = color;
-
             try {
-                const contents = range.extractContents();
-                span.appendChild(contents);
+                span.appendChild(range.extractContents());
                 range.insertNode(span);
-
-                // Maintain selection on the formatted content
                 range.selectNodeContents(span);
                 selection.removeAllRanges();
                 selection.addRange(range);
-            } catch (error) {
-                console.error('Error applying highlight color:', error);
-                document.execCommand('hiliteColor', false, color);
-            }
+            } catch { document.execCommand('hiliteColor', false, color); }
         }
     }
 
-    // Utility method to insert text at current selection
     insertTextAtSelection(text) {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const range = selection.getRangeAt(0);
         range.deleteContents();
-
         const textNode = document.createTextNode(text);
         range.insertNode(textNode);
-
-        // Move cursor to end of inserted text
         range.setStartAfter(textNode);
         range.setEndAfter(textNode);
         selection.removeAllRanges();
         selection.addRange(range);
     }
 
-    // Get selected HTML content with formatting
     getSelectedHtml() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return '';
-
-        const range = selection.getRangeAt(0);
-        const clonedSelection = range.cloneContents();
         const div = document.createElement('div');
-        div.appendChild(clonedSelection);
+        div.appendChild(selection.getRangeAt(0).cloneContents());
         return div.innerHTML;
     }
 
-    // Insert HTML content at current selection
     insertHtmlAtSelection(html) {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const range = selection.getRangeAt(0);
         range.deleteContents();
-
-        // Sanitize the HTML before inserting
-        const sanitizedHtml = this.sanitizeHtml(html);
-
-        // Create a document fragment from the HTML
-        const fragment = document.createRange().createContextualFragment(sanitizedHtml);
+        const fragment = document.createRange().createContextualFragment(this.sanitizeHtml(html));
         range.insertNode(fragment);
-
-        // Move cursor to end of inserted content
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
     }
 
-    // Set up temporary formatting for subsequent typing at collapsed selection
     setupTempFormatting(span, styles) {
         const editor = document.getElementById('textEditor');
-
-        // Store the current styles for next character input
         this.tempFormattingStyles = styles;
         this.tempFormattingSpan = span;
 
-        // Set up one-time event handler for next input
         const handleInput = (e) => {
             if (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') {
-                // Apply formatting to the newly typed content
                 const range = window.getSelection().getRangeAt(0);
                 const textNode = range.startContainer;
-
                 if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                    // Wrap the newly typed text in a span with the formatting
                     const newSpan = document.createElement('span');
                     Object.assign(newSpan.style, this.tempFormattingStyles);
-
-                    // Replace the temp span with the new formatted span
                     if (this.tempFormattingSpan && this.tempFormattingSpan.parentNode) {
                         this.tempFormattingSpan.parentNode.replaceChild(newSpan, this.tempFormattingSpan);
                         newSpan.appendChild(textNode);
-
-                        // Position cursor after the formatted text
                         const newRange = document.createRange();
                         newRange.setStartAfter(newSpan);
                         newRange.collapse(true);
@@ -1993,179 +1642,115 @@ class NotesApp {
                         selection.addRange(newRange);
                     }
                 }
-
-                // Clean up
                 this.tempFormattingStyles = null;
                 this.tempFormattingSpan = null;
                 editor.removeEventListener('input', handleInput);
             }
         };
 
-        editor.addEventListener('input', handleInput, { once: true });
-
-        // Also clean up if user moves cursor or clicks elsewhere
         const cleanupHandler = () => {
             if (this.tempFormattingSpan && this.tempFormattingSpan.parentNode) {
-                // Remove empty temp span
-                const parent = this.tempFormattingSpan.parentNode;
-                parent.removeChild(this.tempFormattingSpan);
-
-                // Normalize the parent to merge adjacent text nodes
-                if (parent.normalize) {
-                    parent.normalize();
-                }
+                this.tempFormattingSpan.parentNode.removeChild(this.tempFormattingSpan);
+                if (this.tempFormattingSpan.parentNode && this.tempFormattingSpan.parentNode.normalize)
+                    this.tempFormattingSpan.parentNode.normalize();
             }
             this.tempFormattingStyles = null;
             this.tempFormattingSpan = null;
             editor.removeEventListener('input', handleInput);
             editor.removeEventListener('click', cleanupHandler);
-            editor.removeEventListener('keydown', cleanupHandler);
         };
 
-        // Clean up on click or arrow keys
+        editor.addEventListener('input', handleInput, { once: true });
         editor.addEventListener('click', cleanupHandler, { once: true });
         editor.addEventListener('keydown', (e) => {
-            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
-                cleanupHandler();
-            }
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) cleanupHandler();
         }, { once: true });
     }
-    // Show export modal with share link
-    async exportNoteAsLink() {
-        if (!this.currentNoteId) {
-            return;
-        }
 
+    // ─── Export / Import ─────────────────────────────────────────────────────────
+
+    async exportNoteAsLink() {
+        if (!this.currentNoteId) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
-
         try {
-            // Compress note data with browser-native deflate, then URL-safe base64
-            const data = JSON.stringify({t:note.title,c:note.content});
-            const token = await compressToUrl(data);
+            const token = await compressToUrl(JSON.stringify({ t: note.title, c: note.content }));
             const shareLink = `${window.location.origin}${window.location.pathname}?s=${token}`;
-
-            // Show modal with the link
             const exportModal = document.getElementById('exportModal');
             const exportLink = document.getElementById('exportLink');
             const cancelBtn = document.getElementById('exportModalCancel');
             const copyBtn = document.getElementById('exportModalCopy');
-
             if (!exportModal) return;
-
-            // Save selection
             this.saveSelection();
-
-            // Show modal
             exportModal.classList.add('show');
-
-            // Set link value
             exportLink.value = shareLink;
             exportLink.select();
 
-            // Handle cancel
-            const handleCancel = () => {
+            const cleanup = () => {
                 exportModal.classList.remove('show');
-                cancelBtn.removeEventListener('click', handleCancel);
+                cancelBtn.removeEventListener('click', cleanup);
                 copyBtn.removeEventListener('click', handleCopy);
             };
-
-            // Handle copy
             const handleCopy = () => {
                 exportLink.select();
                 try {
                     if (navigator.clipboard && window.isSecureContext) {
-                        navigator.clipboard.writeText(exportLink.value).then(() => {
-                            exportModal.classList.remove('show');
-                        }).catch(() => {
-                            document.execCommand('copy');
-                            exportModal.classList.remove('show');
-                        });
-                    } else {
-                        document.execCommand('copy');
-                        exportModal.classList.remove('show');
-                    }
-                } catch (e) {
-                }
-                cancelBtn.removeEventListener('click', handleCancel);
+                        navigator.clipboard.writeText(exportLink.value).then(cleanup).catch(() => { document.execCommand('copy'); cleanup(); });
+                    } else { document.execCommand('copy'); cleanup(); }
+                } catch { }
+                cancelBtn.removeEventListener('click', cleanup);
                 copyBtn.removeEventListener('click', handleCopy);
             };
-
-            cancelBtn.addEventListener('click', handleCancel);
+            cancelBtn.addEventListener('click', cleanup);
             copyBtn.addEventListener('click', handleCopy);
-        } catch (error) {
-            console.error('Error encoding note:', error);
-        }
+        } catch (error) { console.error('Error encoding note:', error); }
     }
 
-    // Import note from URL parameter
     async importNoteFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const token = params.get('s');
-
         if (!token) return;
-
         try {
-            // Decompress with browser-native deflate and parse
-            const decompressed = await decompressFromUrl(token);
-            const data = JSON.parse(decompressed);
-
-            const title = data.t || 'Untitled';
+            const data = JSON.parse(await decompressFromUrl(token));
             const newNote = {
                 id: this.generateId(),
-                title: title,
+                title: data.t || 'Untitled',
                 content: data.c || '',
                 color: '#ffffff',
                 createdAt: new Date().toISOString(),
                 modifiedAt: new Date().toISOString()
             };
-
             this.notes.unshift(newNote);
             this.selectNote(newNote.id);
             this.renderNotesList();
             this.saveNotesToStorage();
-
-            // Clean the URL
             window.history.replaceState({}, document.title, window.location.pathname);
-
-            // Show modal after short delay to let DOM settle
-            setTimeout(() => this.showImportModal(title), 150);
-        } catch (error) {
-            console.error('Error importing note:', error);
-        }
+            setTimeout(() => this.showImportModal(data.t || 'Untitled'), 150);
+        } catch (error) { console.error('Error importing note:', error); }
     }
 
-    // Show import success modal
     showImportModal(noteTitle) {
         const modal = document.getElementById('importModal');
         const message = document.getElementById('importModalMessage');
         const cancelBtn = document.getElementById('importModalCancel');
         const continueBtn = document.getElementById('importModalContinue');
-
         if (!modal || !message) return;
-
         message.innerHTML = `Added to your collection: <strong>${noteTitle}</strong>`;
-
         modal.classList.add('show');
-
         const close = () => modal.classList.remove('show');
         if (cancelBtn) cancelBtn.onclick = close;
         if (continueBtn) continueBtn.onclick = close;
     }
 }
 
-// Initialize the app when DOM is loaded
+// ─── Init ──────────────────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', () => {
     window.notesApp = new NotesApp();
-    // Check for import on page load
     window.notesApp.importNoteFromUrl();
 });
 
-// Auto-save before page unload
 window.addEventListener('beforeunload', () => {
     const app = window.notesApp;
-    if (app && app.saveTimeout) {
-        clearTimeout(app.saveTimeout);
-        app.saveNotesToStorage();
-    }
+    if (app && app.saveTimeout) { clearTimeout(app.saveTimeout); app.saveNotesToStorage(); }
 });
