@@ -78,7 +78,7 @@ const LZString = (function() {
                 case 1: bits = 0; maxpower = 65536; power = 1; while (power != maxpower) { resb = data.val & data.pos; data.pos >>= 1; if (!data.pos) { data.pos = resetVal; data.val = getVal(data.idx++); } bits |= (resb > 0 ? 1 : 0) * power; power <<= 1; } dic[dictSize++] = String.fromCharCode(bits); c = dictSize - 1; enlargeIn--; break;
                 case 2: return result.join('');
             }
-            if (!enlargeIn--) { enlargeIn = Math.pow(2, numBits); numBits++; }
+            if (enlargeIn === 0) { enlargeIn = Math.pow(2, numBits); numBits++; }
             entry = dic[c] ? dic[c] : (c === dictSize ? w + w[0] : null);
             if (!entry) return null;
             result.push(entry);
