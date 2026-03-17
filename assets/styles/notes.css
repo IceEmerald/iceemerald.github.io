@@ -933,7 +933,7 @@
         min-width: 0;
     }
 
-    /* Editor actions: tighter, no overflow */
+    /* Editor actions: all buttons identical size, no overflow */
     .editor-actions {
         gap: 4px;
         flex-shrink: 0;
@@ -941,36 +941,48 @@
         align-items: center;
     }
 
+    /* Uniform size for ALL action buttons */
+    .action-btn,
+    #noteColorDropdown .ms-dropdown-btn {
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        border-radius: 8px !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        align-items: center !important;
+        flex-shrink: 0 !important;
+    }
+
     .action-btn {
-        padding: 8px;
-        height: 36px;
+        padding: 0 10px;
         width: 36px;
         min-width: 36px;
-        display: flex;
-        align-items: center;
         justify-content: center;
-        flex-shrink: 0;
     }
 
-    /* Note color dropdown on mobile — show color swatch + label, not clipped */
+    /* Note color dropdown button — same height, compact */
     #noteColorDropdown .ms-dropdown-btn {
-        min-width: 80px;
-        padding: 6px 20px 6px 8px;
-        height: 36px;
-        border-radius: 6px;
-        box-sizing: border-box;
-        width: auto;
+        padding: 0 20px 0 8px !important;
+        width: auto !important;
+        min-width: 88px !important;
+        justify-content: flex-start !important;
     }
 
-    /* Always show the color label text on mobile */
+    /* Always show the color label */
     #noteColorDropdown .dropdown-value {
-        display: inline;
+        display: inline !important;
         font-size: 11px;
         white-space: nowrap;
     }
 
     #noteColorDropdown .ms-dropdown-btn::after {
-        right: 4px;
+        right: 5px;
+    }
+
+    /* Color swatch inside dropdown button */
+    #noteColorDropdown .color-preview {
+        flex-shrink: 0;
     }
 
     /* --- MOBILE BACK BUTTON: shown as ← in editor header --- */
