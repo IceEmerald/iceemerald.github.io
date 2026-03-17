@@ -826,36 +826,44 @@
         align-items: center;
     }
 
-    /* --- SIDEBAR: full-screen panel, slides in from left --- */
+    /* --- SIDEBAR: slides in from left, sits BELOW the sticky navbar --- */
     .sidebar {
         position: fixed;
-        top: 0;
+        /* sit below the .navbar which is sticky-top at 4rem (64px) */
+        top: 64px;
         left: 0;
         width: 85vw;
         max-width: 340px;
-        height: 100%;
+        /* fill remaining screen below navbar */
+        height: calc(100% - 64px);
         z-index: 2000;
         transform: translateX(-100%);
         transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
         border-radius: 0 16px 16px 0;
         box-shadow: none;
-        background: rgba(255, 255, 255, 0.98);
+        background: rgba(255, 255, 255, 0.99);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        /* override collapsed styles on mobile */
-        overflow: visible;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
     }
 
     .sidebar.mobile-open {
         transform: translateX(0);
-        box-shadow: 4px 0 40px rgba(0, 0, 0, 0.2);
+        box-shadow: 4px 0 40px rgba(0, 0, 0, 0.25);
     }
 
-    /* Collapsed state has no effect on mobile — always use mobile-open */
+    /* Collapsed state has no effect on mobile */
     .sidebar.collapsed {
         width: 85vw;
         max-width: 340px;
         min-width: unset;
+        transform: translateX(-100%);
+    }
+
+    .sidebar.collapsed.mobile-open {
+        transform: translateX(0);
     }
 
     .sidebar.collapsed .sidebar-header h3,
@@ -872,17 +880,28 @@
         gap: 12px;
     }
 
-    /* Sidebar header close button on mobile */
+    /* Sidebar header on mobile */
     .sidebar-header {
         border-radius: 0 16px 0 0;
+        flex-shrink: 0;
     }
 
-    /* Backdrop overlay when sidebar is open */
+    /* notes-list must be scrollable within the panel */
+    .notes-list {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Backdrop overlay when sidebar is open — also sits below navbar */
     .sidebar-backdrop {
         display: none;
         position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
+        top: 64px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.45);
         z-index: 1999;
         backdrop-filter: blur(2px);
         -webkit-backdrop-filter: blur(2px);
@@ -893,53 +912,68 @@
         display: block;
     }
 
-    /* --- EDITOR AREA: full width, no left margin gap --- */
+    /* --- EDITOR AREA: full width, sits correctly in remaining space --- */
     .editor-area {
         margin: 0 8px 8px 8px;
         border-radius: 10px;
         width: calc(100% - 16px);
         flex: 1;
+        min-width: 0; /* prevent overflow */
     }
 
     .editor-header {
-        padding: 12px 16px;
+        padding: 10px 12px;
         border-radius: 10px 10px 0 0;
-        gap: 8px;
+        gap: 6px;
+        flex-wrap: nowrap;
+        min-height: 0;
     }
 
     .note-title {
-        font-size: 18px;
-        max-width: 55%;
+        font-size: 16px;
+        max-width: none;
+        flex: 1;
+        min-width: 0;
     }
 
+    /* Editor actions: tighter, no overflow */
     .editor-actions {
-        gap: 6px;
+        gap: 4px;
+        flex-shrink: 0;
+        flex-wrap: nowrap;
+        align-items: center;
     }
 
     .action-btn {
         padding: 8px;
-        height: 40px;
-        width: 40px;
+        height: 36px;
+        width: 36px;
+        min-width: 36px;
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
     }
 
-    /* Hide note color dropdown label text on mobile to save space */
-    #noteColorDropdown .dropdown-value {
-        display: none;
-    }
-
+    /* Note color dropdown on mobile — show color swatch + label, not clipped */
     #noteColorDropdown .ms-dropdown-btn {
-        min-width: unset;
-        padding: 8px;
-        height: 40px;
-        width: 40px;
-        justify-content: center;
+        min-width: 80px;
+        padding: 6px 20px 6px 8px;
+        height: 36px;
+        border-radius: 6px;
+        box-sizing: border-box;
+        width: auto;
+    }
+
+    /* Always show the color label text on mobile */
+    #noteColorDropdown .dropdown-value {
+        display: inline;
+        font-size: 11px;
+        white-space: nowrap;
     }
 
     #noteColorDropdown .ms-dropdown-btn::after {
-        display: none;
+        right: 4px;
     }
 
     /* --- MOBILE BACK BUTTON: shown as ← in editor header --- */

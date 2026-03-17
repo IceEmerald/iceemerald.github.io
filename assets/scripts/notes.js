@@ -289,11 +289,21 @@ class NotesApp {
                 this.isSwiping = true;
             }
 
-            // If sidebar is open, drag it closed with the finger
-            if (this.sidebarOpen && this.isSwiping && dx < 0) {
-                const sidebar = document.querySelector('.sidebar');
-                const clampedDx = Math.max(dx, -sidebar.offsetWidth);
+            if (!this.isSwiping) return;
+
+            const sidebar = document.querySelector('.sidebar');
+            const sidebarWidth = sidebar.offsetWidth;
+
+            if (this.sidebarOpen && dx < 0) {
+                // Dragging sidebar closed — follow finger
+                const clampedDx = Math.max(dx, -sidebarWidth);
                 sidebar.style.transform = `translateX(${clampedDx}px)`;
+                sidebar.style.transition = 'none';
+            } else if (!this.sidebarOpen && dx > 0) {
+                // Dragging sidebar open — follow finger from left
+                const clampedDx = Math.min(dx - sidebarWidth, 0);
+                sidebar.style.transform = `translateX(${clampedDx}px)`;
+                sidebar.style.transition = 'none';
             }
         }, { passive: true });
 
@@ -320,10 +330,9 @@ class NotesApp {
             if (!isHorizontalSwipe) return;
 
             if (dx > 0 && !this.sidebarOpen) {
-                // Swipe right — open sidebar only if swipe starts near left edge (first 40px)
-                if (this.touchStartX < 40 || this.touchStartX < window.innerWidth * 0.15) {
-                    this.openMobileSidebar();
-                }
+                // Swipe right from ANYWHERE on screen — open sidebar
+                // (no left-edge restriction; entire screen is a valid swipe zone)
+                this.openMobileSidebar();
             } else if (dx < 0 && this.sidebarOpen) {
                 // Swipe left — close sidebar
                 this.closeMobileSidebar();
@@ -979,8 +988,7 @@ class NotesApp {
             editorContent.style.display = 'none';
             this.currentNoteId = null;
 
-            // On mobile with no notes, auto-open sidebar
-            if (this.isMobile()) this.openMobileSidebar();
+            // Do NOT auto-open sidebar — user swipes right to open
         }
     }
 
