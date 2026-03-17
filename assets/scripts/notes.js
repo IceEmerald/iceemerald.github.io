@@ -217,6 +217,11 @@ class NotesApp {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
 
+        // Enable normal scroll wheel (prevent scrollice interference)
+        editor.addEventListener('wheel', (e) => {
+            e.stopPropagation();
+        }, false);
+
         // Update button states when selection changes
         editor.addEventListener('mouseup', () => {
             this.saveSelection();
@@ -2003,16 +2008,13 @@ class NotesApp {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
 
-        // Create minimal export object (title + content only to keep link short)
-        const exportObj = {
-            t: note.title,
-            c: note.content
-        };
-
-        // Encode to base64 for URL safety
         try {
-            const encoded = btoa(encodeURIComponent(JSON.stringify(exportObj)));
-            const shareLink = `${window.location.origin}${window.location.pathname}?i=${encoded}`;
+            // Generate short ID and store in localStorage
+            const id = Math.random().toString(36).substr(2, 8);
+            const exports = JSON.parse(localStorage.getItem('nexp') || '{}');
+            exports[id] = {t:note.title,c:note.content,e:Date.now()+30*86400000};
+            localStorage.setItem('nexp', JSON.stringify(exports));
+            const shareLink = `${window.location.origin}${window.location.pathname}?e=${id}`;
             
             // Show modal with the link
             const exportModal = document.getElementById('exportModal');
@@ -2070,14 +2072,15 @@ class NotesApp {
     // Import note from URL parameter
     importNoteFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        const importData = params.get('i');
+        const id = params.get('e');
 
-        if (!importData) return;
+        if (!id) return;
 
         try {
-            // Decode from base64
-            const decoded = decodeURIComponent(atob(importData));
-            const importObj = JSON.parse(decoded);
+            const exports = JSON.parse(localStorage.getItem('nexp') || '{}');
+            const exp = exports[id];
+            if (!exp || Date.now() > exp.e) return;
+            const importObj = exp;
 
             // Create new note with imported content
             const newNote = {
