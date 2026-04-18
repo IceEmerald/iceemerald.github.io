@@ -1769,6 +1769,17 @@ class CollaborationManager {
         } catch { alert('Invalid JSON. Paste the complete Firebase config object.'); }
     }
 
+    _prefillFirebaseUrl() {
+        const el = document.getElementById('firebaseConfigInput');
+        if (!el || el.value.trim()) return;
+        el.value = '{\n  "apiKey": "",\n  "authDomain": "",\n  "databaseURL": "https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/",\n  "projectId": "",\n  "appId": ""\n}';
+    }
+
+    showSetupModal() {
+        this._prefillFirebaseUrl();
+        document.getElementById('firebaseSetupModal')?.classList.add('show');
+    }
+
     async initFirebase() {
         if (this.db) return true;
         if (typeof firebase === 'undefined') {

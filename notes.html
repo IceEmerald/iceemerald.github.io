@@ -255,7 +255,7 @@
                     <label>Firebase Config (JSON):</label>
                     <textarea id="firebaseConfigInput" class="link-input" rows="5" style="height:110px;resize:vertical;font-family:monospace;font-size:11px;" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/","projectId":"...","appId":"..."}'></textarea>
                 </div>
-                <p style="font-size:11px;color:#888;margin:8px 0 0">In Firebase Console: Project Settings → Your apps → Web app → Config. Use your Realtime Database URL above in the <strong>databaseURL</strong> field, and enable <strong>Realtime Database</strong> in locked mode with rules that only allow authenticated access if you add auth later.</p>
+                <p style="font-size:11px;color:#888;margin:8px 0 0">Paste your Firebase Web App config JSON here. Keep the <strong>databaseURL</strong> set to <code>https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/</code>.</p>
             </div>
             <div class="link-modal-actions">
                 <button class="link-modal-btn link-modal-btn-cancel" onclick="document.getElementById('firebaseSetupModal').classList.remove('show')">Cancel</button>
