@@ -12,7 +12,9 @@ A rich-text notes app with optional live collaboration on GitHub Pages.
 1. Open the app
 2. Click **Go Live / Share**
 3. If prompted, paste your Firebase Web App config JSON
-4. Enable Realtime Database in Firebase Console
+4. In that JSON, set `databaseURL` to:
+   `https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/`
+5. Enable Realtime Database in Firebase Console and use locked rules as needed
 
 ## Files
 - `notes.html`

@@ -253,9 +253,9 @@
                 <p style="font-size:13px;color:#555;margin:0 0 12px">To enable real-time collaboration, you need a <strong>free</strong> Firebase project. <a href="https://console.firebase.google.com" target="_blank" style="color:#239a4d">Create one →</a></p>
                 <div class="link-input-group">
                     <label>Firebase Config (JSON):</label>
-                    <textarea id="firebaseConfigInput" class="link-input" rows="5" style="height:110px;resize:vertical;font-family:monospace;font-size:11px;" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"https://your-project-default-rtdb.firebaseio.com","projectId":"...","appId":"..."}'></textarea>
+                    <textarea id="firebaseConfigInput" class="link-input" rows="5" style="height:110px;resize:vertical;font-family:monospace;font-size:11px;" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/","projectId":"...","appId":"..."}'></textarea>
                 </div>
-                <p style="font-size:11px;color:#888;margin:8px 0 0">In Firebase Console: Project Settings → Your apps → Web app → Config. Also enable <strong>Realtime Database</strong> and set rules to allow read/write.</p>
+                <p style="font-size:11px;color:#888;margin:8px 0 0">In Firebase Console: Project Settings → Your apps → Web app → Config. Use your Realtime Database URL above in the <strong>databaseURL</strong> field, and enable <strong>Realtime Database</strong> in locked mode with rules that only allow authenticated access if you add auth later.</p>
             </div>
             <div class="link-modal-actions">
                 <button class="link-modal-btn link-modal-btn-cancel" onclick="document.getElementById('firebaseSetupModal').classList.remove('show')">Cancel</button>
