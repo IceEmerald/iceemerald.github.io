@@ -10,6 +10,9 @@
                                                                                                     <link rel="stylesheet" href="/assets/styles/style.css" />
                                                                                                     <link rel="stylesheet" href="/assets/styles/notes.css" />
                                                                                                     <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+                                                                                                    <!-- Firebase SDK for real-time collaboration -->
+                                                                                                    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+                                                                                                    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
                                                                                                 </head>
                                                                                                 <body>
                                                                                                     <div class="notes-app">
@@ -296,12 +299,23 @@
                                                                                                                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                                                                                                                             </svg>
                                                                                                                         </button>
+                                                                                                                        <button class="action-btntwo live-btn" id="goLiveBtn" title="Go Live / Share">
+                                                                                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                                                                                <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/>
+                                                                                                                            </svg>
+                                                                                                                        </button>
+                                                                                                                        <button class="action-btntwo ai-btn" id="aiBtn" title="AI Assistant">
+                                                                                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                                                                                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2z"/>
+                                                                                                                            </svg>
+                                                                                                                        </button>
                                                                                                                         <button class="action-btn" id="deleteNoteBtn" title="Delete Note">
                                                                                                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                                                                                                 <polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2 0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2v2"/>
                                                                                                                             </svg>
                                                                                                                         </button>
                                                                                                                     </div>
+                                                                                                                    <div class="presence-bar" id="presenceBar" style="display:none;"></div>
                                                                                                                 </div>
                                                                                                                 <div class="editor-content">
                                                                                                                     <div class="text-editor" id="textEditor" contenteditable="true" spellcheck="true">
@@ -425,6 +439,113 @@
                                                                                                             </div>
                                                                                                             <div class="link-modal-actions">
                                                                                                                 <button class="link-modal-btn link-modal-btn-create" id="importModalContinue">Continue</button>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+
+                                                                                                    <!-- Firebase Setup Modal -->
+                                                                                                    <div class="link-modal" id="firebaseSetupModal">
+                                                                                                        <div class="link-modal-content" style="max-width:500px">
+                                                                                                            <div class="link-modal-header">
+                                                                                                                <div class="link-modal-icon">🔥</div>
+                                                                                                                <h3 class="link-modal-title">Setup Live Collaboration</h3>
+                                                                                                            </div>
+                                                                                                            <div class="link-modal-body">
+                                                                                                                <p style="font-size:13px;color:#555;margin:0 0 12px">To enable real-time collaboration, you need a <strong>free</strong> Firebase project. <a href="https://console.firebase.google.com" target="_blank" style="color:#239a4d">Create one →</a></p>
+                                                                                                                <div class="link-input-group">
+                                                                                                                    <label>Firebase Config (JSON):</label>
+                                                                                                                    <textarea id="firebaseConfigInput" class="link-input" rows="5" style="height:110px;resize:vertical;font-family:monospace;font-size:11px;" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"https://your-project-default-rtdb.firebaseio.com","projectId":"...","appId":"..."}'></textarea>
+                                                                                                                </div>
+                                                                                                                <p style="font-size:11px;color:#888;margin:8px 0 0">In Firebase Console: Project Settings → Your apps → Web app → Config. Also enable <strong>Realtime Database</strong> and set rules to allow read/write.</p>
+                                                                                                            </div>
+                                                                                                            <div class="link-modal-actions">
+                                                                                                                <button class="link-modal-btn link-modal-btn-cancel" onclick="document.getElementById('firebaseSetupModal').classList.remove('show')">Cancel</button>
+                                                                                                                <button class="link-modal-btn link-modal-btn-create" onclick="window.notesApp?.collab?.saveSetupConfig()">Save &amp; Enable</button>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+
+                                                                                                    <!-- Share Live Modal -->
+                                                                                                    <div class="link-modal" id="shareLiveModal">
+                                                                                                        <div class="link-modal-content">
+                                                                                                            <div class="link-modal-header">
+                                                                                                                <div class="link-modal-icon">📡</div>
+                                                                                                                <h3 class="link-modal-title">Note is Live</h3>
+                                                                                                            </div>
+                                                                                                            <div class="link-modal-body">
+                                                                                                                <div class="link-input-group">
+                                                                                                                    <label>Share this link with collaborators:</label>
+                                                                                                                    <div style="display:flex;gap:8px;align-items:center;">
+                                                                                                                        <input type="text" id="shareLinkInput" class="link-input" readonly style="flex:1">
+                                                                                                                        <button class="link-modal-btn link-modal-btn-create" id="copyShareLinkBtn" onclick="window.notesApp?.collab?.copyShareLink()" style="white-space:nowrap;min-width:72px;">Copy</button>
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                                <p style="font-size:12px;color:#666;margin:10px 0 0">Anyone with this link can view and edit this note in real time.</p>
+                                                                                                            </div>
+                                                                                                            <div class="link-modal-actions">
+                                                                                                                <button class="link-modal-btn link-modal-btn-cancel" onclick="document.getElementById('shareLiveModal').classList.remove('show')">Close</button>
+                                                                                                                <button class="link-modal-btn link-modal-btn-danger" onclick="window.notesApp?.collab?.stopLive()">Stop Sharing</button>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+
+                                                                                                    <!-- AI Assistant Panel -->
+                                                                                                    <div class="ai-panel" id="aiPanel">
+                                                                                                        <div class="ai-panel-header">
+                                                                                                            <div class="ai-panel-title">
+                                                                                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2z"/></svg>
+                                                                                                                AI Assistant
+                                                                                                            </div>
+                                                                                                            <div style="display:flex;gap:2px;">
+                                                                                                                <button class="ai-panel-icon-btn" title="Settings" onclick="window.notesApp?.ai?.showSettings()">⚙</button>
+                                                                                                                <button class="ai-panel-icon-btn" onclick="window.notesApp?.ai?.close()">✕</button>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                        <div class="ai-quick-actions">
+                                                                                                            <button class="ai-quick-btn" onclick="window.notesApp?.ai?.quickAction('continue')">✍ Continue</button>
+                                                                                                            <button class="ai-quick-btn" onclick="window.notesApp?.ai?.quickAction('improve')">✨ Improve</button>
+                                                                                                            <button class="ai-quick-btn" onclick="window.notesApp?.ai?.quickAction('summarize')">📋 Summarize</button>
+                                                                                                            <button class="ai-quick-btn" onclick="window.notesApp?.ai?.quickAction('grammar')">✅ Fix Grammar</button>
+                                                                                                        </div>
+                                                                                                        <div class="ai-input-area">
+                                                                                                            <textarea id="aiPromptInput" class="ai-textarea" placeholder="Ask anything about your note…"></textarea>
+                                                                                                            <button id="aiSendBtn" class="ai-send-btn" onclick="window.notesApp?.ai?.sendMessage(document.getElementById('aiPromptInput').value)">Generate</button>
+                                                                                                        </div>
+                                                                                                        <div class="ai-response-area" id="aiResponseArea">
+                                                                                                            <div class="ai-response-label">AI Response</div>
+                                                                                                            <div class="ai-response-text" id="aiResponseText"></div>
+                                                                                                            <div class="ai-insert-actions" id="aiInsertActions">
+                                                                                                                <button class="ai-insert-btn" onclick="window.notesApp?.ai?.insertAtCursor()">Insert at cursor</button>
+                                                                                                                <button class="ai-insert-btn ai-insert-btn-alt" onclick="window.notesApp?.ai?.replaceNote()">Replace note</button>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+
+                                                                                                    <!-- AI Settings Modal -->
+                                                                                                    <div class="link-modal" id="aiSettingsModal">
+                                                                                                        <div class="link-modal-content">
+                                                                                                            <div class="link-modal-header">
+                                                                                                                <div class="link-modal-icon">⚙️</div>
+                                                                                                                <h3 class="link-modal-title">AI Settings</h3>
+                                                                                                            </div>
+                                                                                                            <div class="link-modal-body">
+                                                                                                                <div class="link-input-group">
+                                                                                                                    <label>API Key (OpenAI, Groq, or compatible):</label>
+                                                                                                                    <input type="password" id="aiApiKeyInput" class="link-input" placeholder="sk-...">
+                                                                                                                </div>
+                                                                                                                <div class="link-input-group">
+                                                                                                                    <label>API Endpoint:</label>
+                                                                                                                    <input type="url" id="aiEndpointInput" class="link-input" value="https://api.openai.com/v1/chat/completions">
+                                                                                                                </div>
+                                                                                                                <div class="link-input-group">
+                                                                                                                    <label>Model:</label>
+                                                                                                                    <input type="text" id="aiModelInput" class="link-input" value="gpt-3.5-turbo" placeholder="gpt-3.5-turbo">
+                                                                                                                </div>
+                                                                                                                <p style="font-size:11px;color:#888;margin:10px 0 0">Works with OpenAI, Groq (free tier), Together AI, and any OpenAI-compatible API. Your key is stored only in your browser.</p>
+                                                                                                            </div>
+                                                                                                            <div class="link-modal-actions">
+                                                                                                                <button class="link-modal-btn link-modal-btn-cancel" onclick="document.getElementById('aiSettingsModal').classList.remove('show')">Cancel</button>
+                                                                                                                <button class="link-modal-btn link-modal-btn-create" onclick="window.notesApp?.ai?.saveSettings()">Save</button>
                                                                                                             </div>
                                                                                                         </div>
                                                                                                     </div>

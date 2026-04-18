@@ -47,6 +47,10 @@ class NotesApp {
         this.touchStartTime = 0;
         this.isSwiping = false;
 
+        // Collaboration and AI (initialized in init())
+        this.collab = null;
+        this.ai = null;
+
         this.init();
     }
 
@@ -61,6 +65,11 @@ class NotesApp {
         this.setupMobileUI();
         this.setupSwipeGesture();
         this.isInitialized = true;
+
+        // Initialize collaboration manager and AI assistant
+        this.collab = new CollaborationManager(this);
+        this.ai = new AIAssistant(this);
+        this.collab.checkRoomFromUrl();
     }
 
     // ─── Storage ────────────────────────────────────────────────────────────────
@@ -139,6 +148,11 @@ class NotesApp {
 
         const exportNoteBtn = document.getElementById('exportNoteBtn');
         if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
+
+        const goLiveBtn = document.getElementById('goLiveBtn');
+        if (goLiveBtn) goLiveBtn.addEventListener('click', () => this.collab?.goLive());
+        const aiBtn = document.getElementById('aiBtn');
+        if (aiBtn) aiBtn.addEventListener('click', () => this.ai?.toggle());
 
         const noteTitle = document.getElementById('noteTitle');
         if (noteTitle) {
@@ -849,6 +863,10 @@ class NotesApp {
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
             this.debouncedSave();
+            if (this.collab?.currentRoom) {
+                const ed = document.getElementById('textEditor');
+                this.collab.syncContent(ed?.innerHTML || '', title || '');
+            }
         }
     }
 
@@ -861,6 +879,10 @@ class NotesApp {
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
             this.debouncedSave();
+            if (this.collab?.currentRoom) {
+                const ti = document.getElementById('noteTitle');
+                this.collab.syncContent(note.content || '', ti?.value || note.title || '');
+            }
         }
     }
 
@@ -920,7 +942,7 @@ class NotesApp {
         const date = new Date(note.modifiedAt);
 
         div.innerHTML = `
-            <div class="note-item-title">${this.escapeHtml(note.title)}</div>
+            <div class="note-item-title">${this.escapeHtml(note.title)}${note.isLive ? '<span class="live-badge">● Live</span>' : ''}</div>
             <div class="note-item-preview">${this.escapeHtml(preview)}${preview.length === 150 ? '...' : ''}</div>
             <div class="note-item-date">${this.formatDate(date)}</div>
         `;
@@ -1707,6 +1729,397 @@ class NotesApp {
         const close = () => modal.classList.remove('show');
         if (cancelBtn) cancelBtn.onclick = close;
         if (continueBtn) continueBtn.onclick = close;
+    }
+}
+
+// ─── Collaboration Manager ──────────────────────────────────────────────────────
+
+class CollaborationManager {
+    constructor(notesApp) {
+        this.app = notesApp;
+        this.db = null;
+        this.currentRoom = null;
+        this.isHost = false;
+        this.isLocalUpdate = false;
+        this.debounceTimer = null;
+        this.userId = this._getOrCreate('collab_uid', 'u_' + Math.random().toString(36).substr(2, 9));
+        this.userName = this._getOrCreate('collab_name', 'User' + Math.floor(Math.random() * 9000 + 1000));
+        this.userColor = this._getOrCreate('collab_color', this._randomColor());
+    }
+
+    _getOrCreate(key, def) {
+        let v = localStorage.getItem(key);
+        if (!v) { v = def; localStorage.setItem(key, v); }
+        return v;
+    }
+
+    _randomColor() {
+        const c = ['#e74c3c','#e67e22','#27ae60','#2980b9','#8e44ad','#16a085','#d35400','#c0392b'];
+        return c[Math.floor(Math.random() * c.length)];
+    }
+
+    getConfig() {
+        try { return JSON.parse(localStorage.getItem('firebase_config') || 'null'); } catch { return null; }
+    }
+
+    saveSetupConfig() {
+        const raw = document.getElementById('firebaseConfigInput')?.value?.trim();
+        if (!raw) return;
+        try {
+            JSON.parse(raw);
+            localStorage.setItem('firebase_config', raw);
+            document.getElementById('firebaseSetupModal')?.classList.remove('show');
+            this.db = null;
+            this.goLive();
+        } catch { alert('Invalid JSON. Paste the complete Firebase config object.'); }
+    }
+
+    async initFirebase() {
+        if (this.db) return true;
+        if (typeof firebase === 'undefined') {
+            alert('Firebase SDK failed to load. Check your internet connection.');
+            return false;
+        }
+        const config = this.getConfig();
+        if (!config) return false;
+        try {
+            if (!firebase.apps.length) firebase.initializeApp(config);
+            this.db = firebase.database();
+            return true;
+        } catch (e) {
+            console.error('Firebase init:', e);
+            alert('Firebase error: ' + e.message);
+            return false;
+        }
+    }
+
+    async checkRoomFromUrl() {
+        const m = window.location.hash.match(/#room\/([a-zA-Z0-9_-]+)/);
+        if (!m) return;
+        const roomId = m[1];
+        const ok = await this.initFirebase();
+        if (!ok) { this._pendingRoom = roomId; this.showSetupModal(); return; }
+        await this.joinRoom(roomId);
+    }
+
+    async goLive() {
+        if (!this.app.currentNoteId) { alert('Please select or create a note first.'); return; }
+        const ok = await this.initFirebase();
+        if (!ok) { this.showSetupModal(); return; }
+        if (this.currentRoom) { this.showShareModal(this.currentRoom); return; }
+
+        const note = this.app.notes.find(n => n.id === this.app.currentNoteId);
+        if (!note) return;
+
+        const roomId = this._genId();
+        this.currentRoom = roomId;
+        this.isHost = true;
+        await this.db.ref('rooms/' + roomId).set({
+            title: note.title || 'Untitled Note',
+            content: note.content || '',
+            createdAt: Date.now(),
+            hostId: this.userId
+        });
+
+        note.isLive = true;
+        note.roomId = roomId;
+        this.app.renderNotesList();
+        this.app.saveNotesToStorage();
+
+        this._listenRoom(roomId);
+        this._registerPresence(roomId);
+        window.history.pushState({}, '', '#room/' + roomId);
+        this._updateGoLiveBtn(true);
+        this.showShareModal(roomId);
+    }
+
+    async joinRoom(roomId) {
+        const snap = await this.db.ref('rooms/' + roomId).once('value');
+        const data = snap.val();
+        if (!data) {
+            alert('This shared note no longer exists.');
+            window.history.replaceState({}, '', window.location.pathname);
+            return;
+        }
+        this.currentRoom = roomId;
+        this.isHost = false;
+        let note = this.app.notes.find(n => n.roomId === roomId);
+        if (!note) {
+            note = {
+                id: this.app.generateId(),
+                title: data.title || 'Shared Note',
+                content: data.content || '',
+                color: '#ffffff',
+                createdAt: new Date().toISOString(),
+                modifiedAt: new Date().toISOString(),
+                isLive: true,
+                roomId
+            };
+            this.app.notes.unshift(note);
+        } else {
+            note.title = data.title || note.title;
+            note.content = data.content || note.content;
+            note.isLive = true;
+        }
+        this.app.selectNote(note.id);
+        this.app.renderNotesList();
+        this.app.saveNotesToStorage();
+        this._listenRoom(roomId);
+        this._registerPresence(roomId);
+        this._updateGoLiveBtn(true);
+    }
+
+    _listenRoom(roomId) {
+        const ref = this.db.ref('rooms/' + roomId);
+        ref.child('content').on('value', snap => {
+            if (this.isLocalUpdate) return;
+            const val = snap.val();
+            const note = this.app.notes.find(n => n.roomId === roomId);
+            if (!note || val === null) return;
+            note.content = val;
+            if (this.app.currentNoteId === note.id) {
+                const ed = document.getElementById('textEditor');
+                if (ed && ed.innerHTML !== val) ed.innerHTML = val;
+            }
+        });
+        ref.child('title').on('value', snap => {
+            if (this.isLocalUpdate) return;
+            const val = snap.val();
+            const note = this.app.notes.find(n => n.roomId === roomId);
+            if (!note || val === null) return;
+            note.title = val;
+            if (this.app.currentNoteId === note.id) {
+                const ti = document.getElementById('noteTitle');
+                if (ti && ti.value !== val) ti.value = val;
+            }
+            this.app.renderNotesList();
+        });
+        ref.child('users').on('value', snap => {
+            this._updatePresenceUI(snap.val() || {});
+        });
+    }
+
+    syncContent(content, title) {
+        if (!this.currentRoom || !this.db) return;
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+            this.isLocalUpdate = true;
+            this.db.ref('rooms/' + this.currentRoom).update({
+                content,
+                title: title || 'Untitled',
+                lastUpdated: Date.now()
+            });
+            setTimeout(() => { this.isLocalUpdate = false; }, 400);
+        }, 700);
+    }
+
+    _registerPresence(roomId) {
+        const ref = this.db.ref('rooms/' + roomId + '/users/' + this.userId);
+        ref.set({ name: this.userName, color: this.userColor, joinedAt: Date.now() });
+        ref.onDisconnect().remove();
+    }
+
+    _updatePresenceUI(users) {
+        const bar = document.getElementById('presenceBar');
+        if (!bar) return;
+        const list = Object.values(users);
+        if (list.length < 2) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
+        bar.style.display = 'flex';
+        bar.innerHTML = list.map(u =>
+            `<div class="presence-avatar" style="background:${u.color}" title="${u.name}">${u.name.charAt(0).toUpperCase()}</div>`
+        ).join('') + `<span class="presence-label">${list.length} collaborating</span>`;
+    }
+
+    async stopLive() {
+        if (!this.currentRoom) return;
+        if (this.db) {
+            this.db.ref('rooms/' + this.currentRoom + '/users/' + this.userId).remove();
+            if (this.isHost) this.db.ref('rooms/' + this.currentRoom).remove();
+        }
+        const note = this.app.notes.find(n => n.roomId === this.currentRoom);
+        if (note) { note.isLive = false; note.roomId = null; }
+        this.currentRoom = null;
+        this.isHost = false;
+        window.history.replaceState({}, '', window.location.pathname);
+        this._updateGoLiveBtn(false);
+        const bar = document.getElementById('presenceBar');
+        if (bar) { bar.innerHTML = ''; bar.style.display = 'none'; }
+        this.app.renderNotesList();
+        this.app.saveNotesToStorage();
+        document.getElementById('shareLiveModal')?.classList.remove('show');
+    }
+
+    _genId() { return Math.random().toString(36).substr(2, 8) + Date.now().toString(36); }
+
+    _updateGoLiveBtn(live) {
+        const btn = document.getElementById('goLiveBtn');
+        if (!btn) return;
+        btn.classList.toggle('live-active', live);
+        btn.title = live ? 'Currently Live — click to see share link' : 'Go Live / Share';
+    }
+
+    showSetupModal() { document.getElementById('firebaseSetupModal')?.classList.add('show'); }
+
+    showShareModal(roomId) {
+        const modal = document.getElementById('shareLiveModal');
+        if (!modal) return;
+        const li = document.getElementById('shareLinkInput');
+        if (li) li.value = location.origin + location.pathname + '#room/' + roomId;
+        modal.classList.add('show');
+    }
+
+    copyShareLink() {
+        const v = document.getElementById('shareLinkInput')?.value;
+        if (!v) return;
+        navigator.clipboard.writeText(v).then(() => {
+            const btn = document.getElementById('copyShareLinkBtn');
+            if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
+        });
+    }
+}
+
+// ─── AI Assistant ───────────────────────────────────────────────────────────────
+
+class AIAssistant {
+    constructor(notesApp) {
+        this.app = notesApp;
+        this.isOpen = false;
+        this.isLoading = false;
+        this.lastResponse = '';
+    }
+
+    getApiKey() { return localStorage.getItem('ai_api_key') || ''; }
+    setApiKey(k) { localStorage.setItem('ai_api_key', k); }
+    getEndpoint() { return localStorage.getItem('ai_endpoint') || 'https://api.openai.com/v1/chat/completions'; }
+    getModel() { return localStorage.getItem('ai_model') || 'gpt-3.5-turbo'; }
+
+    toggle() {
+        this.isOpen = !this.isOpen;
+        const p = document.getElementById('aiPanel');
+        if (p) p.classList.toggle('open', this.isOpen);
+        const btn = document.getElementById('aiBtn');
+        if (btn) btn.classList.toggle('active', this.isOpen);
+    }
+
+    close() {
+        this.isOpen = false;
+        document.getElementById('aiPanel')?.classList.remove('open');
+        document.getElementById('aiBtn')?.classList.remove('active');
+    }
+
+    _getNoteContext() {
+        const note = this.app.notes.find(n => n.id === this.app.currentNoteId);
+        if (!note) return '';
+        const d = document.createElement('div');
+        d.innerHTML = note.content || '';
+        return d.textContent.substring(0, 2000);
+    }
+
+    async sendMessage(prompt) {
+        if (!prompt?.trim()) return;
+        if (this.isLoading) return;
+        const key = this.getApiKey();
+        if (!key) { this.showSettings(); return; }
+        this.isLoading = true;
+        const responseArea = document.getElementById('aiResponseArea');
+        const responseText = document.getElementById('aiResponseText');
+        const insertActions = document.getElementById('aiInsertActions');
+        const sendBtn = document.getElementById('aiSendBtn');
+        if (responseArea) responseArea.style.display = 'block';
+        if (responseText) responseText.textContent = 'Generating…';
+        if (insertActions) insertActions.style.display = 'none';
+        if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = 'Generating…'; }
+
+        const ctx = this._getNoteContext();
+        try {
+            const res = await fetch(this.getEndpoint(), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + key
+                },
+                body: JSON.stringify({
+                    model: this.getModel(),
+                    messages: [
+                        { role: 'system', content: 'You are a helpful writing assistant for a notes app. Be concise and practical. Return only the requested content without extra meta-commentary.' },
+                        { role: 'user', content: ctx ? 'Note content:\n' + ctx + '\n\nRequest: ' + prompt : prompt }
+                    ],
+                    max_tokens: 800
+                })
+            });
+            if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'HTTP ' + res.status); }
+            const data = await res.json();
+            this.lastResponse = data.choices?.[0]?.message?.content || '';
+            if (responseText) responseText.textContent = this.lastResponse;
+            if (insertActions) insertActions.style.display = 'flex';
+        } catch (e) {
+            if (responseText) responseText.textContent = 'Error: ' + e.message;
+        } finally {
+            this.isLoading = false;
+            if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Generate'; }
+        }
+    }
+
+    async quickAction(type) {
+        const prompts = {
+            continue: 'Continue writing this note. Add 1-2 relevant paragraphs that naturally follow the existing content.',
+            improve: 'Improve the writing quality, clarity, and flow of this note. Return the full improved version.',
+            summarize: 'Summarize the key points of this note in 3-5 concise bullet points.',
+            grammar: 'Fix all grammar, spelling, and punctuation errors in this note. Return the corrected version.'
+        };
+        const input = document.getElementById('aiPromptInput');
+        if (input) input.value = prompts[type] || type;
+        await this.sendMessage(prompts[type] || type);
+    }
+
+    insertAtCursor() {
+        if (!this.lastResponse) return;
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+        editor.focus();
+        const formatted = '<p>' + this.lastResponse.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount) {
+            const range = sel.getRangeAt(0);
+            range.collapse(false);
+            const frag = document.createRange().createContextualFragment(formatted);
+            range.insertNode(frag);
+        } else {
+            editor.innerHTML += formatted;
+        }
+        this.app.updateNoteContent();
+        this.close();
+    }
+
+    replaceNote() {
+        if (!this.lastResponse) return;
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+        editor.innerHTML = '<p>' + this.lastResponse.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+        this.app.updateNoteContent();
+        this.close();
+    }
+
+    showSettings() {
+        const modal = document.getElementById('aiSettingsModal');
+        if (!modal) return;
+        const ki = document.getElementById('aiApiKeyInput');
+        const ei = document.getElementById('aiEndpointInput');
+        const mi = document.getElementById('aiModelInput');
+        if (ki) ki.value = this.getApiKey();
+        if (ei) ei.value = this.getEndpoint();
+        if (mi) mi.value = this.getModel();
+        modal.classList.add('show');
+    }
+
+    saveSettings() {
+        const k = document.getElementById('aiApiKeyInput')?.value?.trim();
+        const e = document.getElementById('aiEndpointInput')?.value?.trim();
+        const m = document.getElementById('aiModelInput')?.value?.trim();
+        if (k) this.setApiKey(k);
+        if (e) localStorage.setItem('ai_endpoint', e);
+        if (m) localStorage.setItem('ai_model', m);
+        document.getElementById('aiSettingsModal')?.classList.remove('show');
     }
 }
 
