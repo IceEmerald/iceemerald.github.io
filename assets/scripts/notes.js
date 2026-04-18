@@ -47,9 +47,6 @@ class NotesApp {
         this.touchStartTime = 0;
         this.isSwiping = false;
 
-        // Collaboration (initialized in init())
-        this.collab = null;
-
         this.init();
     }
 
@@ -64,10 +61,6 @@ class NotesApp {
         this.setupMobileUI();
         this.setupSwipeGesture();
         this.isInitialized = true;
-
-        // Initialize collaboration manager
-        this.collab = new CollaborationManager(this);
-        this.collab.checkRoomFromUrl();
     }
 
     // ─── Storage ────────────────────────────────────────────────────────────────
@@ -147,8 +140,6 @@ class NotesApp {
         const exportNoteBtn = document.getElementById('exportNoteBtn');
         if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
 
-        const goLiveBtn = document.getElementById('goLiveBtn');
-        if (goLiveBtn) goLiveBtn.addEventListener('click', () => this.collab?.goLive());
         const noteTitle = document.getElementById('noteTitle');
         if (noteTitle) {
             noteTitle.addEventListener('input', (e) => {
@@ -858,10 +849,6 @@ class NotesApp {
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
             this.debouncedSave();
-            if (this.collab?.currentRoom) {
-                const ed = document.getElementById('textEditor');
-                this.collab.syncContent(ed?.innerHTML || '', title || '');
-            }
         }
     }
 
@@ -874,10 +861,6 @@ class NotesApp {
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
             this.debouncedSave();
-            if (this.collab?.currentRoom) {
-                const ti = document.getElementById('noteTitle');
-                this.collab.syncContent(note.content || '', ti?.value || note.title || '');
-            }
         }
     }
 
@@ -937,7 +920,7 @@ class NotesApp {
         const date = new Date(note.modifiedAt);
 
         div.innerHTML = `
-            <div class="note-item-title">${this.escapeHtml(note.title)}${note.isLive ? '<span class="live-badge">● Live</span>' : ''}</div>
+            <div class="note-item-title">${this.escapeHtml(note.title)}</div>
             <div class="note-item-preview">${this.escapeHtml(preview)}${preview.length === 150 ? '...' : ''}</div>
             <div class="note-item-date">${this.formatDate(date)}</div>
         `;
@@ -1724,236 +1707,6 @@ class NotesApp {
         const close = () => modal.classList.remove('show');
         if (cancelBtn) cancelBtn.onclick = close;
         if (continueBtn) continueBtn.onclick = close;
-    }
-}
-
-// ─── Collaboration Manager ──────────────────────────────────────────────────────
-
-class CollaborationManager {
-    constructor(notesApp) {
-        this.app = notesApp;
-        this.db = null;
-        this.currentRoom = null;
-        this.isHost = false;
-        this.isLocalUpdate = false;
-        this.debounceTimer = null;
-        this.userId = this._getOrCreate('collab_uid', 'u_' + Math.random().toString(36).substr(2, 9));
-        this.userName = this._getOrCreate('collab_name', 'User' + Math.floor(Math.random() * 9000 + 1000));
-        this.userColor = this._getOrCreate('collab_color', this._randomColor());
-    }
-
-    _getOrCreate(key, def) {
-        let v = localStorage.getItem(key);
-        if (!v) { v = def; localStorage.setItem(key, v); }
-        return v;
-    }
-
-    _randomColor() {
-        const c = ['#e74c3c','#e67e22','#27ae60','#2980b9','#8e44ad','#16a085','#d35400','#c0392b'];
-        return c[Math.floor(Math.random() * c.length)];
-    }
-
-    async initFirebase() {
-        if (this.db) return true;
-        if (typeof firebase === 'undefined') {
-            alert('Firebase SDK failed to load. Check your internet connection.');
-            return false;
-        }
-        try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp({
-                    databaseURL: 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/'
-                });
-            }
-            this.db = firebase.database();
-            return true;
-        } catch (e) {
-            console.error('Firebase init:', e);
-            alert('Firebase error: ' + e.message);
-            return false;
-        }
-    }
-
-    async checkRoomFromUrl() {
-        const m = window.location.hash.match(/#room\/([a-zA-Z0-9_-]+)/);
-        if (!m) return;
-        const roomId = m[1];
-        const ok = await this.initFirebase();
-        if (!ok) return;
-        await this.joinRoom(roomId);
-    }
-
-    async goLive() {
-        if (!this.app.currentNoteId) { alert('Please select or create a note first.'); return; }
-        const ok = await this.initFirebase();
-        if (!ok) return;
-        if (this.currentRoom) { this.showShareModal(this.currentRoom); return; }
-
-        const note = this.app.notes.find(n => n.id === this.app.currentNoteId);
-        if (!note) return;
-
-        const roomId = this._genId();
-        this.currentRoom = roomId;
-        this.isHost = true;
-        await this.db.ref('rooms/' + roomId).set({
-            title: note.title || 'Untitled Note',
-            content: note.content || '',
-            createdAt: Date.now(),
-            hostId: this.userId
-        });
-
-        note.isLive = true;
-        note.roomId = roomId;
-        this.app.renderNotesList();
-        this.app.saveNotesToStorage();
-
-        this._listenRoom(roomId);
-        this._registerPresence(roomId);
-        window.history.pushState({}, '', '#room/' + roomId);
-        this._updateGoLiveBtn(true);
-        this.showShareModal(roomId);
-    }
-
-    async joinRoom(roomId) {
-        const snap = await this.db.ref('rooms/' + roomId).once('value');
-        const data = snap.val();
-        if (!data) {
-            alert('This shared note no longer exists.');
-            window.history.replaceState({}, '', window.location.pathname);
-            return;
-        }
-        this.currentRoom = roomId;
-        this.isHost = false;
-        let note = this.app.notes.find(n => n.roomId === roomId);
-        if (!note) {
-            note = {
-                id: this.app.generateId(),
-                title: data.title || 'Shared Note',
-                content: data.content || '',
-                color: '#ffffff',
-                createdAt: new Date().toISOString(),
-                modifiedAt: new Date().toISOString(),
-                isLive: true,
-                roomId
-            };
-            this.app.notes.unshift(note);
-        } else {
-            note.title = data.title || note.title;
-            note.content = data.content || note.content;
-            note.isLive = true;
-        }
-        this.app.selectNote(note.id);
-        this.app.renderNotesList();
-        this.app.saveNotesToStorage();
-        this._listenRoom(roomId);
-        this._registerPresence(roomId);
-        this._updateGoLiveBtn(true);
-    }
-
-    _listenRoom(roomId) {
-        const ref = this.db.ref('rooms/' + roomId);
-        ref.child('content').on('value', snap => {
-            if (this.isLocalUpdate) return;
-            const val = snap.val();
-            const note = this.app.notes.find(n => n.roomId === roomId);
-            if (!note || val === null) return;
-            note.content = val;
-            if (this.app.currentNoteId === note.id) {
-                const ed = document.getElementById('textEditor');
-                if (ed && ed.innerHTML !== val) ed.innerHTML = val;
-            }
-        });
-        ref.child('title').on('value', snap => {
-            if (this.isLocalUpdate) return;
-            const val = snap.val();
-            const note = this.app.notes.find(n => n.roomId === roomId);
-            if (!note || val === null) return;
-            note.title = val;
-            if (this.app.currentNoteId === note.id) {
-                const ti = document.getElementById('noteTitle');
-                if (ti && ti.value !== val) ti.value = val;
-            }
-            this.app.renderNotesList();
-        });
-        ref.child('users').on('value', snap => {
-            this._updatePresenceUI(snap.val() || {});
-        });
-    }
-
-    syncContent(content, title) {
-        if (!this.currentRoom || !this.db) return;
-        clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => {
-            this.isLocalUpdate = true;
-            this.db.ref('rooms/' + this.currentRoom).update({
-                content,
-                title: title || 'Untitled',
-                lastUpdated: Date.now()
-            });
-            setTimeout(() => { this.isLocalUpdate = false; }, 400);
-        }, 700);
-    }
-
-    _registerPresence(roomId) {
-        const ref = this.db.ref('rooms/' + roomId + '/users/' + this.userId);
-        ref.set({ name: this.userName, color: this.userColor, joinedAt: Date.now() });
-        ref.onDisconnect().remove();
-    }
-
-    _updatePresenceUI(users) {
-        const bar = document.getElementById('presenceBar');
-        if (!bar) return;
-        const list = Object.values(users);
-        if (list.length < 2) { bar.innerHTML = ''; bar.style.display = 'none'; return; }
-        bar.style.display = 'flex';
-        bar.innerHTML = list.map(u =>
-            `<div class="presence-avatar" style="background:${u.color}" title="${u.name}">${u.name.charAt(0).toUpperCase()}</div>`
-        ).join('') + `<span class="presence-label">${list.length} collaborating</span>`;
-    }
-
-    async stopLive() {
-        if (!this.currentRoom) return;
-        if (this.db) {
-            this.db.ref('rooms/' + this.currentRoom + '/users/' + this.userId).remove();
-            if (this.isHost) this.db.ref('rooms/' + this.currentRoom).remove();
-        }
-        const note = this.app.notes.find(n => n.roomId === this.currentRoom);
-        if (note) { note.isLive = false; note.roomId = null; }
-        this.currentRoom = null;
-        this.isHost = false;
-        window.history.replaceState({}, '', window.location.pathname);
-        this._updateGoLiveBtn(false);
-        const bar = document.getElementById('presenceBar');
-        if (bar) { bar.innerHTML = ''; bar.style.display = 'none'; }
-        this.app.renderNotesList();
-        this.app.saveNotesToStorage();
-        document.getElementById('shareLiveModal')?.classList.remove('show');
-    }
-
-    _genId() { return Math.random().toString(36).substr(2, 8) + Date.now().toString(36); }
-
-    _updateGoLiveBtn(live) {
-        const btn = document.getElementById('goLiveBtn');
-        if (!btn) return;
-        btn.classList.toggle('live-active', live);
-        btn.title = live ? 'Currently Live — click to see share link' : 'Go Live / Share';
-    }
-
-    showShareModal(roomId) {
-        const modal = document.getElementById('shareLiveModal');
-        if (!modal) return;
-        const li = document.getElementById('shareLinkInput');
-        if (li) li.value = location.origin + location.pathname + '#room/' + roomId;
-        modal.classList.add('show');
-    }
-
-    copyShareLink() {
-        const v = document.getElementById('shareLinkInput')?.value;
-        if (!v) return;
-        navigator.clipboard.writeText(v).then(() => {
-            const btn = document.getElementById('copyShareLinkBtn');
-            if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
-        });
     }
 }
 
