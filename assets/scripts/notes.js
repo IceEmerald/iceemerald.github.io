@@ -1761,18 +1761,27 @@ class CollaborationManager {
         const raw = document.getElementById('firebaseConfigInput')?.value?.trim();
         if (!raw) return;
         try {
-            JSON.parse(raw);
-            localStorage.setItem('firebase_config', raw);
+            const parsed = JSON.parse(raw);
+            const dbUrl = parsed.databaseURL || parsed.databaseUrl || parsed.url || raw;
+            const config = typeof raw === 'string' && raw.startsWith('{') ? parsed : {
+                apiKey: '',
+                authDomain: '',
+                databaseURL: dbUrl,
+                projectId: '',
+                appId: ''
+            };
+            if (!config.databaseURL) throw new Error('Missing databaseURL');
+            localStorage.setItem('firebase_config', JSON.stringify(config));
             document.getElementById('firebaseSetupModal')?.classList.remove('show');
             this.db = null;
             this.goLive();
-        } catch { alert('Invalid JSON. Paste the complete Firebase config object.'); }
+        } catch { alert('Paste either the Firebase config JSON or just the database URL.'); }
     }
 
     _prefillFirebaseUrl() {
         const el = document.getElementById('firebaseConfigInput');
         if (!el || el.value.trim()) return;
-        el.value = '{\n  "apiKey": "",\n  "authDomain": "",\n  "databaseURL": "https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/",\n  "projectId": "",\n  "appId": ""\n}';
+        el.value = 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/';
     }
 
     showSetupModal() {
