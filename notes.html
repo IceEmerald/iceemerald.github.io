@@ -243,27 +243,6 @@
         </div>
     </div>
 
-    <div class="link-modal" id="firebaseSetupModal">
-        <div class="link-modal-content" style="max-width:500px">
-            <div class="link-modal-header">
-                <div class="link-modal-icon">🔥</div>
-                <h3 class="link-modal-title">Setup Live Collaboration</h3>
-            </div>
-            <div class="link-modal-body">
-                <p style="font-size:13px;color:#555;margin:0 0 12px">You only need the Firebase Realtime Database URL for this app. <a href="https://console.firebase.google.com" target="_blank" style="color:#239a4d">Open Firebase →</a></p>
-                <div class="link-input-group">
-                    <label>Firebase Database URL:</label>
-                    <textarea id="firebaseConfigInput" class="link-input" rows="2" style="height:72px;resize:vertical;font-family:monospace;font-size:11px;" placeholder='https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/'></textarea>
-                </div>
-                <p style="font-size:11px;color:#888;margin:8px 0 0">Paste the database URL above. API key and App ID are not required for this app.</p>
-            </div>
-            <div class="link-modal-actions">
-                <button class="link-modal-btn link-modal-btn-cancel" onclick="document.getElementById('firebaseSetupModal').classList.remove('show')">Cancel</button>
-                <button class="link-modal-btn link-modal-btn-create" onclick="window.notesApp?.collab?.saveSetupConfig()">Save &amp; Enable</button>
-            </div>
-        </div>
-    </div>
-
     <div class="link-modal" id="shareLiveModal">
         <div class="link-modal-content">
             <div class="link-modal-header">

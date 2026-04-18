@@ -1753,52 +1753,18 @@ class CollaborationManager {
         return c[Math.floor(Math.random() * c.length)];
     }
 
-    getConfig() {
-        try { return JSON.parse(localStorage.getItem('firebase_config') || 'null'); } catch { return null; }
-    }
-
-    saveSetupConfig() {
-        const raw = document.getElementById('firebaseConfigInput')?.value?.trim();
-        if (!raw) return;
-        try {
-            const parsed = JSON.parse(raw);
-            const dbUrl = parsed.databaseURL || parsed.databaseUrl || parsed.url || raw;
-            const config = typeof raw === 'string' && raw.startsWith('{') ? parsed : {
-                apiKey: '',
-                authDomain: '',
-                databaseURL: dbUrl,
-                projectId: '',
-                appId: ''
-            };
-            if (!config.databaseURL) throw new Error('Missing databaseURL');
-            localStorage.setItem('firebase_config', JSON.stringify(config));
-            document.getElementById('firebaseSetupModal')?.classList.remove('show');
-            this.db = null;
-            this.goLive();
-        } catch { alert('Paste either the Firebase config JSON or just the database URL.'); }
-    }
-
-    _prefillFirebaseUrl() {
-        const el = document.getElementById('firebaseConfigInput');
-        if (!el || el.value.trim()) return;
-        el.value = 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/';
-    }
-
-    showSetupModal() {
-        this._prefillFirebaseUrl();
-        document.getElementById('firebaseSetupModal')?.classList.add('show');
-    }
-
     async initFirebase() {
         if (this.db) return true;
         if (typeof firebase === 'undefined') {
             alert('Firebase SDK failed to load. Check your internet connection.');
             return false;
         }
-        const config = this.getConfig();
-        if (!config) return false;
         try {
-            if (!firebase.apps.length) firebase.initializeApp(config);
+            if (!firebase.apps.length) {
+                firebase.initializeApp({
+                    databaseURL: 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app/'
+                });
+            }
             this.db = firebase.database();
             return true;
         } catch (e) {
@@ -1813,14 +1779,14 @@ class CollaborationManager {
         if (!m) return;
         const roomId = m[1];
         const ok = await this.initFirebase();
-        if (!ok) { this._pendingRoom = roomId; this.showSetupModal(); return; }
+        if (!ok) return;
         await this.joinRoom(roomId);
     }
 
     async goLive() {
         if (!this.app.currentNoteId) { alert('Please select or create a note first.'); return; }
         const ok = await this.initFirebase();
-        if (!ok) { this.showSetupModal(); return; }
+        if (!ok) return;
         if (this.currentRoom) { this.showShareModal(this.currentRoom); return; }
 
         const note = this.app.notes.find(n => n.id === this.app.currentNoteId);
@@ -1972,8 +1938,6 @@ class CollaborationManager {
         btn.classList.toggle('live-active', live);
         btn.title = live ? 'Currently Live — click to see share link' : 'Go Live / Share';
     }
-
-    showSetupModal() { document.getElementById('firebaseSetupModal')?.classList.add('show'); }
 
     showShareModal(roomId) {
         const modal = document.getElementById('shareLiveModal');
