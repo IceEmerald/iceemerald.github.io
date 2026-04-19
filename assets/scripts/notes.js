@@ -172,6 +172,7 @@ class NotesApp {
         this.setupCustomContextMenu();
         this.setupEditorPlaceholder();
         this.setupSidebarToggle();
+        this.setupTableToolbar();
     }
 
     // ─── Mobile UI ──────────────────────────────────────────────────────────────
@@ -629,6 +630,39 @@ class NotesApp {
 
         editor.addEventListener('blur', () => this.saveSelection());
 
+        // Handle Enter key in todo items - move cursor below the todo item
+        editor.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const node = sel.getRangeAt(0).commonAncestorContainer;
+            const label = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+            const todoLabel = label && label.closest ? label.closest('.todo-label') : null;
+            if (!todoLabel) return;
+
+            e.preventDefault();
+            const todoItem = todoLabel.closest('.todo-item');
+            if (!todoItem) return;
+
+            // Insert an empty div after the todo item and move cursor there
+            const newBlock = document.createElement('div');
+            newBlock.innerHTML = '<br>';
+            const next = todoItem.nextSibling;
+            if (next) {
+                todoItem.parentNode.insertBefore(newBlock, next);
+            } else {
+                todoItem.parentNode.appendChild(newBlock);
+            }
+
+            // Place cursor in the new block
+            const newRange = document.createRange();
+            newRange.setStart(newBlock, 0);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            this.updateNoteContent();
+        });
+
         editor.addEventListener('paste', (e) => {
             setTimeout(() => {
                 this.updatePlaceholderState(editor);
@@ -660,10 +694,11 @@ class NotesApp {
 
     restoreSelection() {
         if (this.savedSelection) {
+            const editor = document.getElementById('textEditor');
+            if (editor) editor.focus();
             const selection = window.getSelection();
             selection.removeAllRanges();
             selection.addRange(this.savedSelection.cloneRange());
-            document.getElementById('textEditor').focus();
         }
     }
 
@@ -877,11 +912,10 @@ class NotesApp {
         // On mobile, close sidebar when a note is selected
         if (this.isMobile()) this.closeMobileSidebar();
 
-        // Load drawing overlay if present
-        if (this.drawCtx) {
-            this.resizeCanvas();
-            this.loadDrawing();
-        }
+        // If in draw mode, exit it
+        if (this.isDrawMode) { this.isDrawMode = false; const tb = document.getElementById('drawToolbar'); if (tb) tb.classList.remove('visible'); const db = document.getElementById('drawBtn'); if (db) db.classList.remove('active'); const te = document.getElementById('textEditor'); if (te) te.contentEditable = 'true'; }
+        // Load the drawing for this note (or hide canvas if none)
+        this.loadDrawing();
 
         setTimeout(() => document.getElementById('textEditor').focus(), 100);
     }
@@ -1000,7 +1034,7 @@ class NotesApp {
 
     // ─── Insert Operations ──────────────────────────────────────────────────────
 
-    insertTable() { this.showTableModal(); }
+    insertTable() { this.saveSelection(); this.showTableModal(); }
 
     insertTodo() {
         const editor = document.getElementById('textEditor');
@@ -1079,7 +1113,9 @@ class NotesApp {
             for (let j = 0; j < cols; j++) tableHTML += '<td>Cell ' + i + ',' + (j + 1) + '</td>';
             tableHTML += '</tr>';
         }
-        tableHTML += '</table>';
+        tableHTML += '</table><br>';
+        // Restore cursor to where user was before opening the modal
+        this.restoreSelection();
         this.executeCommand('insertHTML', tableHTML);
     }
 
@@ -1090,13 +1126,22 @@ class NotesApp {
         this.isDrawMode = false;
         this.isDrawing = false;
         this.drawTool = 'pen';
+        this.drawColor = '#000000';
+        this.drawSize = 2;
 
         canvas.addEventListener('mousedown', (e) => this.startDraw(e));
         canvas.addEventListener('mousemove', (e) => this.drawLine(e));
         canvas.addEventListener('mouseup', () => this.endDraw());
         canvas.addEventListener('mouseleave', () => this.endDraw());
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); this.startDraw(e.touches[0]); }, { passive: false });
-        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); this.drawLine(e.touches[0]); }, { passive: false });
+
+        // Allow scrolling in draw mode - only prevent default when actually drawing
+        canvas.addEventListener('touchstart', (e) => {
+            this.startDraw(e.touches[0]);
+        }, { passive: true });
+        canvas.addEventListener('touchmove', (e) => {
+            if (this.isDrawing) e.preventDefault();
+            this.drawLine(e.touches[0]);
+        }, { passive: false });
         canvas.addEventListener('touchend', () => this.endDraw());
 
         const penBtn = document.getElementById('drawPenBtn');
@@ -1117,9 +1162,46 @@ class NotesApp {
         if (clearBtn) clearBtn.addEventListener('click', () => {
             const c = document.getElementById('drawingCanvas');
             if (c && this.drawCtx) this.drawCtx.clearRect(0, 0, c.width, c.height);
-            this.saveDrawing();
         });
-        if (doneBtn) doneBtn.addEventListener('click', () => this.toggleDrawMode());
+        if (doneBtn) doneBtn.addEventListener('click', () => this.finishDrawing());
+
+        // Color swatches
+        const colorPresets = document.getElementById('drawColorPresets');
+        if (colorPresets) {
+            colorPresets.addEventListener('click', (e) => {
+                const swatch = e.target.closest('.draw-color-swatch');
+                if (swatch) {
+                    this.drawColor = swatch.dataset.color;
+                    colorPresets.querySelectorAll('.draw-color-swatch').forEach(s => s.classList.remove('active'));
+                    swatch.classList.add('active');
+                }
+            });
+        }
+
+        // Custom color picker
+        const colorPicker = document.getElementById('drawColorPicker');
+        if (colorPicker) {
+            colorPicker.addEventListener('input', () => {
+                this.drawColor = colorPicker.value;
+                // Remove active from all swatches since it's a custom color
+                if (colorPresets) colorPresets.querySelectorAll('.draw-color-swatch').forEach(s => s.classList.remove('active'));
+            });
+        }
+
+        // Size preset buttons
+        const toolbar = document.getElementById('drawToolbar');
+        if (toolbar) {
+            toolbar.addEventListener('click', (e) => {
+                const sizeBtn = e.target.closest('.draw-size-btn');
+                if (sizeBtn) {
+                    this.drawSize = parseInt(sizeBtn.dataset.size);
+                    toolbar.querySelectorAll('.draw-size-btn').forEach(b => b.classList.remove('active'));
+                    sizeBtn.classList.add('active');
+                    const slider = document.getElementById('drawThickness');
+                    if (slider) slider.value = this.drawSize;
+                }
+            });
+        }
     }
 
     resizeCanvas() {
@@ -1147,19 +1229,41 @@ class NotesApp {
         const drawBtn = document.getElementById('drawBtn');
 
         if (this.isDrawMode) {
-            this.resizeCanvas();
-            if (canvas) canvas.style.pointerEvents = 'all';
-            if (textEditor) { textEditor.style.userSelect = 'none'; textEditor.contentEditable = 'false'; }
-            if (toolbar) toolbar.style.display = 'flex';
+            if (canvas) { canvas.style.pointerEvents = 'all'; canvas.style.display = 'block'; }
+            // resizeCanvas snapshots+restores existing drawing; also reload from note for safety
+            const noteForDraw = this.notes.find(n => n.id === this.currentNoteId);
+            if (noteForDraw && noteForDraw.drawing && this.drawCtx) {
+                const img = new Image();
+                img.onload = () => {
+                    this.resizeCanvas();
+                    if (this.drawCtx) this.drawCtx.drawImage(img, 0, 0);
+                };
+                img.src = noteForDraw.drawing;
+            } else {
+                this.resizeCanvas();
+            }
+            if (textEditor) { textEditor.contentEditable = 'false'; }
+            if (toolbar) toolbar.classList.add('visible');
             if (drawBtn) drawBtn.classList.add('active');
-            this.loadDrawing();
         } else {
+            // Save the drawing and keep canvas visible (pointer-events: none)
             this.saveDrawing();
-            if (canvas) canvas.style.pointerEvents = 'none';
-            if (textEditor) { textEditor.style.userSelect = ''; textEditor.contentEditable = 'true'; }
-            if (toolbar) toolbar.style.display = 'none';
+            if (canvas) {
+                canvas.style.pointerEvents = 'none';
+                // Keep visible if there's a drawing, else hide
+                const noteForDraw = this.notes.find(n => n.id === this.currentNoteId);
+                if (!noteForDraw || !noteForDraw.drawing) canvas.style.display = 'none';
+            }
+            if (textEditor) { textEditor.contentEditable = 'true'; }
+            if (toolbar) toolbar.classList.remove('visible');
             if (drawBtn) drawBtn.classList.remove('active');
         }
+    }
+
+    finishDrawing() {
+        // Save the drawing to note.drawing and exit draw mode
+        // The canvas stays visible as a persistent overlay (pointer-events: none)
+        if (this.isDrawMode) this.toggleDrawMode();
     }
 
     startDraw(e) {
@@ -1185,16 +1289,14 @@ class NotesApp {
         const scaleY = canvas.height / rect.height;
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
-        const colorPicker = document.getElementById('drawColorPicker');
-        const thicknessSlider = document.getElementById('drawThickness');
-        const thickness = parseInt(thicknessSlider ? thicknessSlider.value : 4);
+        const thickness = this.drawSize || 2;
 
         if (this.drawTool === 'eraser') {
             this.drawCtx.globalCompositeOperation = 'destination-out';
-            this.drawCtx.lineWidth = thickness * 4;
+            this.drawCtx.lineWidth = thickness * 5;
         } else {
             this.drawCtx.globalCompositeOperation = 'source-over';
-            this.drawCtx.strokeStyle = colorPicker ? colorPicker.value : '#000000';
+            this.drawCtx.strokeStyle = this.drawColor || '#000000';
             this.drawCtx.lineWidth = thickness;
         }
         this.drawCtx.lineCap = 'round';
@@ -1208,29 +1310,34 @@ class NotesApp {
     endDraw() {
         if (!this.isDrawing) return;
         this.isDrawing = false;
-        this.saveDrawing();
     }
 
     saveDrawing() {
-        const canvas = document.getElementById('drawingCanvas');
-        if (!canvas || !this.currentNoteId || !this.drawCtx) return;
+        if (!this.currentNoteId) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas || !this.drawCtx) return;
+        // Check if there's anything drawn
         const pixelData = this.drawCtx.getImageData(0, 0, canvas.width, canvas.height).data;
         const hasContent = Array.from(pixelData).some(v => v > 0);
-        note.drawing = hasContent ? canvas.toDataURL() : '';
+        note.drawing = hasContent ? canvas.toDataURL('image/png') : null;
         this.debouncedSave();
     }
 
     loadDrawing() {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas || !this.drawCtx) return;
-        const note = this.notes.find(n => n.id === this.currentNoteId);
         this.drawCtx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!this.currentNoteId) { canvas.style.display = 'none'; return; }
+        const note = this.notes.find(n => n.id === this.currentNoteId);
         if (note && note.drawing) {
+            canvas.style.display = 'block';
             const img = new Image();
             img.onload = () => { if (this.drawCtx) this.drawCtx.drawImage(img, 0, 0); };
             img.src = note.drawing;
+        } else {
+            canvas.style.display = 'none';
         }
     }
 
@@ -1383,12 +1490,20 @@ class NotesApp {
                     const value = item.dataset.value;
                     const label = item.dataset.label || item.textContent;
                     const valueSpan = btn.querySelector('.dropdown-value');
-                    if (valueSpan) valueSpan.textContent = label;
+                    // For color-only dropdowns, keep the permanent label (e.g. "Text", "Highlight")
+                    const isColorOnlyDropdown = dropdown.id === 'fontColorDropdown' || dropdown.id === 'highlightColorDropdown';
+                    if (valueSpan && !isColorOnlyDropdown) valueSpan.textContent = label;
                     const colorPreview = btn.querySelector('.color-preview');
                     if (colorPreview && value) {
-                        colorPreview.style.background = value;
-                        colorPreview.setAttribute('data-color', value);
-                        if (value === 'transparent') { colorPreview.style.border = '1px solid #ccc'; colorPreview.removeAttribute('data-color'); }
+                        if (value === 'transparent') {
+                            colorPreview.style.background = 'transparent';
+                            colorPreview.style.border = '1px solid #ccc';
+                            colorPreview.removeAttribute('data-color');
+                        } else {
+                            colorPreview.style.background = value;
+                            colorPreview.style.border = '';
+                            colorPreview.setAttribute('data-color', value);
+                        }
                     }
                     dropdown.classList.remove('active');
                     btn.setAttribute('aria-expanded', 'false');
@@ -1450,6 +1565,93 @@ class NotesApp {
 
         document.addEventListener('click', (e) => { if (!contextMenu.contains(e.target)) contextMenu.style.display = 'none'; });
         document.addEventListener('scroll', () => { contextMenu.style.display = 'none'; });
+    }
+
+    // ─── Table Toolbar ───────────────────────────────────────────────────────────
+
+    setupTableToolbar() {
+        const toolbar = document.getElementById('tableToolbar');
+        const editor = document.getElementById('textEditor');
+        if (!toolbar || !editor) return;
+
+        let activeCell = null;
+
+        // Show toolbar when user clicks inside a table cell
+        editor.addEventListener('click', (e) => {
+            const cell = e.target.closest('td, th');
+            if (cell && editor.contains(cell)) {
+                activeCell = cell;
+                toolbar.style.display = 'flex';
+                // Position toolbar above the table
+                const table = cell.closest('table');
+                const tableRect = table.getBoundingClientRect();
+                const tbH = 36;
+                let top = tableRect.top - tbH - 6;
+                if (top < 4) top = tableRect.bottom + 6;
+                toolbar.style.top = top + 'px';
+                toolbar.style.left = Math.max(4, tableRect.left) + 'px';
+            } else {
+                if (!toolbar.contains(e.target)) { toolbar.style.display = 'none'; activeCell = null; }
+            }
+        });
+
+        // Handle toolbar button actions
+        toolbar.addEventListener('click', (e) => {
+            const btn = e.target.closest('.tbl-btn');
+            if (!btn || !activeCell) return;
+            const action = btn.dataset.tbl;
+            const row = activeCell.parentElement;
+            const table = row ? row.closest('table') : null;
+            if (!table) return;
+
+            const colIndex = Array.from(row.children).indexOf(activeCell);
+
+            if (action === 'addRowAbove') {
+                const newRow = this._makeTableRow(row.cells.length, row.querySelector('th') ? 'th' : 'td');
+                row.parentNode.insertBefore(newRow, row);
+            } else if (action === 'addRowBelow') {
+                const newRow = this._makeTableRow(row.cells.length, 'td');
+                row.parentNode.insertBefore(newRow, row.nextSibling);
+            } else if (action === 'deleteRow') {
+                if (table.rows.length > 1) { row.remove(); activeCell = null; toolbar.style.display = 'none'; }
+                else { table.remove(); toolbar.style.display = 'none'; activeCell = null; }
+            } else if (action === 'addColLeft') {
+                Array.from(table.rows).forEach((r, ri) => {
+                    const cell = document.createElement(ri === 0 ? 'th' : 'td');
+                    cell.textContent = ri === 0 ? 'Header' : '';
+                    r.insertBefore(cell, r.cells[colIndex]);
+                });
+            } else if (action === 'addColRight') {
+                Array.from(table.rows).forEach((r, ri) => {
+                    const cell = document.createElement(ri === 0 ? 'th' : 'td');
+                    cell.textContent = ri === 0 ? 'Header' : '';
+                    const ref = r.cells[colIndex + 1];
+                    if (ref) r.insertBefore(cell, ref); else r.appendChild(cell);
+                });
+            } else if (action === 'deleteCol') {
+                if (row.cells.length > 1) {
+                    Array.from(table.rows).forEach(r => { if (r.cells[colIndex]) r.cells[colIndex].remove(); });
+                }
+            }
+            this.updateNoteContent();
+        });
+
+        // Hide toolbar when clicking outside editor
+        document.addEventListener('click', (e) => {
+            if (!editor.contains(e.target) && !toolbar.contains(e.target)) {
+                toolbar.style.display = 'none'; activeCell = null;
+            }
+        });
+    }
+
+    _makeTableRow(colCount, cellTag = 'td') {
+        const row = document.createElement('tr');
+        for (let i = 0; i < colCount; i++) {
+            const cell = document.createElement(cellTag);
+            cell.textContent = '';
+            row.appendChild(cell);
+        }
+        return row;
     }
 
     // ─── Note Color ──────────────────────────────────────────────────────────────
@@ -1736,15 +1938,56 @@ class NotesApp {
                 this.setupTempFormatting(span, { backgroundColor: color });
             }
         } else {
-            const span = document.createElement('span');
-            if (!isNone) span.style.backgroundColor = color;
-            try {
-                span.appendChild(range.extractContents());
-                range.insertNode(span);
-                range.selectNodeContents(span);
-                selection.removeAllRanges();
-                selection.addRange(range);
-            } catch { if (!isNone) document.execCommand('hiliteColor', false, color); }
+            if (isNone) {
+                // In-place removal: walk up ancestors and within selection to clear background-color
+                const editor = document.getElementById('textEditor');
+                const unwrapSpan = (el) => {
+                    const parent = el.parentNode;
+                    if (!parent) return;
+                    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+                    parent.removeChild(el);
+                };
+
+                // 1. Walk up ancestors of selection start to clear parent highlight spans
+                let ancestor = range.commonAncestorContainer;
+                if (ancestor.nodeType === Node.TEXT_NODE) ancestor = ancestor.parentElement;
+                let cur = ancestor;
+                while (cur && cur !== editor && cur !== document.body) {
+                    if (cur.nodeType === Node.ELEMENT_NODE && cur.style && cur.style.backgroundColor) {
+                        cur.style.removeProperty('background-color');
+                        if (cur.tagName === 'SPAN' && (!cur.getAttribute('style') || cur.getAttribute('style').trim() === '') && !cur.className) {
+                            const next = cur.parentElement;
+                            unwrapSpan(cur);
+                            cur = next;
+                            continue;
+                        }
+                    }
+                    cur = cur.parentElement;
+                }
+
+                // 2. Clear highlight from all descendant elements within the range
+                if (ancestor && ancestor !== editor) {
+                    const spans = Array.from(ancestor.querySelectorAll('span[style]'));
+                    for (let i = spans.length - 1; i >= 0; i--) {
+                        const el = spans[i];
+                        try { if (!range.intersectsNode(el)) continue; } catch { continue; }
+                        el.style.removeProperty('background-color');
+                        if (el.tagName === 'SPAN' && (!el.getAttribute('style') || el.getAttribute('style').trim() === '') && !el.className) {
+                            unwrapSpan(el);
+                        }
+                    }
+                }
+            } else {
+                const span = document.createElement('span');
+                span.style.backgroundColor = color;
+                try {
+                    span.appendChild(range.extractContents());
+                    range.insertNode(span);
+                    range.selectNodeContents(span);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                } catch { document.execCommand('hiliteColor', false, color); }
+            }
         }
         this.updateNoteContent();
     }

@@ -567,6 +567,7 @@
     flex-direction: column;
     position: relative;
     z-index: 1;
+    min-height: 0;
 }
 
 .text-editor {
@@ -586,6 +587,7 @@
     white-space: pre-wrap;
     hyphens: auto;
     position: relative;
+    min-height: 0;
 }
 
 .text-editor:focus {
@@ -1979,76 +1981,267 @@
     color: #888;
 }
 
-/* ─── Draw Toolbar ────────────────────────────────────────────────────────── */
+/* ─── Draw Toolbar (floating, toast-style) ────────────────────────────────── */
 
 .draw-toolbar {
     display: none;
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: #1a2332;
-    border-bottom: 1px solid #2a3a4a;
-    flex-wrap: wrap;
-    z-index: 20;
+    gap: 10px;
+    padding: 10px 18px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.07);
+    z-index: 9000;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    animation: drawToolbarIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.draw-toolbar.visible {
+    display: flex;
+}
+
+@keyframes drawToolbarIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.95); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);    }
+}
+
+.draw-toolbar-divider {
+    width: 1px;
+    height: 28px;
+    background: #e5e7eb;
+    flex-shrink: 0;
+    margin: 0 2px;
 }
 
 .draw-tool-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border: 1px solid #3a4a5a;
-    border-radius: 4px;
-    background: #243040;
-    color: #e0e0e0;
+    gap: 5px;
+    padding: 6px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+    color: #374151;
     cursor: pointer;
     font-size: 13px;
-    transition: background 0.15s, border-color 0.15s;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
 }
 
 .draw-tool-btn:hover {
-    background: #2e4060;
-    border-color: #5a7a9a;
+    background: #f3f4f6;
+    border-color: #d1d5db;
+    color: #111827;
 }
 
 .draw-tool-btn.active {
-    background: #2ecc71;
-    border-color: #27ae60;
-    color: #fff;
+    background: #d1fae5;
+    border-color: #2ecc71;
+    color: #065f46;
 }
 
-.draw-clear-btn { color: #e74c3c; border-color: #c0392b; }
-.draw-clear-btn:hover { background: #3a1a1a; border-color: #e74c3c; }
+.draw-clear-btn {
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+.draw-clear-btn:hover {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #b91c1c;
+}
 
-.draw-done-btn { color: #27ae60; border-color: #27ae60; }
-.draw-done-btn:hover { background: #1a3a2a; border-color: #2ecc71; }
+.draw-done-btn {
+    background: #d1fae5;
+    border-color: #2ecc71;
+    color: #065f46;
+    font-weight: 600;
+}
+.draw-done-btn:hover {
+    background: #a7f3d0;
+    border-color: #10b981;
+    color: #064e3b;
+}
 
-.draw-label {
-    font-size: 12px;
-    color: #b0b0b0;
+.draw-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 4px;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.draw-color-section, .draw-size-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.draw-color-presets {
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
+.draw-color-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.12s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.draw-color-swatch:hover {
+    transform: scale(1.15);
+}
+
+.draw-color-swatch.active {
+    border-color: #374151;
+    transform: scale(1.15);
+    box-shadow: 0 0 0 1px #fff inset;
+}
+
+.draw-color-custom {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #e5e7eb;
+    background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: transform 0.12s;
+    flex-shrink: 0;
+    color: #fff;
+}
+.draw-color-custom:hover {
+    transform: scale(1.15);
+}
+
+.draw-size-presets {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.draw-size-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, border-color 0.12s;
+    color: #374151;
+    padding: 0;
+}
+
+.draw-size-btn:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.draw-size-btn.active {
+    background: #d1fae5;
+    border-color: #2ecc71;
+    color: #065f46;
+}
+
+.draw-label {
+    font-size: 12px;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'DM Sans', sans-serif;
+}
+
 .draw-label input[type="color"] {
     width: 28px;
     height: 24px;
-    border: 1px solid #3a4a5a;
-    border-radius: 3px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
     cursor: pointer;
-    padding: 1px;
+    padding: 2px;
     background: transparent;
+}
+
+.draw-label input[type="range"] {
+    accent-color: #2ecc71;
+    vertical-align: middle;
 }
 
 /* ─── Drawing Canvas ──────────────────────────────────────────────────────── */
 
 #drawingCanvas {
-    display: block;
+    display: none;
     position: absolute;
     top: 0;
     left: 0;
     pointer-events: none;
     z-index: 10;
     cursor: crosshair;
+}
+/* ─── Table Toolbar ──────────────────────────────────────────────────────── */
+
+#tableToolbar {
+    display: none;
+    position: fixed;
+    z-index: 8000;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 4px 6px;
+    gap: 3px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.tbl-btn {
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    color: #374151;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.tbl-btn:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+}
+
+.tbl-btn-danger {
+    color: #dc2626;
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.tbl-btn-danger:hover {
+    background: #fee2e2;
+    border-color: #f87171;
 }
