@@ -56,6 +56,7 @@ class NotesApp {
         this.setupRibbon();
         this.setupMobileRibbon();
         this.setupTextEditor();
+        this.setupDrawing();
         this.renderNotesList();
         this.showWelcomeScreenIfNeeded();
         this.setupMobileUI();
@@ -597,9 +598,11 @@ class NotesApp {
         if (pasteBtn) pasteBtn.addEventListener('click', () => this.executeCommand('paste'));
 
         const insertTableBtn = document.getElementById('insertTableBtn');
-        const insertLinkBtn = document.getElementById('insertLinkBtn');
+        const insertTodoBtn = document.getElementById('insertTodoBtn');
+        const drawBtn = document.getElementById('drawBtn');
         if (insertTableBtn) insertTableBtn.addEventListener('click', () => this.insertTable());
-        if (insertLinkBtn) insertLinkBtn.addEventListener('click', () => this.insertLink());
+        if (insertTodoBtn) insertTodoBtn.addEventListener('click', () => this.insertTodo());
+        if (drawBtn) drawBtn.addEventListener('click', () => this.toggleDrawMode());
 
         const zoomInBtn = document.getElementById('zoomInBtn');
         const zoomOutBtn = document.getElementById('zoomOutBtn');
@@ -631,6 +634,20 @@ class NotesApp {
                 this.updatePlaceholderState(editor);
                 this.updateNoteContent();
             }, 10);
+        });
+
+        // Handle checkbox clicks in todo items
+        editor.addEventListener('click', (e) => {
+            if (e.target.type === 'checkbox' && e.target.closest('.todo-item')) {
+                setTimeout(() => {
+                    if (e.target.checked) {
+                        e.target.setAttribute('checked', 'checked');
+                    } else {
+                        e.target.removeAttribute('checked');
+                    }
+                    this.updateNoteContent();
+                }, 0);
+            }
         });
     }
 
@@ -666,6 +683,7 @@ class NotesApp {
             if (command === 'cut') { this.modernCut(); return; }
             if (command === 'copy') { this.modernCopy(); return; }
             if (command === 'paste') { this.modernPaste(); return; }
+            if (command === 'fontName') { this.modernFontFamily(value); return; }
             if (command === 'fontSize') { this.modernFontSize(value); return; }
             if (command === 'foreColor') { this.modernTextColor(value); return; }
             if (command === 'hiliteColor') { this.modernHighlightColor(value); return; }
@@ -712,14 +730,20 @@ class NotesApp {
 
         while (element && element !== document.getElementById('textEditor')) {
             const styles = window.getComputedStyle(element);
-            if (!fontFamily && styles.fontFamily && styles.fontFamily !== 'inherit')
-                fontFamily = styles.fontFamily.replace(/['"]/g, '');
+            if (!fontFamily && styles.fontFamily && styles.fontFamily !== 'inherit') {
+                // Extract first font name, strip quotes and fallback fonts
+                const raw = styles.fontFamily.replace(/['"]/g, '').split(',')[0].trim();
+                fontFamily = raw;
+            }
             if (!fontSize && element.style && element.style.fontSize)
                 fontSize = element.style.fontSize.replace('px', '');
             if (!textColor && element.style && element.style.color)
                 textColor = element.style.color;
             if (!backgroundColor && element.style && element.style.backgroundColor)
                 backgroundColor = element.style.backgroundColor;
+            // Also check <font> tag attributes
+            if (!textColor && element.tagName && element.tagName.toLowerCase() === 'font' && element.getAttribute('color'))
+                textColor = element.getAttribute('color');
             element = element.parentElement;
         }
 
@@ -727,15 +751,21 @@ class NotesApp {
         if (fontFamilyDropdown && fontFamily) {
             const valueSpan = fontFamilyDropdown.querySelector('.dropdown-value');
             if (valueSpan) {
-                const matchingItem = fontFamilyDropdown.querySelector(`[data-value="${fontFamily}"]`);
-                if (matchingItem) valueSpan.textContent = matchingItem.dataset.label || matchingItem.textContent;
+                // Try exact match first, then case-insensitive
+                let matchingItem = fontFamilyDropdown.querySelector(`[data-value="${fontFamily}"]`);
+                if (!matchingItem) {
+                    const lower = fontFamily.toLowerCase();
+                    matchingItem = Array.from(fontFamilyDropdown.querySelectorAll('.ms-dropdown-item'))
+                        .find(el => el.dataset.value.toLowerCase() === lower);
+                }
+                if (matchingItem) valueSpan.textContent = matchingItem.textContent.trim();
             }
         }
 
         const fontSizeDropdown = document.getElementById('fontSizeDropdown');
         if (fontSizeDropdown && fontSize) {
             const valueSpan = fontSizeDropdown.querySelector('.dropdown-value');
-            if (valueSpan) valueSpan.textContent = fontSize + 'px';
+            if (valueSpan) valueSpan.textContent = fontSize; // no 'px' suffix
         }
 
         const fontColorDropdown = document.getElementById('fontColorDropdown');
@@ -745,9 +775,17 @@ class NotesApp {
         }
 
         const highlightColorDropdown = document.getElementById('highlightColorDropdown');
-        if (highlightColorDropdown && backgroundColor) {
+        if (highlightColorDropdown) {
             const colorPreview = highlightColorDropdown.querySelector('.color-preview');
-            if (colorPreview) { colorPreview.style.background = backgroundColor; colorPreview.setAttribute('data-color', backgroundColor); }
+            if (colorPreview) {
+                if (backgroundColor && backgroundColor !== 'rgba(0, 0, 0, 0)' && backgroundColor !== 'transparent') {
+                    colorPreview.style.background = backgroundColor;
+                    colorPreview.style.border = '';
+                } else {
+                    colorPreview.style.background = 'transparent';
+                    colorPreview.style.border = '1px solid #ccc';
+                }
+            }
         }
     }
 
@@ -838,6 +876,12 @@ class NotesApp {
 
         // On mobile, close sidebar when a note is selected
         if (this.isMobile()) this.closeMobileSidebar();
+
+        // Load drawing overlay if present
+        if (this.drawCtx) {
+            this.resizeCanvas();
+            this.loadDrawing();
+        }
 
         setTimeout(() => document.getElementById('textEditor').focus(), 100);
     }
@@ -957,7 +1001,39 @@ class NotesApp {
     // ─── Insert Operations ──────────────────────────────────────────────────────
 
     insertTable() { this.showTableModal(); }
-    insertLink() { this.showLinkModal(); }
+
+    insertTodo() {
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+        const div = document.createElement('div');
+        div.className = 'todo-item';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'todo-checkbox';
+        const label = document.createElement('span');
+        label.className = 'todo-label';
+        label.textContent = ' To-do item';
+        div.appendChild(checkbox);
+        div.appendChild(label);
+        const br = document.createElement('br');
+
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(br);
+            range.insertNode(div);
+            const newRange = document.createRange();
+            newRange.selectNodeContents(label);
+            newRange.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+        } else {
+            editor.appendChild(div);
+            editor.appendChild(br);
+        }
+        this.updateNoteContent();
+    }
 
     showTableModal() {
         const modal = document.getElementById('tableModal');
@@ -1007,88 +1083,158 @@ class NotesApp {
         this.executeCommand('insertHTML', tableHTML);
     }
 
-    showLinkModal() {
-        const modal = document.getElementById('linkModal');
-        const cancelBtn = document.getElementById('linkModalCancel');
-        const createBtn = document.getElementById('linkModalCreate');
-        const urlInput = document.getElementById('linkUrl');
-        const textInput = document.getElementById('linkText');
-        if (!modal) return;
-        this.saveSelection();
-        modal.classList.add('show');
-        urlInput.value = 'https://';
-        textInput.value = '';
-        createBtn.disabled = true;
-        setTimeout(() => { urlInput.focus(); urlInput.select(); }, 100);
+    setupDrawing() {
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas) return;
+        this.drawCtx = canvas.getContext('2d');
+        this.isDrawMode = false;
+        this.isDrawing = false;
+        this.drawTool = 'pen';
 
-        const validateUrl = (url) => {
-            if (!url || url.trim() === '' || url.trim() === 'https://') return { valid: false, message: '' };
-            url = url.trim();
-            if (!url.match(/^[a-z][a-z0-9+.-]*:/i)) { url = 'https://' + url; urlInput.value = url; }
-            const dangerousSchemes = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:'];
-            for (const scheme of dangerousSchemes) {
-                if (url.toLowerCase().startsWith(scheme))
-                    return { valid: false, message: 'Unsafe URL scheme. Use http://, https://, or mailto:' };
-            }
-            if (!/^(https?|mailto):/i.test(url)) return { valid: false, message: 'Only HTTP, HTTPS, and mailto URLs allowed' };
-            try {
-                if (url.startsWith('mailto:')) {
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(url.substring(7)))
-                        return { valid: false, message: 'Invalid email address' };
-                } else {
-                    const urlObj = new URL(url);
-                    if (!urlObj.hostname) return { valid: false, message: 'Invalid URL format' };
-                }
-                return { valid: true, message: '', url };
-            } catch { return { valid: false, message: 'Invalid URL format' }; }
-        };
+        canvas.addEventListener('mousedown', (e) => this.startDraw(e));
+        canvas.addEventListener('mousemove', (e) => this.drawLine(e));
+        canvas.addEventListener('mouseup', () => this.endDraw());
+        canvas.addEventListener('mouseleave', () => this.endDraw());
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); this.startDraw(e.touches[0]); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); this.drawLine(e.touches[0]); }, { passive: false });
+        canvas.addEventListener('touchend', () => this.endDraw());
 
-        const showFeedback = (input, message, isValid) => {
-            let feedback = input.parentNode.querySelector('.validation-feedback');
-            if (!feedback) { feedback = document.createElement('div'); feedback.className = 'validation-feedback'; input.parentNode.appendChild(feedback); }
-            feedback.textContent = message;
-            feedback.className = `validation-feedback ${isValid ? 'valid' : 'invalid'}`;
-            feedback.style.display = message ? 'block' : 'none';
-        };
+        const penBtn = document.getElementById('drawPenBtn');
+        const eraserBtn = document.getElementById('drawEraserBtn');
+        const clearBtn = document.getElementById('drawClearBtn');
+        const doneBtn = document.getElementById('drawDoneBtn');
 
-        const updateBtn = () => {
-            const url = urlInput.value.trim();
-            const text = textInput.value.trim();
-            const v = validateUrl(url);
-            createBtn.disabled = !(v.valid && text);
-            if (url && url !== 'https://') showFeedback(urlInput, v.message || (v.valid ? 'Valid URL' : ''), v.valid);
-            else { const f = urlInput.parentNode.querySelector('.validation-feedback'); if (f) f.style.display = 'none'; }
-        };
-
-        const cleanup = () => {
-            modal.classList.remove('show');
-            cancelBtn.removeEventListener('click', cleanup);
-            createBtn.removeEventListener('click', handleCreate);
-            urlInput.removeEventListener('input', updateBtn);
-            textInput.removeEventListener('input', updateBtn);
-            this.restoreSelection();
-        };
-        const handleCreate = () => {
-            const url = urlInput.value.trim();
-            const text = textInput.value.trim();
-            const v = validateUrl(url);
-            if (v.valid && text) {
-                this.restoreSelection();
-                this.executeCommand('insertHTML', `<a href="${this.escapeHtml(v.url || url)}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(text)}</a>`);
-                cleanup();
-            }
-        };
-
-        cancelBtn.addEventListener('click', cleanup);
-        createBtn.addEventListener('click', handleCreate);
-        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cleanup(); });
-        urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !createBtn.disabled) handleCreate(); });
-        textInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !createBtn.disabled) handleCreate(); });
-        urlInput.addEventListener('input', updateBtn);
-        textInput.addEventListener('input', updateBtn);
-        updateBtn();
+        if (penBtn) penBtn.addEventListener('click', () => {
+            this.drawTool = 'pen';
+            penBtn.classList.add('active');
+            if (eraserBtn) eraserBtn.classList.remove('active');
+        });
+        if (eraserBtn) eraserBtn.addEventListener('click', () => {
+            this.drawTool = 'eraser';
+            eraserBtn.classList.add('active');
+            if (penBtn) penBtn.classList.remove('active');
+        });
+        if (clearBtn) clearBtn.addEventListener('click', () => {
+            const c = document.getElementById('drawingCanvas');
+            if (c && this.drawCtx) this.drawCtx.clearRect(0, 0, c.width, c.height);
+            this.saveDrawing();
+        });
+        if (doneBtn) doneBtn.addEventListener('click', () => this.toggleDrawMode());
     }
+
+    resizeCanvas() {
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas) return;
+        const container = canvas.parentElement || document.querySelector('.editor-content');
+        if (!container) return;
+        // Snapshot current drawing
+        const snapshot = this.drawCtx ? canvas.toDataURL() : null;
+        canvas.width = container.offsetWidth || container.clientWidth || 800;
+        canvas.height = Math.max(container.offsetHeight || container.clientHeight || 600, 600);
+        // Restore drawing
+        if (snapshot && this.drawCtx) {
+            const img = new Image();
+            img.onload = () => { if (this.drawCtx) this.drawCtx.drawImage(img, 0, 0); };
+            img.src = snapshot;
+        }
+    }
+
+    toggleDrawMode() {
+        this.isDrawMode = !this.isDrawMode;
+        const canvas = document.getElementById('drawingCanvas');
+        const toolbar = document.getElementById('drawToolbar');
+        const textEditor = document.getElementById('textEditor');
+        const drawBtn = document.getElementById('drawBtn');
+
+        if (this.isDrawMode) {
+            this.resizeCanvas();
+            if (canvas) canvas.style.pointerEvents = 'all';
+            if (textEditor) { textEditor.style.userSelect = 'none'; textEditor.contentEditable = 'false'; }
+            if (toolbar) toolbar.style.display = 'flex';
+            if (drawBtn) drawBtn.classList.add('active');
+            this.loadDrawing();
+        } else {
+            this.saveDrawing();
+            if (canvas) canvas.style.pointerEvents = 'none';
+            if (textEditor) { textEditor.style.userSelect = ''; textEditor.contentEditable = 'true'; }
+            if (toolbar) toolbar.style.display = 'none';
+            if (drawBtn) drawBtn.classList.remove('active');
+        }
+    }
+
+    startDraw(e) {
+        if (!this.isDrawMode || !this.drawCtx) return;
+        this.isDrawing = true;
+        const canvas = document.getElementById('drawingCanvas');
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        this.drawCtx.beginPath();
+        this.drawCtx.moveTo(x, y);
+        this.lastX = x;
+        this.lastY = y;
+    }
+
+    drawLine(e) {
+        if (!this.isDrawMode || !this.isDrawing || !this.drawCtx) return;
+        const canvas = document.getElementById('drawingCanvas');
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        const colorPicker = document.getElementById('drawColorPicker');
+        const thicknessSlider = document.getElementById('drawThickness');
+        const thickness = parseInt(thicknessSlider ? thicknessSlider.value : 4);
+
+        if (this.drawTool === 'eraser') {
+            this.drawCtx.globalCompositeOperation = 'destination-out';
+            this.drawCtx.lineWidth = thickness * 4;
+        } else {
+            this.drawCtx.globalCompositeOperation = 'source-over';
+            this.drawCtx.strokeStyle = colorPicker ? colorPicker.value : '#000000';
+            this.drawCtx.lineWidth = thickness;
+        }
+        this.drawCtx.lineCap = 'round';
+        this.drawCtx.lineJoin = 'round';
+        this.drawCtx.lineTo(x, y);
+        this.drawCtx.stroke();
+        this.lastX = x;
+        this.lastY = y;
+    }
+
+    endDraw() {
+        if (!this.isDrawing) return;
+        this.isDrawing = false;
+        this.saveDrawing();
+    }
+
+    saveDrawing() {
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas || !this.currentNoteId || !this.drawCtx) return;
+        const note = this.notes.find(n => n.id === this.currentNoteId);
+        if (!note) return;
+        const pixelData = this.drawCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+        const hasContent = Array.from(pixelData).some(v => v > 0);
+        note.drawing = hasContent ? canvas.toDataURL() : '';
+        this.debouncedSave();
+    }
+
+    loadDrawing() {
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas || !this.drawCtx) return;
+        const note = this.notes.find(n => n.id === this.currentNoteId);
+        this.drawCtx.clearRect(0, 0, canvas.width, canvas.height);
+        if (note && note.drawing) {
+            const img = new Image();
+            img.onload = () => { if (this.drawCtx) this.drawCtx.drawImage(img, 0, 0); };
+            img.src = note.drawing;
+        }
+    }
+
+
 
     zoomIn() {
         const editor = document.getElementById('textEditor');
@@ -1135,14 +1281,28 @@ class NotesApp {
 
     sanitizeHtml(html) {
         if (!html) return '';
-        const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'b', 'i', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a', 'table', 'tr', 'td', 'th'];
-        const allowedAttributes = ['style', 'href', 'target', 'rel'];
+        const allowedTags = [
+            'p', 'br', 'strong', 'em', 'u', 'b', 'i', 'ul', 'ol', 'li',
+            'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a',
+            'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'colgroup', 'col',
+            'font', 'input'
+        ];
+        const allowedAttributes = [
+            'style', 'href', 'target', 'rel',
+            'face', 'color', 'size',
+            'type', 'checked', 'class', 'data-checked',
+            'width', 'height', 'colspan', 'rowspan', 'border',
+            'cellpadding', 'cellspacing', 'align', 'valign'
+        ];
         try {
             const div = document.createElement('div');
             div.innerHTML = html;
-            div.querySelectorAll('script, iframe, object, embed, form, input, button, link, meta').forEach(el => el.remove());
+            div.querySelectorAll('script, iframe, object, embed, form, link, meta').forEach(el => el.remove());
             div.querySelectorAll('*').forEach(element => {
                 const tagName = element.tagName.toLowerCase();
+                if (tagName === 'input' && element.getAttribute('type') !== 'checkbox') {
+                    element.remove(); return;
+                }
                 if (!allowedTags.includes(tagName)) {
                     const span = document.createElement('span');
                     span.innerHTML = element.innerHTML;
@@ -1466,6 +1626,36 @@ class NotesApp {
         }
     }
 
+    modernFontFamily(font) {
+        this.restoreSelection();
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+        if (range.collapsed) {
+            const span = document.createElement('span');
+            span.style.fontFamily = font;
+            span.className = 'temp-formatting';
+            span.innerHTML = '&#8203;';
+            range.insertNode(span);
+            range.setStartAfter(span);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            this.setupTempFormatting(span, { fontFamily: font });
+        } else {
+            const span = document.createElement('span');
+            span.style.fontFamily = font;
+            try {
+                span.appendChild(range.extractContents());
+                range.insertNode(span);
+                range.selectNodeContents(span);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } catch { document.execCommand('fontName', false, font); }
+        }
+        this.updateNoteContent();
+    }
+
     modernFontSize(size) {
         this.restoreSelection();
         const selection = window.getSelection();
@@ -1493,6 +1683,7 @@ class NotesApp {
                 selection.addRange(range);
             } catch { document.execCommand('fontSize', false, size); }
         }
+        this.updateNoteContent();
     }
 
     modernTextColor(color) {
@@ -1522,6 +1713,7 @@ class NotesApp {
                 selection.addRange(range);
             } catch { document.execCommand('foreColor', false, color); }
         }
+        this.updateNoteContent();
     }
 
     modernHighlightColor(color) {
@@ -1529,28 +1721,32 @@ class NotesApp {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
         const range = selection.getRangeAt(0);
+        const isNone = !color || color === 'transparent' || color === 'none';
         if (range.collapsed) {
-            const span = document.createElement('span');
-            span.style.backgroundColor = color;
-            span.className = 'temp-formatting';
-            span.innerHTML = '&#8203;';
-            range.insertNode(span);
-            range.setStartAfter(span);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            this.setupTempFormatting(span, { backgroundColor: color });
+            if (!isNone) {
+                const span = document.createElement('span');
+                span.style.backgroundColor = color;
+                span.className = 'temp-formatting';
+                span.innerHTML = '&#8203;';
+                range.insertNode(span);
+                range.setStartAfter(span);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                this.setupTempFormatting(span, { backgroundColor: color });
+            }
         } else {
             const span = document.createElement('span');
-            span.style.backgroundColor = color;
+            if (!isNone) span.style.backgroundColor = color;
             try {
                 span.appendChild(range.extractContents());
                 range.insertNode(span);
                 range.selectNodeContents(span);
                 selection.removeAllRanges();
                 selection.addRange(range);
-            } catch { document.execCommand('hiliteColor', false, color); }
+            } catch { if (!isNone) document.execCommand('hiliteColor', false, color); }
         }
+        this.updateNoteContent();
     }
 
     insertTextAtSelection(text) {

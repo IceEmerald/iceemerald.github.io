@@ -1948,3 +1948,107 @@
         line-height: 1.5 !important;
     }
 }
+
+/* ─── To-Do Items ─────────────────────────────────────────────────────────── */
+
+.todo-item {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 2px 0;
+    padding: 1px 0;
+}
+
+.todo-checkbox {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    cursor: pointer;
+    margin-top: 2px;
+    accent-color: var(--primary-color, #2ecc71);
+}
+
+.todo-label {
+    flex: 1;
+    outline: none;
+    word-break: break-word;
+}
+
+.todo-item:has(.todo-checkbox:checked) .todo-label {
+    text-decoration: line-through;
+    color: #888;
+}
+
+/* ─── Draw Toolbar ────────────────────────────────────────────────────────── */
+
+.draw-toolbar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #1a2332;
+    border-bottom: 1px solid #2a3a4a;
+    flex-wrap: wrap;
+    z-index: 20;
+}
+
+.draw-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px solid #3a4a5a;
+    border-radius: 4px;
+    background: #243040;
+    color: #e0e0e0;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.draw-tool-btn:hover {
+    background: #2e4060;
+    border-color: #5a7a9a;
+}
+
+.draw-tool-btn.active {
+    background: #2ecc71;
+    border-color: #27ae60;
+    color: #fff;
+}
+
+.draw-clear-btn { color: #e74c3c; border-color: #c0392b; }
+.draw-clear-btn:hover { background: #3a1a1a; border-color: #e74c3c; }
+
+.draw-done-btn { color: #27ae60; border-color: #27ae60; }
+.draw-done-btn:hover { background: #1a3a2a; border-color: #2ecc71; }
+
+.draw-label {
+    font-size: 12px;
+    color: #b0b0b0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.draw-label input[type="color"] {
+    width: 28px;
+    height: 24px;
+    border: 1px solid #3a4a5a;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 1px;
+    background: transparent;
+}
+
+/* ─── Drawing Canvas ──────────────────────────────────────────────────────── */
+
+#drawingCanvas {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 10;
+    cursor: crosshair;
+}

@@ -226,11 +226,17 @@
                                                                                                                                 </svg>
                                                                                                                                 <span>Table</span>
                                                                                                                             </button>
-                                                                                                                            <button class="ribbon-btn" id="insertLinkBtn" title="Insert Link">
+                                                                                                                            <button class="ribbon-btn" id="insertTodoBtn" title="Insert To-Do Item">
                                                                                                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                                                                                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                                                                                                                    <rect x="3" y="5" width="4" height="4" rx="1"/><line x1="10" y1="7" x2="21" y2="7"/><rect x="3" y="13" width="4" height="4" rx="1"/><line x1="10" y1="15" x2="21" y2="15"/><polyline points="3,19 5,21 9,17"/>
                                                                                                                                 </svg>
-                                                                                                                                <span>Link</span>
+                                                                                                                                <span>To-Do</span>
+                                                                                                                            </button>
+                                                                                                                            <button class="ribbon-btn" id="drawBtn" title="Toggle Drawing Mode">
+                                                                                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                                                                                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                                                                                                                                </svg>
+                                                                                                                                <span>Draw</span>
                                                                                                                             </button>
                                                                                                                         </div>
                                                                                                                     </div>
@@ -303,9 +309,27 @@
                                                                                                                         </button>
                                                                                                                     </div>
                                                                                                                 </div>
+                                                                                                                <!-- Drawing Toolbar (shown in draw mode) -->
+                                                                                                                <div class="draw-toolbar" id="drawToolbar" style="display:none;">
+                                                                                                                    <button class="draw-tool-btn active" id="drawPenBtn" title="Pen">
+                                                                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                                                                                                        Pen
+                                                                                                                    </button>
+                                                                                                                    <button class="draw-tool-btn" id="drawEraserBtn" title="Eraser">
+                                                                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16l11-11 6 6-3.5 3.5"/><path d="M6.0 11.0 L13 18"/></svg>
+                                                                                                                        Eraser
+                                                                                                                    </button>
+                                                                                                                    <label class="draw-label">Color: <input type="color" id="drawColorPicker" value="#000000" title="Draw Color"></label>
+                                                                                                                    <label class="draw-label">Size: <input type="range" id="drawThickness" min="1" max="30" value="4" title="Brush Size" style="width:80px;vertical-align:middle;"></label>
+                                                                                                                    <button class="draw-tool-btn draw-clear-btn" id="drawClearBtn" title="Clear Drawing">Clear</button>
+                                                                                                                    <button class="draw-tool-btn draw-done-btn" id="drawDoneBtn" title="Exit Draw Mode">Done</button>
+                                                                                                                </div>
                                                                                                                 <div class="editor-content">
-                                                                                                                    <div class="text-editor" id="textEditor" contenteditable="true" spellcheck="true">
-                                                                                                                        <p>Start typing your note here..</p>
+                                                                                                                    <div style="position:relative;flex:1;display:flex;flex-direction:column;">
+                                                                                                                        <div class="text-editor" id="textEditor" contenteditable="true" spellcheck="true">
+                                                                                                                            <p>Start typing your note here..</p>
+                                                                                                                        </div>
+                                                                                                                        <canvas id="drawingCanvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:10;"></canvas>
                                                                                                                     </div>
                                                                                                                 </div>
 
@@ -370,30 +394,7 @@
                                                                                                         </div>
                                                                                                     </div>
 
-                                                                                                    <!-- Custom Link Insertion Modal -->
-                                                                                                    <div class="link-modal" id="linkModal">
-                                                                                                        <div class="link-modal-content">
-                                                                                                            <div class="link-modal-header">
-                                                                                                                <div class="link-modal-icon">🔗</div>
-                                                                                                                <h3 class="link-modal-title">Insert Link</h3>
-                                                                                                            </div>
-                                                                                                            <div class="link-modal-body">
-                                                                                                                <div class="link-input-group">
-                                                                                                                    <label for="linkUrl">URL:</label>
-                                                                                                                    <input type="url" id="linkUrl" placeholder="https://" value="https://" class="link-input">
-                                                                                                                    <div class="validation-feedback" style="display: none;"></div>
-                                                                                                                </div>
-                                                                                                                <div class="link-input-group">
-                                                                                                                    <label for="linkText">Link text:</label>
-                                                                                                                    <input type="text" id="linkText" placeholder="Link" value="Link" class="link-input">
-                                                                                                                </div>
-                                                                                                            </div>
-                                                                                                            <div class="link-modal-actions">
-                                                                                                                <button class="link-modal-btn link-modal-btn-cancel" id="linkModalCancel">Cancel</button>
-                                                                                                                <button class="link-modal-btn link-modal-btn-create" id="linkModalCreate">Insert Link</button>
-                                                                                                            </div>
-                                                                                                        </div>
-                                                                                                    </div>
+
 
                                                                                                     <div class="link-modal" id="exportModal">
                                                                                                         <div class="link-modal-content">
