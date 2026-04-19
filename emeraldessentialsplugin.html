@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork | Minecraft Plugin</title>
+    <meta name="description" content="Welcome to the EmeraldNetwork website, home to applications or files created by IceEmerald and developed with love.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="/assets/styles/style.css" />
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+</head>
+<body>
+
+    <!--
+        Welcome to the EmeraldNetwork Website!
+    -->
+
+        <header class="navbar sticky-top">
+            <div class="navcontainer nav-container">
+                <a href="/" class="logo">
+                    <img href="/" src="/assets/images/favicon.webp" width="30" height="30" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></img>
+                    <span href="/" class="logo-text">EmeraldNetwork</span>
+                </a>
+                        <nav class="nav-links">
+                            <a href="#about">About</a>
+                         <a href="#installation">Installation</a>
+                        </nav>
+            </div>
+        </header>
+
+
+                      <div id="custom-context-menu" class="rightclick-menu">
+                        <div class="context-section">
+                          <span class="context-title">🔧 Tools</span>
+                          <a onclick="copyTextContent()">Copy Text</a>
+                          <a onclick="copyPageLink()">Copy Page Link</a>
+                          <a onclick="showElementInfo()">Show Element Info</a>
+                        </div>
+                      </div>
+
+                      <div id="custom-toast" class="custom-toast"></div>
+
+                        
+        <main>
+            <section id="hero" class="section about-section" style="position: relative; overflow: hidden;">
+
+              <!-- Background div with image, full size and behind -->
+              <div 
+                class="hero-background" 
+                style="
+                  position: absolute;
+                  top: 0; left: 0; right: 0; bottom: 0;
+                  background-image: url('/assets/images/aurora.webp');
+                  background-size: cover;
+                  background-position: center center;
+                  z-index: -1;
+                  ">
+              </div>
+
+                <div class="container hero-container" style="position: relative; z-index: 2;">
+                    <div class="animate-on-scroll hero-content">
+                      <div style="margin-bottom: 1rem"></div>
+
+                        <h1 style="background: linear-gradient(90deg, #808080, #5a5a5a, #3a3a3a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">EmeraldEssentials</h1>
+                      <p>
+                        A streamlined plugin suite for Minecraft servers, built around essential features and refined additions that enhance your server.
+                      </p>
+                        <div>
+                            <a href="#installation" class="button" style="margin-right: 15px;">
+                                Install
+                            </a>
+                            <a href="#about" class="aboutice-link button button-outline">
+                                About
+                            </a>
+                        </div>
+                    </div>
+                    <div class="animate-on-scroll hero-image-container">
+                      <img class="show-desktop-only hover-zoom hover-img" src="/assets/images/favicon.webp" style="max-width: 300px; height: auto;">
+                    </div>
+                  </div>
+                <div style="margin-bottom: 3rem"></div>
+            </section>
+    
+            <section id="about" class="section">
+                <div class="container">
+                    <div class="section-header" style="margin-top: 3rem;">
+                        <h2 class="animate-on-scroll" style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">Make your server the best it can be.</h2>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+              <div class="container about-container" style="display: flex; align-items: stretch; justify-content: space-between; gap: 2rem; flex-direction: row-reverse;">
+                <div class="animate-on-scroll about-content" style="flex: 1;">
+                  <div style="margin-top: 3rem;"></div>
+                  <h2 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">Wide Compatibility</h2>
+                  <p>Built for nearly every platform with compatibility in mind, EmeraldEssentials works seamlessly alongside thousands of other plugins.</p>
+                </div>
+                <div class="animate-on-scroll about-image-container" style="overflow: hidden;">
+                  <img class="hover-zoom" src="/assets/images/emeraldessentialsplugin/plugin1.webp" style="max-width: 400px; height: auto;">
+                </div>
+              </div>
+            </section>
+
+            <section class="section about-section">
+              <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8rem;">
+                <div class="animate-on-scroll about-image-container" style="overflow: visible; flex-shrink: 0; max-width: 400px;">
+                  <img class="hover-zoom" src="/assets/images/emeraldessentialsplugin/plugin2.webp" style="width: 100%; height: auto;">
+                </div>
+                <div class="animate-on-scroll about-content">
+                  <h2 style="background: linear-gradient(-90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent;">Very Stable</h2>
+                  <p>Designed for stability, keeping your server running smoothly and reliably at all times.</p>
+                </div>
+              </div>
+            </section>
+
+                <div style="margin-bottom: 1rem;"> </div>
+
+            <section style="background-color: #F8F8F8" id="installation" class="section">
+                <div class="container">
+                    <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
+                            <h2 style="
+                              background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a);
+                              -webkit-background-clip: text;
+                              -webkit-text-fill-color: transparent;
+                              background-clip: text;
+                              text-fill-color: transparent;
+                            ">Installation</h2>
+                        <p>EmeraldEssentials isn’t built for casual servers. It is designed with an advanced configuration-first approach. Access and configuration are provided based on your specific requirements, contact IceEmerald in Discord to get started.</p>
+                        <div style="margin-bottom: 5rem;"></div>
+                    </div>
+                    <div class="animate-on-scroll hero-buttons" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem; justify-content: center;">
+                    <a href="https://discord.gg/CQqZ34T8Jn" class="button button-outline">
+                        Join Discord Server!
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                            <polyline points="12 5 19 12 12 19"/>
+                        </svg>
+                    </a>
+                    </div>
+                    <div class="animate-on-scroll">
+                        <div style="margin-bottom: 3rem;"></div>
+                        <div style="margin-bottom: 5rem;"></div>
+                    </div>
+                    </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="container footer-container">
+                <p>&copy; <span id="current-year"></span> EmeraldNetwork - IceEmerald</p>
+                <div class="footer-social-links">
+                     <a href="https://youtube.com/iceemerald" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="YouTube">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2A29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58z"></path>
+                             <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon>
+                         </svg>
+                     </a>
+
+                     <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                             <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+                             <line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/>
+                         </svg>
+                     </a>
+                     <a href="mailto:iceemerald23@gmail.com" class="social-icon-button-footer" aria-label="Email">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        </footer>                  
+    <script src="/assets/scripts/animationvisible.js"></script>
+    <script src="/assets/scripts/scrollice.js"></script>
+     <script src="/assets/scripts/dropdown.js"></script>
+    <script src="/assets/scripts/rightclick.js"></script>
+                        <script>
+                          if ("serviceWorker" in navigator) {
+                            navigator.serviceWorker.register("/sw.js").then(() => {
+                              console.log("Service Worker registered!");
+                            });
+                          }
+                        </script>
+
+
+</body>
+</html>
