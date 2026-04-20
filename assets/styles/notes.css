@@ -159,7 +159,8 @@
     margin-right: 0;
 }
 
-.group-label {
+.group-label,
+.font-group-label {
     font-size: 11px;
     color: rgba(44, 62, 80, 0.6);
     text-align: center;
@@ -167,6 +168,8 @@
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    pointer-events: none;
+    cursor: default;
 }
 
 .ribbon-controls {
@@ -977,6 +980,7 @@
 
     /* Uniform size for ALL action buttons */
     .action-btn,
+    .action-btntwo,
     #noteColorDropdown .ms-dropdown-btn {
         height: 36px !important;
         min-height: 36px !important;
@@ -988,7 +992,8 @@
         flex-shrink: 0 !important;
     }
 
-    .action-btn {
+    .action-btn,
+    .action-btntwo {
         padding: 0 10px;
         width: 36px;
         min-width: 36px;
@@ -1161,6 +1166,7 @@
     .editor-area,
     .editor-header,
     .action-btn,
+    .action-btntwo,
     .ms-dropdown-btn,
     .ms-dropdown-menu,
     .mobile-more-panel,
@@ -1191,13 +1197,15 @@
     .note-item              { box-shadow: none !important; }
     .note-item.active       { box-shadow: 0 0 0 2px rgba(35,154,77,0.25) !important; }
     .ribbon-btn             { box-shadow: none !important; }
-    .action-btn             { box-shadow: none !important; }
+    .action-btn,
+    .action-btntwo          { box-shadow: none !important; }
     .ms-dropdown-menu       { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
     .mobile-more-panel      { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
 
     /* ── Replace transition:all with explicit fast properties ── */
     .ribbon-btn,
     .action-btn,
+    .action-btntwo,
     .sidebar-toggle,
     .new-note-btn,
     .mobile-more-btn,
@@ -2089,6 +2097,33 @@
     gap: 2px;
 }
 
+.draw-color-section {
+    overflow: hidden;
+    max-width: 300px;
+    transition: max-width 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+    opacity: 1;
+}
+
+.draw-color-section.eraser-hidden {
+    max-width: 0;
+    opacity: 0;
+    pointer-events: none;
+    padding: 0;
+    gap: 0;
+}
+
+.draw-toolbar-divider.color-divider {
+    transition: max-width 0.3s ease, opacity 0.3s ease;
+    overflow: hidden;
+    max-width: 10px;
+    opacity: 1;
+}
+
+.draw-toolbar-divider.color-divider.eraser-hidden {
+    max-width: 0;
+    opacity: 0;
+}
+
 .draw-color-presets {
     display: flex;
     align-items: center;
@@ -2200,7 +2235,11 @@
     left: 0;
     pointer-events: none;
     z-index: 10;
-    cursor: crosshair;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z' fill='%23374151'/%3E%3C/svg%3E") 0 24, crosshair;
+}
+
+#drawingCanvas.eraser-active {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M20 20H7L3 16l11-11 6 6-3.5 3.5' stroke='%23374151' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11L13 18' stroke='%23374151' stroke-width='2' fill='none'/%3E%3C/svg%3E") 12 12, crosshair;
 }
 /* ─── Table Toolbar ──────────────────────────────────────────────────────── */
 
@@ -2244,4 +2283,201 @@
 .tbl-btn-danger:hover {
     background: #fee2e2;
     border-color: #f87171;
+}
+
+/* ─── Inserted Images ──────────────────────────────────────────────────────── */
+
+.text-editor img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    cursor: default;
+    display: inline-block;
+    vertical-align: middle;
+    transition: box-shadow 0.15s ease, outline 0.15s ease;
+}
+
+.text-editor img:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    outline: 2px solid rgba(35, 154, 77, 0.4);
+    outline-offset: 2px;
+}
+
+.text-editor img.img-selected {
+    outline: 2px solid #239a4d;
+    outline-offset: 2px;
+}
+
+/* Drag-and-drop zone highlight */
+.text-editor.drag-over {
+    outline: 3px dashed #239a4d;
+    outline-offset: -3px;
+    background: rgba(35, 154, 77, 0.04) !important;
+}
+
+/* Image resize wrapper when selected */
+.img-resize-wrapper {
+    display: inline-block;
+    position: relative;
+    line-height: 0;
+    user-select: none;
+}
+
+.img-resize-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #239a4d;
+    border: 2px solid #fff;
+    border-radius: 2px;
+    cursor: se-resize;
+    bottom: -5px;
+    right: -5px;
+    z-index: 20;
+}
+
+/* ─── Table Column Resize ─────────────────────────────────────────────────── */
+
+.text-editor table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+    position: relative;
+}
+
+.col-resize-handle {
+    position: absolute;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 5;
+    transition: background 0.15s;
+}
+
+.col-resize-handle:hover,
+.col-resize-handle.dragging {
+    background: rgba(35, 154, 77, 0.5);
+}
+
+/* ─── Table Drag / Floating ───────────────────────────────────────────────── */
+
+table.em-floating {
+    position: absolute;
+    z-index: 100;
+    cursor: move;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    border-radius: 6px;
+    border: 2px solid #239a4d;
+    min-width: 120px;
+}
+
+table.em-floating:hover {
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+}
+
+.table-drag-handle {
+    display: none;
+    position: absolute;
+    top: -26px;
+    left: 0;
+    background: #239a4d;
+    color: #fff;
+    border-radius: 5px 5px 0 0;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: move;
+    align-items: center;
+    gap: 5px;
+    user-select: none;
+    white-space: nowrap;
+    z-index: 101;
+}
+
+table.em-floating .table-drag-handle {
+    display: flex;
+}
+
+/* ─── Drawing Canvas Drag Handle ─────────────────────────────────────────── */
+
+#canvasDragHandle {
+    display: none;
+    position: absolute;
+    z-index: 20;
+    background: rgba(35, 154, 77, 0.9);
+    color: #fff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: move;
+    align-items: center;
+    gap: 5px;
+    user-select: none;
+    white-space: nowrap;
+    top: 8px;
+    right: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+#canvasDragHandle.visible {
+    display: flex;
+}
+
+/* ─── Font Dropdown Enhancements ─────────────────────────────────────────── */
+
+#fontFamilyDropdown .ms-dropdown-menu {
+    max-height: 320px;
+    overflow-y: auto;
+    min-width: 200px;
+}
+
+#mobileFontFamilyDropdown .ms-dropdown-menu {
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+/* ─── Format Button State (strikethrough, sub, sup) ─────────────────────── */
+
+#strikethroughBtn text,
+#subscriptBtn text,
+#superscriptBtn text {
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* ─── Image Insert Button ─────────────────────────────────────────────────── */
+
+#insertImageBtn {
+    position: relative;
+}
+
+/* ─── Move Table Button ───────────────────────────────────────────────────── */
+
+.tbl-btn-move {
+    color: #239a4d;
+    border-color: #a7f3c5;
+    background: #f0fdf4;
+}
+
+.tbl-btn-move:hover {
+    background: #dcfce7;
+    border-color: #6ee7b7;
+}
+
+/* ─── Canvas Visual Bug Fix ───────────────────────────────────────────────── */
+
+#drawingCanvas {
+    outline: none;
+}
+
+/* When canvas is hidden, ensure no layout space is taken */
+#drawingCanvas[style*="display: none"],
+#drawingCanvas[style*="display:none"] {
+    width: 0 !important;
+    height: 0 !important;
 }

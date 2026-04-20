@@ -57,6 +57,9 @@ class NotesApp {
         this.setupMobileRibbon();
         this.setupTextEditor();
         this.setupDrawing();
+        this.setupImageDragDrop();
+        this.setupTableResize();
+        this.setupCanvasDragHandle();
         this.renderNotesList();
         this.showWelcomeScreenIfNeeded();
         this.setupMobileUI();
@@ -101,6 +104,15 @@ class NotesApp {
             console.error('Error saving notes to storage:', error);
             this.showSaveIndicator('error');
         }
+    }
+
+    showToast(message, duration = 3000) {
+        const toast = document.getElementById('custom-toast');
+        if (!toast) { console.warn(message); return; }
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(this._toastTimer);
+        this._toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
     }
 
     showSaveIndicator(status) {
@@ -430,12 +442,38 @@ class NotesApp {
                     <span class="dropdown-value">Arial</span>
                 </button>
                 <div class="ms-dropdown-menu">
-                    <div class="ms-dropdown-item" data-value="Arial">Arial</div>
-                    <div class="ms-dropdown-item" data-value="Helvetica">Helvetica</div>
-                    <div class="ms-dropdown-item" data-value="Times New Roman">Times New Roman</div>
-                    <div class="ms-dropdown-item" data-value="Georgia">Georgia</div>
-                    <div class="ms-dropdown-item" data-value="Verdana">Verdana</div>
-                    <div class="ms-dropdown-item" data-value="Courier New">Courier New</div>
+                    <div class="ms-dropdown-item font-group-label">— Sans-Serif —</div>
+                    <div class="ms-dropdown-item" data-value="Arial" style="font-family:Arial,sans-serif;">Arial</div>
+                    <div class="ms-dropdown-item" data-value="Helvetica" style="font-family:Helvetica,sans-serif;">Helvetica</div>
+                    <div class="ms-dropdown-item" data-value="Verdana" style="font-family:Verdana,sans-serif;">Verdana</div>
+                    <div class="ms-dropdown-item" data-value="Roboto" style="font-family:Roboto,sans-serif;">Roboto</div>
+                    <div class="ms-dropdown-item" data-value="Open Sans" style="font-family:'Open Sans',sans-serif;">Open Sans</div>
+                    <div class="ms-dropdown-item" data-value="Lato" style="font-family:Lato,sans-serif;">Lato</div>
+                    <div class="ms-dropdown-item" data-value="Montserrat" style="font-family:Montserrat,sans-serif;">Montserrat</div>
+                    <div class="ms-dropdown-item" data-value="Poppins" style="font-family:Poppins,sans-serif;">Poppins</div>
+                    <div class="ms-dropdown-item" data-value="Raleway" style="font-family:Raleway,sans-serif;">Raleway</div>
+                    <div class="ms-dropdown-item" data-value="Nunito" style="font-family:Nunito,sans-serif;">Nunito</div>
+                    <div class="ms-dropdown-item" data-value="Ubuntu" style="font-family:Ubuntu,sans-serif;">Ubuntu</div>
+                    <div class="ms-dropdown-item" data-value="Mulish" style="font-family:Mulish,sans-serif;">Mulish</div>
+                    <div class="ms-dropdown-item" data-value="Oswald" style="font-family:Oswald,sans-serif;">Oswald</div>
+                    <div class="ms-dropdown-item" data-value="Quicksand" style="font-family:Quicksand,sans-serif;">Quicksand</div>
+                    <div class="ms-dropdown-item" data-value="Comfortaa" style="font-family:Comfortaa,sans-serif;">Comfortaa</div>
+                    <div class="ms-dropdown-item font-group-label">— Serif —</div>
+                    <div class="ms-dropdown-item" data-value="Georgia" style="font-family:Georgia,serif;">Georgia</div>
+                    <div class="ms-dropdown-item" data-value="Times New Roman" style="font-family:'Times New Roman',serif;">Times New Roman</div>
+                    <div class="ms-dropdown-item" data-value="Merriweather" style="font-family:Merriweather,serif;">Merriweather</div>
+                    <div class="ms-dropdown-item" data-value="Lora" style="font-family:Lora,serif;">Lora</div>
+                    <div class="ms-dropdown-item" data-value="Playfair Display" style="font-family:'Playfair Display',serif;">Playfair Display</div>
+                    <div class="ms-dropdown-item font-group-label">— Monospace —</div>
+                    <div class="ms-dropdown-item" data-value="Courier New" style="font-family:'Courier New',monospace;">Courier New</div>
+                    <div class="ms-dropdown-item" data-value="Source Code Pro" style="font-family:'Source Code Pro',monospace;">Source Code Pro</div>
+                    <div class="ms-dropdown-item" data-value="Fira Code" style="font-family:'Fira Code',monospace;">Fira Code</div>
+                    <div class="ms-dropdown-item" data-value="JetBrains Mono" style="font-family:'JetBrains Mono',monospace;">JetBrains Mono</div>
+                    <div class="ms-dropdown-item font-group-label">— Handwriting —</div>
+                    <div class="ms-dropdown-item" data-value="Dancing Script" style="font-family:'Dancing Script',cursive;">Dancing Script</div>
+                    <div class="ms-dropdown-item" data-value="Pacifico" style="font-family:Pacifico,cursive;">Pacifico</div>
+                    <div class="ms-dropdown-item" data-value="Satisfy" style="font-family:Satisfy,cursive;">Satisfy</div>
+                    <div class="ms-dropdown-item" data-value="Caveat" style="font-family:Caveat,cursive;">Caveat</div>
                 </div>
             </div>
             <div id="mobileFontSizeDropdown" class="ms-dropdown" style="margin-bottom:6px;">
@@ -554,6 +592,7 @@ class NotesApp {
                 e.stopPropagation();
                 e.preventDefault();
                 const value = item.dataset.value;
+                if (value === undefined || value === null || value === '') return; // Skip group labels
                 const label = item.dataset.label || item.textContent.trim();
                 const valueSpan = btn.querySelector('.dropdown-value');
                 if (valueSpan) valueSpan.textContent = label;
@@ -601,9 +640,20 @@ class NotesApp {
         const insertTableBtn = document.getElementById('insertTableBtn');
         const insertTodoBtn = document.getElementById('insertTodoBtn');
         const drawBtn = document.getElementById('drawBtn');
+        const insertImageBtn = document.getElementById('insertImageBtn');
+        const insertImageInput = document.getElementById('insertImageInput');
         if (insertTableBtn) insertTableBtn.addEventListener('click', () => this.insertTable());
         if (insertTodoBtn) insertTodoBtn.addEventListener('click', () => this.insertTodo());
         if (drawBtn) drawBtn.addEventListener('click', () => this.toggleDrawMode());
+        if (insertImageBtn) insertImageBtn.addEventListener('click', () => {
+            this.saveSelection();
+            if (insertImageInput) insertImageInput.click();
+        });
+        if (insertImageInput) insertImageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) { this.insertImage(file); }
+            insertImageInput.value = '';
+        });
 
         const zoomInBtn = document.getElementById('zoomInBtn');
         const zoomOutBtn = document.getElementById('zoomOutBtn');
@@ -739,7 +789,7 @@ class NotesApp {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
 
-        const commands = ['bold', 'italic', 'underline', 'justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList'];
+        const commands = ['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList'];
         commands.forEach(command => {
             const btns = document.querySelectorAll(`[data-command="${command}"]`);
             btns.forEach(btn => {
@@ -1069,6 +1119,227 @@ class NotesApp {
         this.updateNoteContent();
     }
 
+    insertImage(file) {
+        const editor = document.getElementById('textEditor');
+        if (!file || !editor) return;
+        if (!file.type.startsWith('image/')) {
+            this.showToast('Please select an image file.');
+            return;
+        }
+        const maxSize = 5 * 1024 * 1024; // 5 MB
+        if (file.size > maxSize) {
+            this.showToast('Image too large. Please use images under 5 MB.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            const img = `<img src="${dataUrl}" alt="${file.name}" style="max-width:100%;height:auto;border-radius:6px;">`;
+            this.restoreSelection();
+            // If we have a saved selection, use insertHTML; otherwise append
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+                this.executeCommand('insertHTML', img);
+            } else {
+                editor.focus();
+                this.executeCommand('insertHTML', img);
+            }
+            this.updateNoteContent();
+        };
+        reader.onerror = () => { this.showToast('Failed to read image file.'); };
+        reader.readAsDataURL(file);
+    }
+
+    setupImageDragDrop() {
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+
+        editor.addEventListener('dragover', (e) => {
+            if (e.dataTransfer && Array.from(e.dataTransfer.items).some(i => i.kind === 'file' && i.type.startsWith('image/'))) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                editor.classList.add('drag-over');
+            }
+        });
+
+        editor.addEventListener('dragleave', (e) => {
+            if (!editor.contains(e.relatedTarget)) {
+                editor.classList.remove('drag-over');
+            }
+        });
+
+        editor.addEventListener('drop', (e) => {
+            editor.classList.remove('drag-over');
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (!files) return;
+            let handled = false;
+            Array.from(files).forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    handled = true;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.insertImage(file);
+                }
+            });
+        });
+    }
+
+    setupTableResize() {
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+
+        let resizing = false;
+        let startX = 0;
+        let startW = 0;
+        let targetCell = null;
+        let nextCell = null;
+
+        editor.addEventListener('mousemove', (e) => {
+            if (resizing) return;
+            const th = e.target.closest('th, td');
+            if (!th) { editor.style.cursor = ''; return; }
+            const rect = th.getBoundingClientRect();
+            const nearRight = e.clientX > rect.right - 6 && e.clientX < rect.right + 4;
+            if (nearRight) {
+                editor.style.cursor = 'col-resize';
+            } else {
+                editor.style.cursor = '';
+            }
+        });
+
+        editor.addEventListener('mousedown', (e) => {
+            const th = e.target.closest('th, td');
+            if (!th) return;
+            const rect = th.getBoundingClientRect();
+            const nearRight = e.clientX > rect.right - 6 && e.clientX < rect.right + 4;
+            if (!nearRight) return;
+
+            e.preventDefault();
+            resizing = true;
+            startX = e.clientX;
+            targetCell = th;
+            startW = th.offsetWidth;
+            const row = th.parentElement;
+            const idx = Array.from(row.cells).indexOf(th);
+            nextCell = row.cells[idx + 1] || null;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!resizing || !targetCell) return;
+            const diff = e.clientX - startX;
+            const newW = Math.max(40, startW + diff);
+            targetCell.style.width = newW + 'px';
+            if (nextCell) nextCell.style.width = '';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!resizing) return;
+            resizing = false;
+            targetCell = null;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            this.updateNoteContent();
+        });
+    }
+
+    setupTableDrag(table) {
+        if (!table || table.dataset.dragSetup) return;
+        table.dataset.dragSetup = '1';
+
+        const dragHandle = document.createElement('div');
+        dragHandle.className = 'table-drag-handle';
+        dragHandle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5H10V7H8V5ZM14 5H16V7H14V5ZM8 11H10V13H8V11ZM14 11H16V13H14V11ZM8 17H10V19H8V17ZM14 17H16V19H14V17Z"/></svg> Move`;
+        table.style.position = 'relative';
+        table.appendChild(dragHandle);
+
+        let dragging = false;
+        let startX, startY, initLeft, initTop;
+
+        dragHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = table.getBoundingClientRect();
+            const editorRect = document.getElementById('textEditor').getBoundingClientRect();
+            initLeft = rect.left - editorRect.left;
+            initTop = rect.top - editorRect.top + document.getElementById('textEditor').scrollTop;
+            table.classList.add('em-floating');
+            table.style.left = initLeft + 'px';
+            table.style.top = initTop + 'px';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            table.style.left = (initLeft + dx) + 'px';
+            table.style.top = (initTop + dy) + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!dragging) return;
+            dragging = false;
+            document.body.style.userSelect = '';
+            this.updateNoteContent();
+        });
+    }
+
+    setupCanvasDragHandle() {
+        const canvas = document.getElementById('drawingCanvas');
+        const editorContent = canvas ? canvas.parentElement : null;
+        if (!canvas || !editorContent) return;
+
+        const handle = document.createElement('div');
+        handle.id = 'canvasDragHandle';
+        handle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5H10V7H8V5ZM14 5H16V7H14V5ZM8 11H10V13H8V11ZM14 11H16V13H14V11ZM8 17H10V19H8V17ZM14 17H16V19H14V17Z"/></svg> Move Drawing`;
+        editorContent.appendChild(handle);
+
+        let dragging = false;
+        let startX, startY, initTop = 0, initLeft = 0;
+
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            initTop = parseInt(canvas.style.top || '0') || 0;
+            initLeft = parseInt(canvas.style.left || '0') || 0;
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            canvas.style.top = (initTop + dy) + 'px';
+            canvas.style.left = (initLeft + dx) + 'px';
+            handle.style.top = (8 + initTop + dy) + 'px';
+            handle.style.right = '';
+            handle.style.left = (Math.max(8, initLeft + dx)) + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!dragging) return;
+            dragging = false;
+            document.body.style.userSelect = '';
+            this.saveDrawing();
+        });
+
+        const observer = new MutationObserver(() => {
+            const isVisible = canvas.style.display !== 'none' && !this.isDrawMode;
+            if (isVisible) {
+                handle.classList.add('visible');
+            } else {
+                handle.classList.remove('visible');
+            }
+        });
+        observer.observe(canvas, { attributes: true, attributeFilter: ['style'] });
+    }
+
     showTableModal() {
         const modal = document.getElementById('tableModal');
         const cancelBtn = document.getElementById('tableModalCancel');
@@ -1149,15 +1420,24 @@ class NotesApp {
         const clearBtn = document.getElementById('drawClearBtn');
         const doneBtn = document.getElementById('drawDoneBtn');
 
+        const colorSection = document.querySelector('.draw-color-section');
+        const colorDivider = colorSection ? colorSection.previousElementSibling : null;
+
         if (penBtn) penBtn.addEventListener('click', () => {
             this.drawTool = 'pen';
             penBtn.classList.add('active');
             if (eraserBtn) eraserBtn.classList.remove('active');
+            if (colorSection) colorSection.classList.remove('eraser-hidden');
+            if (colorDivider && colorDivider.classList.contains('color-divider')) colorDivider.classList.remove('eraser-hidden');
+            if (canvas) canvas.classList.remove('eraser-active');
         });
         if (eraserBtn) eraserBtn.addEventListener('click', () => {
             this.drawTool = 'eraser';
             eraserBtn.classList.add('active');
             if (penBtn) penBtn.classList.remove('active');
+            if (colorSection) colorSection.classList.add('eraser-hidden');
+            if (colorDivider && colorDivider.classList.contains('color-divider')) colorDivider.classList.add('eraser-hidden');
+            if (canvas) canvas.classList.add('eraser-active');
         });
         if (clearBtn) clearBtn.addEventListener('click', () => {
             const c = document.getElementById('drawingCanvas');
@@ -1392,14 +1672,15 @@ class NotesApp {
             'p', 'br', 'strong', 'em', 'u', 'b', 'i', 'ul', 'ol', 'li',
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a',
             'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'colgroup', 'col',
-            'font', 'input'
+            'font', 'input', 'img', 's', 'strike', 'sub', 'sup'
         ];
         const allowedAttributes = [
             'style', 'href', 'target', 'rel',
             'face', 'color', 'size',
             'type', 'checked', 'class', 'data-checked',
             'width', 'height', 'colspan', 'rowspan', 'border',
-            'cellpadding', 'cellspacing', 'align', 'valign'
+            'cellpadding', 'cellspacing', 'align', 'valign',
+            'src', 'alt', 'draggable'
         ];
         try {
             const div = document.createElement('div');
@@ -1418,12 +1699,16 @@ class NotesApp {
                 }
                 Array.from(element.attributes).forEach(attr => {
                     const attrName = attr.name.toLowerCase();
-                    const attrValue = attr.value.toLowerCase();
+                    const attrValue = attr.value;
+                    const attrValueLower = attrValue.toLowerCase();
                     if (attrName === 'href' && tagName === 'a') {
-                        if (attrValue.startsWith('http://') || attrValue.startsWith('https://') || attrValue.startsWith('mailto:')) return;
+                        if (attrValueLower.startsWith('http://') || attrValueLower.startsWith('https://') || attrValueLower.startsWith('mailto:')) return;
                     }
-                    if (attrName.startsWith('on') || attrName.includes('javascript:') || attrValue.includes('javascript:') ||
-                        attrName === 'src' || (attrName === 'href' && tagName !== 'a') || !allowedAttributes.includes(attrName)) {
+                    if (attrName === 'src' && tagName === 'img') {
+                        if (attrValueLower.startsWith('data:image/') || attrValueLower.startsWith('http://') || attrValueLower.startsWith('https://') || attrValueLower.startsWith('/')) return;
+                    }
+                    if (attrName.startsWith('on') || attrValueLower.includes('javascript:') ||
+                        (attrName === 'src' && tagName !== 'img') || (attrName === 'href' && tagName !== 'a') || !allowedAttributes.includes(attrName)) {
                         element.removeAttribute(attr.name);
                     }
                 });
@@ -1488,6 +1773,7 @@ class NotesApp {
                 item.addEventListener('click', (e) => {
                     e.stopPropagation(); e.preventDefault();
                     const value = item.dataset.value;
+                    if (value === undefined || value === null || value === '') return; // Skip group labels
                     const label = item.dataset.label || item.textContent;
                     const valueSpan = btn.querySelector('.dropdown-value');
                     // For color-only dropdowns, keep the permanent label (e.g. "Text", "Highlight")
@@ -1632,6 +1918,12 @@ class NotesApp {
                 if (row.cells.length > 1) {
                     Array.from(table.rows).forEach(r => { if (r.cells[colIndex]) r.cells[colIndex].remove(); });
                 }
+            } else if (action === 'moveTable') {
+                this.setupTableDrag(table);
+                toolbar.style.display = 'none';
+                activeCell = null;
+                this.showToast('Table is now draggable — grab the Move handle on the table to reposition it.');
+                return;
             }
             this.updateNoteContent();
         });
@@ -2159,4 +2451,4 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('beforeunload', () => {
     const app = window.notesApp;
     if (app && app.saveTimeout) { clearTimeout(app.saveTimeout); app.saveNotesToStorage(); }
-});
+});    
