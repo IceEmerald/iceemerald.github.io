@@ -1976,6 +1976,7 @@
     cursor: pointer;
     margin-top: 2px;
     accent-color: var(--primary-color, #2ecc71);
+    cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
 }
 
 .todo-label {

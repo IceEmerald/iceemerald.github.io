@@ -1096,7 +1096,7 @@ class NotesApp {
         checkbox.className = 'todo-checkbox';
         const label = document.createElement('span');
         label.className = 'todo-label';
-        label.textContent = ' To-do item';
+        label.textContent = ' ';
         div.appendChild(checkbox);
         div.appendChild(label);
         const br = document.createElement('br');
@@ -1377,11 +1377,11 @@ class NotesApp {
     createTable(rows, cols) {
         let tableHTML = '<table>';
         tableHTML += '<tr>';
-        for (let j = 0; j < cols; j++) tableHTML += '<th>Header ' + (j + 1) + '</th>';
+        for (let j = 0; j < cols; j++) tableHTML += '<th> </th>';
         tableHTML += '</tr>';
         for (let i = 1; i < rows; i++) {
             tableHTML += '<tr>';
-            for (let j = 0; j < cols; j++) tableHTML += '<td>Cell ' + i + ',' + (j + 1) + '</td>';
+            for (let j = 0; j < cols; j++) tableHTML += '<td> </td>';
             tableHTML += '</tr>';
         }
         tableHTML += '</table><br>';
