@@ -59,7 +59,6 @@ class NotesApp {
         this.setupDrawing();
         this.setupImageDragDrop();
         this.setupTableResize();
-        this.setupTableWrapperInteractions();
         this.setupImageInteractions();
         this.setupCanvasDragHandle();
         this.setupStatusBar();
@@ -986,8 +985,6 @@ class NotesApp {
         if (this.isDrawMode) { this.isDrawMode = false; const tb = document.getElementById('drawToolbar'); if (tb) tb.classList.remove('visible'); const db = document.getElementById('drawBtn'); if (db) db.classList.remove('active'); const te = document.getElementById('textEditor'); if (te) te.contentEditable = 'true'; }
         // Load the drawing for this note (or hide canvas if none)
         this.loadDrawing();
-        // Rewire any persisted floating tables and image wrappers
-        this._rewireTableWrappers();
         this.updateStatusBar();
 
         setTimeout(() => document.getElementById('textEditor').focus(), 100);
@@ -1097,6 +1094,9 @@ class NotesApp {
         const editorHeader = document.querySelector('.editor-header');
         const editorContent = document.querySelector('.editor-content');
         const statusbar = document.getElementById('editorStatusbar');
+        const ribbon = document.querySelector('.ribbon');
+        const sidebar = document.querySelector('.sidebar');
+        const editorArea = document.querySelector('.editor-area');
 
         if (hasNotes && this.currentNoteId) {
             welcomeScreen.classList.add('hidden');
@@ -1104,6 +1104,10 @@ class NotesApp {
             editorContent.style.display = 'flex';
             if (statusbar) statusbar.style.display = '';
             document.body.classList.remove('no-active-note');
+            // Trigger animations
+            if (ribbon) { ribbon.classList.remove('entering'); void ribbon.offsetWidth; ribbon.classList.add('entering'); }
+            if (sidebar) { sidebar.classList.remove('appearing'); void sidebar.offsetWidth; sidebar.classList.add('appearing'); }
+            if (editorArea) { editorArea.classList.remove('appearing'); void editorArea.offsetWidth; editorArea.classList.add('appearing'); }
         } else {
             welcomeScreen.classList.remove('hidden');
             editorHeader.style.display = 'none';
@@ -1111,7 +1115,10 @@ class NotesApp {
             if (statusbar) statusbar.style.display = 'none';
             document.body.classList.add('no-active-note');
             this.currentNoteId = null;
-
+            // Clear animation classes
+            if (ribbon) ribbon.classList.remove('entering');
+            if (sidebar) sidebar.classList.remove('appearing');
+            if (editorArea) editorArea.classList.remove('appearing');
             // Do NOT auto-open sidebar — user swipes right to open
         }
     }
@@ -1304,48 +1311,6 @@ class NotesApp {
         });
     }
 
-    setupTableDrag(table) {
-        if (!table) return;
-        const editor = document.getElementById('textEditor');
-        if (!editor) return;
-
-        let wrapper = table.parentElement && table.parentElement.classList.contains('em-table-wrapper')
-            ? table.parentElement : null;
-
-        if (!wrapper) {
-            wrapper = document.createElement('div');
-            wrapper.className = 'em-table-wrapper';
-            const tRect = table.getBoundingClientRect();
-            const eRect = editor.getBoundingClientRect();
-            const left = (tRect.left - eRect.left) + editor.scrollLeft;
-            const top = (tRect.top - eRect.top) + editor.scrollTop;
-            const width = table.offsetWidth || tRect.width;
-            table.parentNode.insertBefore(wrapper, table);
-            wrapper.appendChild(table);
-            wrapper.style.left = left + 'px';
-            wrapper.style.top = top + 'px';
-            wrapper.style.width = width + 'px';
-        }
-
-        // Ensure handles exist (re-create if missing — important after innerHTML reload)
-        if (!wrapper.querySelector('.em-table-drag-handle')) {
-            const dragHandle = document.createElement('div');
-            dragHandle.className = 'em-table-drag-handle';
-            dragHandle.contentEditable = 'false';
-            dragHandle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5H10V7H8V5ZM14 5H16V7H14V5ZM8 11H10V13H8V11ZM14 11H16V13H14V11ZM8 17H10V19H8V17ZM14 17H16V19H14V17Z"/></svg> Move`;
-            wrapper.appendChild(dragHandle);
-        }
-        if (!wrapper.querySelector('.em-table-resize-handle')) {
-            const rh = document.createElement('div');
-            rh.className = 'em-table-resize-handle';
-            rh.contentEditable = 'false';
-            wrapper.appendChild(rh);
-        }
-        wrapper.classList.add('em-floating');
-        wrapper.classList.add('active');
-        table.classList.add('em-floating');
-    }
-
     // ─── Status Bar (Ln, Col, Words, Characters) ─────────────────────────────
     setupStatusBar() {
         const editor = document.getElementById('textEditor');
@@ -1471,7 +1436,10 @@ class NotesApp {
         // Drag to move within the editor (HTML5 drag for caret-aware drop)
         img.draggable = true;
         img.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/em-image-id', '1');
+            if (e.dataTransfer) {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', '');
+            }
             this._draggingImg = img;
         });
         img.addEventListener('dragend', () => { this._draggingImg = null; });
@@ -1495,103 +1463,19 @@ class NotesApp {
                     const p = document.caretPositionFromPoint(e.clientX, e.clientY);
                     if (p) { range = document.createRange(); range.setStart(p.offsetNode, p.offset); }
                 }
+                const originalParent = wrap.parentNode;
+                const originalSibling = wrap.nextSibling;
                 if (range) {
+                    if (originalParent) originalParent.removeChild(wrap);
                     range.insertNode(wrap);
                     this.updateNoteContent();
+                } else if (originalParent) {
+                    originalParent.insertBefore(wrap, originalSibling);
                 }
                 this._draggingImg = null;
             });
         }
         return wrapper;
-    }
-
-    // Wire up persistent table-wrappers loaded from saved HTML
-    _rewireTableWrappers() {
-        const editor = document.getElementById('textEditor');
-        if (!editor) return;
-        editor.querySelectorAll('.em-table-wrapper').forEach(w => {
-            const t = w.querySelector('table');
-            if (t) this.setupTableDrag(t);
-        });
-    }
-
-    // Single delegated drag/resize handler (so it survives innerHTML reloads)
-    setupTableWrapperInteractions() {
-        const editor = document.getElementById('textEditor');
-        if (!editor) return;
-        let dragging = null, resizing = null;
-        let sX = 0, sY = 0, iL = 0, iT = 0, iW = 0, iH = 0;
-
-        document.addEventListener('mousedown', (e) => {
-            const dh = e.target.closest && e.target.closest('.em-table-drag-handle');
-            const rh = e.target.closest && e.target.closest('.em-table-resize-handle');
-            if (dh) {
-                const wrap = dh.closest('.em-table-wrapper');
-                if (!wrap) return;
-                e.preventDefault();
-                e.stopPropagation();
-                wrap.classList.add('active');
-                dragging = wrap;
-                sX = e.clientX; sY = e.clientY;
-                iL = parseInt(wrap.style.left || '0') || 0;
-                iT = parseInt(wrap.style.top || '0') || 0;
-                document.body.style.userSelect = 'none';
-            } else if (rh) {
-                const wrap = rh.closest('.em-table-wrapper');
-                if (!wrap) return;
-                e.preventDefault();
-                e.stopPropagation();
-                wrap.classList.add('active');
-                resizing = wrap;
-                sX = e.clientX; sY = e.clientY;
-                // Use real pixel size as the starting point so resize is stable
-                const r = wrap.getBoundingClientRect();
-                iW = r.width;
-                iH = r.height;
-                // Clear any explicit cell widths so the table can scale freely
-                const tbl = wrap.querySelector('table');
-                if (tbl) {
-                    tbl.style.width = '100%';
-                    tbl.style.height = '100%';
-                    tbl.querySelectorAll('th,td').forEach(c => { c.style.width = ''; });
-                }
-                document.body.style.cursor = 'se-resize';
-                document.body.style.userSelect = 'none';
-            }
-        }, true);
-        document.addEventListener('mousemove', (e) => {
-            if (dragging) {
-                dragging.style.left = (iL + (e.clientX - sX)) + 'px';
-                dragging.style.top = (iT + (e.clientY - sY)) + 'px';
-            } else if (resizing) {
-                const newW = Math.max(80, iW + (e.clientX - sX));
-                const newH = Math.max(40, iH + (e.clientY - sY));
-                resizing.style.width = newW + 'px';
-                resizing.style.height = newH + 'px';
-                const tbl = resizing.querySelector('table');
-                if (tbl) { tbl.style.width = '100%'; tbl.style.height = '100%'; }
-            }
-        });
-        document.addEventListener('mouseup', () => {
-            if (dragging || resizing) {
-                document.body.style.userSelect = '';
-                document.body.style.cursor = '';
-                dragging = null; resizing = null;
-                this.updateNoteContent();
-            }
-        });
-
-        // Click-outside-to-place: when the user clicks anywhere outside an
-        // active floating-table wrapper, exit "move mode" by removing the
-        // .active class so the drag/resize handles disappear. Click on the
-        // wrapper (or its handles) re-activates it.
-        document.addEventListener('mousedown', (e) => {
-            const inside = e.target.closest && e.target.closest('.em-table-wrapper');
-            document.querySelectorAll('.em-table-wrapper.active').forEach(w => {
-                if (w !== inside) w.classList.remove('active');
-            });
-            if (inside) inside.classList.add('active');
-        });
     }
 
     setupCanvasDragHandle() {
@@ -2090,8 +1974,9 @@ class NotesApp {
         if (!note) return;
 
         const bbox = this._computeDrawingBBox();
-        // Always hide the overlay canvas — drawings live inside the editor now
+        // Always hide and clear the overlay canvas — drawings live inside the editor now
         canvas.style.display = 'none';
+        if (this.drawCtx) this.drawCtx.clearRect(0, 0, canvas.width, canvas.height);
         note.drawing = null;
         this._drawingMeta = null;
 
@@ -2498,12 +2383,6 @@ class NotesApp {
                 if (row.cells.length > 1) {
                     Array.from(table.rows).forEach(r => { if (r.cells[colIndex]) r.cells[colIndex].remove(); });
                 }
-            } else if (action === 'moveTable') {
-                this.setupTableDrag(table);
-                toolbar.style.display = 'none';
-                activeCell = null;
-                this.showToast('Table is now draggable — grab the Move handle on the table to reposition it.');
-                return;
             }
             this.updateNoteContent();
         });

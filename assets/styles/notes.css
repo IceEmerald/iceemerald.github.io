@@ -82,7 +82,30 @@
     position: relative;
     z-index: 10;
     flex-shrink: 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+    transform: translateY(0);
+    will-change: transform, opacity, margin;
+}
+
+body.no-active-note .ribbon {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ribbon.entering {
+    animation: ribbonSlideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes ribbonSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .ribbon-tabs {
@@ -277,6 +300,8 @@
     display: flex;
     flex: 1;
     overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: flex;
 }
 
 /* =============================================
@@ -292,9 +317,34 @@
     flex-shrink: 0;
     border-radius: 12px 0 0 12px;
     /* Animate width only — not "all", to avoid fighting other properties */
-    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                min-width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                min-width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    opacity: 1;
+    will-change: width, opacity;
+}
+
+body.no-active-note .sidebar {
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    min-width: 0;
+}
+
+.sidebar.appearing {
+    animation: sidebarSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes sidebarSlideIn {
+    from {
+        opacity: 0;
+        width: 0;
+    }
+    to {
+        opacity: 1;
+        width: 320px;
+    }
 }
 
 .sidebar.collapsed {
@@ -414,14 +464,32 @@
     position: relative;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    opacity: 1;
+    transform: translateX(0);
+    animation: noteItemFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes noteItemFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .note-item:hover {
     background: rgba(255, 255, 255, 1);
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .note-item.active {
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.025), 0 4px 12px rgba(0, 0, 0, 0.025);
+    box-shadow: 0 4px 16px rgba(35, 154, 77, 0.15);
+    border-color: rgba(35, 154, 77, 0.2);
+    background: rgba(255, 255, 255, 1);
 }
 
 .note-item-title {
@@ -467,8 +535,30 @@
     border-radius: 12px;
     margin: 12px;
     border: 1px solid rgba(0, 0, 0, 0.05);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    will-change: flex, margin, border-radius;
+}
+
+body.no-active-note .editor-area {
+    border-radius: 0;
+    margin: 0;
+    border: none;
+}
+
+.editor-area.appearing {
+    animation: editorExpand 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes editorExpand {
+    from {
+        margin: 0;
+        border-radius: 0;
+    }
+    to {
+        margin: 12px;
+        border-radius: 12px;
+    }
 }
 
 .editor-header {
@@ -483,6 +573,19 @@
     border-radius: 0 12px 0 0;
     position: relative;
     z-index: 100;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: headerFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes headerFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .note-title {
@@ -593,7 +696,17 @@
     position: relative;
     z-index: 1;
     min-height: 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: editorContentFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+@keyframes editorContentFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 
 .text-editor {
     flex: 1;
@@ -687,58 +800,102 @@
     align-items: center;
     justify-content: center;
     flex: 1;
-    background: rgba(255, 255, 255, 0.5);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+    position: relative;
+    overflow-y: auto;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .welcome-screen.hidden {
-    display: none;
+    display: none !important;
+    pointer-events: none;
+    opacity: 0;
 }
 
 .welcome-content {
     text-align: center;
     color: #666;
+    padding: 40px 20px;
+    max-width: 600px;
+    animation: welcomeFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes welcomeFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .welcome-content img {
-    margin-bottom: 16px;
-    opacity: 0.8;
+    margin-bottom: 24px;
+    opacity: 0.9;
+    filter: drop-shadow(0 4px 12px rgba(35, 154, 77, 0.1));
+    animation: welcomeBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes welcomeBounce {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(-8px);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        opacity: 0.9;
+        transform: scale(1) translateY(0);
+    }
 }
 
 .welcome-content h2 {
     margin: 0 0 12px 0;
-    color: rgba(44, 62, 80, 0.9);
-    font-weight: 600;
+    color: rgba(44, 62, 80, 0.95);
+    font-weight: 700;
     font-family: 'DM Sans', sans-serif;
-    font-size: 28px;
+    font-size: 32px;
+    line-height: 1.3;
 }
 
 .welcome-content p {
-    margin: 0 0 32px 0;
-    color: rgba(44, 62, 80, 0.6);
+    margin: 0 0 40px 0;
+    color: rgba(44, 62, 80, 0.65);
     font-size: 16px;
     font-family: 'DM Sans', sans-serif;
+    line-height: 1.5;
 }
 
 .welcome-btn {
-    background: #239a4d;
+    background: linear-gradient(135deg, #239a4d 0%, #197138 100%);
     color: white;
     border: none;
     border-radius: 12px;
-    padding: 16px 32px;
+    padding: 16px 36px;
     font-size: 15px;
     cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 12px;
-    margin: 0 auto;
     font-weight: 600;
     font-family: 'DM Sans', sans-serif;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(35, 154, 77, 0.2);
 }
 
 .welcome-btn:hover {
-    background: #197138;
+    background: linear-gradient(135deg, #197138 0%, #0f5a2a 100%);
+    box-shadow: 0 8px 24px rgba(35, 154, 77, 0.3);
+    transform: translateY(-2px);
+}
+
+.welcome-btn:active {
+    transform: translateY(0);
 }
 
 /* =============================================
@@ -2479,18 +2636,6 @@ table.em-floating .table-drag-handle {
     position: relative;
 }
 
-/* ─── Move Table Button ───────────────────────────────────────────────────── */
-
-.tbl-btn-move {
-    color: #239a4d;
-    border-color: #a7f3c5;
-    background: #f0fdf4;
-}
-
-.tbl-btn-move:hover {
-    background: #dcfce7;
-    border-color: #6ee7b7;
-}
 
 /* ─── Canvas Visual Bug Fix ───────────────────────────────────────────────── */
 
@@ -2524,10 +2669,19 @@ table.em-floating .table-drag-handle {
 .editor-statusbar .statbar-sep  { color: #d1d5db; }
 
 /* ─── Welcome-screen state: gray ribbon out and hide status bar ─────────── */
-body.no-active-note .editor-statusbar { display: none !important; }
+body.no-active-note .editor-header,
+body.no-active-note .editor-content,
+body.no-active-note .editor-statusbar {
+    display: none !important;
+}
+body.no-active-note .welcome-screen {
+    display: flex !important;
+}
 body.no-active-note .ribbon,
 body.no-active-note .ribbon * {
     pointer-events: none !important;
+    opacity: 0.4;
+    filter: grayscale(1);
 }
 body.no-active-note .ribbon {
     opacity: 0.45;
@@ -2561,67 +2715,6 @@ body.no-active-note .ribbon {
 /* While in draw mode, the canvas covers the whole editor */
 #drawingCanvas { background: transparent; }
 
-/* ─── Floating table wrapper ──────────────────────────────────────────────── */
-.em-table-wrapper {
-    position: absolute;
-    z-index: 50;
-    background: #fff;
-    border-radius: 6px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-    border: 2px solid #239a4d;
-    min-width: 120px;
-    min-height: 48px;
-    overflow: visible;
-}
-.em-table-wrapper > table {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    border-collapse: collapse;
-}
-.em-table-wrapper .em-table-drag-handle {
-    position: absolute;
-    top: -26px;
-    left: 0;
-    background: #239a4d;
-    color: #fff;
-    border-radius: 5px 5px 0 0;
-    padding: 3px 8px;
-    font-size: 11px;
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 500;
-    cursor: move;
-    display: none;
-    align-items: center;
-    gap: 5px;
-    user-select: none;
-    white-space: nowrap;
-    z-index: 51;
-}
-.em-table-wrapper .em-table-resize-handle {
-    position: absolute;
-    right: -7px;
-    bottom: -7px;
-    width: 14px;
-    height: 14px;
-    background: #239a4d;
-    border: 2px solid #fff;
-    border-radius: 3px;
-    cursor: se-resize;
-    z-index: 51;
-    display: none;
-}
-.em-table-wrapper.active {
-    border-color: #239a4d;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.22);
-}
-.em-table-wrapper.active .em-table-drag-handle { display: flex; }
-.em-table-wrapper.active .em-table-resize-handle { display: block; }
-/* When not active the table is "placed": no handles, lighter outline */
-.em-table-wrapper:not(.active) {
-    border-color: transparent;
-    box-shadow: none;
-}
 
 /* Image resize wrapper - selected state */
 .img-resize-wrapper.selected {
