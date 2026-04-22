@@ -59,7 +59,10 @@ class NotesApp {
         this.setupDrawing();
         this.setupImageDragDrop();
         this.setupTableResize();
+        this.setupTableWrapperInteractions();
+        this.setupImageInteractions();
         this.setupCanvasDragHandle();
+        this.setupStatusBar();
         this.renderNotesList();
         this.showWelcomeScreenIfNeeded();
         this.setupMobileUI();
@@ -644,6 +647,20 @@ class NotesApp {
         const insertImageInput = document.getElementById('insertImageInput');
         if (insertTableBtn) insertTableBtn.addEventListener('click', () => this.insertTable());
         if (insertTodoBtn) insertTodoBtn.addEventListener('click', () => this.insertTodo());
+        // Save the editor selection before any toolbar button steals focus.
+        // mousedown fires before the click handler runs and before focus
+        // moves to the button, so we capture the in-editor caret first.
+        const ribbonRoot = document.querySelector('.ribbon');
+        if (ribbonRoot) {
+            ribbonRoot.addEventListener('mousedown', (e) => {
+                const editor = document.getElementById('textEditor');
+                if (!editor) return;
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+                    this.saveSelection();
+                }
+            }, true);
+        }
         if (drawBtn) drawBtn.addEventListener('click', () => this.toggleDrawMode());
         if (insertImageBtn) insertImageBtn.addEventListener('click', () => {
             this.saveSelection();
@@ -958,6 +975,9 @@ class NotesApp {
         document.getElementById('welcomeScreen').classList.add('hidden');
         document.querySelector('.editor-header').style.display = 'flex';
         document.querySelector('.editor-content').style.display = 'flex';
+        const _sb = document.getElementById('editorStatusbar');
+        if (_sb) _sb.style.display = '';
+        document.body.classList.remove('no-active-note');
 
         // On mobile, close sidebar when a note is selected
         if (this.isMobile()) this.closeMobileSidebar();
@@ -966,6 +986,9 @@ class NotesApp {
         if (this.isDrawMode) { this.isDrawMode = false; const tb = document.getElementById('drawToolbar'); if (tb) tb.classList.remove('visible'); const db = document.getElementById('drawBtn'); if (db) db.classList.remove('active'); const te = document.getElementById('textEditor'); if (te) te.contentEditable = 'true'; }
         // Load the drawing for this note (or hide canvas if none)
         this.loadDrawing();
+        // Rewire any persisted floating tables and image wrappers
+        this._rewireTableWrappers();
+        this.updateStatusBar();
 
         setTimeout(() => document.getElementById('textEditor').focus(), 100);
     }
@@ -973,7 +996,13 @@ class NotesApp {
     updateNoteTitle(title) {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (note) {
-            note.title = title || 'Untitled Note';
+            // Hard cap title to 40 chars (in case maxlength bypassed)
+            let t = (title || '').slice(0, 40);
+            if (title && title.length > 70) {
+                const titleEl = document.getElementById('noteTitle');
+                if (titleEl) titleEl.value = t;
+            }
+            note.title = t || 'Untitled Note';
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
             this.debouncedSave();
@@ -1067,15 +1096,20 @@ class NotesApp {
         const welcomeScreen = document.getElementById('welcomeScreen');
         const editorHeader = document.querySelector('.editor-header');
         const editorContent = document.querySelector('.editor-content');
+        const statusbar = document.getElementById('editorStatusbar');
 
         if (hasNotes && this.currentNoteId) {
             welcomeScreen.classList.add('hidden');
             editorHeader.style.display = 'flex';
             editorContent.style.display = 'flex';
+            if (statusbar) statusbar.style.display = '';
+            document.body.classList.remove('no-active-note');
         } else {
             welcomeScreen.classList.remove('hidden');
             editorHeader.style.display = 'none';
             editorContent.style.display = 'none';
+            if (statusbar) statusbar.style.display = 'none';
+            document.body.classList.add('no-active-note');
             this.currentNoteId = null;
 
             // Do NOT auto-open sidebar — user swipes right to open
@@ -1089,6 +1123,26 @@ class NotesApp {
     insertTodo() {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
+
+        // Make sure the cursor is inside the note editor — never replace
+        // selected text outside it (ribbon, title, sidebar, etc.).
+        const selection = window.getSelection();
+        let useRange = null;
+        if (selection && selection.rangeCount > 0) {
+            const r = selection.getRangeAt(0);
+            if (editor.contains(r.commonAncestorContainer)) {
+                useRange = r;
+            }
+        }
+        if (!useRange && this.savedSelection &&
+            editor.contains(this.savedSelection.commonAncestorContainer)) {
+            editor.focus();
+            const sel2 = window.getSelection();
+            sel2.removeAllRanges();
+            sel2.addRange(this.savedSelection.cloneRange());
+            useRange = sel2.getRangeAt(0);
+        }
+
         const div = document.createElement('div');
         div.className = 'todo-item';
         const checkbox = document.createElement('input');
@@ -1101,20 +1155,26 @@ class NotesApp {
         div.appendChild(label);
         const br = document.createElement('br');
 
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            range.deleteContents();
-            range.insertNode(br);
-            range.insertNode(div);
+        if (useRange) {
+            useRange.deleteContents();
+            useRange.insertNode(br);
+            useRange.insertNode(div);
             const newRange = document.createRange();
             newRange.selectNodeContents(label);
             newRange.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(newRange);
+            const sel3 = window.getSelection();
+            sel3.removeAllRanges();
+            sel3.addRange(newRange);
         } else {
+            editor.focus();
             editor.appendChild(div);
             editor.appendChild(br);
+            const newRange = document.createRange();
+            newRange.selectNodeContents(label);
+            newRange.collapse(false);
+            const sel4 = window.getSelection();
+            sel4.removeAllRanges();
+            sel4.addRange(newRange);
         }
         this.updateNoteContent();
     }
@@ -1245,46 +1305,292 @@ class NotesApp {
     }
 
     setupTableDrag(table) {
-        if (!table || table.dataset.dragSetup) return;
-        table.dataset.dragSetup = '1';
+        if (!table) return;
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
 
-        const dragHandle = document.createElement('div');
-        dragHandle.className = 'table-drag-handle';
-        dragHandle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5H10V7H8V5ZM14 5H16V7H14V5ZM8 11H10V13H8V11ZM14 11H16V13H14V11ZM8 17H10V19H8V17ZM14 17H16V19H14V17Z"/></svg> Move`;
-        table.style.position = 'relative';
-        table.appendChild(dragHandle);
+        let wrapper = table.parentElement && table.parentElement.classList.contains('em-table-wrapper')
+            ? table.parentElement : null;
 
-        let dragging = false;
-        let startX, startY, initLeft, initTop;
+        if (!wrapper) {
+            wrapper = document.createElement('div');
+            wrapper.className = 'em-table-wrapper';
+            const tRect = table.getBoundingClientRect();
+            const eRect = editor.getBoundingClientRect();
+            const left = (tRect.left - eRect.left) + editor.scrollLeft;
+            const top = (tRect.top - eRect.top) + editor.scrollTop;
+            const width = table.offsetWidth || tRect.width;
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+            wrapper.style.left = left + 'px';
+            wrapper.style.top = top + 'px';
+            wrapper.style.width = width + 'px';
+        }
 
-        dragHandle.addEventListener('mousedown', (e) => {
+        // Ensure handles exist (re-create if missing — important after innerHTML reload)
+        if (!wrapper.querySelector('.em-table-drag-handle')) {
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'em-table-drag-handle';
+            dragHandle.contentEditable = 'false';
+            dragHandle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5H10V7H8V5ZM14 5H16V7H14V5ZM8 11H10V13H8V11ZM14 11H16V13H14V11ZM8 17H10V19H8V17ZM14 17H16V19H14V17Z"/></svg> Move`;
+            wrapper.appendChild(dragHandle);
+        }
+        if (!wrapper.querySelector('.em-table-resize-handle')) {
+            const rh = document.createElement('div');
+            rh.className = 'em-table-resize-handle';
+            rh.contentEditable = 'false';
+            wrapper.appendChild(rh);
+        }
+        wrapper.classList.add('em-floating');
+        wrapper.classList.add('active');
+        table.classList.add('em-floating');
+    }
+
+    // ─── Status Bar (Ln, Col, Words, Characters) ─────────────────────────────
+    setupStatusBar() {
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+        const update = () => this.updateStatusBar();
+        editor.addEventListener('keyup', update);
+        editor.addEventListener('mouseup', update);
+        editor.addEventListener('input', update);
+        editor.addEventListener('focus', update);
+        document.addEventListener('selectionchange', () => {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+                update();
+            }
+        });
+        // Initial render
+        this.updateStatusBar();
+    }
+
+    updateStatusBar() {
+        const editor = document.getElementById('textEditor');
+        const lineEl = document.getElementById('statbar-line');
+        const wordsEl = document.getElementById('statbar-words');
+        const charsEl = document.getElementById('statbar-chars');
+        if (!editor || !lineEl || !wordsEl || !charsEl) return;
+
+        const text = editor.innerText || '';
+        const words = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
+        const chars = text.replace(/\r/g, '').length;
+
+        // Compute caret line/column relative to plain text content
+        let line = 1, col = 1;
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+            const range = sel.getRangeAt(0);
+            const pre = range.cloneRange();
+            pre.selectNodeContents(editor);
+            pre.setEnd(range.endContainer, range.endOffset);
+            // Approximate plain text up to the caret using a temporary container
+            const frag = pre.cloneContents();
+            const tmp = document.createElement('div');
+            tmp.appendChild(frag);
+            const before = tmp.innerText || '';
+            const lines = before.split(/\n/);
+            line = lines.length;
+            col = lines[lines.length - 1].length + 1;
+        }
+        lineEl.textContent = `Ln ${line}, Col ${col}`;
+        wordsEl.textContent = `${words} word${words === 1 ? '' : 's'}`;
+        charsEl.textContent = `${chars} character${chars === 1 ? '' : 's'}`;
+    }
+
+    // ─── Inline Image Interactions (click to select, drag, resize) ───────────
+    setupImageInteractions() {
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+
+        // Click on an image: wrap in a resize wrapper if needed and select it.
+        editor.addEventListener('click', (e) => {
+            const img = e.target && e.target.tagName === 'IMG' ? e.target : null;
+            // Clear previous selection
+            editor.querySelectorAll('.img-resize-wrapper.selected').forEach(w => {
+                if (w !== (img && img.parentElement)) w.classList.remove('selected');
+            });
+            editor.querySelectorAll('img.img-selected').forEach(i => {
+                if (i !== img) i.classList.remove('img-selected');
+            });
+            if (!img) return;
+            this._wrapImageForResize(img);
+            const wrap = img.parentElement;
+            if (wrap && wrap.classList.contains('img-resize-wrapper')) {
+                wrap.classList.add('selected');
+            }
+            img.classList.add('img-selected');
+        });
+    }
+
+    _wrapImageForResize(img) {
+        if (!img) return;
+        let wrapper = img.parentElement;
+        if (wrapper && wrapper.classList.contains('img-resize-wrapper')) return wrapper;
+        wrapper = document.createElement('span');
+        wrapper.className = 'img-resize-wrapper';
+        wrapper.contentEditable = 'false';
+        img.parentNode.insertBefore(wrapper, img);
+        wrapper.appendChild(img);
+        const handle = document.createElement('span');
+        handle.className = 'img-resize-handle';
+        wrapper.appendChild(handle);
+
+        // Resize via the corner handle
+        let resizing = false, sX = 0, sY = 0, sW = 0, sH = 0, ar = 1;
+        handle.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            dragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            const rect = table.getBoundingClientRect();
-            const editorRect = document.getElementById('textEditor').getBoundingClientRect();
-            initLeft = rect.left - editorRect.left;
-            initTop = rect.top - editorRect.top + document.getElementById('textEditor').scrollTop;
-            table.classList.add('em-floating');
-            table.style.left = initLeft + 'px';
-            table.style.top = initTop + 'px';
+            e.stopPropagation();
+            resizing = true;
+            sX = e.clientX; sY = e.clientY;
+            sW = img.offsetWidth; sH = img.offsetHeight;
+            ar = sW / Math.max(1, sH);
             document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'se-resize';
         });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!dragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            table.style.left = (initLeft + dx) + 'px';
-            table.style.top = (initTop + dy) + 'px';
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (!dragging) return;
-            dragging = false;
+        const moveH = (e) => {
+            if (!resizing) return;
+            const dx = e.clientX - sX;
+            // Maintain aspect ratio based on horizontal drag
+            const newW = Math.max(40, sW + dx);
+            const newH = Math.max(40, Math.round(newW / ar));
+            img.style.width = newW + 'px';
+            img.style.height = newH + 'px';
+            img.style.maxWidth = 'none';
+        };
+        const upH = () => {
+            if (!resizing) return;
+            resizing = false;
             document.body.style.userSelect = '';
+            document.body.style.cursor = '';
             this.updateNoteContent();
+        };
+        document.addEventListener('mousemove', moveH);
+        document.addEventListener('mouseup', upH);
+
+        // Drag to move within the editor (HTML5 drag for caret-aware drop)
+        img.draggable = true;
+        img.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/em-image-id', '1');
+            this._draggingImg = img;
+        });
+        img.addEventListener('dragend', () => { this._draggingImg = null; });
+
+        const editor = document.getElementById('textEditor');
+        if (editor && !editor.dataset.imgDropWired) {
+            editor.dataset.imgDropWired = '1';
+            editor.addEventListener('dragover', (e) => {
+                if (this._draggingImg) e.preventDefault();
+            });
+            editor.addEventListener('drop', (e) => {
+                if (!this._draggingImg) return;
+                e.preventDefault();
+                const img = this._draggingImg;
+                const wrap = img.parentElement && img.parentElement.classList.contains('img-resize-wrapper')
+                    ? img.parentElement : img;
+                let range = null;
+                if (document.caretRangeFromPoint) {
+                    range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                } else if (document.caretPositionFromPoint) {
+                    const p = document.caretPositionFromPoint(e.clientX, e.clientY);
+                    if (p) { range = document.createRange(); range.setStart(p.offsetNode, p.offset); }
+                }
+                if (range) {
+                    range.insertNode(wrap);
+                    this.updateNoteContent();
+                }
+                this._draggingImg = null;
+            });
+        }
+        return wrapper;
+    }
+
+    // Wire up persistent table-wrappers loaded from saved HTML
+    _rewireTableWrappers() {
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+        editor.querySelectorAll('.em-table-wrapper').forEach(w => {
+            const t = w.querySelector('table');
+            if (t) this.setupTableDrag(t);
+        });
+    }
+
+    // Single delegated drag/resize handler (so it survives innerHTML reloads)
+    setupTableWrapperInteractions() {
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
+        let dragging = null, resizing = null;
+        let sX = 0, sY = 0, iL = 0, iT = 0, iW = 0, iH = 0;
+
+        document.addEventListener('mousedown', (e) => {
+            const dh = e.target.closest && e.target.closest('.em-table-drag-handle');
+            const rh = e.target.closest && e.target.closest('.em-table-resize-handle');
+            if (dh) {
+                const wrap = dh.closest('.em-table-wrapper');
+                if (!wrap) return;
+                e.preventDefault();
+                e.stopPropagation();
+                wrap.classList.add('active');
+                dragging = wrap;
+                sX = e.clientX; sY = e.clientY;
+                iL = parseInt(wrap.style.left || '0') || 0;
+                iT = parseInt(wrap.style.top || '0') || 0;
+                document.body.style.userSelect = 'none';
+            } else if (rh) {
+                const wrap = rh.closest('.em-table-wrapper');
+                if (!wrap) return;
+                e.preventDefault();
+                e.stopPropagation();
+                wrap.classList.add('active');
+                resizing = wrap;
+                sX = e.clientX; sY = e.clientY;
+                // Use real pixel size as the starting point so resize is stable
+                const r = wrap.getBoundingClientRect();
+                iW = r.width;
+                iH = r.height;
+                // Clear any explicit cell widths so the table can scale freely
+                const tbl = wrap.querySelector('table');
+                if (tbl) {
+                    tbl.style.width = '100%';
+                    tbl.style.height = '100%';
+                    tbl.querySelectorAll('th,td').forEach(c => { c.style.width = ''; });
+                }
+                document.body.style.cursor = 'se-resize';
+                document.body.style.userSelect = 'none';
+            }
+        }, true);
+        document.addEventListener('mousemove', (e) => {
+            if (dragging) {
+                dragging.style.left = (iL + (e.clientX - sX)) + 'px';
+                dragging.style.top = (iT + (e.clientY - sY)) + 'px';
+            } else if (resizing) {
+                const newW = Math.max(80, iW + (e.clientX - sX));
+                const newH = Math.max(40, iH + (e.clientY - sY));
+                resizing.style.width = newW + 'px';
+                resizing.style.height = newH + 'px';
+                const tbl = resizing.querySelector('table');
+                if (tbl) { tbl.style.width = '100%'; tbl.style.height = '100%'; }
+            }
+        });
+        document.addEventListener('mouseup', () => {
+            if (dragging || resizing) {
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+                dragging = null; resizing = null;
+                this.updateNoteContent();
+            }
+        });
+
+        // Click-outside-to-place: when the user clicks anywhere outside an
+        // active floating-table wrapper, exit "move mode" by removing the
+        // .active class so the drag/resize handles disappear. Click on the
+        // wrapper (or its handles) re-activates it.
+        document.addEventListener('mousedown', (e) => {
+            const inside = e.target.closest && e.target.closest('.em-table-wrapper');
+            document.querySelectorAll('.em-table-wrapper.active').forEach(w => {
+                if (w !== inside) w.classList.remove('active');
+            });
+            if (inside) inside.classList.add('active');
         });
     }
 
@@ -1295,8 +1601,24 @@ class NotesApp {
 
         const handle = document.createElement('div');
         handle.id = 'canvasDragHandle';
-        handle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5H10V7H8V5ZM14 5H16V7H14V5ZM8 11H10V13H8V11ZM14 11H16V13H14V11ZM8 17H10V19H8V17ZM14 17H16V19H14V17Z"/></svg> Move Drawing`;
+        handle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5H10V7H8V5ZM14 5H16V7H14V5ZM8 11H10V13H8V11ZM14 11H16V13H14V11ZM8 17H10V19H8V17ZM14 17H16V19H14V17Z"/></svg> Move`;
         editorContent.appendChild(handle);
+
+        const resizeHandle = document.createElement('div');
+        resizeHandle.id = 'canvasResizeHandle';
+        editorContent.appendChild(resizeHandle);
+
+        const positionOverlays = () => {
+            const top = parseInt(canvas.style.top || '0') || 0;
+            const left = parseInt(canvas.style.left || '0') || 0;
+            const w = canvas.offsetWidth || parseInt(canvas.style.width || '0') || 0;
+            const h = canvas.offsetHeight || parseInt(canvas.style.height || '0') || 0;
+            handle.style.top = (top - 24) + 'px';
+            handle.style.left = left + 'px';
+            handle.style.right = '';
+            resizeHandle.style.top = (top + h - 8) + 'px';
+            resizeHandle.style.left = (left + w - 8) + 'px';
+        };
 
         let dragging = false;
         let startX, startY, initTop = 0, initLeft = 0;
@@ -1317,27 +1639,87 @@ class NotesApp {
             const dy = e.clientY - startY;
             canvas.style.top = (initTop + dy) + 'px';
             canvas.style.left = (initLeft + dx) + 'px';
-            handle.style.top = (8 + initTop + dy) + 'px';
-            handle.style.right = '';
-            handle.style.left = (Math.max(8, initLeft + dx)) + 'px';
+            positionOverlays();
         });
 
         document.addEventListener('mouseup', () => {
             if (!dragging) return;
             dragging = false;
             document.body.style.userSelect = '';
-            this.saveDrawing();
+            this._persistDrawingMeta();
+            this.debouncedSave();
         });
 
-        const observer = new MutationObserver(() => {
+        // Resize handle (bottom-right)
+        let resizing = false;
+        let rStartX, rStartY, rStartW = 0, rStartH = 0;
+        resizeHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            resizing = true;
+            rStartX = e.clientX;
+            rStartY = e.clientY;
+            rStartW = canvas.offsetWidth;
+            rStartH = canvas.offsetHeight;
+            document.body.style.userSelect = '';
+            document.body.style.cursor = 'se-resize';
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!resizing) return;
+            const dw = e.clientX - rStartX;
+            const dh = e.clientY - rStartY;
+            const newW = Math.max(40, rStartW + dw);
+            const newH = Math.max(40, rStartH + dh);
+            canvas.style.width = newW + 'px';
+            canvas.style.height = newH + 'px';
+            positionOverlays();
+        });
+        document.addEventListener('mouseup', () => {
+            if (!resizing) return;
+            resizing = false;
+            document.body.style.cursor = '';
+            // Re-bake the canvas bitmap to new size so rendering stays crisp
+            this._rebakeCanvasToCSSSize();
+            this._persistDrawingMeta();
+            this.debouncedSave();
+        });
+
+        const update = () => {
             const isVisible = canvas.style.display !== 'none' && !this.isDrawMode;
             if (isVisible) {
                 handle.classList.add('visible');
+                resizeHandle.classList.add('visible');
+                positionOverlays();
             } else {
                 handle.classList.remove('visible');
+                resizeHandle.classList.remove('visible');
             }
-        });
+        };
+        const observer = new MutationObserver(update);
         observer.observe(canvas, { attributes: true, attributeFilter: ['style'] });
+        this._updateCanvasOverlays = update;
+    }
+
+    _rebakeCanvasToCSSSize() {
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas || !this.drawCtx) return;
+        const dpr = window.devicePixelRatio || 1;
+        const cssW = canvas.offsetWidth || parseInt(canvas.style.width || '0') || canvas.width;
+        const cssH = canvas.offsetHeight || parseInt(canvas.style.height || '0') || canvas.height;
+        // Synchronous via offscreen canvas
+        const off = document.createElement('canvas');
+        off.width = canvas.width;
+        off.height = canvas.height;
+        off.getContext('2d').drawImage(canvas, 0, 0);
+        canvas.width = Math.max(1, Math.round(cssW * dpr));
+        canvas.height = Math.max(1, Math.round(cssH * dpr));
+        this.drawCtx.setTransform(1, 0, 0, 1, 0, 0);
+        this.drawCtx.scale(dpr, dpr);
+        this.drawCtx.imageSmoothingEnabled = true;
+        this.drawCtx.imageSmoothingQuality = 'high';
+        this.drawCtx.lineCap = 'round';
+        this.drawCtx.lineJoin = 'round';
+        this.drawCtx.clearRect(0, 0, cssW, cssH);
+        this.drawCtx.drawImage(off, 0, 0, cssW, cssH);
     }
 
     showTableModal() {
@@ -1394,11 +1776,18 @@ class NotesApp {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas) return;
         this.drawCtx = canvas.getContext('2d');
+        // Smoother lines
+        this.drawCtx.imageSmoothingEnabled = true;
+        this.drawCtx.imageSmoothingQuality = 'high';
         this.isDrawMode = false;
         this.isDrawing = false;
         this.drawTool = 'pen';
         this.drawColor = '#000000';
         this.drawSize = 2;
+        // Stroke point buffer for midpoint-quadratic smoothing
+        this._drawPoints = [];
+        // Cached drawing meta for the active note { x, y, w, h, dataUrl }
+        this._drawingMeta = null;
 
         canvas.addEventListener('mousedown', (e) => this.startDraw(e));
         canvas.addEventListener('mousemove', (e) => this.drawLine(e));
@@ -1484,19 +1873,41 @@ class NotesApp {
         }
     }
 
+    // Configure the canvas backing store for HiDPI rendering at the given
+    // CSS size (in CSS pixels). Sets a transform so all drawing commands
+    // continue to use CSS-pixel coordinates.
+    _configureCanvasForCss(cssW, cssH) {
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas || !this.drawCtx) return;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.max(1, Math.round(cssW * dpr));
+        canvas.height = Math.max(1, Math.round(cssH * dpr));
+        canvas.style.width = cssW + 'px';
+        canvas.style.height = cssH + 'px';
+        this.drawCtx.setTransform(1, 0, 0, 1, 0, 0);
+        this.drawCtx.scale(dpr, dpr);
+        this.drawCtx.imageSmoothingEnabled = true;
+        this.drawCtx.imageSmoothingQuality = 'high';
+        this.drawCtx.lineCap = 'round';
+        this.drawCtx.lineJoin = 'round';
+    }
+
     resizeCanvas() {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas) return;
         const container = canvas.parentElement || document.querySelector('.editor-content');
         if (!container) return;
-        // Snapshot current drawing
-        const snapshot = this.drawCtx ? canvas.toDataURL() : null;
-        canvas.width = container.offsetWidth || container.clientWidth || 800;
-        canvas.height = Math.max(container.offsetHeight || container.clientHeight || 600, 600);
-        // Restore drawing
+        const cssW = container.offsetWidth || container.clientWidth || 800;
+        const cssH = Math.max(container.offsetHeight || container.clientHeight || 600, 600);
+        // Snapshot current drawing first
+        let snapshot = null;
+        try { snapshot = canvas.width > 0 ? canvas.toDataURL() : null; } catch (_) {}
+        this._configureCanvasForCss(cssW, cssH);
         if (snapshot && this.drawCtx) {
             const img = new Image();
-            img.onload = () => { if (this.drawCtx) this.drawCtx.drawImage(img, 0, 0); };
+            img.onload = () => {
+                if (this.drawCtx) this.drawCtx.drawImage(img, 0, 0, cssW, cssH);
+            };
             img.src = snapshot;
         }
     }
@@ -1509,68 +1920,55 @@ class NotesApp {
         const drawBtn = document.getElementById('drawBtn');
 
         if (this.isDrawMode) {
-            if (canvas) { canvas.style.pointerEvents = 'all'; canvas.style.display = 'block'; }
-            // resizeCanvas snapshots+restores existing drawing; also reload from note for safety
-            const noteForDraw = this.notes.find(n => n.id === this.currentNoteId);
-            if (noteForDraw && noteForDraw.drawing && this.drawCtx) {
+            // Enter draw mode: expand the canvas to cover the whole editor and
+            // restore any previous drawing at its saved bbox position.
+            if (canvas) {
+                canvas.style.pointerEvents = 'all';
+                canvas.style.display = 'block';
+                canvas.style.top = '0px';
+                canvas.style.left = '0px';
+            }
+            const note = this.notes.find(n => n.id === this.currentNoteId);
+            const meta = note ? this._getDrawingMeta(note) : null;
+            this.resizeCanvas();
+            if (meta && meta.dataUrl && this.drawCtx) {
                 const img = new Image();
                 img.onload = () => {
-                    this.resizeCanvas();
-                    if (this.drawCtx) this.drawCtx.drawImage(img, 0, 0);
+                    if (!this.drawCtx) return;
+                    this.drawCtx.drawImage(img, meta.x || 0, meta.y || 0, meta.w || img.width, meta.h || img.height);
                 };
-                img.src = noteForDraw.drawing;
-            } else {
-                this.resizeCanvas();
+                img.src = meta.dataUrl;
             }
             if (textEditor) { textEditor.contentEditable = 'false'; }
             if (toolbar) toolbar.classList.add('visible');
             if (drawBtn) drawBtn.classList.add('active');
         } else {
-            // Save the drawing and keep canvas visible (pointer-events: none)
-            this.saveDrawing();
-            if (canvas) {
-                canvas.style.pointerEvents = 'none';
-                // Keep visible if there's a drawing, else hide
-                const noteForDraw = this.notes.find(n => n.id === this.currentNoteId);
-                if (!noteForDraw || !noteForDraw.drawing) canvas.style.display = 'none';
-            }
+            // Exit draw mode: crop to the bounding box of pixels drawn,
+            // shrink the canvas to that bbox and reposition it.
+            this._cropAndPersistDrawing();
+            if (canvas) { canvas.style.pointerEvents = 'none'; }
             if (textEditor) { textEditor.contentEditable = 'true'; }
             if (toolbar) toolbar.classList.remove('visible');
             if (drawBtn) drawBtn.classList.remove('active');
+            if (this._updateCanvasOverlays) this._updateCanvasOverlays();
         }
     }
 
-    finishDrawing() {
-        // Save the drawing to note.drawing and exit draw mode
-        // The canvas stays visible as a persistent overlay (pointer-events: none)
-        if (this.isDrawMode) this.toggleDrawMode();
+    finishDrawing() { if (this.isDrawMode) this.toggleDrawMode(); }
+
+    _eventToCssXY(e) {
+        const canvas = document.getElementById('drawingCanvas');
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
     startDraw(e) {
         if (!this.isDrawMode || !this.drawCtx) return;
         this.isDrawing = true;
-        const canvas = document.getElementById('drawingCanvas');
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
-        this.drawCtx.beginPath();
-        this.drawCtx.moveTo(x, y);
-        this.lastX = x;
-        this.lastY = y;
-    }
-
-    drawLine(e) {
-        if (!this.isDrawMode || !this.isDrawing || !this.drawCtx) return;
-        const canvas = document.getElementById('drawingCanvas');
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
+        const { x, y } = this._eventToCssXY(e);
+        this._drawPoints = [{ x, y }];
+        // Configure stroke style up front
         const thickness = this.drawSize || 2;
-
         if (this.drawTool === 'eraser') {
             this.drawCtx.globalCompositeOperation = 'destination-out';
             this.drawCtx.lineWidth = thickness * 5;
@@ -1579,45 +1977,227 @@ class NotesApp {
             this.drawCtx.strokeStyle = this.drawColor || '#000000';
             this.drawCtx.lineWidth = thickness;
         }
-        this.drawCtx.lineCap = 'round';
-        this.drawCtx.lineJoin = 'round';
-        this.drawCtx.lineTo(x, y);
-        this.drawCtx.stroke();
-        this.lastX = x;
-        this.lastY = y;
+        // Render a dot so single-clicks produce a visible mark
+        this.drawCtx.beginPath();
+        this.drawCtx.arc(x, y, Math.max(0.5, this.drawCtx.lineWidth / 2), 0, Math.PI * 2);
+        this.drawCtx.fillStyle = this.drawTool === 'eraser' ? '#000' : (this.drawColor || '#000000');
+        this.drawCtx.fill();
+        this.drawCtx.beginPath();
+        this.drawCtx.moveTo(x, y);
+    }
+
+    drawLine(e) {
+        if (!this.isDrawMode || !this.isDrawing || !this.drawCtx) return;
+        const { x, y } = this._eventToCssXY(e);
+        const pts = this._drawPoints;
+        pts.push({ x, y });
+        // Smooth using mid-point quadratic curves: draw from previous mid-point
+        // to current point with the previous point as the control point.
+        if (pts.length >= 3) {
+            const p0 = pts[pts.length - 3];
+            const p1 = pts[pts.length - 2];
+            const p2 = pts[pts.length - 1];
+            const mid1x = (p0.x + p1.x) / 2;
+            const mid1y = (p0.y + p1.y) / 2;
+            const mid2x = (p1.x + p2.x) / 2;
+            const mid2y = (p1.y + p2.y) / 2;
+            this.drawCtx.beginPath();
+            this.drawCtx.moveTo(mid1x, mid1y);
+            this.drawCtx.quadraticCurveTo(p1.x, p1.y, mid2x, mid2y);
+            this.drawCtx.stroke();
+        } else {
+            // Two points so far — straight segment
+            const p0 = pts[0];
+            const p1 = pts[1];
+            this.drawCtx.beginPath();
+            this.drawCtx.moveTo(p0.x, p0.y);
+            this.drawCtx.lineTo(p1.x, p1.y);
+            this.drawCtx.stroke();
+        }
     }
 
     endDraw() {
         if (!this.isDrawing) return;
         this.isDrawing = false;
+        // Draw the trailing segment so the very last pixel doesn't get cut
+        const pts = this._drawPoints;
+        if (pts.length >= 2 && this.drawCtx) {
+            const p1 = pts[pts.length - 2];
+            const p2 = pts[pts.length - 1];
+            const mx = (p1.x + p2.x) / 2;
+            const my = (p1.y + p2.y) / 2;
+            this.drawCtx.beginPath();
+            this.drawCtx.moveTo(mx, my);
+            this.drawCtx.lineTo(p2.x, p2.y);
+            this.drawCtx.stroke();
+        }
+        this._drawPoints = [];
     }
 
-    saveDrawing() {
+    // Compute a tight bounding box of non-transparent pixels and return a
+    // cropped data URL plus its position/size in CSS pixels.
+    _computeDrawingBBox() {
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas || !this.drawCtx) return null;
+        const W = canvas.width;
+        const H = canvas.height;
+        if (W === 0 || H === 0) return null;
+        let data;
+        try { data = this.drawCtx.getImageData(0, 0, W, H).data; }
+        catch (_) { return null; }
+        let minX = W, minY = H, maxX = -1, maxY = -1;
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                const a = data[(y * W + x) * 4 + 3];
+                if (a > 0) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        if (maxX < 0) return null;
+        const dpr = window.devicePixelRatio || 1;
+        // Add a small padding so strokes near the edge aren't clipped
+        const padCss = 4;
+        const padDev = Math.round(padCss * dpr);
+        const x0 = Math.max(0, minX - padDev);
+        const y0 = Math.max(0, minY - padDev);
+        const x1 = Math.min(W - 1, maxX + padDev);
+        const y1 = Math.min(H - 1, maxY + padDev);
+        const wDev = x1 - x0 + 1;
+        const hDev = y1 - y0 + 1;
+        // Crop into an offscreen canvas
+        const off = document.createElement('canvas');
+        off.width = wDev;
+        off.height = hDev;
+        off.getContext('2d').drawImage(canvas, x0, y0, wDev, hDev, 0, 0, wDev, hDev);
+        return {
+            x: x0 / dpr,
+            y: y0 / dpr,
+            w: wDev / dpr,
+            h: hDev / dpr,
+            dataUrl: off.toDataURL('image/png')
+        };
+    }
+
+    _cropAndPersistDrawing() {
+        const canvas = document.getElementById('drawingCanvas');
+        if (!canvas || !this.drawCtx) return;
+        if (!this.currentNoteId) return;
+        const note = this.notes.find(n => n.id === this.currentNoteId);
+        if (!note) return;
+
+        const bbox = this._computeDrawingBBox();
+        // Always hide the overlay canvas — drawings live inside the editor now
+        canvas.style.display = 'none';
+        note.drawing = null;
+        this._drawingMeta = null;
+
+        if (!bbox) {
+            this.debouncedSave();
+            return;
+        }
+
+        // Insert the cropped drawing as an inline image inside the editor so
+        // it scrolls with the note content and behaves like other images
+        // (drag, resize via the image-resize-wrapper).
+        const editor = document.getElementById('textEditor');
+        if (editor) {
+            const img = document.createElement('img');
+            img.src = bbox.dataUrl;
+            img.alt = 'drawing';
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.borderRadius = '6px';
+            img.setAttribute('data-drawing', '1');
+
+            // Drop the image at the saved selection if it lives in the editor;
+            // otherwise append at the end.
+            let placed = false;
+            if (this.savedSelection && editor.contains(this.savedSelection.commonAncestorContainer)) {
+                try {
+                    const range = this.savedSelection.cloneRange();
+                    range.collapse(false);
+                    range.insertNode(img);
+                    placed = true;
+                } catch (_) {}
+            }
+            if (!placed) {
+                editor.appendChild(img);
+            }
+            this.updateNoteContent();
+        }
+    }
+
+    // Save just position/size (e.g. after a drag or resize of the persisted
+    // drawing block, without re-cropping).
+    _persistDrawingMeta() {
         if (!this.currentNoteId) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
         const canvas = document.getElementById('drawingCanvas');
-        if (!canvas || !this.drawCtx) return;
-        // Check if there's anything drawn
-        const pixelData = this.drawCtx.getImageData(0, 0, canvas.width, canvas.height).data;
-        const hasContent = Array.from(pixelData).some(v => v > 0);
-        note.drawing = hasContent ? canvas.toDataURL('image/png') : null;
-        this.debouncedSave();
+        if (!canvas) return;
+        const meta = this._getDrawingMeta(note);
+        if (!meta) return;
+        const x = parseInt(canvas.style.left || '0') || 0;
+        const y = parseInt(canvas.style.top || '0') || 0;
+        const w = canvas.offsetWidth || meta.w;
+        const h = canvas.offsetHeight || meta.h;
+        // Re-bake current canvas pixels at the new size into the data URL so
+        // resize is preserved, but only when the canvas size actually changed.
+        try {
+            const dataUrl = canvas.toDataURL('image/png');
+            note.drawing = { dataUrl, x, y, w, h };
+            this._drawingMeta = note.drawing;
+        } catch (_) {
+            note.drawing = { dataUrl: meta.dataUrl, x, y, w, h };
+            this._drawingMeta = note.drawing;
+        }
+    }
+
+    // Back-compat: old notes stored note.drawing as a string (full editor-sized
+    // dataUrl). Normalize to { dataUrl, x, y, w, h }.
+    _getDrawingMeta(note) {
+        if (!note || !note.drawing) return null;
+        if (typeof note.drawing === 'string') {
+            return { dataUrl: note.drawing, x: 0, y: 0, w: null, h: null };
+        }
+        return note.drawing;
+    }
+
+    saveDrawing() {
+        // Kept for compatibility — when called outside crop flow, just persist
+        // current canvas as a meta object using current canvas position/size.
+        this._cropAndPersistDrawing();
     }
 
     loadDrawing() {
         const canvas = document.getElementById('drawingCanvas');
-        if (!canvas || !this.drawCtx) return;
-        this.drawCtx.clearRect(0, 0, canvas.width, canvas.height);
-        if (!this.currentNoteId) { canvas.style.display = 'none'; return; }
+        if (!canvas) return;
+        canvas.style.display = 'none';
+        this._drawingMeta = null;
+        if (this._updateCanvasOverlays) this._updateCanvasOverlays();
+        if (!this.currentNoteId) return;
+
+        // Migrate legacy floating drawing into the editor as an inline image.
         const note = this.notes.find(n => n.id === this.currentNoteId);
-        if (note && note.drawing) {
-            canvas.style.display = 'block';
-            const img = new Image();
-            img.onload = () => { if (this.drawCtx) this.drawCtx.drawImage(img, 0, 0); };
-            img.src = note.drawing;
-        } else {
-            canvas.style.display = 'none';
+        const meta = this._getDrawingMeta(note);
+        if (meta && meta.dataUrl) {
+            const editor = document.getElementById('textEditor');
+            if (editor) {
+                const img = document.createElement('img');
+                img.src = meta.dataUrl;
+                img.alt = 'drawing';
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                img.style.borderRadius = '6px';
+                img.setAttribute('data-drawing', '1');
+                editor.appendChild(img);
+            }
+            note.drawing = null;
+            this.updateNoteContent();
         }
     }
 
@@ -2372,14 +2952,37 @@ class NotesApp {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
         try {
-            const token = await compressToUrl(JSON.stringify({ t: note.title, c: note.content }));
-            const shareLink = `${window.location.origin}${window.location.pathname}?s=${token}`;
             const exportModal = document.getElementById('exportModal');
             const exportLink = document.getElementById('exportLink');
             const cancelBtn = document.getElementById('exportModalCancel');
             const copyBtn = document.getElementById('exportModalCopy');
             if (!exportModal) return;
             this.saveSelection();
+
+            // Reject notes whose raw payload would produce an unreasonably long URL.
+            // 1,500,000 characters is the cap set in the UI.
+            const MAX_CHARS = 1500000;
+            const payloadLength = (note.title || '').length + (note.content || '').length;
+            if (payloadLength > MAX_CHARS) {
+                exportModal.classList.add('show');
+                exportLink.value = 'This note is too long to share with a link.';
+                exportLink.readOnly = true;
+                exportLink.select();
+                if (copyBtn) copyBtn.disabled = true;
+                const cleanupTooLong = () => {
+                    exportModal.classList.remove('show');
+                    if (copyBtn) copyBtn.disabled = false;
+                    cancelBtn.removeEventListener('click', cleanupTooLong);
+                    if (copyBtn) copyBtn.removeEventListener('click', cleanupTooLong);
+                };
+                cancelBtn.addEventListener('click', cleanupTooLong);
+                if (copyBtn) copyBtn.addEventListener('click', cleanupTooLong);
+                return;
+            }
+            if (copyBtn) copyBtn.disabled = false;
+
+            const token = await compressToUrl(JSON.stringify({ t: note.title, c: note.content }));
+            const shareLink = `${window.location.origin}${window.location.pathname}?s=${token}`;
             exportModal.classList.add('show');
             exportLink.value = shareLink;
             exportLink.select();
