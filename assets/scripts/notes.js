@@ -971,6 +971,7 @@ class NotesApp {
             item.classList.toggle('active', item.dataset.noteId === noteId);
         });
 
+        const wasWelcome = document.body.classList.contains('no-active-note');
         document.getElementById('welcomeScreen').classList.add('hidden');
         document.querySelector('.editor-header').style.display = 'flex';
         document.querySelector('.editor-content').style.display = 'flex';
@@ -978,12 +979,14 @@ class NotesApp {
         if (_sb) _sb.style.display = '';
         document.body.classList.remove('no-active-note');
 
-        // Trigger ribbon slide-down animation
-        const ribbon = document.querySelector('.ribbon');
-        if (ribbon) {
-            ribbon.classList.remove('entering');
-            void ribbon.offsetWidth; // Force reflow to restart animation
-            ribbon.classList.add('entering');
+        // Only animate the ribbon when opening from the welcome screen
+        if (wasWelcome) {
+            const ribbon = document.querySelector('.ribbon');
+            if (ribbon) {
+                ribbon.classList.remove('entering');
+                void ribbon.offsetWidth; // Force reflow to restart animation
+                ribbon.classList.add('entering');
+            }
         }
 
         // On mobile, close sidebar when a note is selected
