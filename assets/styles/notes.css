@@ -473,13 +473,12 @@ body.no-active-note .sidebar {
     padding: 16px 20px;
     margin-bottom: 8px;
     cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     opacity: 1;
     transform: translateX(0);
-    animation: noteItemFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes noteItemFadeIn {
