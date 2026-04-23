@@ -308,7 +308,8 @@ body.no-active-note .ribbon {
     overflow: hidden;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: flex;
-    background: transparent;
+    background: #F5F5F5;
+    position: relative;
 }
 
 /* =============================================
@@ -809,8 +810,13 @@ body.no-active-note .editor-area {
     justify-content: center;
     flex: 1;
     width: 100%;
-    background: linear-gradient(135deg, #f0f8ff 0%, #e8f4fb 100%);
-    position: relative;
+    height: 100%;
+    background: #F5F5F5;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     overflow-y: auto;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
