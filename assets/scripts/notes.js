@@ -978,6 +978,14 @@ class NotesApp {
         if (_sb) _sb.style.display = '';
         document.body.classList.remove('no-active-note');
 
+        // Trigger ribbon slide-down animation
+        const ribbon = document.querySelector('.ribbon');
+        if (ribbon) {
+            ribbon.classList.remove('entering');
+            void ribbon.offsetWidth; // Force reflow to restart animation
+            ribbon.classList.add('entering');
+        }
+
         // On mobile, close sidebar when a note is selected
         if (this.isMobile()) this.closeMobileSidebar();
 
