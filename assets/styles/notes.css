@@ -919,7 +919,7 @@ body.no-active-note .editor-area {
 }
 
 .create-note-btn {
-    background: linear-gradient(135deg, #239a4d 0%, #197138 100%);
+    background: #239a4d;
     color: white;
     border: none;
     border-radius: 8px;
@@ -929,7 +929,7 @@ body.no-active-note .editor-area {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-weight: 600;
+    font-weight: 500;
     font-family: 'DM Sans', sans-serif;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
