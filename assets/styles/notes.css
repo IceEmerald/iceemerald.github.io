@@ -1097,9 +1097,10 @@ body.no-active-note .editor-area {
 }
 
 .no-notes-icon {
-    font-size: 64px;
-    color: rgba(44, 62, 80, 0.15);
+    font-size: 128px;
+    color: rgba(150, 111, 80, 0.15);
     line-height: 1;
+    font-weight: 1000;
 }
 
 .no-notes-container p {
