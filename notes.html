@@ -379,15 +379,29 @@
                                                                                                                 <!-- Welcome screen for when no note is selected -->
                                                                                                                 <div class="welcome-screen" id="welcomeScreen">
                                                                                                                     <div class="welcome-content">
-                                                                                                                        <img src="/assets/images/favicon.webp" width="64" height="64" alt="EmeraldNotes">
-                                                                                                                        <h2>Welcome to EmeraldNetwork Notes</h2>
-                                                                                                                        <p>Create your first note to get started</p>
-                                                                                                                        <button class="welcome-btn" id="welcomeNewNoteBtn">
-                                                                                                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                                                                                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                                                                                                                            </svg>
-                                                                                                                            Create New Note
-                                                                                                                        </button>
+                                                                                                                        <div class="welcome-header">
+                                                                                                                            <img src="/assets/images/favicon.webp" width="64" height="64" alt="EmeraldNetwork" class="welcome-logo">
+                                                                                                                            <h1>Welcome to EmeraldNetwork Notes!</h1>
+                                                                                                                        </div>
+                                                                                                                        <div class="notes-section">
+                                                                                                                            <div class="section-title">
+                                                                                                                                <h3>Your notes</h3>
+                                                                                                                                <button class="create-note-btn" id="welcomeNewNoteBtn" title="Create New Note">
+                                                                                                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                                                                                                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                                                                                                                    </svg>
+                                                                                                                                    Create New Note
+                                                                                                                                </button>
+                                                                                                                            </div>
+                                                                                                                            <div class="notes-list-display" id="notesListDisplay">
+                                                                                                                                <!-- Notes will be displayed as cards here -->
+                                                                                                                            </div>
+                                                                                                                            <div class="no-notes-container" id="noNotesContainer">
+                                                                                                                                <div class="no-notes-icon">?</div>
+                                                                                                                                <p>No notes created.</p>
+                                                                                                                                <p class="no-notes-hint">Create your first note to get started</p>
+                                                                                                                            </div>
+                                                                                                                        </div>
                                                                                                                     </div>
                                                                                                                 </div>
                                                                                                             </main>

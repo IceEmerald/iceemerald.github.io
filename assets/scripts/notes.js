@@ -63,6 +63,7 @@ class NotesApp {
         this.setupCanvasDragHandle();
         this.setupStatusBar();
         this.renderNotesList();
+        this.renderNotesCards();
         this.showWelcomeScreenIfNeeded();
         this.setupMobileUI();
         this.setupSwipeGesture();
@@ -928,6 +929,7 @@ class NotesApp {
         this.notes.unshift(note);
         this.selectNote(note.id);
         this.renderNotesList();
+        this.renderNotesCards();
         this.debouncedSave();
 
         setTimeout(() => {
@@ -1013,6 +1015,7 @@ class NotesApp {
             note.title = t || 'Untitled Note';
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
+            this.renderNotesCards();
             this.debouncedSave();
         }
     }
@@ -1025,6 +1028,7 @@ class NotesApp {
             note.content = this.isEditorEmpty(textEditor) ? '' : content;
             note.modifiedAt = new Date().toISOString();
             this.renderNotesList();
+            this.renderNotesCards();
             this.debouncedSave();
         }
     }
@@ -1054,6 +1058,7 @@ class NotesApp {
 
             this.saveNotesToStorage();
             this.renderNotesList();
+            this.renderNotesCards();
         });
     }
 
@@ -1099,6 +1104,61 @@ class NotesApp {
         return div;
     }
 
+    renderNotesCards() {
+        const notesListDisplay = document.getElementById('notesListDisplay');
+        const noNotesContainer = document.getElementById('noNotesContainer');
+        
+        if (!notesListDisplay) return;
+        
+        notesListDisplay.innerHTML = '';
+        
+        if (this.notes.length === 0) {
+            notesListDisplay.style.display = 'none';
+            noNotesContainer.style.display = 'flex';
+            return;
+        }
+        
+        notesListDisplay.style.display = 'grid';
+        noNotesContainer.style.display = 'none';
+        
+        const colorClasses = ['pink', 'blue', 'green', 'yellow', 'purple'];
+        
+        this.notes.forEach((note, index) => {
+            const card = document.createElement('div');
+            card.className = 'note-card';
+            card.dataset.noteId = note.id;
+            
+            // Assign color based on index
+            const colorClass = colorClasses[index % colorClasses.length];
+            card.classList.add(colorClass);
+            
+            // Extract preview text
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = note.content;
+            const plainText = tempDiv.textContent || tempDiv.innerText || '';
+            const preview = plainText.substring(0, 100);
+            
+            // Format date
+            const date = new Date(note.modifiedAt);
+            const formattedDate = this.formatDate(date);
+            
+            // Create title - default to "Untitled Note" if empty
+            const title = note.title || 'Untitled Note';
+            
+            card.innerHTML = `
+                <h4 class="note-card-title">${this.escapeHtml(title)}</h4>
+                <p class="note-card-preview">${this.escapeHtml(preview)}</p>
+                <p class="note-card-date">${formattedDate}</p>
+            `;
+            
+            card.addEventListener('click', () => {
+                this.selectNote(note.id);
+            });
+            
+            notesListDisplay.appendChild(card);
+        });
+    }
+
     showWelcomeScreenIfNeeded() {
         const hasNotes = this.notes.length > 0;
         const welcomeScreen = document.getElementById('welcomeScreen');
@@ -1130,6 +1190,8 @@ class NotesApp {
             if (ribbon) ribbon.classList.remove('entering');
             if (sidebar) sidebar.classList.remove('appearing');
             if (editorArea) editorArea.classList.remove('appearing');
+            // Render notes cards on welcome screen
+            this.renderNotesCards();
             // Do NOT auto-open sidebar — user swipes right to open
         }
     }
@@ -2425,6 +2487,7 @@ class NotesApp {
         note.color = color;
         this.debouncedSave();
         this.renderNotesList();
+        this.renderNotesCards();
         const textEditor = document.getElementById('textEditor');
         if (textEditor) {
             textEditor.style.backgroundColor = color === '#ffffff' ? 'rgba(255, 255, 255, 0.5)' : color;
@@ -2914,6 +2977,7 @@ class NotesApp {
             this.notes.unshift(newNote);
             this.selectNote(newNote.id);
             this.renderNotesList();
+            this.renderNotesCards();
             this.saveNotesToStorage();
             window.history.replaceState({}, document.title, window.location.pathname);
             setTimeout(() => this.showImportModal(data.t || 'Untitled'), 150);
