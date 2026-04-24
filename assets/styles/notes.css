@@ -812,13 +812,13 @@ body.no-active-note .editor-area {
 /* Welcome Screen */
 .welcome-screen {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
     flex: 1;
     width: 100%;
     background: linear-gradient(135deg, #ffffff 0%, #fcfffc 100%);
     position: relative;
-    overflow-y: auto;
+    overflow: hidden;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -829,13 +829,15 @@ body.no-active-note .editor-area {
 }
 
 .welcome-content {
-    padding: 60px 40px;
-    max-width: 1000px;
+    padding: 40px;
+    max-width: 1200px;
     width: 100%;
     animation: welcomeFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
-    gap: 40px;
+    gap: 24px;
+    height: 100%;
+    overflow: hidden;
 }
 
 @keyframes welcomeFadeIn {
@@ -852,15 +854,21 @@ body.no-active-note .editor-area {
 .welcome-header {
     display: flex;
     flex-direction: column;
+    gap: 24px;
+    flex-shrink: 0;
+}
+
+.welcome-header-top {
+    display: flex;
     align-items: center;
-    gap: 20px;
-    text-align: center;
+    gap: 24px;
 }
 
 .welcome-logo {
     opacity: 0.9;
     filter: drop-shadow(0 4px 12px rgba(35, 154, 77, 0.15));
     animation: welcomeBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    flex-shrink: 0;
 }
 
 @keyframes welcomeBounce {
@@ -889,7 +897,9 @@ body.no-active-note .editor-area {
 .notes-section {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
+    flex: 1;
+    overflow: hidden;
 }
 
 .section-title {
@@ -897,11 +907,12 @@ body.no-active-note .editor-area {
     justify-content: space-between;
     align-items: center;
     gap: 16px;
+    flex-shrink: 0;
 }
 
 .section-title h3 {
     margin: 0;
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 600;
     color: rgba(44, 62, 80, 0.9);
     font-family: 'DM Sans', sans-serif;
@@ -925,6 +936,7 @@ body.no-active-note .editor-area {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 4px 16px rgba(35, 154, 77, 0.2);
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .create-note-btn:hover {
@@ -940,9 +952,29 @@ body.no-active-note .editor-area {
 
 .notes-list-display {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
-    min-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 8px;
+    flex: 1;
+}
+
+.notes-list-display::-webkit-scrollbar {
+    width: 8px;
+}
+
+.notes-list-display::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.notes-list-display::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.notes-list-display::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
 }
 
 .note-card {
@@ -960,6 +992,7 @@ body.no-active-note .editor-area {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     position: relative;
     overflow: hidden;
+    min-height: 120px;
 }
 
 .note-card::before {
@@ -1037,7 +1070,7 @@ body.no-active-note .editor-area {
     margin: 0;
     line-height: 1.4;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-family: 'DM Sans', sans-serif;
@@ -1049,6 +1082,7 @@ body.no-active-note .editor-area {
     color: rgba(44, 62, 80, 0.5);
     margin: 0;
     font-family: 'DM Sans', sans-serif;
+    margin-top: auto;
 }
 
 .no-notes-container {
@@ -2915,3 +2949,60 @@ body.no-active-note .ribbon {
     outline-offset: 2px;
 }
 .img-resize-wrapper > img { display: block; cursor: move; }
+
+/* ─── Responsive Grid Layout ──────────────────────────────────────────────── */
+
+@media (max-width: 1400px) {
+    .notes-list-display {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .notes-list-display {
+        grid-template-columns: 1fr;
+    }
+    
+    .welcome-content {
+        padding: 30px;
+    }
+    
+    .welcome-header-top {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .welcome-header h1 {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 640px) {
+    .welcome-content {
+        padding: 20px;
+        gap: 16px;
+    }
+    
+    .welcome-header {
+        gap: 16px;
+    }
+    
+    .welcome-logo {
+        width: 48px;
+        height: 48px;
+    }
+    
+    .welcome-header h1 {
+        font-size: 24px;
+    }
+    
+    .section-title {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .create-note-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}

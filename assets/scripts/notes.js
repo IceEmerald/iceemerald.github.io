@@ -1128,9 +1128,13 @@ class NotesApp {
             card.className = 'note-card';
             card.dataset.noteId = note.id;
             
-            // Assign color based on index
-            const colorClass = colorClasses[index % colorClasses.length];
-            card.classList.add(colorClass);
+            // Only apply color if the note has a color set AND it's not white (#ffffff)
+            if (note.color && note.color !== '#ffffff') {
+                const colorIndex = this.getColorClassFromHex(note.color);
+                if (colorIndex !== -1) {
+                    card.classList.add(colorClasses[colorIndex]);
+                }
+            }
             
             // Extract preview text
             const tempDiv = document.createElement('div');
@@ -1157,6 +1161,17 @@ class NotesApp {
             
             notesListDisplay.appendChild(card);
         });
+    }
+
+    getColorClassFromHex(hex) {
+        const colorMap = {
+            '#ffe4e1': 0, // pink
+            '#e6f3ff': 1, // blue
+            '#e8f5e8': 2, // green
+            '#fff9e6': 3, // yellow
+            '#f3e6ff': 4  // purple
+        };
+        return colorMap[hex] !== undefined ? colorMap[hex] : -1;
     }
 
     showWelcomeScreenIfNeeded() {
