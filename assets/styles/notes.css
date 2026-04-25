@@ -1363,6 +1363,7 @@ body.no-active-note .editor-area {
     /* Uniform size for ALL action buttons */
     .action-btn,
     .action-btntwo,
+    .action-btnthree,
     #noteColorDropdown .ms-dropdown-btn {
         height: 36px !important;
         min-height: 36px !important;
@@ -1375,7 +1376,8 @@ body.no-active-note .editor-area {
     }
 
     .action-btn,
-    .action-btntwo {
+    .action-btntwo,
+    .action-btnthree {
         padding: 0 10px;
         width: 36px;
         min-width: 36px;
