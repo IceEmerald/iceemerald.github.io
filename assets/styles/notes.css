@@ -676,14 +676,14 @@ body.no-active-note .editor-area {
     background: rgba(255, 255, 255, 0.8);
     border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 8px;
-    padding: 12px;
+    padding: 8px;
     cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
-    color: rgb(73, 79, 43, 0.7);
+    color: rgba(44, 62, 80, 0.7);
     transition: all 0.2s ease;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    height: 48px;
+    height: 36px;
     box-sizing: border-box;
 }
 
