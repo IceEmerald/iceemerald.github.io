@@ -676,18 +676,23 @@ body.no-active-note .editor-area {
     background: rgba(255, 255, 255, 0.8);
     border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 8px;
-        padding: 12px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
-        color: rgba(44, 62, 80, 0.7);
-        transition: all 0.2s ease;
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        height: 48px;
-    background: rgb(217, 220, 56, 0.2);
-    border-color: #c9dc38;
-    color: #b9bc2f;
-    box-shadow: 0 2px 6px rgb(217, 220, 56, 0.2);
+    padding: 12px;
+    cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+    color: rgba(44, 62, 80, 0.7);
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    height: 48px;
+    color: rgba(44, 62, 80, 0.7);
+    box-shadow: 0 2px 6px rgb(217, 220, 56, 0.05);
+}
+
+.action-btnthree:hover {
+    background: rgba(217, 220, 56, 0.2);
+    border-color: #c3dc38;
+    color: #dcd138;
+    box-shadow: 0 2px 6px rgba(220, 190, 56, 0.2);
 }
 
 
