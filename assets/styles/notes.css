@@ -994,17 +994,6 @@ body.no-active-note .editor-area {
     min-height: 120px;
 }
 
-.note-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: inherit;
-    border-radius: 12px 12px 0 0;
-}
-
 .note-card.pink {
     background: #ffe4e1;
 }
