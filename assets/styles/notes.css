@@ -957,7 +957,6 @@ body.no-active-note .editor-area {
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 8px;
-    flex: 1;
 }
 
 .notes-list-display::-webkit-scrollbar {
