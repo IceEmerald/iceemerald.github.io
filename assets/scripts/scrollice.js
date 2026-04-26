@@ -31,7 +31,14 @@
  // --- Event Listener for Mouse Wheel ---
  window.addEventListener('wheel', function(event) {
 
-     event.preventDefault();
+     // Only prevent default if we're scrolling the main document, not scrollable elements
+     if (event.target === document.body || event.target === document.documentElement) {
+         event.preventDefault();
+     } else {
+         // Allow normal scrolling for other elements
+         return;
+     }
+
      if (!isWheeling || animationFrameId === null) {
           currentScrollY = window.pageYOffset;
      }
