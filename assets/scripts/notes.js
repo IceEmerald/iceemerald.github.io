@@ -47,11 +47,22 @@ class NotesApp {
         this.touchStartTime = 0;
         this.isSwiping = false;
 
+        // Collaboration state
+        this.collabSessionId = null;
+        this.collabSessionRef = null;
+        this.collabDb = null;
+        this.collabUser = null;
+        this.collabIsOwner = false;
+        this.collabPermission = 'edit';
+        this.collabMode = false;
+        this.collabNoteData = null;
+
         this.init();
     }
 
     init() {
         this.loadNotesFromStorage();
+        this.initializeCollaboration();
         this.setupEventListeners();
         this.setupRibbon();
         this.setupMobileRibbon();
@@ -65,6 +76,7 @@ class NotesApp {
         this.renderNotesList();
         this.renderNotesCards();
         this.showWelcomeScreenIfNeeded();
+        this.checkShareSessionFromURL();
         this.setupMobileUI();
         this.setupSwipeGesture();
         this.isInitialized = true;
@@ -118,7 +130,316 @@ class NotesApp {
         this._toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
     }
 
-    showSaveIndicator(status) {
+    initializeCollaboration() {
+        if (!window.firebase) return;
+        if (!firebase.apps.length) {
+            const firebaseConfig = {
+                databaseURL: 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app',
+                projectId: 'emeraldnetwork-web-default-rtdb'
+            };
+            firebase.initializeApp(firebaseConfig);
+        }
+        this.collabDb = firebase.database();
+        this.collabUser = this.loadCollaboratorInfo();
+        window.addEventListener('visibilitychange', () => {
+            if (document.hidden) this.leaveCollaboration();
+            else if (this.collabSessionId) this.updateActiveUserPresence();
+        });
+    }
+
+    loadCollaboratorInfo() {
+        try {
+            const stored = localStorage.getItem('emeraldnotes_collaborator');
+            if (stored) return JSON.parse(stored);
+        } catch (error) {
+            console.warn('Failed to load collaborator info', error);
+        }
+        const names = ['Jade', 'Nova', 'Luna', 'Kai', 'Aria', 'Echo', 'Onyx', 'Ariel', 'Zara', 'Orion'];
+        const colors = ['#00b894', '#0984e3', '#6c5ce7', '#e17055', '#00cec9', '#fdcb6e', '#ff7675', '#74b9ff', '#55efc4', '#ffeaa7'];
+        const collaborator = {
+            id: this.generateId(10),
+            name: `${names[Math.floor(Math.random() * names.length)]} ${Math.floor(Math.random() * 90 + 10)}`,
+            color: colors[Math.floor(Math.random() * colors.length)]
+        };
+        localStorage.setItem('emeraldnotes_collaborator', JSON.stringify(collaborator));
+        return collaborator;
+    }
+
+    checkShareSessionFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('collab');
+        if (!sessionId || !this.collabDb) return;
+        this.joinCollabSession(sessionId);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    async joinCollabSession(sessionId) {
+        if (!this.collabDb) return;
+        this.collabSessionId = sessionId;
+        this.collabSessionRef = this.collabDb.ref(`sharednotes/${sessionId}`);
+        const snapshot = await this.collabSessionRef.once('value');
+        const data = snapshot.val();
+        if (!data) {
+            this.showShareModal({ title: 'Invalid Session', message: 'This live collaboration link is no longer valid.' });
+            return;
+        }
+        if (data.status === 'closed') {
+            this.showShareModal({ title: 'Session Closed', message: 'This shared note session has ended. It is not added to your notes list.' });
+            return;
+        }
+        this.collabIsOwner = data.ownerId === this.collabUser.id;
+        this.collabPermission = data.permission || 'edit';
+        this.collabMode = true;
+        this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
+        this.setEditorForSession(this.collabNoteData);
+        this.renderShareCollaborators(data.activeUsers || {});
+        this.setupSessionListener();
+        this.updateActiveUserPresence();
+        this.showToast(`Joined shared note as ${this.collabUser.name}`);
+    }
+
+    openShareModal() {
+        if (!this.collabDb) {
+            this.showToast('Live collaboration requires Firebase to be loaded.');
+            return;
+        }
+        if (!this.currentNoteId && !this.collabMode) return;
+        const note = this.notes.find(n => n.id === this.currentNoteId);
+        if (!this.collabSessionId || !this.collabMode) {
+            this.collabSessionId = this.collabSessionId || this.generateId(10);
+            this.collabSessionRef = this.collabDb.ref(`sharednotes/${this.collabSessionId}`);
+            this.collabIsOwner = true;
+            this.collabMode = true;
+            this.collabPermission = 'edit';
+            this.collabNoteData = note ? { ...note } : { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
+            this.collabSessionRef.set({
+                ownerId: this.collabUser.id,
+                noteId: note ? note.id : null,
+                permission: this.collabPermission,
+                status: 'open',
+                createdAt: new Date().toISOString(),
+                note: this.collabNoteData,
+                activeUsers: {}
+            });
+            this.setupSessionListener();
+            this.updateActiveUserPresence();
+        }
+        const shareModal = document.getElementById('shareModal');
+        const shareLink = document.getElementById('shareLink');
+        const permissionSelect = document.getElementById('sharePermission');
+        const cancelBtn = document.getElementById('shareModalCancel');
+        const copyBtn = document.getElementById('shareModalCopy');
+        const closeBtn = document.getElementById('shareModalClose');
+        if (!shareModal || !shareLink || !permissionSelect) return;
+        shareLink.value = `${window.location.origin}${window.location.pathname}?collab=${this.collabSessionId}`;
+        permissionSelect.value = this.collabPermission;
+        closeBtn.style.display = this.collabIsOwner ? 'inline-flex' : 'none';
+        shareModal.classList.add('show');
+        const cleanup = () => {
+            shareModal.classList.remove('show');
+            cancelBtn.removeEventListener('click', cleanup);
+            copyBtn.removeEventListener('click', handleCopy);
+            closeBtn.removeEventListener('click', handleCloseSession);
+            permissionSelect.removeEventListener('change', handlePermissionChange);
+        };
+        const handleCopy = () => {
+            shareLink.select();
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(shareLink.value);
+                } else {
+                    document.execCommand('copy');
+                }
+                this.showToast('Link copied to clipboard');
+            } catch (error) {
+                console.warn('Copy failed', error);
+            }
+        };
+        const handlePermissionChange = () => {
+            this.collabPermission = permissionSelect.value;
+            if (this.collabSessionRef) {
+                this.collabSessionRef.child('permission').set(this.collabPermission);
+            }
+        };
+        const handleCloseSession = async () => {
+            if (!this.collabIsOwner || !this.collabSessionRef) return;
+            await this.collabSessionRef.update({ status: 'closed', closedAt: new Date().toISOString() });
+            this.showToast('Session closed');
+            cleanup();
+        };
+        cancelBtn.addEventListener('click', cleanup);
+        closeBtn.addEventListener('click', handleCloseSession);
+        copyBtn.addEventListener('click', handleCopy);
+        permissionSelect.addEventListener('change', handlePermissionChange);
+    }
+
+    showShareModal({ title = 'Live Collaboration', message = '', collaborators = [] } = {}) {
+        const modal = document.getElementById('shareModal');
+        const shareLink = document.getElementById('shareLink');
+        const permissionSelect = document.getElementById('sharePermission');
+        const collaboratorsContainer = document.getElementById('shareCollaborators');
+        const closeBtn = document.getElementById('shareModalClose');
+        if (!modal) return;
+        if (closeBtn) closeBtn.style.display = 'none';
+        if (title) modal.querySelector('.link-modal-title').textContent = title;
+        if (shareLink) shareLink.value = message;
+        if (permissionSelect) permissionSelect.style.display = 'none';
+        if (collaboratorsContainer) collaboratorsContainer.innerHTML = collaborators.map(c => `<span style="display:inline-flex;align-items:center;gap:6px;background:${c.color};color:#fff;padding:6px 10px;border-radius:999px;">${c.name}</span>`).join('');
+        modal.classList.add('show');
+        const cancelBtn = document.getElementById('shareModalCancel');
+        if (cancelBtn) cancelBtn.onclick = () => { modal.classList.remove('show'); if (permissionSelect) permissionSelect.style.display = ''; };
+    }
+
+    async updateActiveUserPresence() {
+        if (!this.collabSessionRef || !this.collabUser) return;
+        const userRef = this.collabSessionRef.child(`activeUsers/${this.collabUser.id}`);
+        await userRef.update({
+            id: this.collabUser.id,
+            name: this.collabUser.name,
+            color: this.collabUser.color,
+            cursor: null,
+            updatedAt: new Date().toISOString(),
+            isOwner: this.collabIsOwner
+        });
+        userRef.onDisconnect().remove();
+    }
+
+    setupSessionListener() {
+        if (!this.collabSessionRef) return;
+        this.collabSessionRef.on('value', snapshot => {
+            const data = snapshot.val();
+            if (!data) return;
+            if (data.status === 'closed' && !this.collabIsOwner) {
+                this.showShareModal({ title: 'Session Ended', message: 'This session has been closed by the owner.' });
+                return;
+            }
+            if (data.note) {
+                if (!this.collabIsOwner && this.collabPermission === 'edit' && (!this.collabNoteData || data.note.modifiedAt !== this.collabNoteData.modifiedAt)) {
+                    this.collabNoteData = data.note;
+                    this.setEditorForSession(data.note, false);
+                }
+                if (this.collabIsOwner) {
+                    this.renderShareCollaborators(data.activeUsers || {});
+                }
+            }
+            this.renderShareCollaborators(data.activeUsers || {});
+        });
+    }
+
+    renderShareCollaborators(activeUsers) {
+        const container = document.getElementById('shareCollaborators');
+        const cursors = document.getElementById('collabCursors');
+        if (container) {
+            container.innerHTML = '';
+            Object.values(activeUsers || {}).forEach(user => {
+                const badge = document.createElement('span');
+                badge.textContent = user.name + (user.isOwner ? ' (Owner)' : '');
+                badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:' + user.color + ';color:#fff;padding:6px 10px;border-radius:999px;font-size:13px;';
+                container.appendChild(badge);
+            });
+        }
+        if (cursors) {
+            cursors.innerHTML = '';
+            Object.values(activeUsers || {}).forEach(user => {
+                if (user.id === this.collabUser.id || !user.cursor) return;
+                const cursor = document.createElement('div');
+                cursor.className = 'collab-cursor';
+                cursor.style.top = `${user.cursor.top}px`;
+                cursor.style.left = `${user.cursor.left}px`;
+                cursor.style.height = `${user.cursor.height || 18}px`;
+                cursor.style.backgroundColor = user.color || '#005fa3';
+                const label = document.createElement('div');
+                label.className = 'collab-cursor-label';
+                label.textContent = user.name;
+                if (user.color) label.style.backgroundColor = user.color;
+                cursor.appendChild(label);
+                cursors.appendChild(cursor);
+            });
+        }
+    }
+
+    setEditorForSession(noteData, focus = true) {
+        const titleInput = document.getElementById('noteTitle');
+        const textEditor = document.getElementById('textEditor');
+        if (titleInput) {
+            titleInput.value = noteData.title || 'Untitled Note';
+            titleInput.disabled = !this.collabIsOwner && this.collabPermission === 'view';
+        }
+        if (textEditor) {
+            textEditor.innerHTML = this.sanitizeHtml(noteData.content || '');
+            textEditor.contentEditable = this.collabPermission === 'edit';
+        }
+        if (focus && textEditor && this.collabPermission === 'edit') {
+            textEditor.focus();
+        }
+    }
+
+    updateCollabNoteTitle(title) {
+        if (!this.collabMode) return;
+        this.collabNoteData = this.collabNoteData || {};
+        this.collabNoteData.title = title.slice(0, 40) || 'Untitled Note';
+        this.collabNoteData.modifiedAt = new Date().toISOString();
+        if (this.currentNoteId) {
+            const note = this.notes.find(n => n.id === this.currentNoteId);
+            if (note) {
+                note.title = this.collabNoteData.title;
+                note.modifiedAt = this.collabNoteData.modifiedAt;
+                this.renderNotesList();
+                this.renderNotesCards();
+                this.debouncedSave();
+            }
+        }
+        if (this.collabSessionRef && this.collabPermission === 'edit') {
+            this.collabSessionRef.child('note').set(this.collabNoteData);
+        }
+    }
+
+    updateCollabNoteContent() {
+        if (!this.collabMode) return;
+        const textEditor = document.getElementById('textEditor');
+        if (!textEditor) return;
+        const content = textEditor.innerHTML.trim();
+        this.collabNoteData = this.collabNoteData || {};
+        this.collabNoteData.content = this.isEditorEmpty(textEditor) ? '' : content;
+        this.collabNoteData.modifiedAt = new Date().toISOString();
+        if (this.currentNoteId) {
+            const note = this.notes.find(n => n.id === this.currentNoteId);
+            if (note) {
+                note.content = this.collabNoteData.content;
+                note.modifiedAt = this.collabNoteData.modifiedAt;
+                this.renderNotesList();
+                this.renderNotesCards();
+                this.debouncedSave();
+            }
+        }
+        if (this.collabSessionRef && this.collabPermission === 'edit') {
+            this.collabSessionRef.child('note').set(this.collabNoteData);
+        }
+    }
+
+    handleSelectionChange() {
+        if (!this.collabMode || !this.collabSessionRef || !this.collabUser) return;
+        const editor = document.getElementById('textEditor');
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) return;
+        const range = selection.getRangeAt(0).cloneRange();
+        const rect = range.getBoundingClientRect();
+        if (!rect || rect.width === 0 && rect.height === 0) return;
+        const editorRect = editor.getBoundingClientRect();
+        const position = {
+            top: rect.top - editorRect.top + editor.scrollTop,
+            left: rect.left - editorRect.left + editor.scrollLeft,
+            height: rect.height || 18
+        };
+        this.collabSessionRef.child(`activeUsers/${this.collabUser.id}`).update({ cursor: position, updatedAt: new Date().toISOString() });
+    }
+
+    leaveCollaboration() {
+        if (!this.collabSessionId || !this.collabDb || !this.collabUser) return;
+        if (this.collabSessionRef) {
+            this.collabSessionRef.child(`activeUsers/${this.collabUser.id}`).remove();
+        }
+    }
         const indicator = document.getElementById('saveIndicator');
         const text = indicator.querySelector('.save-text');
         indicator.className = 'save-indicator';
@@ -156,23 +477,33 @@ class NotesApp {
         const exportNoteBtn = document.getElementById('exportNoteBtn');
         if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
 
+        const shareNoteBtn = document.getElementById('shareNoteBtn');
+        if (shareNoteBtn) shareNoteBtn.addEventListener('click', () => this.openShareModal());
+
         const noteTitle = document.getElementById('noteTitle');
         if (noteTitle) {
             noteTitle.addEventListener('input', (e) => {
-                if (this.currentNoteId) this.updateNoteTitle(e.target.value);
+                if (this.collabMode) {
+                    this.updateCollabNoteTitle(e.target.value);
+                } else if (this.currentNoteId) {
+                    this.updateNoteTitle(e.target.value);
+                }
             });
         }
 
         const textEditor = document.getElementById('textEditor');
         if (textEditor) {
             textEditor.addEventListener('input', () => {
-                if (this.currentNoteId) {
-                    this.updatePlaceholderState(textEditor);
+                this.updatePlaceholderState(textEditor);
+                if (this.collabMode) {
+                    this.updateCollabNoteContent();
+                } else if (this.currentNoteId) {
                     this.updateNoteContent();
                 }
             });
         }
 
+        document.addEventListener('selectionchange', () => this.handleSelectionChange());
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
 
         document.querySelectorAll('.ribbon-btn, .ribbon-tab').forEach(el => {
