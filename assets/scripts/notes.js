@@ -2927,11 +2927,14 @@ class NotesApp {
             if (!exportModal) return;
             this.saveSelection();
 
-            // Reject notes whose raw payload would produce an unreasonably long URL.
-            // 1,500,000 characters is the cap set in the UI.
-            const MAX_CHARS = 1500000;
-            const payloadLength = (note.title || '').length + (note.content || '').length;
-            if (payloadLength > MAX_CHARS) {
+            // Reject notes whose compressed URL would exceed the maximum URL length.
+            // Maximum URL length is 8215 characters (common browser limit).
+            const MAX_URL_LENGTH = 8215;
+            const baseUrl = `${window.location.origin}${window.location.pathname}?s=`;
+            const token = await compressToUrl(JSON.stringify({ t: note.title, c: note.content }));
+            const fullUrl = baseUrl + token;
+
+            if (fullUrl.length > MAX_URL_LENGTH) {
                 exportModal.classList.add('show');
                 exportLink.value = 'This note is too long to share with a link.';
                 exportLink.readOnly = true;
@@ -2948,8 +2951,6 @@ class NotesApp {
                 return;
             }
             if (copyBtn) copyBtn.disabled = false;
-
-            const token = await compressToUrl(JSON.stringify({ t: note.title, c: note.content }));
             const shareLink = `${window.location.origin}${window.location.pathname}?s=${token}`;
             exportModal.classList.add('show');
             exportLink.value = shareLink;
