@@ -56,6 +56,7 @@ class NotesApp {
         this.collabPermission = 'edit';
         this.collabMode = false;
         this.collabNoteData = null;
+        this.collabNoteId = null;
 
         this.init();
     }
@@ -199,9 +200,45 @@ class NotesApp {
     checkShareSessionFromURL() {
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get('collab');
-        if (!sessionId) return;
-        this.joinCollabSession(sessionId);
-        window.history.replaceState({}, document.title, window.location.pathname);
+        if (sessionId) {
+            this.joinCollabSession(sessionId);
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+        }
+        // Bug 7: Owner reload — check if we have a saved owner session
+        try {
+            const saved = localStorage.getItem('emeraldnotes_collab_owner');
+            if (saved) {
+                const { sessionId: sid, noteId } = JSON.parse(saved);
+                if (sid) {
+                    this._dbGet(`/sharednotes/${sid}`).then(data => {
+                        if (!data || data.status === 'closed') {
+                            localStorage.removeItem('emeraldnotes_collab_owner');
+                            return;
+                        }
+                        if (data.ownerId !== this.collabUser.id) return;
+                        this.collabSessionId = sid;
+                        this.collabNoteId = noteId || data.noteId || null;
+                        this.collabIsOwner = true;
+                        this.collabPermission = data.permission || 'edit';
+                        this.collabMode = true;
+                        this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
+                        this._activeUsers = data.activeUsers || {};
+                        if (this.collabNoteId) {
+                            this.selectNote(this.collabNoteId);
+                        } else {
+                            this.setEditorForSession(this.collabNoteData);
+                        }
+                        this.setupSessionListener();
+                        this.updateActiveUserPresence();
+                        this.renderCollabBar(this._activeUsers);
+                        this.showToast('Reconnected to your live session');
+                    }).catch(() => {
+                        localStorage.removeItem('emeraldnotes_collab_owner');
+                    });
+                }
+            }
+        } catch (_) {}
     }
 
     async joinCollabSession(sessionId) {
@@ -219,6 +256,7 @@ class NotesApp {
             this.collabIsOwner = data.ownerId === this.collabUser.id;
             this.collabPermission = data.permission || 'edit';
             this.collabMode = true;
+            this.collabNoteId = data.noteId || null;
             this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
             this.setEditorForSession(this.collabNoteData);
             this.renderShareCollaborators(data.activeUsers || {});
@@ -236,19 +274,24 @@ class NotesApp {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!this.collabSessionId || !this.collabMode) {
             this.collabSessionId = this.collabSessionId || this.generateId(10);
+            this.collabNoteId = note ? note.id : null;
             this.collabIsOwner = true;
             this.collabMode = true;
             this.collabPermission = 'edit';
             this.collabNoteData = note ? { ...note } : { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
             this._dbPut(`/sharednotes/${this.collabSessionId}`, {
                 ownerId: this.collabUser.id,
-                noteId: note ? note.id : null,
+                noteId: this.collabNoteId,
                 permission: this.collabPermission,
                 status: 'open',
                 createdAt: new Date().toISOString(),
                 note: this.collabNoteData,
                 activeUsers: {}
             });
+            // Bug 7: persist owner session so reload rejoins automatically
+            try {
+                localStorage.setItem('emeraldnotes_collab_owner', JSON.stringify({ sessionId: this.collabSessionId, noteId: this.collabNoteId }));
+            } catch (_) {}
             this._activeUsers = {};
             this.setupSessionListener();
             this.updateActiveUserPresence();
@@ -257,18 +300,24 @@ class NotesApp {
         const shareModal = document.getElementById('shareModal');
         const shareLink = document.getElementById('shareLink');
         const permissionSelect = document.getElementById('sharePermission');
+        const permissionGroup = document.getElementById('sharePermissionGroup');
+        const collaboratorsGroup = document.getElementById('shareCollaboratorsList');
         const cancelBtn = document.getElementById('shareModalCancel');
         const copyBtn = document.getElementById('shareModalCopy');
         const closeBtn = document.getElementById('shareModalClose');
         if (!shareModal || !shareLink || !permissionSelect) return;
         shareLink.value = `${window.location.origin}${window.location.pathname}?collab=${this.collabSessionId}`;
         permissionSelect.value = this.collabPermission;
+        // Bug 3: only owners see the permissions row and copy link; non-owners see read-only info
+        if (permissionGroup) permissionGroup.style.display = this.collabIsOwner ? '' : 'none';
+        if (collaboratorsGroup) collaboratorsGroup.style.display = this.collabIsOwner ? '' : 'none';
         if (closeBtn) closeBtn.style.display = this.collabIsOwner ? 'inline-flex' : 'none';
+        if (copyBtn) copyBtn.style.display = this.collabIsOwner ? 'inline-flex' : 'none';
         shareModal.classList.add('show');
         const cleanup = () => {
             shareModal.classList.remove('show');
             cancelBtn.removeEventListener('click', cleanup);
-            copyBtn.removeEventListener('click', handleCopy);
+            if (copyBtn) copyBtn.removeEventListener('click', handleCopy);
             if (closeBtn) closeBtn.removeEventListener('click', handleCloseSession);
             permissionSelect.removeEventListener('change', handlePermissionChange);
         };
@@ -296,10 +345,12 @@ class NotesApp {
             await this._dbPatch(`/sharednotes/${this.collabSessionId}`, { status: 'closed', closedAt: new Date().toISOString() });
             this.showToast('Session closed');
             cleanup();
+            // Bug 11: owner resets collab state immediately
+            this._resetCollabState();
         };
         cancelBtn.addEventListener('click', cleanup);
         if (closeBtn) closeBtn.addEventListener('click', handleCloseSession);
-        copyBtn.addEventListener('click', handleCopy);
+        if (copyBtn) copyBtn.addEventListener('click', handleCopy);
         permissionSelect.addEventListener('change', handlePermissionChange);
     }
 
@@ -353,17 +404,20 @@ class NotesApp {
         };
         const applyPermissionUpdate = (perm) => {
             if (!perm || perm === this.collabPermission) return;
-            const old = this.collabPermission;
             this.collabPermission = perm;
             if (this.collabNoteData) this.setEditorForSession(this.collabNoteData, false);
+            // Bug 4: update the presence bar badge immediately
+            this.renderCollabBar(this._activeUsers || {});
             if (!this.collabIsOwner) {
                 this.showToast(perm === 'edit' ? 'Permission changed: You can now edit' : 'Permission changed: View only');
             }
         };
         const applyClose = () => {
             if (this.collabIsOwner) return;
-            es.close();
-            this.showShareModal({ title: 'Session Ended', message: 'This session has been closed by the owner.' });
+            // Bug 11: non-owner full cleanup on session end
+            const msg = 'The owner has ended this session.';
+            this._resetCollabState();
+            this.showToast(msg, 5000);
         };
 
         es.addEventListener('put', (event) => {
@@ -495,19 +549,25 @@ class NotesApp {
     setEditorForSession(noteData, focus = true) {
         const titleInput = document.getElementById('noteTitle');
         const textEditor = document.getElementById('textEditor');
+        const isViewOnly = !this.collabIsOwner && this.collabPermission === 'view';
+        const isNonOwner = !this.collabIsOwner;
         if (titleInput) {
             titleInput.value = noteData.title || 'Untitled Note';
-            titleInput.disabled = !this.collabIsOwner && this.collabPermission === 'view';
+            titleInput.disabled = isViewOnly;
         }
         if (textEditor) {
             textEditor.innerHTML = this.sanitizeHtml(noteData.content || '');
-            textEditor.contentEditable = this.collabPermission === 'edit';
+            textEditor.contentEditable = this.collabIsOwner || this.collabPermission === 'edit';
             if (noteData.color && noteData.color !== '#ffffff') {
                 textEditor.style.backgroundColor = noteData.color;
             } else {
                 textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
             }
         }
+        // Bug 2: gray out ribbon for view-only collaborators
+        document.body.classList.toggle('collab-view-only', isViewOnly);
+        // Bug 5: hide owner-only actions for non-owners
+        document.body.classList.toggle('collab-non-owner', isNonOwner);
         const welcomeScreen = document.getElementById('welcomeScreen');
         if (welcomeScreen) welcomeScreen.classList.add('hidden');
         const editorHeader = document.querySelector('.editor-header');
@@ -517,7 +577,7 @@ class NotesApp {
         const editorStatusbar = document.getElementById('editorStatusbar');
         if (editorStatusbar) editorStatusbar.style.display = '';
         document.body.classList.remove('no-active-note');
-        if (focus && textEditor && this.collabPermission === 'edit') {
+        if (focus && textEditor && (this.collabIsOwner || this.collabPermission === 'edit')) {
             textEditor.focus();
         }
     }
@@ -542,6 +602,8 @@ class NotesApp {
 
     updateCollabNoteContent() {
         if (!this.collabMode) return;
+        // Bug 6: only push if the editor is showing the collab note (not a different local note)
+        if (this.collabNoteId && this.currentNoteId && this.currentNoteId !== this.collabNoteId) return;
         const textEditor = document.getElementById('textEditor');
         if (!textEditor) return;
         const content = textEditor.innerHTML.trim();
@@ -594,6 +656,47 @@ class NotesApp {
     leaveCollaboration() {
         if (!this.collabSessionId || !this.collabUser) return;
         this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`);
+    }
+
+    // Bug 11: centralized cleanup of all collab state
+    _resetCollabState() {
+        if (this._collabEventSource) {
+            this._collabEventSource.close();
+            this._collabEventSource = null;
+        }
+        if (this.collabSessionId && this.collabUser) {
+            this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`).catch(() => {});
+        }
+        this.collabMode = false;
+        this.collabIsOwner = false;
+        this.collabSessionId = null;
+        this.collabNoteId = null;
+        this.collabPermission = 'edit';
+        this.collabNoteData = null;
+        this._activeUsers = {};
+        this._lastPushedModifiedAt = null;
+        // Remove presence bar
+        const bar = document.getElementById('collabPresenceBar');
+        if (bar) bar.remove();
+        // Remove body classes for view-only
+        document.body.classList.remove('collab-view-only', 'collab-non-owner');
+        // Remove cursor overlays
+        const cursors = document.getElementById('collabCursors');
+        if (cursors) cursors.innerHTML = '';
+        // Remove owner session from localStorage
+        try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
+        // Restore all owner-only buttons
+        ['exportNoteBtn', 'deleteNoteBtn', 'noteColorDropdown', 'shareNoteBtn'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = '';
+        });
+        // Re-enable the editor
+        const textEditor = document.getElementById('textEditor');
+        if (textEditor) textEditor.contentEditable = 'true';
+        const titleInput = document.getElementById('noteTitle');
+        if (titleInput) titleInput.disabled = false;
+        // Show welcome screen if no note is selected; otherwise stay on current note
+        this.showWelcomeScreenIfNeeded();
     }
 
     showSaveIndicator(status) {
@@ -842,11 +945,20 @@ class NotesApp {
         row.id = 'mobileRibbonRow';
         row.className = 'mobile-ribbon-row';
 
-        // Essential buttons: Bold, Italic, Underline | Bullet, Number | Align L/C/R | More⋯
+        // Essential buttons: Bold, Italic, Underline, Strikethrough | Undo, Redo | Bullet, Number | Align L/C | More⋯
         const essentials = [
             { command: 'bold', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>`, title: 'Bold' },
             { command: 'italic', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>`, title: 'Italic' },
             { command: 'underline', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>`, title: 'Underline' },
+            { command: 'strikeThrough', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><path d="M16 6C16 6 14.5 4 12 4C9.5 4 7 5.5 7 8C7 10.5 9.5 11 12 12C14.5 13 17 13.5 17 16C17 18.5 14.5 20 12 20C9.5 20 8 18 8 18"/></svg>`, title: 'Strikethrough' },
+        ];
+
+        const div0 = document.createElement('div');
+        div0.className = 'mobile-ribbon-divider';
+
+        const undoRedo = [
+            { command: 'undo', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`, title: 'Undo' },
+            { command: 'redo', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`, title: 'Redo' },
         ];
 
         const div1 = document.createElement('div');
@@ -865,53 +977,30 @@ class NotesApp {
             { command: 'justifyCenter', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>`, title: 'Center' },
         ];
 
+        // Helper to create a command button
+        const makeBtn = (command, icon, title, cls = 'ribbon-btn format-btn') => {
+            const btn = document.createElement('button');
+            btn.className = cls;
+            btn.dataset.command = command;
+            btn.title = title;
+            btn.innerHTML = icon;
+            btn.addEventListener('mousedown', (e) => e.preventDefault());
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.executeCommand(command);
+                this.updateButtonStates();
+            });
+            return btn;
+        };
+
         // Build buttons
-        [...essentials].forEach(({ command, icon, title }) => {
-            const btn = document.createElement('button');
-            btn.className = 'ribbon-btn format-btn';
-            btn.dataset.command = command;
-            btn.title = title;
-            btn.innerHTML = icon;
-            btn.addEventListener('mousedown', (e) => e.preventDefault());
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.executeCommand(command);
-                this.updateButtonStates();
-            });
-            row.appendChild(btn);
-        });
-
+        [...essentials].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
+        row.appendChild(div0);
+        [...undoRedo].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
         row.appendChild(div1);
-        [...secondary].forEach(({ command, icon, title }) => {
-            const btn = document.createElement('button');
-            btn.className = 'ribbon-btn format-btn';
-            btn.dataset.command = command;
-            btn.title = title;
-            btn.innerHTML = icon;
-            btn.addEventListener('mousedown', (e) => e.preventDefault());
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.executeCommand(command);
-                this.updateButtonStates();
-            });
-            row.appendChild(btn);
-        });
-
+        [...secondary].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
         row.appendChild(div2);
-        [...tertiary].forEach(({ command, icon, title }) => {
-            const btn = document.createElement('button');
-            btn.className = 'ribbon-btn format-btn';
-            btn.dataset.command = command;
-            btn.title = title;
-            btn.innerHTML = icon;
-            btn.addEventListener('mousedown', (e) => e.preventDefault());
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.executeCommand(command);
-                this.updateButtonStates();
-            });
-            row.appendChild(btn);
-        });
+        [...tertiary].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
 
         // Spacer
         const spacer = document.createElement('div');
@@ -926,11 +1015,27 @@ class NotesApp {
         moreBtn.textContent = '⋯';
         row.appendChild(moreBtn);
 
-        // More panel (font, colors)
+        // More panel (insert actions + font, colors)
         const morePanel = document.createElement('div');
         morePanel.className = 'mobile-more-panel';
         morePanel.id = 'mobileMorePanel';
         morePanel.innerHTML = `
+            <div style="padding:4px 0 8px;font-size:11px;font-weight:600;color:rgba(44,62,80,0.5);text-transform:uppercase;letter-spacing:0.5px;">Insert</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+                <button class="ribbon-btn" id="mobileInsertTableBtn" title="Table" style="font-size:11px;padding:5px 10px;gap:4px;display:flex;align-items:center;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Table
+                </button>
+                <button class="ribbon-btn" id="mobileInsertImageBtn" title="Image" style="font-size:11px;padding:5px 10px;gap:4px;display:flex;align-items:center;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Image
+                </button>
+                <button class="ribbon-btn" id="mobileInsertTodoBtn" title="To-do" style="font-size:11px;padding:5px 10px;gap:4px;display:flex;align-items:center;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> To-do
+                </button>
+                <button class="ribbon-btn" id="mobileDrawBtn" title="Draw" style="font-size:11px;padding:5px 10px;gap:4px;display:flex;align-items:center;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Draw
+                </button>
+            </div>
+            <div style="border-top:1px solid rgba(0,0,0,0.07);margin-bottom:8px;"></div>
             <div style="padding:4px 0 8px;font-size:11px;font-weight:600;color:rgba(44,62,80,0.5);text-transform:uppercase;letter-spacing:0.5px;">Font</div>
             <div id="mobileFontFamilyDropdown" class="ms-dropdown" style="margin-bottom:6px;">
                 <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
@@ -1061,6 +1166,34 @@ class NotesApp {
             this.restoreSelection();
             this.executeCommand('hiliteColor', value);
         });
+
+        // Wire insert buttons in the more panel (bug 10)
+        const mobileInsertTableBtn = morePanel.querySelector('#mobileInsertTableBtn');
+        const mobileInsertImageBtn = morePanel.querySelector('#mobileInsertImageBtn');
+        const mobileInsertTodoBtn = morePanel.querySelector('#mobileInsertTodoBtn');
+        const mobileDrawBtn = morePanel.querySelector('#mobileDrawBtn');
+        const desktopImageInput = document.getElementById('insertImageInput');
+
+        if (mobileInsertTableBtn) {
+            mobileInsertTableBtn.addEventListener('mousedown', (e) => e.preventDefault());
+            mobileInsertTableBtn.addEventListener('click', () => { morePanel.classList.remove('open'); moreBtn.classList.remove('active'); this.insertTable(); });
+        }
+        if (mobileInsertImageBtn) {
+            mobileInsertImageBtn.addEventListener('mousedown', (e) => e.preventDefault());
+            mobileInsertImageBtn.addEventListener('click', () => {
+                morePanel.classList.remove('open'); moreBtn.classList.remove('active');
+                this.saveSelection();
+                if (desktopImageInput) desktopImageInput.click();
+            });
+        }
+        if (mobileInsertTodoBtn) {
+            mobileInsertTodoBtn.addEventListener('mousedown', (e) => e.preventDefault());
+            mobileInsertTodoBtn.addEventListener('click', () => { morePanel.classList.remove('open'); moreBtn.classList.remove('active'); this.insertTodo(); });
+        }
+        if (mobileDrawBtn) {
+            mobileDrawBtn.addEventListener('mousedown', (e) => e.preventDefault());
+            mobileDrawBtn.addEventListener('click', () => { morePanel.classList.remove('open'); moreBtn.classList.remove('active'); this.toggleDrawMode(); });
+        }
 
         ribbonContent.appendChild(row);
     }
@@ -2629,6 +2762,8 @@ class NotesApp {
                 editor.appendChild(img);
             }
             this.updateNoteContent();
+            // Bug 8: sync drawing to collab session
+            if (this.collabMode) this.updateCollabNoteContent();
         }
     }
 
