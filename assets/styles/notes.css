@@ -975,7 +975,7 @@ body.no-active-note .editor-area {
 }
 
 .create-note-btn:hover {
-    background: linear-gradient(135deg, #197138 0%, #0f5a2a 100%);
+    background: #1a793c;
     box-shadow: 0 8px 24px rgba(35, 154, 77, 0.3);
     transform: translateY(-2px);
 }
