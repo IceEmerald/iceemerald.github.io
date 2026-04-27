@@ -141,6 +141,16 @@ class NotesApp {
         });
         window.addEventListener('beforeunload', () => {
             if (this.collabSessionId && this.collabUser) {
+                if (this.collabMode && this.collabPermission === 'edit' && this.collabNoteData) {
+                    try {
+                        navigator.sendBeacon(
+                            `${this.dbUrl}/sharednotes/${this.collabSessionId}.json`,
+                            JSON.stringify({ note: this.collabNoteData })
+                        );
+                    } catch (err) {
+                        console.warn('Failed to flush collab note before unload', err);
+                    }
+                }
                 navigator.sendBeacon(
                     `${this.dbUrl}/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}.json?x-http-method-override=DELETE`,
                     ''
@@ -226,6 +236,9 @@ class NotesApp {
                         this._activeUsers = data.activeUsers || {};
                         if (this.collabNoteId) {
                             this.selectNote(this.collabNoteId);
+                            if (this.collabNoteData) {
+                                this.setEditorForSession(this.collabNoteData, false);
+                            }
                         } else {
                             this.setEditorForSession(this.collabNoteData);
                         }
@@ -271,6 +284,10 @@ class NotesApp {
 
     openShareModal() {
         if (!this.currentNoteId && !this.collabMode) return;
+        if (this.collabMode && this.collabNoteId && this.currentNoteId !== this.collabNoteId) {
+            this.showToast('Live collaboration is only active on the shared note. Switch back to continue.');
+            return;
+        }
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!this.collabSessionId || !this.collabMode) {
             this.collabSessionId = this.collabSessionId || this.generateId(10);
@@ -330,6 +347,7 @@ class NotesApp {
                     document.execCommand('copy');
                 }
                 this.showToast('Link copied to clipboard');
+                cleanup();
             } catch (error) {
                 console.warn('Copy failed', error);
             }
@@ -508,7 +526,7 @@ class NotesApp {
 
     renderCollabBar(activeUsers) {
         const editorArea = document.querySelector('.editor-area');
-        if (!editorArea || !this.collabMode) {
+        if (!editorArea || !this.collabMode || this.currentNoteId !== this.collabNoteId) {
             const old = document.getElementById('collabPresenceBar');
             if (old) old.remove();
             return;
@@ -1596,6 +1614,17 @@ class NotesApp {
             textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
         }
 
+        if (this.collabMode && noteId === this.collabNoteId) {
+            if (this.collabNoteData) {
+                this.setEditorForSession(this.collabNoteData, false);
+            } else {
+                this.setEditorForSession(note, false);
+            }
+        } else if (this.collabMode && this.currentNoteId !== this.collabNoteId) {
+            const old = document.getElementById('collabPresenceBar');
+            if (old) old.remove();
+        }
+
         const noteColorDropdown = document.getElementById('noteColorDropdown');
         if (noteColorDropdown) {
             const colorPreview = noteColorDropdown.querySelector('.color-preview');
@@ -1702,6 +1731,11 @@ class NotesApp {
 
         const title = currentNote.title || 'Untitled Note';
         this.showDeleteModal(title, () => {
+            if (this.collabMode && this.collabIsOwner && this.currentNoteId === this.collabNoteId) {
+                this._dbPatch(`/sharednotes/${this.collabSessionId}`, { status: 'closed', closedAt: new Date().toISOString() }).catch(() => {});
+                this._resetCollabState();
+            }
+
             const currentIndex = this.notes.findIndex(n => n.id === this.currentNoteId);
             this.notes = this.notes.filter(note => note.id !== this.currentNoteId);
 
