@@ -440,7 +440,13 @@ class NotesApp {
             this.collabSessionRef.child(`activeUsers/${this.collabUser.id}`).remove();
         }
     }
+
+    showSaveIndicator(status) {
         const indicator = document.getElementById('saveIndicator');
+        if (!indicator) {
+            console.warn('Expected DOM element not found: saveIndicator');
+            return;
+        }
         const text = indicator.querySelector('.save-text');
         indicator.className = 'save-indicator';
         switch (status) {
@@ -1265,6 +1271,10 @@ class NotesApp {
 
         setTimeout(() => {
             const titleInput = document.getElementById('noteTitle');
+            if (!titleInput) {
+                console.warn('Expected DOM element not found: noteTitle');
+                return;
+            }
             titleInput.select();
         }, 100);
 
@@ -1278,8 +1288,18 @@ class NotesApp {
 
         this.currentNoteId = noteId;
 
-        document.getElementById('noteTitle').value = note.title;
-        document.getElementById('textEditor').innerHTML = this.sanitizeHtml(note.content);
+        const noteTitle = document.getElementById('noteTitle');
+        if (!noteTitle) {
+            console.warn('Expected DOM element not found: noteTitle');
+            return;
+        }
+        noteTitle.value = note.title;
+        const textEditorInit = document.getElementById('textEditor');
+        if (!textEditorInit) {
+            console.warn('Expected DOM element not found: textEditor');
+            return;
+        }
+        textEditorInit.innerHTML = this.sanitizeHtml(note.content);
 
         const textEditor = document.getElementById('textEditor');
         if (note.color && note.color !== '#ffffff') {
@@ -1305,9 +1325,24 @@ class NotesApp {
         });
 
         const wasWelcome = document.body.classList.contains('no-active-note');
-        document.getElementById('welcomeScreen').classList.add('hidden');
-        document.querySelector('.editor-header').style.display = 'flex';
-        document.querySelector('.editor-content').style.display = 'flex';
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        if (welcomeScreen) {
+            welcomeScreen.classList.add('hidden');
+        } else {
+            console.warn('Expected DOM element not found: welcomeScreen');
+        }
+        const editorHeader = document.querySelector('.editor-header');
+        if (editorHeader) {
+            editorHeader.style.display = 'flex';
+        } else {
+            console.warn('Expected DOM element not found: .editor-header');
+        }
+        const editorContent = document.querySelector('.editor-content');
+        if (editorContent) {
+            editorContent.style.display = 'flex';
+        } else {
+            console.warn('Expected DOM element not found: .editor-content');
+        }
         const _sb = document.getElementById('editorStatusbar');
         if (_sb) _sb.style.display = '';
         document.body.classList.remove('no-active-note');
@@ -1331,7 +1366,14 @@ class NotesApp {
         this.loadDrawing();
         this.updateStatusBar();
 
-        setTimeout(() => document.getElementById('textEditor').focus(), 100);
+        setTimeout(() => {
+            const textEditorFocus = document.getElementById('textEditor');
+            if (textEditorFocus) {
+                textEditorFocus.focus();
+            } else {
+                console.warn('Expected DOM element not found: textEditor');
+            }
+        }, 100);
     }
 
     updateNoteTitle(title) {
