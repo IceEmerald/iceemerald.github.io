@@ -347,7 +347,7 @@ class NotesApp {
                 return;
             }
             if (data.note) {
-                if (!this.collabIsOwner && this.collabPermission === 'edit' && (!this.collabNoteData || data.note.modifiedAt !== this.collabNoteData.modifiedAt)) {
+                if (!this.collabIsOwner && (!this.collabNoteData || data.note.modifiedAt !== this.collabNoteData.modifiedAt)) {
                     this.collabNoteData = data.note;
                     this.setEditorForSession(data.note, false);
                 }
@@ -363,12 +363,14 @@ class NotesApp {
         es.addEventListener('patch', (event) => {
             try {
                 const msg = JSON.parse(event.data);
-                if (msg.data && this.collabNoteData) {
-                    if (msg.data.note) {
-                        this.collabNoteData = { ...this.collabNoteData, ...msg.data.note };
-                        if (!this.collabIsOwner && this.collabPermission === 'edit') {
-                            this.setEditorForSession(this.collabNoteData, false);
-                        }
+                if (msg.data) {
+                    if (msg.data.note && !this.collabIsOwner) {
+                        this.collabNoteData = { ...(this.collabNoteData || {}), ...msg.data.note };
+                        this.setEditorForSession(this.collabNoteData, false);
+                    }
+                    if (msg.data.permission) {
+                        this.collabPermission = msg.data.permission;
+                        if (this.collabNoteData) this.setEditorForSession(this.collabNoteData, false);
                     }
                     if (msg.data.activeUsers !== undefined) {
                         this.renderShareCollaborators(msg.data.activeUsers || {});
@@ -427,7 +429,21 @@ class NotesApp {
         if (textEditor) {
             textEditor.innerHTML = this.sanitizeHtml(noteData.content || '');
             textEditor.contentEditable = this.collabPermission === 'edit';
+            if (noteData.color && noteData.color !== '#ffffff') {
+                textEditor.style.backgroundColor = noteData.color;
+            } else {
+                textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
+            }
         }
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        if (welcomeScreen) welcomeScreen.classList.add('hidden');
+        const editorHeader = document.querySelector('.editor-header');
+        if (editorHeader) editorHeader.style.display = 'flex';
+        const editorContent = document.querySelector('.editor-content');
+        if (editorContent) editorContent.style.display = 'flex';
+        const editorStatusbar = document.getElementById('editorStatusbar');
+        if (editorStatusbar) editorStatusbar.style.display = '';
+        document.body.classList.remove('no-active-note');
         if (focus && textEditor && this.collabPermission === 'edit') {
             textEditor.focus();
         }
