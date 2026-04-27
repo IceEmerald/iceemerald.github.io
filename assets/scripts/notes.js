@@ -57,6 +57,7 @@ class NotesApp {
         this.collabMode = false;
         this.collabNoteData = null;
         this.collabNoteId = null;
+        this.collabNoteVisible = false;
 
         this.init();
     }
@@ -234,14 +235,15 @@ class NotesApp {
                         this.collabMode = true;
                         this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
                         this._activeUsers = data.activeUsers || {};
-                        if (this.collabNoteId) {
-                            this.selectNote(this.collabNoteId);
-                            if (this.collabNoteData) {
-                                this.setEditorForSession(this.collabNoteData, false);
-                            }
+                        if (this.collabNoteId && this.notes.some(n => n.id === this.collabNoteId)) {
+                            this.currentNoteId = this.collabNoteId;
+                            this.renderNotesList();
+                            this.renderNotesCards();
                         } else {
-                            this.setEditorForSession(this.collabNoteData);
+                            this.currentNoteId = null;
                         }
+                        this.setEditorForSession(this.collabNoteData, false);
+                        this.collabNoteVisible = true;
                         this.setupSessionListener();
                         this.updateActiveUserPresence();
                         this.renderCollabBar(this._activeUsers);
@@ -272,6 +274,14 @@ class NotesApp {
             this.collabNoteId = data.noteId || null;
             this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
             this.setEditorForSession(this.collabNoteData);
+            this.collabNoteVisible = true;
+            if (this.collabNoteId && this.notes.some(n => n.id === this.collabNoteId)) {
+                this.currentNoteId = this.collabNoteId;
+                this.renderNotesList();
+                this.renderNotesCards();
+            } else {
+                this.currentNoteId = null;
+            }
             this.renderShareCollaborators(data.activeUsers || {});
             this.setupSessionListener();
             this.updateActiveUserPresence();
@@ -284,7 +294,7 @@ class NotesApp {
 
     openShareModal() {
         if (!this.currentNoteId && !this.collabMode) return;
-        if (this.collabMode && this.collabNoteId && this.currentNoteId !== this.collabNoteId) {
+        if (this.collabMode && this.collabNoteId && !this.collabNoteVisible) {
             this.showToast('Live collaboration is only active on the shared note. Switch back to continue.');
             return;
         }
@@ -526,7 +536,7 @@ class NotesApp {
 
     renderCollabBar(activeUsers) {
         const editorArea = document.querySelector('.editor-area');
-        if (!editorArea || !this.collabMode || this.currentNoteId !== this.collabNoteId) {
+        if (!editorArea || !this.collabMode || !this.collabNoteVisible) {
             const old = document.getElementById('collabPresenceBar');
             if (old) old.remove();
             return;
@@ -569,6 +579,7 @@ class NotesApp {
         const textEditor = document.getElementById('textEditor');
         const isViewOnly = !this.collabIsOwner && this.collabPermission === 'view';
         const isNonOwner = !this.collabIsOwner;
+        this.collabNoteVisible = true;
         if (titleInput) {
             titleInput.value = noteData.title || 'Untitled Note';
             titleInput.disabled = isViewOnly;
@@ -691,6 +702,7 @@ class NotesApp {
         this.collabNoteId = null;
         this.collabPermission = 'edit';
         this.collabNoteData = null;
+        this.collabNoteVisible = false;
         this._activeUsers = {};
         this._lastPushedModifiedAt = null;
         // Remove presence bar
@@ -1615,12 +1627,14 @@ class NotesApp {
         }
 
         if (this.collabMode && noteId === this.collabNoteId) {
+            this.collabNoteVisible = true;
             if (this.collabNoteData) {
                 this.setEditorForSession(this.collabNoteData, false);
             } else {
                 this.setEditorForSession(note, false);
             }
-        } else if (this.collabMode && this.currentNoteId !== this.collabNoteId) {
+        } else if (this.collabMode) {
+            this.collabNoteVisible = false;
             const old = document.getElementById('collabPresenceBar');
             if (old) old.remove();
         }
