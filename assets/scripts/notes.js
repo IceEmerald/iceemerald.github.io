@@ -249,8 +249,10 @@ class NotesApp {
                 note: this.collabNoteData,
                 activeUsers: {}
             });
+            this._activeUsers = {};
             this.setupSessionListener();
             this.updateActiveUserPresence();
+            this.renderCollabBar(this._activeUsers);
         }
         const shareModal = document.getElementById('shareModal');
         const shareLink = document.getElementById('shareLink');
@@ -336,87 +338,158 @@ class NotesApp {
             this._collabEventSource.close();
             this._collabEventSource = null;
         }
+        if (!this._activeUsers) this._activeUsers = {};
         const url = `${this.dbUrl}/sharednotes/${this.collabSessionId}.json`;
         const es = new EventSource(url);
         this._collabEventSource = es;
-        const handleData = (data) => {
-            if (!data) return;
-            if (data.status === 'closed' && !this.collabIsOwner) {
-                es.close();
-                this.showShareModal({ title: 'Session Ended', message: 'This session has been closed by the owner.' });
-                return;
+
+        const applyNoteUpdate = (note) => {
+            if (!note) return;
+            if (this._lastPushedModifiedAt && this._lastPushedModifiedAt === note.modifiedAt) return;
+            if (!this.collabNoteData || note.modifiedAt !== this.collabNoteData.modifiedAt) {
+                this.collabNoteData = note;
+                this.setEditorForSession(note, false);
             }
-            if (data.note) {
-                if (!this.collabIsOwner && (!this.collabNoteData || data.note.modifiedAt !== this.collabNoteData.modifiedAt)) {
-                    this.collabNoteData = data.note;
-                    this.setEditorForSession(data.note, false);
-                }
-            }
-            this.renderShareCollaborators(data.activeUsers || {});
         };
+        const applyPermissionUpdate = (perm) => {
+            if (!perm || perm === this.collabPermission) return;
+            const old = this.collabPermission;
+            this.collabPermission = perm;
+            if (this.collabNoteData) this.setEditorForSession(this.collabNoteData, false);
+            if (!this.collabIsOwner) {
+                this.showToast(perm === 'edit' ? 'Permission changed: You can now edit' : 'Permission changed: View only');
+            }
+        };
+        const applyClose = () => {
+            if (this.collabIsOwner) return;
+            es.close();
+            this.showShareModal({ title: 'Session Ended', message: 'This session has been closed by the owner.' });
+        };
+
         es.addEventListener('put', (event) => {
             try {
                 const msg = JSON.parse(event.data);
-                handleData(msg.data);
+                const data = msg.data;
+                if (!data) return;
+                this._activeUsers = data.activeUsers || {};
+                if (data.status === 'closed') { applyClose(); return; }
+                applyNoteUpdate(data.note);
+                this.renderShareCollaborators(this._activeUsers);
             } catch (e) { console.warn('SSE put parse error', e); }
         });
+
         es.addEventListener('patch', (event) => {
             try {
                 const msg = JSON.parse(event.data);
-                if (msg.data) {
-                    if (msg.data.note && !this.collabIsOwner) {
-                        this.collabNoteData = { ...(this.collabNoteData || {}), ...msg.data.note };
-                        this.setEditorForSession(this.collabNoteData, false);
+                const path = msg.path || '/';
+                const data = msg.data;
+
+                if (path === '/' || path === '') {
+                    if (data.note) applyNoteUpdate(data.note);
+                    if (data.permission) applyPermissionUpdate(data.permission);
+                    if (data.activeUsers !== undefined) {
+                        this._activeUsers = data.activeUsers || {};
+                        this.renderShareCollaborators(this._activeUsers);
                     }
-                    if (msg.data.permission) {
-                        this.collabPermission = msg.data.permission;
-                        if (this.collabNoteData) this.setEditorForSession(this.collabNoteData, false);
+                    if (data.status === 'closed') applyClose();
+                } else if (path === '/note') {
+                    applyNoteUpdate(data);
+                } else if (path === '/permission') {
+                    applyPermissionUpdate(data);
+                } else if (path === '/status') {
+                    if (data === 'closed') applyClose();
+                } else if (path.startsWith('/activeUsers')) {
+                    const parts = path.split('/').filter(Boolean);
+                    if (parts.length === 1) {
+                        this._activeUsers = data || {};
+                    } else if (parts.length >= 2) {
+                        const uid = parts[1];
+                        if (data === null) {
+                            delete this._activeUsers[uid];
+                        } else {
+                            this._activeUsers[uid] = { ...(this._activeUsers[uid] || {}), ...data };
+                        }
                     }
-                    if (msg.data.activeUsers !== undefined) {
-                        this.renderShareCollaborators(msg.data.activeUsers || {});
-                    }
-                    if (msg.data.status === 'closed' && !this.collabIsOwner) {
-                        es.close();
-                        this.showShareModal({ title: 'Session Ended', message: 'This session has been closed by the owner.' });
-                    }
+                    this.renderShareCollaborators(this._activeUsers);
                 }
             } catch (e) { console.warn('SSE patch parse error', e); }
         });
-        es.onerror = () => {
-            console.warn('SSE connection lost, reconnecting...');
-        };
+
+        es.onerror = () => { console.warn('SSE connection lost, will auto-reconnect'); };
     }
 
     renderShareCollaborators(activeUsers) {
+        const users = Object.values(activeUsers || {});
+
         const container = document.getElementById('shareCollaborators');
-        const cursors = document.getElementById('collabCursors');
         if (container) {
             container.innerHTML = '';
-            Object.values(activeUsers || {}).forEach(user => {
+            users.forEach(user => {
                 const badge = document.createElement('span');
                 badge.textContent = user.name + (user.isOwner ? ' (Owner)' : '');
                 badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:' + user.color + ';color:#fff;padding:6px 10px;border-radius:999px;font-size:13px;';
                 container.appendChild(badge);
             });
         }
+
+        const cursors = document.getElementById('collabCursors');
         if (cursors) {
             cursors.innerHTML = '';
-            Object.values(activeUsers || {}).forEach(user => {
+            users.forEach(user => {
                 if (user.id === this.collabUser.id || !user.cursor) return;
                 const cursor = document.createElement('div');
                 cursor.className = 'collab-cursor';
-                cursor.style.top = `${user.cursor.top}px`;
-                cursor.style.left = `${user.cursor.left}px`;
-                cursor.style.height = `${user.cursor.height || 18}px`;
-                cursor.style.backgroundColor = user.color || '#005fa3';
+                cursor.style.cssText = `top:${user.cursor.top}px;left:${user.cursor.left}px;height:${user.cursor.height || 18}px;--cursor-color:${user.color || '#005fa3'};background:${user.color || '#005fa3'}`;
                 const label = document.createElement('div');
                 label.className = 'collab-cursor-label';
                 label.textContent = user.name;
-                if (user.color) label.style.backgroundColor = user.color;
+                label.style.background = user.color || '#005fa3';
                 cursor.appendChild(label);
                 cursors.appendChild(cursor);
             });
         }
+
+        this.renderCollabBar(activeUsers);
+    }
+
+    renderCollabBar(activeUsers) {
+        const editorArea = document.querySelector('.editor-area');
+        if (!editorArea || !this.collabMode) {
+            const old = document.getElementById('collabPresenceBar');
+            if (old) old.remove();
+            return;
+        }
+        let bar = document.getElementById('collabPresenceBar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'collabPresenceBar';
+            bar.className = 'collab-presence-bar';
+            const editorHeader = editorArea.querySelector('.editor-header');
+            if (editorHeader) {
+                editorHeader.insertAdjacentElement('afterend', bar);
+            } else {
+                editorArea.prepend(bar);
+            }
+        }
+
+        const users = Object.values(activeUsers || {});
+        const avatarsHtml = users.map(user => {
+            const initial = (user.name || '?')[0].toUpperCase();
+            const isMe = user.id === this.collabUser.id;
+            return `<div class="collab-avatar${isMe ? ' collab-avatar-me' : ''}" style="background:${user.color || '#00b894'}" title="${user.name}${isMe ? ' (You)' : ''}${user.isOwner ? ' · Owner' : ''}">
+                ${initial}
+                ${user.isOwner ? '<span class="collab-avatar-crown" title="Session Owner">♛</span>' : ''}
+            </div>`;
+        }).join('');
+
+        const permLabel = this.collabIsOwner
+            ? '<span class="collab-perm-badge collab-perm-owner">Owner</span>'
+            : this.collabPermission === 'edit'
+                ? '<span class="collab-perm-badge collab-perm-edit">✎ Can Edit</span>'
+                : '<span class="collab-perm-badge collab-perm-view">&#128065; View Only</span>';
+
+        bar.innerHTML = `<div class="collab-bar-avatars">${avatarsHtml || '<span style="color:#9ca3af;font-size:12px">Connecting...</span>'}</div>
+            <div class="collab-bar-right"><span class="collab-session-dot"></span><span class="collab-session-label">Live</span>${permLabel}</div>`;
     }
 
     setEditorForSession(noteData, focus = true) {
@@ -464,9 +537,7 @@ class NotesApp {
                 this.debouncedSave();
             }
         }
-        if (this.collabSessionId && this.collabPermission === 'edit') {
-            this._dbPatch(`/sharednotes/${this.collabSessionId}`, { note: this.collabNoteData });
-        }
+        this._debouncedCollabPush();
     }
 
     updateCollabNoteContent() {
@@ -487,9 +558,17 @@ class NotesApp {
                 this.debouncedSave();
             }
         }
-        if (this.collabSessionId && this.collabPermission === 'edit') {
-            this._dbPatch(`/sharednotes/${this.collabSessionId}`, { note: this.collabNoteData });
-        }
+        this._debouncedCollabPush();
+    }
+
+    _debouncedCollabPush() {
+        if (this._collabPushTimer) clearTimeout(this._collabPushTimer);
+        this._collabPushTimer = setTimeout(() => {
+            if (this.collabSessionId && this.collabPermission === 'edit' && this.collabNoteData) {
+                this._lastPushedModifiedAt = this.collabNoteData.modifiedAt;
+                this._dbPatch(`/sharednotes/${this.collabSessionId}`, { note: this.collabNoteData });
+            }
+        }, 400);
     }
 
     handleSelectionChange() {
@@ -1556,27 +1635,27 @@ class NotesApp {
     renderNotesCards() {
         const notesListDisplay = document.getElementById('notesListDisplay');
         const noNotesContainer = document.getElementById('noNotesContainer');
-        
+
         if (!notesListDisplay) return;
-        
+
         notesListDisplay.innerHTML = '';
-        
+
         if (this.notes.length === 0) {
             notesListDisplay.style.display = 'none';
             noNotesContainer.style.display = 'flex';
             return;
         }
-        
+
         notesListDisplay.style.display = 'grid';
         noNotesContainer.style.display = 'none';
-        
+
         const colorClasses = ['pink', 'blue', 'green', 'yellow', 'purple'];
-        
+
         this.notes.forEach((note, index) => {
             const card = document.createElement('div');
             card.className = 'note-card';
             card.dataset.noteId = note.id;
-            
+
             // Only apply color if the note has a color set AND it's not white (#ffffff)
             if (note.color && note.color !== '#ffffff') {
                 const colorIndex = this.getColorClassFromHex(note.color);
@@ -1584,30 +1663,30 @@ class NotesApp {
                     card.classList.add(colorClasses[colorIndex]);
                 }
             }
-            
+
             // Extract preview text
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = note.content;
             const plainText = tempDiv.textContent || tempDiv.innerText || '';
             const preview = plainText.substring(0, 100);
-            
+
             // Format date
             const date = new Date(note.modifiedAt);
             const formattedDate = this.formatDate(date);
-            
+
             // Create title - default to "Untitled Note" if empty
             const title = note.title || 'Untitled Note';
-            
+
             card.innerHTML = `
                 <h4 class="note-card-title">${this.escapeHtml(title)}</h4>
                 <p class="note-card-preview">${this.escapeHtml(preview)}</p>
                 <p class="note-card-date">${formattedDate}</p>
             `;
-            
+
             card.addEventListener('click', () => {
                 this.selectNote(note.id);
             });
-            
+
             notesListDisplay.appendChild(card);
         });
     }
