@@ -131,20 +131,51 @@ class NotesApp {
     }
 
     initializeCollaboration() {
-        if (!window.firebase) return;
-        if (!firebase.apps.length) {
-            const firebaseConfig = {
-                databaseURL: 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app',
-                projectId: 'emeraldnetwork-web-default-rtdb'
-            };
-            firebase.initializeApp(firebaseConfig);
-        }
-        this.collabDb = firebase.database();
+        this.dbUrl = 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app';
+        this.collabDb = true;
         this.collabUser = this.loadCollaboratorInfo();
         window.addEventListener('visibilitychange', () => {
             if (document.hidden) this.leaveCollaboration();
             else if (this.collabSessionId) this.updateActiveUserPresence();
         });
+        window.addEventListener('beforeunload', () => {
+            if (this.collabSessionId && this.collabUser) {
+                navigator.sendBeacon(
+                    `${this.dbUrl}/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}.json?x-http-method-override=DELETE`,
+                    ''
+                );
+            }
+        });
+    }
+
+    _sessionUrl(path = '') {
+        return `${this.dbUrl}/sharednotes/${this.collabSessionId}${path}.json`;
+    }
+
+    async _dbGet(path = '') {
+        const res = await fetch(`${this.dbUrl}${path}.json`);
+        if (!res.ok) throw new Error(`DB GET failed: ${res.status}`);
+        return res.json();
+    }
+
+    async _dbPut(path = '', data) {
+        await fetch(`${this.dbUrl}${path}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    async _dbPatch(path = '', data) {
+        await fetch(`${this.dbUrl}${path}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    async _dbDelete(path = '') {
+        await fetch(`${this.dbUrl}${path}.json`, { method: 'DELETE' });
     }
 
     loadCollaboratorInfo() {
@@ -168,51 +199,48 @@ class NotesApp {
     checkShareSessionFromURL() {
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get('collab');
-        if (!sessionId || !this.collabDb) return;
+        if (!sessionId) return;
         this.joinCollabSession(sessionId);
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     async joinCollabSession(sessionId) {
-        if (!this.collabDb) return;
         this.collabSessionId = sessionId;
-        this.collabSessionRef = this.collabDb.ref(`sharednotes/${sessionId}`);
-        const snapshot = await this.collabSessionRef.once('value');
-        const data = snapshot.val();
-        if (!data) {
-            this.showShareModal({ title: 'Invalid Session', message: 'This live collaboration link is no longer valid.' });
-            return;
+        try {
+            const data = await this._dbGet(`/sharednotes/${sessionId}`);
+            if (!data) {
+                this.showShareModal({ title: 'Invalid Session', message: 'This live collaboration link is no longer valid.' });
+                return;
+            }
+            if (data.status === 'closed') {
+                this.showShareModal({ title: 'Session Closed', message: 'This shared note session has ended. It is not added to your notes list.' });
+                return;
+            }
+            this.collabIsOwner = data.ownerId === this.collabUser.id;
+            this.collabPermission = data.permission || 'edit';
+            this.collabMode = true;
+            this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
+            this.setEditorForSession(this.collabNoteData);
+            this.renderShareCollaborators(data.activeUsers || {});
+            this.setupSessionListener();
+            this.updateActiveUserPresence();
+            this.showToast(`Joined shared note as ${this.collabUser.name}`);
+        } catch (err) {
+            console.error('Failed to join collab session', err);
+            this.showToast('Failed to join session. Please try again.');
         }
-        if (data.status === 'closed') {
-            this.showShareModal({ title: 'Session Closed', message: 'This shared note session has ended. It is not added to your notes list.' });
-            return;
-        }
-        this.collabIsOwner = data.ownerId === this.collabUser.id;
-        this.collabPermission = data.permission || 'edit';
-        this.collabMode = true;
-        this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
-        this.setEditorForSession(this.collabNoteData);
-        this.renderShareCollaborators(data.activeUsers || {});
-        this.setupSessionListener();
-        this.updateActiveUserPresence();
-        this.showToast(`Joined shared note as ${this.collabUser.name}`);
     }
 
     openShareModal() {
-        if (!this.collabDb) {
-            this.showToast('Live collaboration requires Firebase to be loaded.');
-            return;
-        }
         if (!this.currentNoteId && !this.collabMode) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!this.collabSessionId || !this.collabMode) {
             this.collabSessionId = this.collabSessionId || this.generateId(10);
-            this.collabSessionRef = this.collabDb.ref(`sharednotes/${this.collabSessionId}`);
             this.collabIsOwner = true;
             this.collabMode = true;
             this.collabPermission = 'edit';
             this.collabNoteData = note ? { ...note } : { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
-            this.collabSessionRef.set({
+            this._dbPut(`/sharednotes/${this.collabSessionId}`, {
                 ownerId: this.collabUser.id,
                 noteId: note ? note.id : null,
                 permission: this.collabPermission,
@@ -233,13 +261,13 @@ class NotesApp {
         if (!shareModal || !shareLink || !permissionSelect) return;
         shareLink.value = `${window.location.origin}${window.location.pathname}?collab=${this.collabSessionId}`;
         permissionSelect.value = this.collabPermission;
-        closeBtn.style.display = this.collabIsOwner ? 'inline-flex' : 'none';
+        if (closeBtn) closeBtn.style.display = this.collabIsOwner ? 'inline-flex' : 'none';
         shareModal.classList.add('show');
         const cleanup = () => {
             shareModal.classList.remove('show');
             cancelBtn.removeEventListener('click', cleanup);
             copyBtn.removeEventListener('click', handleCopy);
-            closeBtn.removeEventListener('click', handleCloseSession);
+            if (closeBtn) closeBtn.removeEventListener('click', handleCloseSession);
             permissionSelect.removeEventListener('change', handlePermissionChange);
         };
         const handleCopy = () => {
@@ -257,18 +285,18 @@ class NotesApp {
         };
         const handlePermissionChange = () => {
             this.collabPermission = permissionSelect.value;
-            if (this.collabSessionRef) {
-                this.collabSessionRef.child('permission').set(this.collabPermission);
+            if (this.collabSessionId) {
+                this._dbPatch(`/sharednotes/${this.collabSessionId}`, { permission: this.collabPermission });
             }
         };
         const handleCloseSession = async () => {
-            if (!this.collabIsOwner || !this.collabSessionRef) return;
-            await this.collabSessionRef.update({ status: 'closed', closedAt: new Date().toISOString() });
+            if (!this.collabIsOwner || !this.collabSessionId) return;
+            await this._dbPatch(`/sharednotes/${this.collabSessionId}`, { status: 'closed', closedAt: new Date().toISOString() });
             this.showToast('Session closed');
             cleanup();
         };
         cancelBtn.addEventListener('click', cleanup);
-        closeBtn.addEventListener('click', handleCloseSession);
+        if (closeBtn) closeBtn.addEventListener('click', handleCloseSession);
         copyBtn.addEventListener('click', handleCopy);
         permissionSelect.addEventListener('change', handlePermissionChange);
     }
@@ -291,9 +319,8 @@ class NotesApp {
     }
 
     async updateActiveUserPresence() {
-        if (!this.collabSessionRef || !this.collabUser) return;
-        const userRef = this.collabSessionRef.child(`activeUsers/${this.collabUser.id}`);
-        await userRef.update({
+        if (!this.collabSessionId || !this.collabUser) return;
+        await this._dbPatch(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`, {
             id: this.collabUser.id,
             name: this.collabUser.name,
             color: this.collabUser.color,
@@ -301,15 +328,21 @@ class NotesApp {
             updatedAt: new Date().toISOString(),
             isOwner: this.collabIsOwner
         });
-        userRef.onDisconnect().remove();
     }
 
     setupSessionListener() {
-        if (!this.collabSessionRef) return;
-        this.collabSessionRef.on('value', snapshot => {
-            const data = snapshot.val();
+        if (!this.collabSessionId) return;
+        if (this._collabEventSource) {
+            this._collabEventSource.close();
+            this._collabEventSource = null;
+        }
+        const url = `${this.dbUrl}/sharednotes/${this.collabSessionId}.json`;
+        const es = new EventSource(url);
+        this._collabEventSource = es;
+        const handleData = (data) => {
             if (!data) return;
             if (data.status === 'closed' && !this.collabIsOwner) {
+                es.close();
                 this.showShareModal({ title: 'Session Ended', message: 'This session has been closed by the owner.' });
                 return;
             }
@@ -318,12 +351,38 @@ class NotesApp {
                     this.collabNoteData = data.note;
                     this.setEditorForSession(data.note, false);
                 }
-                if (this.collabIsOwner) {
-                    this.renderShareCollaborators(data.activeUsers || {});
-                }
             }
             this.renderShareCollaborators(data.activeUsers || {});
+        };
+        es.addEventListener('put', (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                handleData(msg.data);
+            } catch (e) { console.warn('SSE put parse error', e); }
         });
+        es.addEventListener('patch', (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.data && this.collabNoteData) {
+                    if (msg.data.note) {
+                        this.collabNoteData = { ...this.collabNoteData, ...msg.data.note };
+                        if (!this.collabIsOwner && this.collabPermission === 'edit') {
+                            this.setEditorForSession(this.collabNoteData, false);
+                        }
+                    }
+                    if (msg.data.activeUsers !== undefined) {
+                        this.renderShareCollaborators(msg.data.activeUsers || {});
+                    }
+                    if (msg.data.status === 'closed' && !this.collabIsOwner) {
+                        es.close();
+                        this.showShareModal({ title: 'Session Ended', message: 'This session has been closed by the owner.' });
+                    }
+                }
+            } catch (e) { console.warn('SSE patch parse error', e); }
+        });
+        es.onerror = () => {
+            console.warn('SSE connection lost, reconnecting...');
+        };
     }
 
     renderShareCollaborators(activeUsers) {
@@ -389,8 +448,8 @@ class NotesApp {
                 this.debouncedSave();
             }
         }
-        if (this.collabSessionRef && this.collabPermission === 'edit') {
-            this.collabSessionRef.child('note').set(this.collabNoteData);
+        if (this.collabSessionId && this.collabPermission === 'edit') {
+            this._dbPatch(`/sharednotes/${this.collabSessionId}`, { note: this.collabNoteData });
         }
     }
 
@@ -412,13 +471,13 @@ class NotesApp {
                 this.debouncedSave();
             }
         }
-        if (this.collabSessionRef && this.collabPermission === 'edit') {
-            this.collabSessionRef.child('note').set(this.collabNoteData);
+        if (this.collabSessionId && this.collabPermission === 'edit') {
+            this._dbPatch(`/sharednotes/${this.collabSessionId}`, { note: this.collabNoteData });
         }
     }
 
     handleSelectionChange() {
-        if (!this.collabMode || !this.collabSessionRef || !this.collabUser) return;
+        if (!this.collabMode || !this.collabSessionId || !this.collabUser) return;
         const editor = document.getElementById('textEditor');
         const selection = window.getSelection();
         if (!selection || selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) return;
@@ -431,14 +490,15 @@ class NotesApp {
             left: rect.left - editorRect.left + editor.scrollLeft,
             height: rect.height || 18
         };
-        this.collabSessionRef.child(`activeUsers/${this.collabUser.id}`).update({ cursor: position, updatedAt: new Date().toISOString() });
+        if (this._cursorDebounce) clearTimeout(this._cursorDebounce);
+        this._cursorDebounce = setTimeout(() => {
+            this._dbPatch(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`, { cursor: position, updatedAt: new Date().toISOString() });
+        }, 200);
     }
 
     leaveCollaboration() {
-        if (!this.collabSessionId || !this.collabDb || !this.collabUser) return;
-        if (this.collabSessionRef) {
-            this.collabSessionRef.child(`activeUsers/${this.collabUser.id}`).remove();
-        }
+        if (!this.collabSessionId || !this.collabUser) return;
+        this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`);
     }
 
     showSaveIndicator(status) {
