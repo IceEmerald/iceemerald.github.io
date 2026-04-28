@@ -193,18 +193,32 @@ class NotesApp {
     loadCollaboratorInfo() {
         try {
             const stored = localStorage.getItem('emeraldnotes_collaborator');
-            if (stored) return JSON.parse(stored);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                // Ensure name is never undefined
+                if (parsed && parsed.id && parsed.name && parsed.color) {
+                    return parsed;
+                }
+            }
         } catch (error) {
             console.warn('Failed to load collaborator info', error);
         }
         const names = ['Jade', 'Nova', 'Luna', 'Kai', 'Aria', 'Echo', 'Onyx', 'Ariel', 'Zara', 'Orion'];
         const colors = ['#00b894', '#0984e3', '#6c5ce7', '#e17055', '#00cec9', '#fdcb6e', '#ff7675', '#74b9ff', '#55efc4', '#ffeaa7'];
+        const randomName = names[Math.floor(Math.random() * names.length)];
+        const randomNumber = Math.floor(Math.random() * 90 + 10);
         const collaborator = {
             id: this.generateId(10),
-            name: `${names[Math.floor(Math.random() * names.length)]} ${Math.floor(Math.random() * 90 + 10)}`,
+            name: `${randomName} ${randomNumber}`,
             color: colors[Math.floor(Math.random() * colors.length)]
         };
-        localStorage.setItem('emeraldnotes_collaborator', JSON.stringify(collaborator));
+        // Ensure name is always valid
+        if (!collaborator.name || collaborator.name.trim() === '') {
+            collaborator.name = 'User ' + Math.floor(Math.random() * 9999);
+        }
+        try {
+            localStorage.setItem('emeraldnotes_collaborator', JSON.stringify(collaborator));
+        } catch (_) {}
         return collaborator;
     }
 
@@ -225,6 +239,7 @@ class NotesApp {
                     this._dbGet(`/sharednotes/${sid}`).then(data => {
                         if (!data || data.status === 'closed') {
                             localStorage.removeItem('emeraldnotes_collab_owner');
+                            localStorage.removeItem('emeraldnotes_collab_non_owner');
                             return;
                         }
                         if (data.ownerId !== this.collabUser.id) return;
@@ -250,6 +265,24 @@ class NotesApp {
                         this.showToast('Reconnected to your live session');
                     }).catch(() => {
                         localStorage.removeItem('emeraldnotes_collab_owner');
+                    });
+                }
+            }
+        } catch (_) {}
+        // Bug 3: Non-owner reload — check if we have a saved non-owner session
+        try {
+            const savedNonOwner = localStorage.getItem('emeraldnotes_collab_non_owner');
+            if (savedNonOwner) {
+                const { sessionId: sid } = JSON.parse(savedNonOwner);
+                if (sid) {
+                    this._dbGet(`/sharednotes/${sid}`).then(data => {
+                        if (!data || data.status === 'closed') {
+                            localStorage.removeItem('emeraldnotes_collab_non_owner');
+                            return;
+                        }
+                        this.joinCollabSession(sid);
+                    }).catch(() => {
+                        localStorage.removeItem('emeraldnotes_collab_non_owner');
                     });
                 }
             }
@@ -285,6 +318,12 @@ class NotesApp {
             this.renderShareCollaborators(data.activeUsers || {});
             this.setupSessionListener();
             this.updateActiveUserPresence();
+            // Bug 3: Save non-owner session info so they can reconnect
+            if (!this.collabIsOwner) {
+                try {
+                    localStorage.setItem('emeraldnotes_collab_non_owner', JSON.stringify({ sessionId: sessionId }));
+                } catch (_) {}
+            }
             this.showToast(`Joined shared note as ${this.collabUser.name}`);
         } catch (err) {
             console.error('Failed to join collab session', err);
@@ -536,7 +575,8 @@ class NotesApp {
 
     renderCollabBar(activeUsers) {
         const editorArea = document.querySelector('.editor-area');
-        if (!editorArea || !this.collabMode || !this.collabNoteVisible) {
+        // Bug 2: Only show collab bar when in collab mode AND viewing the actual collab note
+        if (!editorArea || !this.collabMode || !this.collabNoteVisible || (this.collabNoteId && this.currentNoteId !== this.collabNoteId)) {
             const old = document.getElementById('collabPresenceBar');
             if (old) old.remove();
             return;
@@ -684,7 +724,24 @@ class NotesApp {
 
     leaveCollaboration() {
         if (!this.collabSessionId || !this.collabUser) return;
-        this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`);
+        // Bug 4: Add 30-second grace period for non-owner disconnect
+        if (!this.collabIsOwner) {
+            this._dbPatch(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`, {
+                id: this.collabUser.id,
+                name: this.collabUser.name,
+                color: this.collabUser.color,
+                cursor: null,
+                updatedAt: new Date().toISOString(),
+                isOwner: false,
+                reconnectTimeout: new Date(Date.now() + 30000).toISOString()
+            }).catch(() => {});
+            // Schedule removal after 30 seconds
+            setTimeout(() => {
+                this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`).catch(() => {});
+            }, 30000);
+        } else {
+            this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`);
+        }
     }
 
     // Bug 11: centralized cleanup of all collab state
@@ -713,8 +770,11 @@ class NotesApp {
         // Remove cursor overlays
         const cursors = document.getElementById('collabCursors');
         if (cursors) cursors.innerHTML = '';
-        // Remove owner session from localStorage
-        try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
+        // Remove owner and non-owner sessions from localStorage
+        try { 
+            localStorage.removeItem('emeraldnotes_collab_owner');
+            localStorage.removeItem('emeraldnotes_collab_non_owner');
+        } catch (_) {}
         // Restore all owner-only buttons
         ['exportNoteBtn', 'deleteNoteBtn', 'noteColorDropdown', 'shareNoteBtn'].forEach(id => {
             const el = document.getElementById(id);
@@ -1637,6 +1697,8 @@ class NotesApp {
             this.collabNoteVisible = false;
             const old = document.getElementById('collabPresenceBar');
             if (old) old.remove();
+            // Bug 2: Clear collab UI when switching to non-collab notes
+            this.renderCollabBar({});
         }
 
         const noteColorDropdown = document.getElementById('noteColorDropdown');
