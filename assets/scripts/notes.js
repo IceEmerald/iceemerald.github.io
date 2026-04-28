@@ -298,7 +298,7 @@ class NotesApp {
                 return;
             }
             if (data.status === 'closed') {
-                this.showShareModal({ title: 'Session Closed', message: 'This shared note session has ended. It is not added to your notes list.' });
+                this.showShareModal({ title: 'Session Closed', message: 'This shared note session has ended.' });
                 return;
             }
             this.collabIsOwner = data.ownerId === this.collabUser.id;
@@ -334,7 +334,7 @@ class NotesApp {
     openShareModal() {
         if (!this.currentNoteId && !this.collabMode) return;
         if (this.collabMode && this.collabNoteId && !this.collabNoteVisible) {
-            this.showToast('Live collaboration is only active on the shared note. Switch back to continue.');
+            this.showToast('⚠️ | Live collaboration is active, but this session got disconnected. Please reload.');
             return;
         }
         const note = this.notes.find(n => n.id === this.currentNoteId);
