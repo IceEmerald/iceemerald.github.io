@@ -1511,9 +1511,12 @@
         /* Editor actions: all buttons identical size, no overflow */
         .editor-actions {
             gap: 4px;
-            flex-shrink: 0;
-            flex-wrap: nowrap;
+            flex-shrink: 1;
+            flex-wrap: wrap;
             align-items: center;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            max-width: 100%;
         }
     
         /* Uniform size for ALL action buttons */
@@ -2978,15 +2981,24 @@
         min-width: 200px;
     }
     
+    #fontColorDropdown .ms-dropdown-menu,
+    #highlightColorDropdown .ms-dropdown-menu,
+    #noteColorDropdown .ms-dropdown-menu {
+        max-height: 240px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
     #mobileFontFamilyDropdown .ms-dropdown-menu {
         max-height: 240px;
         overflow-y: auto;
     }
-    
-    /* ─── Format Button State (strikethrough, sub, sup) ─────────────────────── */
-    
-    #strikethroughBtn text,
-    #subscriptBtn text,
+
+    #mobileFontColorDropdown .ms-dropdown-menu,
+    #mobileHighlightDropdown .ms-dropdown-menu {
+        max-height: 240px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     #superscriptBtn text {
         font-family: 'DM Sans', sans-serif;
     }

@@ -1035,12 +1035,20 @@ class NotesApp {
         row.id = 'mobileRibbonRow';
         row.className = 'mobile-ribbon-row';
 
-        // Essential buttons: Bold, Italic, Underline, Strikethrough | Undo, Redo | Bullet, Number | Align L/C | More⋯
-        const essentials = [
+        // Essential mobile toolbar buttons: clipboard, text formatting, undo/redo, lists, alignment
+        const clipboard = [
+            { command: 'cut', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>`, title: 'Cut' },
+            { command: 'copy', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`, title: 'Copy' },
+            { command: 'paste', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`, title: 'Paste' },
+        ];
+
+        const formatting = [
             { command: 'bold', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>`, title: 'Bold' },
             { command: 'italic', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>`, title: 'Italic' },
             { command: 'underline', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>`, title: 'Underline' },
             { command: 'strikeThrough', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><path d="M16 6C16 6 14.5 4 12 4C9.5 4 7 5.5 7 8C7 10.5 9.5 11 12 12C14.5 13 17 13.5 17 16C17 18.5 14.5 20 12 20C9.5 20 8 18 8 18"/></svg>`, title: 'Strikethrough' },
+            { command: 'subscript', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5l8 8m0-8L4 13"/><text x="13" y="19" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>`, title: 'Subscript' },
+            { command: 'superscript', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9l8 8m0-8L4 17"/><text x="13" y="9" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>`, title: 'Superscript' },
         ];
 
         const div0 = document.createElement('div');
@@ -1065,6 +1073,7 @@ class NotesApp {
         const tertiary = [
             { command: 'justifyLeft', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>`, title: 'Align Left' },
             { command: 'justifyCenter', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>`, title: 'Center' },
+            { command: 'justifyRight', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>`, title: 'Align Right' },
         ];
 
         // Helper to create a command button
@@ -1084,8 +1093,10 @@ class NotesApp {
         };
 
         // Build buttons
-        [...essentials].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
+        [...clipboard].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
         row.appendChild(div0);
+        [...formatting].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
+        row.appendChild(div0.cloneNode());
         [...undoRedo].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
         row.appendChild(div1);
         [...secondary].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
@@ -3736,11 +3747,22 @@ class NotesApp {
             };
             const handleCopy = () => {
                 exportLink.select();
+                const finishCopy = () => {
+                    this.showToast('Link copied to clipboard');
+                    cleanup();
+                };
                 try {
                     if (navigator.clipboard && window.isSecureContext) {
-                        navigator.clipboard.writeText(exportLink.value).then(cleanup).catch(() => { document.execCommand('copy'); cleanup(); });
-                    } else { document.execCommand('copy'); cleanup(); }
-                } catch { }
+                        navigator.clipboard.writeText(exportLink.value)
+                            .then(finishCopy)
+                            .catch(() => { document.execCommand('copy'); finishCopy(); });
+                    } else {
+                        document.execCommand('copy');
+                        finishCopy();
+                    }
+                } catch {
+                    finishCopy();
+                }
                 cancelBtn.removeEventListener('click', cleanup);
                 copyBtn.removeEventListener('click', handleCopy);
             };
