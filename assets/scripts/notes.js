@@ -1103,197 +1103,180 @@ class NotesApp {
         row.appendChild(div2);
         [...tertiary].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
 
-        // Spacer
-        const spacer = document.createElement('div');
-        spacer.style.flex = '1';
-        row.appendChild(spacer);
+        // Divider before insert buttons
+        const div3 = document.createElement('div');
+        div3.className = 'mobile-ribbon-divider';
+        row.appendChild(div3);
 
-        // More ⋯ button
-        const moreBtn = document.createElement('button');
-        moreBtn.className = 'mobile-more-btn';
-        moreBtn.id = 'mobileMoreBtn';
-        moreBtn.title = 'More options';
-        moreBtn.textContent = '⋯';
-        row.appendChild(moreBtn);
+        // Insert buttons directly in row (icon only, matching other ribbon buttons)
+        const insertDefs = [
+            { id: 'mobileInsertTableBtn', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>`, title: 'Table' },
+            { id: 'mobileInsertImageBtn', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`, title: 'Image' },
+            { id: 'mobileInsertTodoBtn', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="4" height="4" rx="1"/><line x1="10" y1="7" x2="21" y2="7"/><rect x="3" y="13" width="4" height="4" rx="1"/><line x1="10" y1="15" x2="21" y2="15"/><polyline points="3,19 5,21 9,17"/></svg>`, title: 'To-Do' },
+            { id: 'mobileDrawBtn', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`, title: 'Draw' },
+        ];
 
-        // More panel (insert actions + font, colors)
-        const morePanel = document.createElement('div');
-        morePanel.className = 'mobile-more-panel';
-        morePanel.id = 'mobileMorePanel';
-        morePanel.innerHTML = `
-            <div style="padding:4px 0 8px;font-size:11px;font-weight:600;color:rgba(44,62,80,0.5);text-transform:uppercase;letter-spacing:0.5px;">Insert</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
-                <button class="ribbon-btn" id="mobileInsertTableBtn" title="Table" style="font-size:11px;padding:5px 10px;gap:4px;display:flex;align-items:center;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> Table
-                </button>
-                <button class="ribbon-btn" id="mobileInsertImageBtn" title="Image" style="font-size:11px;padding:5px 10px;gap:4px;display:flex;align-items:center;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Image
-                </button>
-                <button class="ribbon-btn" id="mobileInsertTodoBtn" title="To-do" style="font-size:11px;padding:5px 10px;gap:4px;display:flex;align-items:center;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> To-do
-                </button>
-                <button class="ribbon-btn" id="mobileDrawBtn" title="Draw" style="font-size:11px;padding:5px 10px;gap:4px;display:flex;align-items:center;">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Draw
-                </button>
-            </div>
-            <div style="border-top:1px solid rgba(0,0,0,0.07);margin-bottom:8px;"></div>
-            <div style="padding:4px 0 8px;font-size:11px;font-weight:600;color:rgba(44,62,80,0.5);text-transform:uppercase;letter-spacing:0.5px;">Font</div>
-            <div id="mobileFontFamilyDropdown" class="ms-dropdown" style="margin-bottom:6px;">
-                <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
-                    <span class="dropdown-value">Arial</span>
-                </button>
-                <div class="ms-dropdown-menu">
-                    <div class="ms-dropdown-item font-group-label">— Sans-Serif —</div>
-                    <div class="ms-dropdown-item" data-value="Arial" style="font-family:Arial,sans-serif;">Arial</div>
-                    <div class="ms-dropdown-item" data-value="Helvetica" style="font-family:Helvetica,sans-serif;">Helvetica</div>
-                    <div class="ms-dropdown-item" data-value="Verdana" style="font-family:Verdana,sans-serif;">Verdana</div>
-                    <div class="ms-dropdown-item" data-value="Roboto" style="font-family:Roboto,sans-serif;">Roboto</div>
-                    <div class="ms-dropdown-item" data-value="Open Sans" style="font-family:'Open Sans',sans-serif;">Open Sans</div>
-                    <div class="ms-dropdown-item" data-value="Lato" style="font-family:Lato,sans-serif;">Lato</div>
-                    <div class="ms-dropdown-item" data-value="Montserrat" style="font-family:Montserrat,sans-serif;">Montserrat</div>
-                    <div class="ms-dropdown-item" data-value="Poppins" style="font-family:Poppins,sans-serif;">Poppins</div>
-                    <div class="ms-dropdown-item" data-value="Raleway" style="font-family:Raleway,sans-serif;">Raleway</div>
-                    <div class="ms-dropdown-item" data-value="Nunito" style="font-family:Nunito,sans-serif;">Nunito</div>
-                    <div class="ms-dropdown-item" data-value="Ubuntu" style="font-family:Ubuntu,sans-serif;">Ubuntu</div>
-                    <div class="ms-dropdown-item" data-value="Mulish" style="font-family:Mulish,sans-serif;">Mulish</div>
-                    <div class="ms-dropdown-item" data-value="Oswald" style="font-family:Oswald,sans-serif;">Oswald</div>
-                    <div class="ms-dropdown-item" data-value="Quicksand" style="font-family:Quicksand,sans-serif;">Quicksand</div>
-                    <div class="ms-dropdown-item" data-value="Comfortaa" style="font-family:Comfortaa,sans-serif;">Comfortaa</div>
-                    <div class="ms-dropdown-item font-group-label">— Serif —</div>
-                    <div class="ms-dropdown-item" data-value="Georgia" style="font-family:Georgia,serif;">Georgia</div>
-                    <div class="ms-dropdown-item" data-value="Times New Roman" style="font-family:'Times New Roman',serif;">Times New Roman</div>
-                    <div class="ms-dropdown-item" data-value="Merriweather" style="font-family:Merriweather,serif;">Merriweather</div>
-                    <div class="ms-dropdown-item" data-value="Lora" style="font-family:Lora,serif;">Lora</div>
-                    <div class="ms-dropdown-item" data-value="Playfair Display" style="font-family:'Playfair Display',serif;">Playfair Display</div>
-                    <div class="ms-dropdown-item font-group-label">— Monospace —</div>
-                    <div class="ms-dropdown-item" data-value="Courier New" style="font-family:'Courier New',monospace;">Courier New</div>
-                    <div class="ms-dropdown-item" data-value="Source Code Pro" style="font-family:'Source Code Pro',monospace;">Source Code Pro</div>
-                    <div class="ms-dropdown-item" data-value="Fira Code" style="font-family:'Fira Code',monospace;">Fira Code</div>
-                    <div class="ms-dropdown-item" data-value="JetBrains Mono" style="font-family:'JetBrains Mono',monospace;">JetBrains Mono</div>
-                    <div class="ms-dropdown-item font-group-label">— Handwriting —</div>
-                    <div class="ms-dropdown-item" data-value="Dancing Script" style="font-family:'Dancing Script',cursive;">Dancing Script</div>
-                    <div class="ms-dropdown-item" data-value="Pacifico" style="font-family:Pacifico,cursive;">Pacifico</div>
-                    <div class="ms-dropdown-item" data-value="Satisfy" style="font-family:Satisfy,cursive;">Satisfy</div>
-                    <div class="ms-dropdown-item" data-value="Caveat" style="font-family:Caveat,cursive;">Caveat</div>
-                </div>
-            </div>
-            <div id="mobileFontSizeDropdown" class="ms-dropdown" style="margin-bottom:6px;">
-                <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
-                    <span class="dropdown-value">12</span>
-                </button>
-                <div class="ms-dropdown-menu">
-                    <div class="ms-dropdown-item" data-value="10">10</div>
-                    <div class="ms-dropdown-item" data-value="12">12</div>
-                    <div class="ms-dropdown-item" data-value="14">14</div>
-                    <div class="ms-dropdown-item" data-value="16">16</div>
-                    <div class="ms-dropdown-item" data-value="18">18</div>
-                    <div class="ms-dropdown-item" data-value="20">20</div>
-                    <div class="ms-dropdown-item" data-value="24">24</div>
-                    <div class="ms-dropdown-item" data-value="28">28</div>
-                    <div class="ms-dropdown-item" data-value="32">32</div>
-                    <div class="ms-dropdown-item" data-value="36">36</div>
-                    <div class="ms-dropdown-item" data-value="48">48</div>
-                </div>
-            </div>
-            <div style="padding:4px 0 8px;font-size:11px;font-weight:600;color:rgba(44,62,80,0.5);text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;">Color</div>
-            <div id="mobileFontColorDropdown" class="ms-dropdown" style="margin-bottom:6px;">
-                <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
-                    <span class="color-preview" style="background:#000000;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>
-                    <span class="dropdown-value">Text Color</span>
-                </button>
-                <div class="ms-dropdown-menu">
-                    <div class="ms-dropdown-item" data-value="#000000" data-label="Black"><span class="color-preview" style="background:#000000;width:12px;height:12px;border-radius:2px;"></span> Black</div>
-                    <div class="ms-dropdown-item" data-value="#FF0000" data-label="Red"><span class="color-preview" style="background:#FF0000;width:12px;height:12px;border-radius:2px;"></span> Red</div>
-                    <div class="ms-dropdown-item" data-value="#0000FF" data-label="Blue"><span class="color-preview" style="background:#0000FF;width:12px;height:12px;border-radius:2px;"></span> Blue</div>
-                    <div class="ms-dropdown-item" data-value="#008000" data-label="Green"><span class="color-preview" style="background:#008000;width:12px;height:12px;border-radius:2px;"></span> Green</div>
-                    <div class="ms-dropdown-item" data-value="#800080" data-label="Purple"><span class="color-preview" style="background:#800080;width:12px;height:12px;border-radius:2px;"></span> Purple</div>
-                </div>
-            </div>
-            <div id="mobileHighlightDropdown" class="ms-dropdown">
-                <button class="ms-dropdown-btn" type="button" style="width:100%;min-width:unset;">
-                    <span class="color-preview" style="background:#FFFF00;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>
-                    <span class="dropdown-value">Highlight</span>
-                </button>
-                <div class="ms-dropdown-menu">
-                    <div class="ms-dropdown-item" data-value="#FFFF00" data-label="Yellow"><span class="color-preview" style="background:#FFFF00;width:12px;height:12px;border-radius:2px;"></span> Yellow</div>
-                    <div class="ms-dropdown-item" data-value="#90EE90" data-label="Light Green"><span class="color-preview" style="background:#90EE90;width:12px;height:12px;border-radius:2px;"></span> Light Green</div>
-                    <div class="ms-dropdown-item" data-value="#FFB6C1" data-label="Light Pink"><span class="color-preview" style="background:#FFB6C1;width:12px;height:12px;border-radius:2px;"></span> Light Pink</div>
-                    <div class="ms-dropdown-item" data-value="#ADD8E6" data-label="Light Blue"><span class="color-preview" style="background:#ADD8E6;width:12px;height:12px;border-radius:2px;"></span> Light Blue</div>
-                    <div class="ms-dropdown-item" data-value="transparent" data-label="None"><span class="color-preview" style="background:transparent;width:12px;height:12px;border:1px solid #ccc;border-radius:2px;"></span> None</div>
-                </div>
+        insertDefs.forEach(({ id, icon, title }) => {
+            const btn = document.createElement('button');
+            btn.className = 'ribbon-btn';
+            btn.id = id;
+            btn.title = title;
+            btn.innerHTML = icon;
+            btn.addEventListener('mousedown', (e) => e.preventDefault());
+            row.appendChild(btn);
+        });
+
+        // Divider before font/color dropdowns
+        const div4 = document.createElement('div');
+        div4.className = 'mobile-ribbon-divider';
+        row.appendChild(div4);
+
+        // Inline font family dropdown
+        const fontFamilyWrapper = document.createElement('div');
+        fontFamilyWrapper.id = 'mobileFontFamilyDropdown';
+        fontFamilyWrapper.className = 'ms-dropdown';
+        fontFamilyWrapper.style.cssText = 'flex-shrink:0;';
+        fontFamilyWrapper.innerHTML = `
+            <button class="ms-dropdown-btn" type="button" style="min-width:80px;max-width:100px;">
+                <span class="dropdown-value">Arial</span>
+            </button>
+            <div class="ms-dropdown-menu">
+                <div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">Sans-Serif</div>
+                <div class="ms-dropdown-item" data-value="Arial" style="font-family:Arial,sans-serif;">Arial</div>
+                <div class="ms-dropdown-item" data-value="Helvetica" style="font-family:Helvetica,sans-serif;">Helvetica</div>
+                <div class="ms-dropdown-item" data-value="Verdana" style="font-family:Verdana,sans-serif;">Verdana</div>
+                <div class="ms-dropdown-item" data-value="Roboto" style="font-family:Roboto,sans-serif;">Roboto</div>
+                <div class="ms-dropdown-item" data-value="Open Sans" style="font-family:'Open Sans',sans-serif;">Open Sans</div>
+                <div class="ms-dropdown-item" data-value="Lato" style="font-family:Lato,sans-serif;">Lato</div>
+                <div class="ms-dropdown-item" data-value="Montserrat" style="font-family:Montserrat,sans-serif;">Montserrat</div>
+                <div class="ms-dropdown-item" data-value="Poppins" style="font-family:Poppins,sans-serif;">Poppins</div>
+                <div class="ms-dropdown-item" data-value="Raleway" style="font-family:Raleway,sans-serif;">Raleway</div>
+                <div class="ms-dropdown-item" data-value="Nunito" style="font-family:Nunito,sans-serif;">Nunito</div>
+                <div class="ms-dropdown-item" data-value="Ubuntu" style="font-family:Ubuntu,sans-serif;">Ubuntu</div>
+                <div class="ms-dropdown-item" data-value="Quicksand" style="font-family:Quicksand,sans-serif;">Quicksand</div>
+                <div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">Serif</div>
+                <div class="ms-dropdown-item" data-value="Georgia" style="font-family:Georgia,serif;">Georgia</div>
+                <div class="ms-dropdown-item" data-value="Merriweather" style="font-family:Merriweather,serif;">Merriweather</div>
+                <div class="ms-dropdown-item" data-value="Lora" style="font-family:Lora,serif;">Lora</div>
+                <div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">Monospace</div>
+                <div class="ms-dropdown-item" data-value="Courier New" style="font-family:'Courier New',monospace;">Courier New</div>
+                <div class="ms-dropdown-item" data-value="Fira Code" style="font-family:'Fira Code',monospace;">Fira Code</div>
+                <div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">Handwriting</div>
+                <div class="ms-dropdown-item" data-value="Dancing Script" style="font-family:'Dancing Script',cursive;">Dancing Script</div>
+                <div class="ms-dropdown-item" data-value="Pacifico" style="font-family:Pacifico,cursive;">Pacifico</div>
+                <div class="ms-dropdown-item" data-value="Caveat" style="font-family:Caveat,cursive;">Caveat</div>
             </div>
         `;
+        row.appendChild(fontFamilyWrapper);
 
-        // Position more panel relative to ribbon
-        const ribbonEl = document.querySelector('.ribbon');
-        ribbonEl.style.position = 'relative';
-        ribbonEl.appendChild(morePanel);
+        // Inline font size dropdown
+        const fontSizeWrapper = document.createElement('div');
+        fontSizeWrapper.id = 'mobileFontSizeDropdown';
+        fontSizeWrapper.className = 'ms-dropdown';
+        fontSizeWrapper.style.cssText = 'flex-shrink:0;';
+        fontSizeWrapper.innerHTML = `
+            <button class="ms-dropdown-btn" type="button" style="min-width:54px;">
+                <span class="dropdown-value">10</span>
+            </button>
+            <div class="ms-dropdown-menu">
+                <div class="ms-dropdown-item" data-value="10">10</div>
+                <div class="ms-dropdown-item" data-value="12">12</div>
+                <div class="ms-dropdown-item" data-value="14">14</div>
+                <div class="ms-dropdown-item" data-value="16">16</div>
+                <div class="ms-dropdown-item" data-value="18">18</div>
+                <div class="ms-dropdown-item" data-value="20">20</div>
+                <div class="ms-dropdown-item" data-value="24">24</div>
+                <div class="ms-dropdown-item" data-value="28">28</div>
+                <div class="ms-dropdown-item" data-value="32">32</div>
+                <div class="ms-dropdown-item" data-value="36">36</div>
+                <div class="ms-dropdown-item" data-value="48">48</div>
+            </div>
+        `;
+        row.appendChild(fontSizeWrapper);
 
-        // Toggle more panel
-        moreBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.saveSelection();
-            morePanel.classList.toggle('open');
-            moreBtn.classList.toggle('active');
-        });
+        // Inline font color dropdown
+        const fontColorWrapper = document.createElement('div');
+        fontColorWrapper.id = 'mobileFontColorDropdown';
+        fontColorWrapper.className = 'ms-dropdown';
+        fontColorWrapper.style.cssText = 'flex-shrink:0;';
+        fontColorWrapper.innerHTML = `
+            <button class="ms-dropdown-btn" type="button" style="min-width:80px;">
+                <span class="color-preview" style="background:#000000;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;flex-shrink:0;"></span>
+                <span class="dropdown-value">Color</span>
+            </button>
+            <div class="ms-dropdown-menu">
+                <div class="ms-dropdown-item" data-value="#000000" data-label="Black"><span class="color-preview" style="background:#000000;width:12px;height:12px;border-radius:2px;"></span> Black</div>
+                <div class="ms-dropdown-item" data-value="#DC143C" data-label="Red"><span class="color-preview" style="background:#DC143C;width:12px;height:12px;border-radius:2px;"></span> Red</div>
+                <div class="ms-dropdown-item" data-value="#FF8C00" data-label="Orange"><span class="color-preview" style="background:#FF8C00;width:12px;height:12px;border-radius:2px;"></span> Orange</div>
+                <div class="ms-dropdown-item" data-value="#FFD700" data-label="Yellow"><span class="color-preview" style="background:#FFD700;width:12px;height:12px;border-radius:2px;"></span> Yellow</div>
+                <div class="ms-dropdown-item" data-value="#008000" data-label="Green"><span class="color-preview" style="background:#008000;width:12px;height:12px;border-radius:2px;"></span> Green</div>
+                <div class="ms-dropdown-item" data-value="#0000FF" data-label="Blue"><span class="color-preview" style="background:#0000FF;width:12px;height:12px;border-radius:2px;"></span> Blue</div>
+                <div class="ms-dropdown-item" data-value="#800080" data-label="Purple"><span class="color-preview" style="background:#800080;width:12px;height:12px;border-radius:2px;"></span> Purple</div>
+                <div class="ms-dropdown-item" data-value="#FF1493" data-label="Pink"><span class="color-preview" style="background:#FF1493;width:12px;height:12px;border-radius:2px;"></span> Pink</div>
+                <div class="ms-dropdown-item" data-value="#ffffff" data-label="White"><span class="color-preview" style="background:#ffffff;width:12px;height:12px;border-radius:2px;border:1px solid #ccc;"></span> White</div>
+            </div>
+        `;
+        row.appendChild(fontColorWrapper);
 
-        // Close more panel on outside click
-        document.addEventListener('click', (e) => {
-            if (!moreBtn.contains(e.target) && !morePanel.contains(e.target)) {
-                morePanel.classList.remove('open');
-                moreBtn.classList.remove('active');
-            }
-        });
+        // Inline highlight dropdown
+        const highlightWrapper = document.createElement('div');
+        highlightWrapper.id = 'mobileHighlightDropdown';
+        highlightWrapper.className = 'ms-dropdown';
+        highlightWrapper.style.cssText = 'flex-shrink:0;';
+        highlightWrapper.innerHTML = `
+            <button class="ms-dropdown-btn" type="button" style="min-width:90px;">
+                <span class="color-preview" style="background:transparent;width:12px;height:12px;border-radius:2px;border:1px solid #ccc;display:inline-block;margin-right:6px;flex-shrink:0;"></span>
+                <span class="dropdown-value">Highlight</span>
+            </button>
+            <div class="ms-dropdown-menu">
+                <div class="ms-dropdown-item" data-value="#FFFF00" data-label="Yellow"><span class="color-preview" style="background:#FFFF00;width:12px;height:12px;border-radius:2px;"></span> Yellow</div>
+                <div class="ms-dropdown-item" data-value="#90EE90" data-label="Light Green"><span class="color-preview" style="background:#90EE90;width:12px;height:12px;border-radius:2px;"></span> Light Green</div>
+                <div class="ms-dropdown-item" data-value="#FFB6C1" data-label="Light Pink"><span class="color-preview" style="background:#FFB6C1;width:12px;height:12px;border-radius:2px;"></span> Light Pink</div>
+                <div class="ms-dropdown-item" data-value="#ADD8E6" data-label="Light Blue"><span class="color-preview" style="background:#ADD8E6;width:12px;height:12px;border-radius:2px;"></span> Light Blue</div>
+                <div class="ms-dropdown-item" data-value="transparent" data-label="None"><span class="color-preview" style="background:transparent;width:12px;height:12px;border:1px solid #ccc;border-radius:2px;"></span> None</div>
+            </div>
+        `;
+        row.appendChild(highlightWrapper);
 
-        // Wire up mobile more panel dropdowns
-        const mobileFontFamily = morePanel.querySelector('#mobileFontFamilyDropdown');
-        const mobileFontSize = morePanel.querySelector('#mobileFontSizeDropdown');
-        const mobileFontColor = morePanel.querySelector('#mobileFontColorDropdown');
-        const mobileHighlight = morePanel.querySelector('#mobileHighlightDropdown');
-
-        this.wireMobileDropdown(mobileFontFamily, (value) => {
+        // Wire up inline dropdowns
+        this.wireMobileDropdown(fontFamilyWrapper, (value) => {
             this.restoreSelection();
             this.executeCommand('fontName', value);
         });
-        this.wireMobileDropdown(mobileFontSize, (value) => {
+        this.wireMobileDropdown(fontSizeWrapper, (value) => {
             this.restoreSelection();
             this.executeCommand('fontSize', value);
         });
-        this.wireMobileDropdown(mobileFontColor, (value) => {
+        this.wireMobileDropdown(fontColorWrapper, (value) => {
             this.restoreSelection();
             this.executeCommand('foreColor', value);
         });
-        this.wireMobileDropdown(mobileHighlight, (value) => {
+        this.wireMobileDropdown(highlightWrapper, (value) => {
             this.restoreSelection();
             this.executeCommand('hiliteColor', value);
         });
 
-        // Wire insert buttons in the more panel (bug 10)
-        const mobileInsertTableBtn = morePanel.querySelector('#mobileInsertTableBtn');
-        const mobileInsertImageBtn = morePanel.querySelector('#mobileInsertImageBtn');
-        const mobileInsertTodoBtn = morePanel.querySelector('#mobileInsertTodoBtn');
-        const mobileDrawBtn = morePanel.querySelector('#mobileDrawBtn');
+        // Wire insert buttons
+        const mobileInsertTableBtn = row.querySelector('#mobileInsertTableBtn');
+        const mobileInsertImageBtn = row.querySelector('#mobileInsertImageBtn');
+        const mobileInsertTodoBtn = row.querySelector('#mobileInsertTodoBtn');
+        const mobileDrawBtn = row.querySelector('#mobileDrawBtn');
         const desktopImageInput = document.getElementById('insertImageInput');
 
         if (mobileInsertTableBtn) {
-            mobileInsertTableBtn.addEventListener('mousedown', (e) => e.preventDefault());
-            mobileInsertTableBtn.addEventListener('click', () => { morePanel.classList.remove('open'); moreBtn.classList.remove('active'); this.insertTable(); });
+            mobileInsertTableBtn.addEventListener('click', () => this.insertTable());
         }
         if (mobileInsertImageBtn) {
-            mobileInsertImageBtn.addEventListener('mousedown', (e) => e.preventDefault());
             mobileInsertImageBtn.addEventListener('click', () => {
-                morePanel.classList.remove('open'); moreBtn.classList.remove('active');
                 this.saveSelection();
                 if (desktopImageInput) desktopImageInput.click();
             });
         }
         if (mobileInsertTodoBtn) {
-            mobileInsertTodoBtn.addEventListener('mousedown', (e) => e.preventDefault());
-            mobileInsertTodoBtn.addEventListener('click', () => { morePanel.classList.remove('open'); moreBtn.classList.remove('active'); this.insertTodo(); });
+            mobileInsertTodoBtn.addEventListener('click', () => this.insertTodo());
         }
         if (mobileDrawBtn) {
-            mobileDrawBtn.addEventListener('mousedown', (e) => e.preventDefault());
-            mobileDrawBtn.addEventListener('click', () => { morePanel.classList.remove('open'); moreBtn.classList.remove('active'); this.toggleDrawMode(); });
+            mobileDrawBtn.addEventListener('click', () => this.toggleDrawMode());
         }
 
         ribbonContent.appendChild(row);
