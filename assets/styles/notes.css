@@ -1681,6 +1681,28 @@
         .ribbon {
             position: relative;
         }
+
+        /* Draw toolbar: full-width scrollable strip on all mobile sizes */
+        .draw-toolbar {
+            left: 8px;
+            right: 8px;
+            bottom: 16px;
+            transform: none;
+            width: auto;
+            max-width: calc(100vw - 16px);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        .draw-toolbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        @keyframes drawToolbarIn {
+            from { opacity: 0; transform: translateY(12px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0)    scale(1);    }
+        }
     }
 
     /* =============================================
@@ -2023,6 +2045,16 @@
     @keyframes dropdownFadeIn {
         from { opacity: 0; transform: translateY(-8px); }
         to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes dropdownFadeOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-8px); }
+    }
+
+    .ms-portal-closing {
+        animation: dropdownFadeOut 0.15s ease forwards !important;
+        pointer-events: none !important;
     }
 
     .fade-in {
