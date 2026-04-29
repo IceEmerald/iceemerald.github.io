@@ -161,7 +161,7 @@
         min-height: 80px;
         background: rgba(255, 255, 255, 0.95);
         display: flex;
-        justify-content: center;
+        justify-content: flex-start;
         max-width: 1900px;
         margin: 0 auto;
         border-radius: 0 0 12px 12px;
@@ -184,8 +184,9 @@
         flex-wrap: nowrap;
         justify-content: flex-start;
         min-width: max-content;
-        padding-right: 3px;
-        padding-left: 50px;
+        padding-right: 12px;
+        padding-left: 12px;
+        margin: 0 auto;
     }
     
     .ribbon-panel.active {
@@ -327,9 +328,6 @@
     .main-content {
         display: flex;
         flex: 1;
-        width: 100%;
-        min-width: 0;
-        padding: 0 12px 12px 12px;
         overflow: hidden;
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: flex;
@@ -341,7 +339,6 @@
        ============================================= */
     .sidebar {
         width: 320px;
-        min-width: 0;
         background: rgba(255, 255, 255, 0);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -566,12 +563,11 @@
         -webkit-backdrop-filter: blur(16px);
         position: relative;
         border-radius: 12px;
-        margin: 12px 0 12px 12px;
+        margin: 12px;
         border: 1px solid rgba(0, 0, 0, 0.05);
         transition: margin 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         overflow: hidden;
         will-change: flex, margin, border-radius;
-        min-width: 0;
     }
     
     body.no-active-note .editor-area {
@@ -1293,7 +1289,6 @@
         .main-content {
             position: relative;
             overflow: hidden;
-            padding: 0;
         }
     
         /* --- Ribbon: compact, no tab system, just a slim toolbar row --- */
@@ -1314,29 +1309,67 @@
     
         /* Replace full ribbon with a compact mobile toolbar */
         .ribbon-content {
-            padding: 8px 12px;
+            padding: 8px 4px 8px 4px;
             min-height: unset;
             border-radius: 10px;
             justify-content: flex-start;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(35, 154, 77, 0.35) rgba(241, 241, 241, 0.9);
+            scrollbar-width: none;
+            position: relative;
         }
-
+    
         .ribbon-content::-webkit-scrollbar {
-            display: block;
-            height: 8px;
+            display: none;
         }
 
-        .ribbon-content::-webkit-scrollbar-track {
-            background: rgba(241, 241, 241, 0.9);
-            border-radius: 999px;
+        /* Scroll arrow buttons for mobile ribbon */
+        .ribbon-scroll-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            min-width: 32px;
+            height: 100%;
+            min-height: 36px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            color: rgba(44, 62, 80, 0.7);
+            flex-shrink: 0;
+            font-size: 14px;
+            transition: all 0.18s ease;
+            position: sticky;
+            z-index: 10;
+            padding: 0;
         }
 
-        .ribbon-content::-webkit-scrollbar-thumb {
-            background: rgba(35, 154, 77, 0.35);
-            border-radius: 999px;
+        .ribbon-scroll-btn:active {
+            background: rgba(35, 154, 77, 0.12);
+            border-color: #239a4d;
+            color: #239a4d;
+        }
+
+        .ribbon-scroll-btn.scroll-left {
+            left: 0;
+            margin-right: 4px;
+        }
+
+        .ribbon-scroll-btn.scroll-right {
+            right: 0;
+            margin-left: 4px;
+        }
+
+        .ribbon-scroll-btn svg {
+            pointer-events: none;
+        }
+    
+        /* Mobile ribbon: single scrollable row of essential buttons */
+        .mobile-ribbon-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
             flex-wrap: nowrap;
             width: 100%;
         }

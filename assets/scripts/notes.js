@@ -1279,7 +1279,38 @@ class NotesApp {
             mobileDrawBtn.addEventListener('click', () => this.toggleDrawMode());
         }
 
+        // Create scroll left button
+        const scrollLeftBtn = document.createElement('button');
+        scrollLeftBtn.className = 'ribbon-scroll-btn scroll-left';
+        scrollLeftBtn.id = 'ribbonScrollLeft';
+        scrollLeftBtn.title = 'Scroll left';
+        scrollLeftBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
+
+        // Create scroll right button
+        const scrollRightBtn = document.createElement('button');
+        scrollRightBtn.className = 'ribbon-scroll-btn scroll-right';
+        scrollRightBtn.id = 'ribbonScrollRight';
+        scrollRightBtn.title = 'Scroll right';
+        scrollRightBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+
+        ribbonContent.appendChild(scrollLeftBtn);
         ribbonContent.appendChild(row);
+        ribbonContent.appendChild(scrollRightBtn);
+
+        // Scroll step amount
+        const SCROLL_STEP = 120;
+
+        scrollLeftBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        scrollLeftBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            ribbonContent.scrollBy({ left: -SCROLL_STEP, behavior: 'smooth' });
+        });
+
+        scrollRightBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        scrollRightBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            ribbonContent.scrollBy({ left: SCROLL_STEP, behavior: 'smooth' });
+        });
     }
 
     wireMobileDropdown(dropdownEl, onSelect) {
