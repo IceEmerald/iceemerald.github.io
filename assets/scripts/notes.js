@@ -47,6 +47,11 @@ class NotesApp {
         this.touchStartTime = 0;
         this.isSwiping = false;
 
+        // Dropdown portal state
+        this._portalMenu = null;
+        this._portalDropdown = null;
+        this._portalBtn = null;
+
         // Collaboration state
         this.collabSessionId = null;
         this.collabSessionRef = null;
@@ -3049,6 +3054,49 @@ class NotesApp {
 
     // ─── MS Dropdowns ────────────────────────────────────────────────────────────
 
+    // Close and return the portal menu to its original dropdown
+    _closePortal() {
+        if (!this._portalMenu) return;
+        this._portalDropdown.appendChild(this._portalMenu);
+        this._portalDropdown.classList.remove('active');
+        this._portalBtn.setAttribute('aria-expanded', 'false');
+        this._portalMenu.style.cssText = '';
+        this._portalMenu = null;
+        this._portalDropdown = null;
+        this._portalBtn = null;
+    }
+
+    // Move menu to body and position it below (or above) the button
+    _openPortal(dropdown, btn, menu) {
+        this._closePortal();
+
+        // Attach to body so no ancestor's overflow can clip it
+        document.body.appendChild(menu);
+        this._portalMenu = menu;
+        this._portalDropdown = dropdown;
+        this._portalBtn = btn;
+        dropdown.classList.add('active');
+        btn.setAttribute('aria-expanded', 'true');
+
+        // Measure position after attaching
+        menu.style.cssText = 'position:fixed;visibility:hidden;display:block;z-index:999999;margin:0;';
+        const btnRect = btn.getBoundingClientRect();
+        const mW = menu.offsetWidth || 180;
+        const mH = menu.offsetHeight || 260;
+        const vW = window.innerWidth;
+        const vH = window.innerHeight;
+
+        let top = btnRect.bottom + 4;
+        if (top + mH > vH - 8) top = btnRect.top - mH - 4;
+        if (top < 8) top = btnRect.bottom + 4;
+
+        let left = btnRect.left;
+        if (left + mW > vW - 8) left = vW - mW - 8;
+        if (left < 8) left = 8;
+
+        menu.style.cssText = `position:fixed;display:block;visibility:visible;z-index:999999;margin:0;left:${left}px;top:${top}px;`;
+    }
+
     setupMSDropdowns() {
         document.querySelectorAll('.ms-dropdown').forEach(dropdown => {
             const btn = dropdown.querySelector('.ms-dropdown-btn');
@@ -3067,12 +3115,13 @@ class NotesApp {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.saveSelection();
-                document.querySelectorAll('.ms-dropdown.active').forEach(other => {
-                    if (other !== dropdown) { other.classList.remove('active'); other.querySelector('.ms-dropdown-btn').setAttribute('aria-expanded', 'false'); }
-                });
-                const isActive = dropdown.classList.toggle('active');
-                btn.setAttribute('aria-expanded', isActive);
-                if (isActive && items[0]) items[0].focus();
+                // Toggle: if already open, close it
+                if (this._portalDropdown === dropdown) {
+                    this._closePortal();
+                    return;
+                }
+                this._openPortal(dropdown, btn, menu);
+                if (items[0]) items[0].focus();
             });
 
             btn.addEventListener('keydown', (e) => {
@@ -3085,7 +3134,7 @@ class NotesApp {
                     if (e.key === 'ArrowDown') { e.preventDefault(); (items[index + 1] || items[0]).focus(); }
                     else if (e.key === 'ArrowUp') { e.preventDefault(); (items[index - 1] || items[items.length - 1]).focus(); }
                     else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.click(); }
-                    else if (e.key === 'Escape') { e.preventDefault(); dropdown.classList.remove('active'); btn.setAttribute('aria-expanded', 'false'); btn.focus(); }
+                    else if (e.key === 'Escape') { e.preventDefault(); this._closePortal(); btn.focus(); }
                 });
             });
 
@@ -3111,8 +3160,7 @@ class NotesApp {
                             colorPreview.setAttribute('data-color', value);
                         }
                     }
-                    dropdown.classList.remove('active');
-                    btn.setAttribute('aria-expanded', 'false');
+                    this._closePortal();
                     setTimeout(() => {
                         const editor = document.getElementById('textEditor');
                         if (editor) editor.focus();
@@ -3128,11 +3176,13 @@ class NotesApp {
             });
         });
 
-        document.addEventListener('click', () => {
-            document.querySelectorAll('.ms-dropdown.active').forEach(dropdown => {
-                dropdown.classList.remove('active');
-                dropdown.querySelector('.ms-dropdown-btn').setAttribute('aria-expanded', 'false');
-            });
+        // Close portal when clicking anywhere outside the open menu/button
+        document.addEventListener('click', (e) => {
+            if (this._portalMenu &&
+                !this._portalMenu.contains(e.target) &&
+                this._portalBtn && !this._portalBtn.contains(e.target)) {
+                this._closePortal();
+            }
         });
     }
 
