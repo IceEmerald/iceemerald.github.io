@@ -327,6 +327,9 @@
     .main-content {
         display: flex;
         flex: 1;
+        width: 100%;
+        min-width: 0;
+        padding: 0 12px 12px 12px;
         overflow: hidden;
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         will-change: flex;
@@ -338,6 +341,7 @@
        ============================================= */
     .sidebar {
         width: 320px;
+        min-width: 0;
         background: rgba(255, 255, 255, 0);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -562,11 +566,12 @@
         -webkit-backdrop-filter: blur(16px);
         position: relative;
         border-radius: 12px;
-        margin: 12px;
+        margin: 12px 0 12px 12px;
         border: 1px solid rgba(0, 0, 0, 0.05);
         transition: margin 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         overflow: hidden;
         will-change: flex, margin, border-radius;
+        min-width: 0;
     }
     
     body.no-active-note .editor-area {
@@ -1288,6 +1293,7 @@
         .main-content {
             position: relative;
             overflow: hidden;
+            padding: 0;
         }
     
         /* --- Ribbon: compact, no tab system, just a slim toolbar row --- */
@@ -1314,18 +1320,23 @@
             justify-content: flex-start;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(35, 154, 77, 0.35) rgba(241, 241, 241, 0.9);
         }
-    
+
         .ribbon-content::-webkit-scrollbar {
-            display: none;
+            display: block;
+            height: 8px;
         }
-    
-        /* Mobile ribbon: single scrollable row of essential buttons */
-        .mobile-ribbon-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+
+        .ribbon-content::-webkit-scrollbar-track {
+            background: rgba(241, 241, 241, 0.9);
+            border-radius: 999px;
+        }
+
+        .ribbon-content::-webkit-scrollbar-thumb {
+            background: rgba(35, 154, 77, 0.35);
+            border-radius: 999px;
             flex-wrap: nowrap;
             width: 100%;
         }
