@@ -1323,48 +1323,6 @@
             display: none;
         }
 
-        /* Scroll arrow buttons for mobile ribbon */
-        .ribbon-scroll-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            min-width: 32px;
-            height: 100%;
-            min-height: 36px;
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            cursor: pointer;
-            color: rgba(44, 62, 80, 0.7);
-            flex-shrink: 0;
-            font-size: 14px;
-            transition: all 0.18s ease;
-            position: sticky;
-            z-index: 10;
-            padding: 0;
-        }
-
-        .ribbon-scroll-btn:active {
-            background: rgba(35, 154, 77, 0.12);
-            border-color: #239a4d;
-            color: #239a4d;
-        }
-
-        .ribbon-scroll-btn.scroll-left {
-            left: 0;
-            margin-right: 4px;
-        }
-
-        .ribbon-scroll-btn.scroll-right {
-            right: 0;
-            margin-left: 4px;
-        }
-
-        .ribbon-scroll-btn svg {
-            pointer-events: none;
-        }
-    
         /* Mobile ribbon: single scrollable row of essential buttons */
         .mobile-ribbon-row {
             display: flex;
