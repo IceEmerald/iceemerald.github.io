@@ -465,8 +465,8 @@
         overflow-y: auto;
         overflow-x: hidden;
         padding: 8px;
-        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
-        mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 1%, black 99%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0%, black 1%, black 99%, transparent 100%);
     }
     
     .note-item {
@@ -1116,8 +1116,8 @@
         overflow-y: auto;
         overflow-x: hidden;
         padding-right: 8px;
-        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
-        mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 1%, black 99%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0%, black 1%, black 99%, transparent 100%);
     }
     
     .notes-list-display::-webkit-scrollbar {
