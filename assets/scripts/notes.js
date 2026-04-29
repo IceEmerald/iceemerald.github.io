@@ -3055,20 +3055,43 @@ class NotesApp {
     // ─── MS Dropdowns ────────────────────────────────────────────────────────────
 
     // Close and return the portal menu to its original dropdown
-    _closePortal() {
+    _closePortal(animate = true) {
         if (!this._portalMenu) return;
-        this._portalDropdown.appendChild(this._portalMenu);
-        this._portalDropdown.classList.remove('active');
-        this._portalBtn.setAttribute('aria-expanded', 'false');
-        this._portalMenu.style.cssText = '';
+
+        const menu = this._portalMenu;
+        const dropdown = this._portalDropdown;
+        const btn = this._portalBtn;
+
+        // Clear state immediately so re-opening works without waiting
         this._portalMenu = null;
         this._portalDropdown = null;
         this._portalBtn = null;
+
+        dropdown.classList.remove('active');
+        btn.setAttribute('aria-expanded', 'false');
+
+        let done = false;
+        const cleanup = () => {
+            if (done) return;
+            done = true;
+            menu.removeEventListener('animationend', cleanup);
+            menu.classList.remove('ms-portal-closing');
+            menu.style.cssText = '';
+            dropdown.appendChild(menu);
+        };
+
+        if (animate) {
+            menu.classList.add('ms-portal-closing');
+            menu.addEventListener('animationend', cleanup);
+            setTimeout(cleanup, 220); // Safety fallback
+        } else {
+            cleanup();
+        }
     }
 
     // Move menu to body and position it below (or above) the button
     _openPortal(dropdown, btn, menu) {
-        this._closePortal();
+        this._closePortal(false); // Close any existing without animation
 
         // Attach to body so no ancestor's overflow can clip it
         document.body.appendChild(menu);
@@ -3078,8 +3101,10 @@ class NotesApp {
         dropdown.classList.add('active');
         btn.setAttribute('aria-expanded', 'true');
 
-        // Measure position after attaching
-        menu.style.cssText = 'position:fixed;visibility:hidden;display:block;z-index:999999;margin:0;';
+        // Measure position after attaching (hidden so no flash)
+        const maxH = Math.min(320, window.innerHeight * 0.6);
+        menu.style.cssText = `position:fixed;visibility:hidden;display:block;z-index:999999;margin:0;max-height:${maxH}px;overflow-y:auto;`;
+
         const btnRect = btn.getBoundingClientRect();
         const mW = menu.offsetWidth || 180;
         const mH = menu.offsetHeight || 260;
@@ -3094,7 +3119,7 @@ class NotesApp {
         if (left + mW > vW - 8) left = vW - mW - 8;
         if (left < 8) left = 8;
 
-        menu.style.cssText = `position:fixed;display:block;visibility:visible;z-index:999999;margin:0;left:${left}px;top:${top}px;`;
+        menu.style.cssText = `position:fixed;display:block;visibility:visible;z-index:999999;margin:0;left:${left}px;top:${top}px;max-height:${maxH}px;overflow-y:auto;animation:dropdownFadeIn 0.18s ease;`;
     }
 
     setupMSDropdowns() {
