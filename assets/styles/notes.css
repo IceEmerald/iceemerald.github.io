@@ -1,10 +1,10 @@
     /* EmeraldNotes CSS - Notes App Styling */
-    
+
     /* Reset and Base Styles */
     .notes-app * {
         box-sizing: border-box;
     }
-    
+
     .notes-app {
         visibility: visible !important;
         opacity: 1 !important;
@@ -18,7 +18,7 @@
         overflow: hidden;
         cursor: url('/assets/images/maincursor.png'), auto;
     }
-    
+
     /* Header Styles */
     .notes-header {
         background: rgba(255, 255, 255, 0.9);
@@ -30,25 +30,25 @@
         flex-shrink: 0;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     }
-    
+
     .header-content {
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
-    
+
     .app-logo {
         display: flex;
         align-items: center;
         gap: 8px;
     }
-    
+
     .app-title {
         font-size: 18px;
         font-weight: 600;
         color: #2c3e50;
     }
-    
+
     .save-indicator {
         background: rgba(35, 154, 77, 0.2);
         border: 1px solid rgba(35, 154, 77, 0.3);
@@ -60,14 +60,14 @@
         font-weight: 500;
         transition: all 0.2s ease;
     }
-    
+
     .save-indicator.saving {
         background: rgba(255, 193, 7, 0.2);
         border-color: rgba(255, 193, 7, 0.4);
         color: #ffc107;
         animation: pulse 1.5s ease-in-out infinite;
     }
-    
+
     /* =============================================
        RIBBON STYLES (Desktop)
        ============================================= */
@@ -91,7 +91,7 @@
         backface-visibility: hidden;
         -webkit-backface-visibility: hidden;
     }
-    
+
     body.no-active-note .ribbon {
         opacity: 0;
         transform: translateY(-110%);
@@ -104,11 +104,11 @@
         overflow: hidden;
         padding: 0;
     }
-    
+
     .ribbon.entering {
         animation: ribbonSlideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    
+
     @keyframes ribbonSlideDown {
         from {
             opacity: 0;
@@ -119,7 +119,7 @@
             transform: translateY(0);
         }
     }
-    
+
     .ribbon-tabs {
         display: flex;
         background: rgba(248, 250, 252, 0.8);
@@ -128,7 +128,7 @@
         border-radius: 12px 12px 0 0;
         overflow: hidden;
     }
-    
+
     .ribbon-tab {
         background: none;
         border: none;
@@ -142,12 +142,12 @@
         font-family: 'DM Sans', sans-serif;
         border-radius: 8px 8px 0 0;
     }
-    
+
     .ribbon-tab:hover {
         background: rgba(35, 154, 77, 0.08);
         color: rgba(44, 62, 80, 0.9);
     }
-    
+
     .ribbon-tab.active {
         background: rgba(255, 255, 255, 0.95);
         border-bottom-color: #239a4d;
@@ -155,7 +155,7 @@
         font-weight: 600;
         box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
     }
-    
+
     .ribbon-content {
         padding: 12px;
         min-height: 80px;
@@ -168,15 +168,15 @@
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
-    
+
     .ribbon-content::-webkit-scrollbar {
         height: 10px;
     }
-    
+
     .ribbon-content::-webkit-scrollbar-track {
         background: rgba(241, 241, 241, 0.9);
     }
-    
+
     .ribbon-panel {
         display: none;
         align-items: center;
@@ -188,11 +188,11 @@
         padding-left: 12px;
         margin: 0 auto;
     }
-    
+
     .ribbon-panel.active {
         display: flex;
     }
-    
+
     .ribbon-group {
         display: flex;
         flex-direction: column;
@@ -203,13 +203,13 @@
         flex-shrink: 0;
         min-width: max-content;
     }
-    
+
     .ribbon-group:last-child {
         border-right: none;
         padding-right: 0;
         margin-right: 0;
     }
-    
+
     .group-label,
     .font-group-label {
      font-size: 10px;
@@ -222,7 +222,7 @@
         margin-bottom: 4px;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .ribbon-controls {
         display: flex;
         align-items: center;
@@ -230,7 +230,7 @@
         flex-wrap: nowrap;
         min-width: max-content;
     }
-    
+
     .ribbon-btn {
         background: rgba(255, 255, 255, 0.6);
         border: 1px solid rgba(0, 0, 0, 0.08);
@@ -250,31 +250,31 @@
         font-weight: 500;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
-    
+
     .ribbon-btn:hover {
         background: rgba(255, 255, 255, 0.9);
         border-color: rgba(35, 154, 77, 0.3);
         color: rgba(44, 62, 80, 1);
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
     }
-    
+
     .ribbon-btn.active {
         background: rgba(35, 154, 77, 0.15);
         border-color: #239a4d;
         color: #239a4d;
         box-shadow: 0 2px 8px rgba(35, 154, 77, 0.2);
     }
-    
+
     .ribbon-btn svg {
         width: 16px;
         height: 16px;
     }
-    
+
     .ribbon-btn span {
         white-space: nowrap;
         font-size: 10px;
     }
-    
+
     /* Font Controls */
     .font-family, .font-size {
         padding: 6px 12px;
@@ -289,26 +289,26 @@
         transition: all 0.2s ease;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
-    
+
     .font-family {
         width: 120px;
     }
-    
+
     .font-size {
         width: 60px;
     }
-    
+
     .font-controls {
         display: flex;
         align-items: center;
         gap: 2px;
     }
-    
+
     .font-controls .ribbon-btn {
         min-width: 32px;
         padding: 4px 6px;
     }
-    
+
     .color-picker {
         width: 28px;
         height: 28px;
@@ -321,7 +321,7 @@
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
     }
-    
+
     /* =============================================
        MAIN CONTENT LAYOUT
        ============================================= */
@@ -333,7 +333,7 @@
         will-change: flex;
         background: transparent;
     }
-    
+
     /* =============================================
        SIDEBAR (Desktop)
        ============================================= */
@@ -354,18 +354,18 @@
         opacity: 1;
         will-change: width, opacity;
     }
-    
+
     body.no-active-note .sidebar {
         opacity: 0;
         pointer-events: none;
         width: 0;
         min-width: 0;
     }
-    
+
     .sidebar.appearing {
         animation: sidebarSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     }
-    
+
     @keyframes sidebarSlideIn {
         from {
             opacity: 0;
@@ -376,41 +376,41 @@
             width: 320px;
         }
     }
-    
+
     .sidebar.collapsed {
         width: 60px;
         min-width: 60px;
     }
-    
+
     /* Fade out inner content smoothly */
     .sidebar-header h3,
     .sidebar .notes-list,
     .sidebar .new-note-btn {
         transition: opacity 0.2s ease;
     }
-    
+
     .sidebar.collapsed .sidebar-header h3,
     .sidebar.collapsed .notes-list {
         opacity: 0;
         pointer-events: none;
     }
-    
+
     .sidebar.collapsed .new-note-btn {
         opacity: 0;
         pointer-events: none;
     }
-    
+
     .sidebar.collapsed .sidebar-header {
         justify-content: center;
         padding: 20px 8px;
         flex-direction: column;
         gap: 8px;
     }
-    
+
     .sidebar.collapsed .sidebar-toggle {
         order: 0;
     }
-    
+
     .sidebar-header {
         padding: 20px;
         display: flex;
@@ -423,7 +423,7 @@
         gap: 12px;
         position: relative;
     }
-    
+
     .sidebar-toggle {
         background: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(0, 0, 0, 0.08);
@@ -440,13 +440,13 @@
         order: 0;
         flex-shrink: 0;
     }
-    
+
     .sidebar-toggle:hover {
         background: rgba(35, 154, 77, 0.1);
         border-color: rgba(35, 154, 77, 0.3);
         color: rgba(35, 154, 77, 0.8);
     }
-    
+
     .sidebar-header h3 {
         margin: 0;
         font-size: 18px;
@@ -456,7 +456,7 @@
         order: 1;
         flex: 1;
     }
-    
+
     .new-note-btn {
         background: #239a4d;
         color: white;
@@ -472,18 +472,18 @@
         order: 2;
         flex-shrink: 0;
     }
-    
+
     .new-note-btn:hover {
         background: #197138;
     }
-    
+
     .notes-list {
         flex: 1;
         overflow-y: auto;
         overflow-x: hidden;
         padding: 8px;
     }
-    
+
     .note-item {
         background: rgba(255, 255, 255, 0.95);
         border: 1px solid rgba(0, 0, 0, 0.06);
@@ -498,7 +498,7 @@
         opacity: 1;
         transform: translateX(0);
     }
-    
+
     @keyframes noteItemFadeIn {
         from {
             opacity: 0;
@@ -509,19 +509,19 @@
             transform: translateX(0);
         }
     }
-    
+
     .note-item:hover {
         background: rgba(255, 255, 255, 1);
         transform: translateX(4px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
-    
+
     .note-item.active {
         box-shadow: 0 4px 16px rgba(35, 154, 77, 0.15);
         border-color: rgba(35, 154, 77, 0.2);
         background: rgba(255, 255, 255, 1);
     }
-    
+
     .note-item-title {
         font-weight: 600;
         color: rgba(44, 62, 80, 0.9);
@@ -532,7 +532,7 @@
         text-overflow: ellipsis;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .note-item-preview {
         color: rgba(44, 62, 80, 0.6);
         font-size: 12px;
@@ -543,14 +543,14 @@
         overflow: hidden;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .note-item-date {
         color: rgba(44, 62, 80, 0.4);
         font-size: 11px;
         margin-top: 8px;
         font-weight: 500;
     }
-    
+
     /* =============================================
        EDITOR AREA STYLES
        ============================================= */
@@ -569,17 +569,17 @@
         overflow: hidden;
         will-change: flex, margin, border-radius;
     }
-    
+
     body.no-active-note .editor-area {
         border-radius: 0;
         margin: 0;
         border-color: transparent;
     }
-    
+
     .editor-area.appearing {
         animation: editorExpand 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    
+
     @keyframes editorExpand {
         from {
             margin: 0;
@@ -592,7 +592,7 @@
             border-color: rgba(0, 0, 0, 0.05);
         }
     }
-    
+
     .editor-header {
         padding: 20px 24px;
         border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -608,7 +608,7 @@
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         animation: headerFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    
+
     @keyframes headerFadeIn {
         from {
             opacity: 0;
@@ -619,7 +619,7 @@
             transform: translateY(0);
         }
     }
-    
+
     .note-title {
         border: none;
         font-size: 24px;
@@ -635,17 +635,17 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    
+
     .note-title::placeholder {
         color: rgba(44, 62, 80, 0.4);
     }
-    
+
     .editor-actions {
         display: flex;
         gap: 8px;
         align-items: center;
     }
-    
+
     .action-btn {
         background: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(0, 0, 0, 0.1);
@@ -660,14 +660,14 @@
         height: 48px;
         box-sizing: border-box;
     }
-    
+
     .action-btn:hover {
         background: rgba(220, 53, 69, 0.2);
         border-color: #dc3545;
         color: #dc3545;
         box-shadow: 0 2px 6px rgba(220, 53, 69, 0.2);
     }
-    
+
     .action-btntwo {
         background: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(0, 0, 0, 0.1);
@@ -682,14 +682,14 @@
         height: 48px;
         box-sizing: border-box;
     }
-    
+
     .action-btntwo:hover {
         background: rgb(56, 88, 220, 0.2);
         border-color: #3858dc;
         color: #384bdc;
         box-shadow: 0 2px 6px rgb(56, 67, 220, 0.2);
     }
-    
+
     .action-btnthree {
         background: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(0, 0, 0, 0.1);
@@ -705,22 +705,22 @@
         color: rgba(44, 62, 80, 0.7);
         box-shadow: 0 2px 6px rgb(217, 220, 56, 0.05);
     }
-    
+
     .action-btnthree:hover {
         background: rgba(217, 220, 56, 0.2);
         border-color: #c3dc38;
         color: #dcd138;
         box-shadow: 0 2px 6px rgba(220, 190, 56, 0.2);
     }
-    
-    
+
+
     /* Mobile-only back button — hidden on desktop */
     .mobile-back-btn {
         display: none;
     }
-    
-    
-    
+
+
+
     .editor-content {
         flex: 1;
         overflow: hidden;
@@ -732,7 +732,7 @@
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         animation: editorContentFadeIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    
+
     @keyframes editorContentFadeIn {
         from {
             opacity: 0;
@@ -741,7 +741,7 @@
             opacity: 1;
         }
     }
-    
+
     .text-editor {
         flex: 1;
         padding: 24px;
@@ -761,7 +761,7 @@
         position: relative;
         min-height: 0;
     }
-    
+
     /* ── Collaboration Presence Bar ───────────────────────────── */
     .collab-presence-bar {
         display: flex;
@@ -851,7 +851,7 @@
     .collab-perm-owner { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
     .collab-perm-edit  { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
     .collab-perm-view  { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-    
+
     /* ── Collaboration Cursors ────────────────────────────────── */
     .collab-cursors {
         position: absolute;
@@ -862,7 +862,7 @@
         pointer-events: none;
         z-index: 8;
     }
-    
+
     .collab-cursor {
         position: absolute;
         pointer-events: none;
@@ -871,7 +871,7 @@
         border-radius: 2px;
         /* Bug 1: cursor animation removed */
     }
-    
+
     .collab-cursor-label {
         position: absolute;
         left: 1px;
@@ -916,11 +916,11 @@
     body.collab-non-owner #noteColorDropdown {
         display: none !important;
     }
-    
+
     .text-editor:focus {
         outline: none;
     }
-    
+
     /* Placeholder styling for contenteditable */
     .text-editor:empty:before,
     .text-editor[data-empty="true"]:before {
@@ -933,56 +933,56 @@
         pointer-events: none;
         white-space: nowrap;
     }
-    
+
     .text-editor:focus:empty:before,
     .text-editor:focus[data-empty="true"]:before {
         color: rgba(44, 62, 80, 0.3);
     }
-    
+
     .text-editor p {
         margin: 0 0 12px 0;
     }
-    
+
     .text-editor h1, .text-editor h2, .text-editor h3, .text-editor h4, .text-editor h5, .text-editor h6 {
         margin: 16px 0 8px 0;
         color: #2c3e50;
     }
-    
+
     .text-editor ul, .text-editor ol {
         padding-left: 24px;
         margin: 8px 0;
     }
-    
+
     .text-editor li {
         margin: 4px 0;
     }
-    
+
     .text-editor table {
         border-collapse: collapse;
         width: 100%;
         margin: 16px 0;
     }
-    
+
     .text-editor table td, .text-editor table th {
         border: 1px solid #d1d1d1;
         padding: 8px 12px;
         text-align: left;
     }
-    
+
     .text-editor table th {
         background: #f8f9fa;
         font-weight: 600;
     }
-    
+
     .text-editor a {
         color: #0078d4;
         text-decoration: none;
     }
-    
+
     .text-editor a:hover {
         text-decoration: underline;
     }
-    
+
     /* Welcome Screen */
     .welcome-screen {
         display: flex;
@@ -995,13 +995,13 @@
         overflow: hidden;
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    
+
     .welcome-screen.hidden {
         display: none !important;
         pointer-events: none;
         opacity: 0;
     }
-    
+
     .welcome-content {
         padding: 40px;
         max-width: 1200px;
@@ -1013,7 +1013,7 @@
         height: 100%;
         overflow: hidden;
     }
-    
+
     @keyframes welcomeFadeIn {
         from {
             opacity: 0;
@@ -1024,27 +1024,27 @@
             transform: translateY(0);
         }
     }
-    
+
     .welcome-header {
         display: flex;
         flex-direction: column;
         gap: 24px;
         flex-shrink: 0;
     }
-    
+
     .welcome-header-top {
         display: flex;
         align-items: center;
         gap: 24px;
     }
-    
+
     .welcome-logo {
         opacity: 0.9;
         filter: drop-shadow(0 4px 12px rgba(35, 154, 77, 0.15));
         animation: welcomeBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
         flex-shrink: 0;
     }
-    
+
     @keyframes welcomeBounce {
         0% {
             opacity: 0;
@@ -1058,7 +1058,7 @@
             transform: scale(1) translateY(0);
         }
     }
-    
+
     .welcome-header h1 {
         margin: 0;
         color: rgba(44, 62, 80, 0.95);
@@ -1067,7 +1067,7 @@
         font-size: 38px;
         line-height: 1.3;
     }
-    
+
     .notes-section {
         display: flex;
         flex-direction: column;
@@ -1075,7 +1075,7 @@
         flex: 1;
         overflow: hidden;
     }
-    
+
     .section-title {
         display: flex;
         justify-content: space-between;
@@ -1083,7 +1083,7 @@
         gap: 16px;
         flex-shrink: 0;
     }
-    
+
     .section-title h3 {
         margin: 0;
         font-size: 18px;
@@ -1091,7 +1091,7 @@
         color: rgba(44, 62, 80, 0.9);
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .create-note-btn {
         background: #239a4d;
         color: white;
@@ -1112,18 +1112,18 @@
         white-space: nowrap;
         flex-shrink: 0;
     }
-    
+
     .create-note-btn:hover {
         background: #1a793c;
         box-shadow: 0 8px 24px rgba(35, 154, 77, 0.3);
         transform: translateY(-2px);
     }
-    
+
     .create-note-btn svg {
         width: 18px;
         height: 18px;
     }
-    
+
     .notes-list-display {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -1132,24 +1132,24 @@
         overflow-x: hidden;
         padding-right: 8px;
     }
-    
+
     .notes-list-display::-webkit-scrollbar {
         width: 8px;
     }
-    
+
     .notes-list-display::-webkit-scrollbar-track {
         background: transparent;
     }
-    
+
     .notes-list-display::-webkit-scrollbar-thumb {
         background: rgba(0, 0, 0, 0.2);
         border-radius: 4px;
     }
-    
+
     .notes-list-display::-webkit-scrollbar-thumb:hover {
         background: rgba(0, 0, 0, 0.3);
     }
-    
+
     .note-card {
         background: #ffffff;
         border: 1px solid rgba(0, 0, 0, 0.08);
@@ -1167,47 +1167,47 @@
         overflow: hidden;
         min-height: 120px;
     }
-    
+
     .note-card.pink {
         background: #ffe4e1;
     }
-    
+
     .note-card.pink:hover {
         background: #ffd4ce;
     }
-    
+
     .note-card.blue {
         background: #e6f3ff;
     }
-    
+
     .note-card.blue:hover {
         background: #cce6ff;
     }
-    
+
     .note-card.green {
         background: #e8f5e8;
     }
-    
+
     .note-card.green:hover {
         background: #d1ebd1;
     }
-    
+
     .note-card.yellow {
         background: #fff9e6;
     }
-    
+
     .note-card.yellow:hover {
         background: #fff3cc;
     }
-    
+
     .note-card.purple {
         background: #f3e6ff;
     }
-    
+
     .note-card.purple:hover {
         background: #e6ccff;
     }
-    
+
     .note-card-title {
         font-size: 16px;
         font-weight: 600;
@@ -1218,7 +1218,7 @@
         text-overflow: ellipsis;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .note-card-preview {
         font-size: 14px;
         color: rgba(44, 62, 80, 0.65);
@@ -1231,7 +1231,7 @@
         font-family: 'DM Sans', sans-serif;
         flex: 1;
     }
-    
+
     .note-card-date {
         font-size: 12px;
         color: rgba(44, 62, 80, 0.5);
@@ -1239,7 +1239,7 @@
         font-family: 'DM Sans', sans-serif;
         margin-top: auto;
     }
-    
+
     .no-notes-container {
         display: flex;
         flex-direction: column;
@@ -1250,63 +1250,63 @@
         text-align: center;
         grid-column: 1 / -1;
     }
-    
+
     .no-notes-icon {
         font-size: 128px;
         color: rgba(150, 111, 80, 0.15);
         line-height: 1;
         font-weight: 1000;
     }
-    
+
     .no-notes-container p {
         margin: 0;
         color: rgba(44, 62, 80, 0.6);
         font-family: 'DM Sans', sans-serif;
         font-size: 16px;
     }
-    
+
     .no-notes-container p:first-of-type {
         font-weight: 500;
         color: rgba(44, 62, 80, 0.8);
     }
-    
+
     .no-notes-hint {
         font-size: 14px;
         color: rgba(44, 62, 80, 0.5) !important;
     }
-    
+
     /* =============================================
        MOBILE & TABLET RESPONSIVE (≤ 1023px)
        ============================================= */
     @media (max-width: 1023px) {
-    
+
         /* --- Layout: single-panel, no left margin --- */
         .notes-app {
             overflow: hidden;
             position: relative;
         }
-    
+
         .main-content {
             position: relative;
             overflow: hidden;
         }
-    
+
         /* --- Ribbon: compact, no tab system, just a slim toolbar row --- */
         .ribbon {
             margin: 8px;
             border-radius: 10px; /* preserve corners */
         }
-    
+
         /* Hide tab bar entirely on mobile */
         .ribbon-tabs {
             display: none;
         }
-    
+
         /* Always show the single flat panel */
         .ribbon-panel {
             display: none !important;
         }
-    
+
         /* Replace full ribbon with a compact mobile toolbar */
         .ribbon-content {
             padding: 8px 4px 8px 4px;
@@ -1318,7 +1318,7 @@
             scrollbar-width: none;
             position: relative;
         }
-    
+
         .ribbon-content::-webkit-scrollbar {
             display: none;
         }
@@ -1331,7 +1331,7 @@
             flex-wrap: nowrap;
             width: 100%;
         }
-    
+
         .mobile-ribbon-row .ribbon-btn {
             min-width: 40px;
             padding: 8px;
@@ -1340,11 +1340,11 @@
             flex-shrink: 0;
             border-radius: 8px;
         }
-    
+
         .mobile-ribbon-row .ribbon-btn span {
             display: none; /* icon only on mobile */
         }
-    
+
         .mobile-ribbon-divider {
             width: 1px;
             height: 28px;
@@ -1352,7 +1352,7 @@
             flex-shrink: 0;
             margin: 0 2px;
         }
-    
+
         /* More overflow menu button */
         .mobile-more-btn {
             min-width: 40px;
@@ -1370,14 +1370,14 @@
             font-weight: 600;
             transition: all 0.2s ease;
         }
-    
+
         .mobile-more-btn:hover,
         .mobile-more-btn.active {
             background: rgba(35, 154, 77, 0.15);
             border-color: #239a4d;
             color: #239a4d;
         }
-    
+
         /* More dropdown panel */
         .mobile-more-panel {
             display: none;
@@ -1394,21 +1394,21 @@
             padding: 8px;
             min-width: 220px;
         }
-    
+
         .mobile-more-panel.open {
             display: block;
             animation: dropdownFadeIn 0.2s ease;
         }
-    
+
         .mobile-more-panel .ms-dropdown {
             margin-bottom: 4px;
         }
-    
+
         .mobile-more-panel .ms-dropdown-btn {
             width: 100%;
             min-width: unset;
         }
-    
+
         /* Inline dropdowns in the mobile ribbon row */
         .mobile-ribbon-row .ms-dropdown {
             flex-shrink: 0;
@@ -1429,7 +1429,7 @@
             max-height: 260px;
             overflow-y: auto;
         }
-    
+
         /* --- SIDEBAR: slides in from left, sits BELOW the sticky navbar --- */
         .sidebar {
             position: fixed;
@@ -1452,12 +1452,12 @@
             display: flex;
             flex-direction: column;
         }
-    
+
         .sidebar.mobile-open {
             transform: translateX(0);
             box-shadow: 4px 0 40px rgba(0, 0, 0, 0.25);
         }
-    
+
         /* Collapsed state has no effect on mobile */
         .sidebar.collapsed {
             width: 85vw;
@@ -1465,38 +1465,38 @@
             min-width: unset;
             transform: translateX(-100%);
         }
-    
+
         .sidebar.collapsed.mobile-open {
             transform: translateX(0);
         }
-    
+
         .sidebar.collapsed .sidebar-header h3,
         .sidebar.collapsed .notes-list,
         .sidebar.collapsed .new-note-btn {
             opacity: 1;
             pointer-events: auto;
         }
-    
+
         .sidebar.collapsed .sidebar-header {
             justify-content: space-between;
             flex-direction: row;
             padding: 20px;
             gap: 12px;
         }
-    
+
         /* Sidebar header on mobile */
         .sidebar-header {
             border-radius: 0 16px 0 0;
             flex-shrink: 0;
         }
-    
+
         /* notes-list must be scrollable within the panel */
         .notes-list {
             flex: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
         }
-    
+
         /* Backdrop overlay when sidebar is open — also sits below navbar */
         .sidebar-backdrop {
             display: none;
@@ -1511,11 +1511,11 @@
             -webkit-backdrop-filter: blur(2px);
             animation: fadeIn 0.2s ease;
         }
-    
+
         .sidebar-backdrop.visible {
             display: block;
         }
-    
+
         /* --- EDITOR AREA: full width, sits correctly in remaining space --- */
         .editor-area {
             margin: 0 8px 8px 8px;
@@ -1524,7 +1524,7 @@
             flex: 1;
             min-width: 0; /* prevent overflow */
         }
-    
+
         .editor-header {
             padding: 10px 12px;
             border-radius: 10px 10px 0 0;
@@ -1532,14 +1532,14 @@
             flex-wrap: nowrap;
             min-height: 0;
         }
-    
+
         .note-title {
             font-size: 16px;
             max-width: none;
             flex: 1;
             min-width: 0;
         }
-    
+
         /* Editor actions: all buttons identical size, no overflow */
         .editor-actions {
             gap: 4px;
@@ -1550,7 +1550,7 @@
             -webkit-overflow-scrolling: touch;
             max-width: 100%;
         }
-    
+
         /* Uniform size for ALL action buttons */
         .action-btn,
         .action-btntwo,
@@ -1565,7 +1565,7 @@
             align-items: center !important;
             flex-shrink: 0 !important;
         }
-    
+
         .action-btn,
         .action-btntwo,
         .action-btnthree {
@@ -1574,7 +1574,7 @@
             min-width: 36px;
             justify-content: center;
         }
-    
+
         /* Note color dropdown button — same height, compact */
         #noteColorDropdown .ms-dropdown-btn {
             padding: 0 20px 0 8px !important;
@@ -1582,23 +1582,23 @@
             min-width: 88px !important;
             justify-content: flex-start !important;
         }
-    
+
         /* Always show the color label */
         #noteColorDropdown .dropdown-value {
             display: inline !important;
             font-size: 11px;
             white-space: nowrap;
         }
-    
+
         #noteColorDropdown .ms-dropdown-btn::after {
             right: 5px;
         }
-    
+
         /* Color swatch inside dropdown button */
         #noteColorDropdown .color-preview {
             flex-shrink: 0;
         }
-    
+
         /* --- MOBILE BACK BUTTON: shown as ← in editor header --- */
         .mobile-back-btn {
             display: flex;
@@ -1614,14 +1614,14 @@
             flex-shrink: 0;
             transition: all 0.2s ease;
         }
-    
+
         .mobile-back-btn:hover {
             background: rgba(35, 154, 77, 0.1);
             border-color: rgba(35, 154, 77, 0.3);
             color: #239a4d;
         }
-    
-    
+
+
         /* Swipe hint indicator at left edge */
         .swipe-hint {
             position: fixed;
@@ -1636,53 +1636,53 @@
             pointer-events: none;
             transition: opacity 0.3s ease;
         }
-    
+
         /* Text editor smaller padding on mobile */
         .text-editor {
             padding: 16px;
             font-size: 15px;
         }
-    
+
         .text-editor:empty:before,
         .text-editor[data-empty="true"]:before {
             top: 16px;
             left: 16px;
         }
-    
+
         /* Welcome screen on mobile */
         .welcome-screen {
             padding: 20px;
         }
-    
+
         .welcome-content h2 {
             font-size: 22px;
         }
-    
+
         .welcome-content p {
             font-size: 14px;
         }
-    
+
         /* MS dropdowns in more panel — full width */
         .mobile-more-panel .ms-dropdown {
             display: block;
             width: 100%;
         }
-    
+
         .mobile-more-panel .ms-dropdown-btn {
             width: 100%;
             border-radius: 8px;
         }
-    
+
         .mobile-more-panel .ms-dropdown-menu {
             min-width: 100%;
         }
-    
+
         /* Ribbon wrapper position */
         .ribbon {
             position: relative;
         }
     }
-    
+
     /* =============================================
        SMALL PHONE EXTRAS (≤ 480px)
        ============================================= */
@@ -1691,22 +1691,22 @@
             margin: 6px;
             border-radius: 8px;
         }
-    
+
         .ribbon-content {
             padding: 6px 10px;
         }
-    
+
         .editor-area {
             margin: 0 6px 6px 6px;
             border-radius: 8px;
         }
-    
+
         .note-title {
             font-size: 16px;
             max-width: 45%;
         }
-    
-    
+
+
         .sidebar {
             width: 92vw;
         }
@@ -1726,7 +1726,7 @@
             to   { opacity: 1; transform: translateY(0)    scale(1);    }
         }
     }
-    
+
     /* =============================================
        NAVBAR ALWAYS ON TOP
        Ensure the sticky navbar sits above the
@@ -1735,14 +1735,14 @@
     .navbar.sticky-top {
         z-index: 3000 !important;
     }
-    
+
     /* =============================================
        MOBILE PERFORMANCE OPTIMISATIONS (≤ 1023px)
        Kill backdrop-filter, transition:all, and
        anything that triggers GPU compositing stutter
        ============================================= */
     @media (max-width: 1023px) {
-    
+
         /* ── Kill all backdrop-filter on mobile — the #1 cause of stutter ── */
         .notes-app,
         .notes-header,
@@ -1771,7 +1771,7 @@
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
         }
-    
+
         /* ── Replace all expensive backgrounds with solid equivalents ── */
         .ribbon                 { background: #ffffff; }
         .ribbon-content         { background: #ffffff; }
@@ -1780,7 +1780,7 @@
         .ms-dropdown-menu       { background: #ffffff; }
         .mobile-more-panel      { background: #ffffff; }
         .note-item              { background: #ffffff; }
-    
+
         /* ── Simplify or remove box-shadows (expensive to repaint) ── */
         .ribbon                 { box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
         .editor-area            { box-shadow: none; }
@@ -1791,7 +1791,7 @@
         .action-btntwo          { box-shadow: none !important; }
         .ms-dropdown-menu       { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
         .mobile-more-panel      { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
-    
+
         /* ── Replace transition:all with explicit fast properties ── */
         .ribbon-btn,
         .action-btn,
@@ -1805,7 +1805,7 @@
             transition: background-color 0.15s ease, color 0.15s ease,
                         border-color 0.15s ease !important;
         }
-    
+
         /* ── Sidebar slide: GPU-composited only, will-change primes the layer ── */
         .sidebar {
             will-change: transform;
@@ -1813,18 +1813,18 @@
             background: #ffffff !important;
             box-shadow: none;
         }
-    
+
         .sidebar.mobile-open {
             box-shadow: 3px 0 20px rgba(0,0,0,0.15);
         }
-    
+
         /* Backdrop: simple fade, no blur */
         .sidebar-backdrop {
             background: rgba(0,0,0,0.4) !important;
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
         }
-    
+
         /* ── Promote scroll containers to own compositor layer ── */
         .notes-list,
         .text-editor {
@@ -1832,26 +1832,26 @@
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
         }
-    
+
         /* ── Stop note-item hover animations on touch (no hover on mobile anyway) ── */
         .note-item:hover {
             background: #ffffff;
             transform: none;
         }
-    
+
         /* ── Remove animation from backdrop — just show instantly ── */
         .sidebar-backdrop.visible {
             animation: none;
         }
     }
-    
+
     /* =============================================
        UTILITY CLASSES
        ============================================= */
     .hidden {
         display: none !important;
     }
-    
+
     .sr-only {
         position: absolute;
         width: 1px;
@@ -1863,7 +1863,7 @@
         white-space: nowrap;
         border: 0;
     }
-    
+
     /* =============================================
        ANIMATIONS
        ============================================= */
@@ -1871,12 +1871,12 @@
         from { opacity: 0; }
         to { opacity: 1; }
     }
-    
+
     @keyframes pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.6; }
     }
-    
+
     /* =============================================
        MICROSOFT OFFICE STYLE DROPDOWNS
        ============================================= */
@@ -1884,7 +1884,7 @@
         position: relative;
         display: inline-block;
     }
-    
+
     .ms-dropdown-btn {
         background: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(0, 0, 0, 0.08);
@@ -1904,7 +1904,7 @@
         display: flex;
         align-items: center;
     }
-    
+
     .color-preview {
         width: 12px;
         height: 12px;
@@ -1915,7 +1915,7 @@
         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px transparent;
         position: relative;
     }
-    
+
     .color-preview[data-color="#ffffff"] {
         border: 1px solid #ccc;
         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(35, 154, 77, 0.3), 0 1px 3px rgba(35, 154, 77, 0.2);
@@ -1940,7 +1940,7 @@
         border: 1px solid rgba(221, 160, 221, 0.4);
         box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px rgba(221, 160, 221, 0.4), 0 1px 3px rgba(221, 160, 221, 0.3);
     }
-    
+
     #noteColorDropdown .ms-dropdown-btn {
         min-width: 100px;
         justify-content: flex-start;
@@ -1949,12 +1949,12 @@
         border-radius: 8px;
         box-sizing: border-box;
     }
-    
+
     #noteColorDropdown .dropdown-value {
         flex: 1;
         text-align: left;
     }
-    
+
     .ms-dropdown-btn:after {
         content: '▼';
         position: absolute;
@@ -1965,17 +1965,17 @@
         color: rgba(44, 62, 80, 0.6);
         transition: transform 0.2s ease;
     }
-    
+
     .ms-dropdown-btn:hover {
         background: rgba(255, 255, 255, 0.95);
         border-color: rgba(35, 154, 77, 0.3);
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
     }
-    
+
     .ms-dropdown.active .ms-dropdown-btn:after {
         transform: translateY(-50%) rotate(180deg);
     }
-    
+
     .ms-dropdown-menu {
         position: absolute;
         top: 100%;
@@ -1992,12 +1992,12 @@
         overflow: hidden;
         margin-top: 4px;
     }
-    
+
     .ms-dropdown.active .ms-dropdown-menu {
         display: block;
         animation: dropdownFadeIn 0.2s ease;
     }
-    
+
     .ms-dropdown-item {
         padding: 10px 16px;
         cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
@@ -2010,25 +2010,25 @@
         align-items: center;
         gap: 8px;
     }
-    
+
     .ms-dropdown-item:last-child {
         border-bottom: none;
     }
-    
+
     .ms-dropdown-item:hover {
         background: rgba(35, 154, 77, 0.08);
         color: rgba(44, 62, 80, 1);
     }
-    
+
     @keyframes dropdownFadeIn {
         from { opacity: 0; transform: translateY(-8px); }
         to { opacity: 1; transform: translateY(0); }
     }
-    
+
     .fade-in {
         animation: fadeIn 0.3s ease-in-out;
     }
-    
+
     /* =============================================
        CUSTOM RIGHT-CLICK CONTEXT MENU
        ============================================= */
@@ -2047,7 +2047,7 @@
         font-family: 'DM Sans', sans-serif;
         font-size: 13px;
     }
-    
+
     .context-menu-item {
         padding: 8px 16px;
         cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
@@ -2057,35 +2057,35 @@
         align-items: center;
         gap: 8px;
     }
-    
+
     .context-menu-item:hover {
         background: rgba(35, 154, 77, 0.08);
         color: rgba(44, 62, 80, 1);
     }
-    
+
     .context-menu-separator {
         height: 1px;
         background: rgba(0, 0, 0, 0.08);
         margin: 4px 0;
     }
-    
+
     .context-menu-item svg {
         opacity: 0.7;
     }
-    
+
     .context-menu-item:hover svg {
         opacity: 1;
     }
-    
+
     @keyframes slideInFromLeft {
         from { transform: translateX(-100%); }
         to { transform: translateX(0); }
     }
-    
+
     .slide-in-left {
         animation: slideInFromLeft 0.3s ease-out;
     }
-    
+
     /* =============================================
        FOCUS STATES
        ============================================= */
@@ -2095,19 +2095,19 @@
     .welcome-btn:focus {
         outline-offset: 0px;
     }
-    
+
     .font-family:focus,
     .font-size:focus {
         outline: none;
         box-shadow: 0 0 0 2px rgba(35, 154, 77, 0.3);
         border-radius: 6px;
     }
-    
+
     .note-title:focus {
         outline: none;
         box-shadow: none;
     }
-    
+
     /* =============================================
        MODALS
        ============================================= */
@@ -2126,12 +2126,12 @@
         visibility: hidden;
         transition: all 0.3s ease;
     }
-    
+
     .delete-modal.show {
         opacity: 1;
         visibility: visible;
     }
-    
+
     .delete-modal-content {
         background: rgba(255, 255, 255, 0.98);
         backdrop-filter: blur(20px);
@@ -2143,12 +2143,12 @@
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    
+
     .delete-modal-header {
         text-align: center;
         margin-bottom: 16px;
     }
-    
+
     .delete-modal-icon {
         width: 48px; height: 48px;
         background: #ee5a52;
@@ -2160,7 +2160,7 @@
         color: white;
         font-size: 24px;
     }
-    
+
     .delete-modal-title {
         font-size: 18px;
         font-weight: 600;
@@ -2168,7 +2168,7 @@
         margin: 0 0 8px 0;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .delete-modal-message {
         font-size: 14px;
         color: rgba(44, 62, 80, 0.7);
@@ -2177,13 +2177,13 @@
         margin-bottom: 24px;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .delete-modal-actions {
         display: flex;
         gap: 12px;
         justify-content: center;
     }
-    
+
     .delete-modal-btn {
         padding: 10px 24px;
         border: none;
@@ -2195,29 +2195,29 @@
         font-family: 'DM Sans', sans-serif;
         min-width: 100px;
     }
-    
+
     .delete-modal-btn-cancel {
         background: rgba(108, 117, 125, 0.1);
         color: rgba(108, 117, 125, 0.8);
         border: 1px solid rgba(108, 117, 125, 0.2);
     }
-    
+
     .delete-modal-btn-cancel:hover {
         background: rgba(108, 117, 125, 0.2);
         color: rgba(108, 117, 125, 1);
     }
-    
+
     .delete-modal-btn-delete {
         background: #ee5a52;
         color: white;
         border: 1px solid rgba(238, 90, 82, 0.3);
     }
-    
+
     .delete-modal-btn-delete:hover {
         background: #e53935;
         box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
     }
-    
+
     /* Table Modal */
     .table-modal {
         position: fixed;
@@ -2234,9 +2234,9 @@
         visibility: hidden;
         transition: all 0.3s ease;
     }
-    
+
     .table-modal.show { opacity: 1; visibility: visible; }
-    
+
     .table-modal-content {
         background: rgba(255, 255, 255, 0.98);
         backdrop-filter: blur(20px);
@@ -2248,9 +2248,9 @@
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    
+
     .table-modal-header { text-align: center; margin-bottom: 20px; }
-    
+
     .table-modal-icon {
         width: 48px; height: 48px;
         background: #239a4d;
@@ -2262,7 +2262,7 @@
         color: white;
         font-size: 24px;
     }
-    
+
     .table-modal-title {
         font-size: 18px;
         font-weight: 600;
@@ -2270,11 +2270,11 @@
         margin: 0;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .table-modal-body { margin-bottom: 24px; }
-    
+
     .table-input-group { margin-bottom: 16px; }
-    
+
     .table-input-group label {
         display: block;
         font-size: 14px;
@@ -2283,7 +2283,7 @@
         margin-bottom: 8px;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .table-input {
         width: 100%;
         padding: 10px 12px;
@@ -2296,20 +2296,20 @@
         transition: all 0.2s ease;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .table-input:focus {
         outline: none;
         border-color: rgba(35, 154, 77, 0.5);
         box-shadow: 0 0 0 3px rgba(35, 154, 77, 0.1);
         background: rgba(255, 255, 255, 0.95);
     }
-    
+
     .table-modal-actions {
         display: flex;
         gap: 12px;
         justify-content: center;
     }
-    
+
     .table-modal-btn {
         padding: 10px 24px;
         border: none;
@@ -2321,29 +2321,29 @@
         font-family: 'DM Sans', sans-serif;
         min-width: 100px;
     }
-    
+
     .table-modal-btn-cancel {
         background: rgba(108, 117, 125, 0.1);
         color: rgba(108, 117, 125, 0.8);
         border: 1px solid rgba(108, 117, 125, 0.2);
     }
-    
+
     .table-modal-btn-cancel:hover {
         background: rgba(108, 117, 125, 0.2);
         color: rgba(108, 117, 125, 1);
     }
-    
+
     .table-modal-btn-create {
         background: #239a4d;
         color: white;
         border: 1px solid rgba(30, 142, 62, 0.3);
     }
-    
+
     .table-modal-btn-create:hover {
         background: #1e8e3e;
         box-shadow: 0 4px 12px rgba(35, 154, 77, 0.4);
     }
-    
+
     /* Link Modal */
     .link-modal {
         position: fixed;
@@ -2360,9 +2360,9 @@
         visibility: hidden;
         transition: all 0.3s ease;
     }
-    
+
     .link-modal.show { opacity: 1; visibility: visible; }
-    
+
     .link-modal-content {
         background: rgba(255, 255, 255, 0.98);
         backdrop-filter: blur(20px);
@@ -2374,9 +2374,9 @@
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    
+
     .link-modal-header { text-align: center; margin-bottom: 20px; }
-    
+
     .link-modal-icon {
         width: 48px; height: 48px;
         background: #005fa3;
@@ -2388,7 +2388,7 @@
         color: white;
         font-size: 24px;
     }
-    
+
     .link-modal-title {
         font-size: 18px;
         font-weight: 600;
@@ -2396,11 +2396,11 @@
         margin: 0;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .link-modal-body { margin-bottom: 24px; }
-    
+
     .link-input-group { margin-bottom: 16px; }
-    
+
     .link-input-group label {
         display: block;
         font-size: 14px;
@@ -2409,7 +2409,7 @@
         margin-bottom: 8px;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .link-input {
         width: 100%;
         padding: 10px 12px;
@@ -2422,21 +2422,21 @@
         transition: all 0.2s ease;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .link-input:focus {
         outline: none;
         border-color: rgba(0, 122, 204, 0.5);
         box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.1);
         background: rgba(255, 255, 255, 0.95);
     }
-    
+
     .link-modal-actions {
         display: flex;
         gap: 12px;
         justify-content: center;
         flex-wrap: nowrap;
     }
-    
+
     .link-modal-btn {
         padding: 10px 24px;
         border: none;
@@ -2448,37 +2448,37 @@
         font-family: 'DM Sans', sans-serif;
         min-width: 100px;
     }
-    
+
     .link-modal-btn-cancel {
         background: rgba(108, 117, 125, 0.1);
         color: rgba(108, 117, 125, 0.8);
         border: 1px solid rgba(108, 117, 125, 0.2);
     }
-    
+
     .link-modal-btn-cancel:hover {
         background: rgba(108, 117, 125, 0.2);
         color: rgba(108, 117, 125, 1);
     }
-    
+
     .link-modal-btn-create {
         background: #005fa3;
         color: white;
         border: 1px solid rgba(0, 95, 163, 0.3);
     }
-    
+
     .link-modal-btn-create:hover { background: #004d87; }
-    
+
     .link-modal-btn-create:disabled {
         background: rgba(108, 117, 125, 0.3);
         color: rgba(108, 117, 125, 0.6);
         border: 1px solid rgba(108, 117, 125, 0.2);
         cursor: not-allowed;
     }
-    
+
     .link-modal-btn-create:disabled:hover {
         background: rgba(108, 117, 125, 0.3);
     }
-    
+
     /* Validation feedback */
     .validation-feedback {
         font-size: 12px;
@@ -2490,19 +2490,19 @@
         display: none;
         animation: fadeIn 0.2s ease-out;
     }
-    
+
     .validation-feedback.valid {
         background: rgba(35, 154, 77, 0.1);
         color: #239a4d;
         border: 1px solid rgba(35, 154, 77, 0.2);
     }
-    
+
     .validation-feedback.invalid {
         background: rgba(220, 53, 69, 0.1);
         color: #dc3545;
         border: 1px solid rgba(220, 53, 69, 0.2);
     }
-    
+
     /* =============================================
        CUSTOM SCROLLBARS
        ============================================= */
@@ -2510,24 +2510,24 @@
     .text-editor::-webkit-scrollbar {
         width: 8px;
     }
-    
+
     .notes-list::-webkit-scrollbar-track,
     .text-editor::-webkit-scrollbar-track {
         background: #f1f1f1;
         border-radius: 4px;
     }
-    
+
     .notes-list::-webkit-scrollbar-thumb,
     .text-editor::-webkit-scrollbar-thumb {
         background: #c1c1c1;
         border-radius: 4px;
     }
-    
+
     .notes-list::-webkit-scrollbar-thumb:hover,
     .text-editor::-webkit-scrollbar-thumb:hover {
         background: #a8a8a8;
     }
-    
+
     /* =============================================
        PRINT STYLES
        ============================================= */
@@ -2538,20 +2538,20 @@
         .editor-header {
             display: none !important;
         }
-    
+
         .main-content { display: block; }
-    
+
         .editor-area { width: 100% !important; }
-    
+
         .text-editor {
             padding: 0 !important;
             font-size: 12pt !important;
             line-height: 1.5 !important;
         }
     }
-    
+
     /* ─── To-Do Items ─────────────────────────────────────────────────────────── */
-    
+
     .todo-item {
         display: flex;
         align-items: baseline;
@@ -2559,7 +2559,7 @@
         margin: 2px 0;
         padding: 1px 0;
     }
-    
+
     .todo-checkbox {
         width: 16px;
         height: 16px;
@@ -2569,20 +2569,20 @@
         accent-color: var(--primary-color, #2ecc71);
         cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
     }
-    
+
     .todo-label {
         flex: 1;
         outline: none;
         word-break: break-word;
     }
-    
+
     .todo-item:has(.todo-checkbox:checked) .todo-label {
         text-decoration: line-through;
         color: #888;
     }
-    
+
     /* ─── Draw Toolbar (floating, toast-style) ────────────────────────────────── */
-    
+
     .draw-toolbar {
         display: none;
         position: fixed;
@@ -2601,16 +2601,16 @@
         white-space: nowrap;
         animation: drawToolbarIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-    
+
     .draw-toolbar.visible {
         display: flex;
     }
-    
+
     @keyframes drawToolbarIn {
         from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.95); }
         to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);    }
     }
-    
+
     .draw-toolbar-divider {
         width: 1px;
         height: 28px;
@@ -2618,7 +2618,7 @@
         flex-shrink: 0;
         margin: 0 2px;
     }
-    
+
     .draw-tool-btn {
         display: inline-flex;
         align-items: center;
@@ -2635,19 +2635,19 @@
         transition: background 0.15s, border-color 0.15s, color 0.15s;
         white-space: nowrap;
     }
-    
+
     .draw-tool-btn:hover {
         background: #f3f4f6;
         border-color: #d1d5db;
         color: #111827;
     }
-    
+
     .draw-tool-btn.active {
         background: #d1fae5;
         border-color: #2ecc71;
         color: #065f46;
     }
-    
+
     .draw-clear-btn {
         color: #dc2626;
         border-color: #fecaca;
@@ -2658,7 +2658,7 @@
         border-color: #ef4444;
         color: #b91c1c;
     }
-    
+
     .draw-done-btn {
         background: #d1fae5;
         border-color: #2ecc71;
@@ -2670,7 +2670,7 @@
         border-color: #10b981;
         color: #064e3b;
     }
-    
+
     .draw-section-label {
         font-size: 10px;
         font-weight: 600;
@@ -2681,21 +2681,21 @@
         margin-bottom: 4px;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .draw-color-section, .draw-size-section {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
         gap: 2px;
     }
-    
+
     .draw-color-section {
         overflow: hidden;
         max-width: 300px;
         transition: max-width 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
         opacity: 1;
     }
-    
+
     .draw-color-section.eraser-hidden {
         max-width: 0;
         opacity: 0;
@@ -2703,25 +2703,25 @@
         padding: 0;
         gap: 0;
     }
-    
+
     .draw-toolbar-divider.color-divider {
         transition: max-width 0.3s ease, opacity 0.3s ease;
         overflow: hidden;
         max-width: 10px;
         opacity: 1;
     }
-    
+
     .draw-toolbar-divider.color-divider.eraser-hidden {
         max-width: 0;
         opacity: 0;
     }
-    
+
     .draw-color-presets {
         display: flex;
         align-items: center;
         gap: 4px;
     }
-    
+
     .draw-color-swatch {
         width: 22px;
         height: 22px;
@@ -2732,17 +2732,17 @@
         flex-shrink: 0;
         padding: 0;
     }
-    
+
     .draw-color-swatch:hover {
         transform: scale(1.15);
     }
-    
+
     .draw-color-swatch.active {
         border-color: #374151;
         transform: scale(1.15);
         box-shadow: 0 0 0 1px #fff inset;
     }
-    
+
     .draw-color-custom {
         width: 22px;
         height: 22px;
@@ -2761,13 +2761,13 @@
     .draw-color-custom:hover {
         transform: scale(1.15);
     }
-    
+
     .draw-size-presets {
         display: flex;
         align-items: center;
         gap: 6px;
     }
-    
+
     .draw-size-btn {
         width: 28px;
         height: 28px;
@@ -2782,18 +2782,18 @@
         color: #374151;
         padding: 0;
     }
-    
+
     .draw-size-btn:hover {
         background: #f3f4f6;
         border-color: #d1d5db;
     }
-    
+
     .draw-size-btn.active {
         background: #d1fae5;
         border-color: #2ecc71;
         color: #065f46;
     }
-    
+
     .draw-label {
         font-size: 12px;
         color: #6b7280;
@@ -2802,7 +2802,7 @@
         gap: 6px;
         font-family: 'DM Sans', sans-serif;
     }
-    
+
     .draw-label input[type="color"] {
         width: 28px;
         height: 24px;
@@ -2812,14 +2812,14 @@
         padding: 2px;
         background: transparent;
     }
-    
+
     .draw-label input[type="range"] {
         accent-color: #2ecc71;
         vertical-align: middle;
     }
-    
+
     /* ─── Drawing Canvas ──────────────────────────────────────────────────────── */
-    
+
     #drawingCanvas {
         display: none;
         position: absolute;
@@ -2829,12 +2829,12 @@
         z-index: 10;
         cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z' fill='%23374151'/%3E%3C/svg%3E") 0 24, crosshair;
     }
-    
+
     #drawingCanvas.eraser-active {
         cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M20 20H7L3 16l11-11 6 6-3.5 3.5' stroke='%23374151' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11L13 18' stroke='%23374151' stroke-width='2' fill='none'/%3E%3C/svg%3E") 12 12, crosshair;
     }
     /* ─── Table Toolbar ──────────────────────────────────────────────────────── */
-    
+
     #tableToolbar {
         display: none;
         position: fixed;
@@ -2848,7 +2848,7 @@
         align-items: center;
         font-size: 12px;
     }
-    
+
     .tbl-btn {
         background: #f3f4f6;
         border: 1px solid #d1d5db;
@@ -2860,25 +2860,25 @@
         white-space: nowrap;
         transition: background 0.15s;
     }
-    
+
     .tbl-btn:hover {
         background: #e5e7eb;
         border-color: #9ca3af;
     }
-    
+
     .tbl-btn-danger {
         color: #dc2626;
         border-color: #fca5a5;
         background: #fef2f2;
     }
-    
+
     .tbl-btn-danger:hover {
         background: #fee2e2;
         border-color: #f87171;
     }
-    
+
     /* ─── Inserted Images ──────────────────────────────────────────────────────── */
-    
+
     .text-editor img {
         max-width: 100%;
         height: auto;
@@ -2889,25 +2889,25 @@
         vertical-align: middle;
         transition: box-shadow 0.15s ease, outline 0.15s ease;
     }
-    
+
     .text-editor img:hover {
         box-shadow: 0 4px 16px rgba(0,0,0,0.18);
         outline: 2px solid rgba(35, 154, 77, 0.4);
         outline-offset: 2px;
     }
-    
+
     .text-editor img.img-selected {
         outline: 2px solid #239a4d;
         outline-offset: 2px;
     }
-    
+
     /* Drag-and-drop zone highlight */
     .text-editor.drag-over {
         outline: 3px dashed #239a4d;
         outline-offset: -3px;
         background: rgba(35, 154, 77, 0.04) !important;
     }
-    
+
     /* Image resize wrapper when selected */
     .img-resize-wrapper {
         display: inline-block;
@@ -2915,7 +2915,7 @@
         line-height: 0;
         user-select: none;
     }
-    
+
     .img-resize-handle {
         position: absolute;
         width: 10px;
@@ -2928,16 +2928,16 @@
         right: -5px;
         z-index: 20;
     }
-    
+
     /* ─── Table Column Resize ─────────────────────────────────────────────────── */
-    
+
     .text-editor table {
         table-layout: fixed;
         width: 100%;
         border-collapse: collapse;
         position: relative;
     }
-    
+
     .col-resize-handle {
         position: absolute;
         top: 0;
@@ -2948,14 +2948,14 @@
         z-index: 5;
         transition: background 0.15s;
     }
-    
+
     .col-resize-handle:hover,
     .col-resize-handle.dragging {
         background: rgba(35, 154, 77, 0.5);
     }
-    
+
     /* ─── Table Drag / Floating ───────────────────────────────────────────────── */
-    
+
     table.em-floating {
         position: absolute;
         z-index: 100;
@@ -2965,11 +2965,11 @@
         border: 2px solid #239a4d;
         min-width: 120px;
     }
-    
+
     table.em-floating:hover {
         box-shadow: 0 12px 40px rgba(0,0,0,0.25);
     }
-    
+
     .table-drag-handle {
         display: none;
         position: absolute;
@@ -2989,13 +2989,13 @@
         white-space: nowrap;
         z-index: 101;
     }
-    
+
     table.em-floating .table-drag-handle {
         display: flex;
     }
-    
+
     /* ─── Drawing Canvas Drag Handle ─────────────────────────────────────────── */
-    
+
     #canvasDragHandle {
         display: none;
         position: absolute;
@@ -3016,19 +3016,19 @@
         right: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
-    
+
     #canvasDragHandle.visible {
         display: flex;
     }
-    
+
     /* ─── Font Dropdown Enhancements ─────────────────────────────────────────── */
-    
+
     #fontFamilyDropdown .ms-dropdown-menu {
         max-height: 320px;
         overflow-y: auto;
         min-width: 200px;
     }
-    
+
     #fontColorDropdown .ms-dropdown-menu,
     #highlightColorDropdown .ms-dropdown-menu,
     #noteColorDropdown .ms-dropdown-menu {
@@ -3052,27 +3052,27 @@
 #superscriptBtn text {
     font-family: 'DM Sans', sans-serif;
 }
-    
+
     /* ─── Image Insert Button ─────────────────────────────────────────────────── */
-    
+
     #insertImageBtn {
         position: relative;
     }
-    
-    
+
+
     /* ─── Canvas Visual Bug Fix ───────────────────────────────────────────────── */
-    
+
     #drawingCanvas {
         outline: none;
     }
-    
+
     /* When canvas is hidden, ensure no layout space is taken */
     #drawingCanvas[style*="display: none"],
     #drawingCanvas[style*="display:none"] {
         width: 0 !important;
         height: 0 !important;
     }
-    
+
     /* ─── Editor Status Bar (line / col / words / characters) ──────────────────── */
     .editor-statusbar {
         display: flex;
@@ -3098,7 +3098,7 @@
         color: #94a3b8;
         flex-shrink: 0;
     }
-    
+
     /* ─── Welcome-screen state: gray ribbon out and hide status bar ─────────── */
     body.no-active-note .editor-header,
     body.no-active-note .editor-content,
@@ -3125,7 +3125,7 @@
         padding: 0 !important;
     }
     /* The ribbon tabs themselves remain visually labelled but are inert */
-    
+
     /* ─── Sidebar collapse: hide "Notes" + "+" instantly when collapsing ─── */
     .sidebar.collapsed .sidebar-header h3,
     .sidebar.collapsed .new-note-btn,
@@ -3133,7 +3133,7 @@
         transition: opacity 0s !important;
         opacity: 0 !important;
     }
-    
+
     /* ─── Drawing canvas resize handle ─────────────────────────────────────────── */
     #canvasResizeHandle {
         display: none;
@@ -3148,69 +3148,69 @@
         box-shadow: 0 2px 6px rgba(0,0,0,0.18);
     }
     #canvasResizeHandle.visible { display: block; }
-    
+
     /* While in draw mode, the canvas covers the whole editor */
     #drawingCanvas { background: transparent; }
-    
-    
+
+
     /* Image resize wrapper - selected state */
     .img-resize-wrapper.selected {
         outline: 2px solid #239a4d;
         outline-offset: 2px;
     }
     .img-resize-wrapper > img { display: block; cursor: move; }
-    
+
     /* ─── Responsive Grid Layout ──────────────────────────────────────────────── */
-    
+
     @media (max-width: 1400px) {
         .notes-list-display {
             grid-template-columns: repeat(2, 1fr);
         }
     }
-    
+
     @media (max-width: 900px) {
         .notes-list-display {
             grid-template-columns: 1fr;
         }
-        
+
         .welcome-content {
             padding: 30px;
         }
-        
+
         .welcome-header-top {
             flex-direction: column;
             text-align: center;
         }
-        
+
         .welcome-header h1 {
             font-size: 28px;
         }
     }
-    
+
     @media (max-width: 640px) {
         .welcome-content {
             padding: 20px;
             gap: 16px;
         }
-        
+
         .welcome-header {
             gap: 16px;
         }
-        
+
         .welcome-logo {
             width: 48px;
             height: 48px;
         }
-        
+
         .welcome-header h1 {
             font-size: 24px;
         }
-        
+
         .section-title {
             flex-direction: column;
             align-items: flex-start;
         }
-        
+
         .create-note-btn {
             width: 100%;
             justify-content: center;
