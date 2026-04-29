@@ -169,13 +169,22 @@
         -webkit-overflow-scrolling: touch;
     }
     
+    .ribbon-content::-webkit-scrollbar {
+        height: 10px;
+    }
+    
+    .ribbon-content::-webkit-scrollbar-track {
+        background: rgba(241, 241, 241, 0.9);
+    }
+    
     .ribbon-panel {
         display: none;
         align-items: center;
         gap: 12px;
         flex-wrap: nowrap;
         justify-content: flex-start;
-        min-width: 100%;
+        min-width: max-content;
+        padding-right: 20px;
     }
     
     .ribbon-panel.active {
@@ -1427,7 +1436,7 @@
             width: 85vw;
             max-width: 340px;
             /* fill remaining screen below navbar */
-            height: calc(100% - 64px);
+            height: 100%;
             z-index: 2000;
             transform: translateX(-100%);
             transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
