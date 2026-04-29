@@ -165,14 +165,17 @@
         max-width: 1900px;
         margin: 0 auto;
         border-radius: 0 0 12px 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
     
     .ribbon-panel {
         display: none;
         align-items: center;
         gap: 12px;
-        flex-wrap: wrap;
-        justify-content: center;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        min-width: 100%;
     }
     
     .ribbon-panel.active {
@@ -186,6 +189,8 @@
         border-right: 1px solid rgba(0, 0, 0, 0.08);
         padding-right: 16px;
         margin-right: 12px;
+        flex-shrink: 0;
+        min-width: max-content;
     }
     
     .ribbon-group:last-child {
@@ -211,7 +216,8 @@
         display: flex;
         align-items: center;
         gap: 4px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        min-width: max-content;
     }
     
     .ribbon-btn {
