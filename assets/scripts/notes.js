@@ -236,63 +236,9 @@ class NotesApp {
             window.history.replaceState({}, document.title, window.location.pathname);
             return;
         }
-        // Bug 7: Owner reload — check if we have a saved owner session
-        try {
-            const saved = localStorage.getItem('emeraldnotes_collab_owner');
-            if (saved) {
-                const { sessionId: sid, noteId } = JSON.parse(saved);
-                if (sid) {
-                    this._dbGet(`/sharednotes/${sid}`).then(data => {
-                        if (!data || data.status === 'closed') {
-                            localStorage.removeItem('emeraldnotes_collab_owner');
-                            localStorage.removeItem('emeraldnotes_collab_non_owner');
-                            return;
-                        }
-                        if (data.ownerId !== this.collabUser.id) return;
-                        this.collabSessionId = sid;
-                        this.collabNoteId = noteId || data.noteId || null;
-                        this.collabIsOwner = true;
-                        this.collabPermission = data.permission || 'edit';
-                        this.collabMode = true;
-                        this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
-                        this._activeUsers = data.activeUsers || {};
-                        if (this.collabNoteId && this.notes.some(n => n.id === this.collabNoteId)) {
-                            this.currentNoteId = this.collabNoteId;
-                            this.renderNotesList();
-                            this.renderNotesCards();
-                        } else {
-                            this.currentNoteId = null;
-                        }
-                        this.setEditorForSession(this.collabNoteData, false);
-                        this.collabNoteVisible = true;
-                        this.setupSessionListener();
-                        this.updateActiveUserPresence();
-                        this.renderCollabBar(this._activeUsers);
-                        this.showToast('Reconnected to your live session');
-                    }).catch(() => {
-                        localStorage.removeItem('emeraldnotes_collab_owner');
-                    });
-                }
-            }
-        } catch (_) {}
-        // Bug 3: Non-owner reload — check if we have a saved non-owner session
-        try {
-            const savedNonOwner = localStorage.getItem('emeraldnotes_collab_non_owner');
-            if (savedNonOwner) {
-                const { sessionId: sid } = JSON.parse(savedNonOwner);
-                if (sid) {
-                    this._dbGet(`/sharednotes/${sid}`).then(data => {
-                        if (!data || data.status === 'closed') {
-                            localStorage.removeItem('emeraldnotes_collab_non_owner');
-                            return;
-                        }
-                        this.joinCollabSession(sid);
-                    }).catch(() => {
-                        localStorage.removeItem('emeraldnotes_collab_non_owner');
-                    });
-                }
-            }
-        } catch (_) {}
+        // Clean up any stale session storage from previous versions
+        try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
+        try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
     }
 
     async joinCollabSession(sessionId) {
@@ -342,12 +288,6 @@ class NotesApp {
             this.setupSessionListener();
             this.updateActiveUserPresence();
             this.renderCollabBar(data.activeUsers || {});
-            // Save non-owner session info so they can reconnect
-            if (!this.collabIsOwner) {
-                try {
-                    localStorage.setItem('emeraldnotes_collab_non_owner', JSON.stringify({ sessionId: sessionId }));
-                } catch (_) {}
-            }
             this.showToast(`Joined shared note as ${this.collabUser.name || 'Guest'}`);
         } catch (err) {
             console.error('Failed to join collab session', err);
@@ -387,13 +327,11 @@ class NotesApp {
                 note: this.collabNoteData,
                 activeUsers: this._activeUsers
             });
-            // Bug 7: persist owner session so reload rejoins automatically
-            try {
-                localStorage.setItem('emeraldnotes_collab_owner', JSON.stringify({ sessionId: this.collabSessionId, noteId: this.collabNoteId }));
-            } catch (_) {}
             this.setupSessionListener();
             this.renderCollabBar(this._activeUsers);
         }
+        // Remove legacy localStorage saves (no auto-rejoin)
+        try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
         const shareModal = document.getElementById('shareModal');
         const shareLink = document.getElementById('shareLink');
         const permissionSelect = document.getElementById('sharePermission');
@@ -836,6 +774,50 @@ class NotesApp {
         } else {
             this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`);
         }
+    }
+
+    // Non-owner: leave shared note without affecting other collaborators or the owner
+    leaveCollabNote() {
+        if (this.collabIsOwner) return; // owners use end session, not leave
+        // Remove own presence from Firebase (don't close the whole session)
+        if (this.collabSessionId && this.collabUser) {
+            this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`).catch(() => {});
+        }
+        if (this._collabEventSource) {
+            this._collabEventSource.close();
+            this._collabEventSource = null;
+        }
+        this.collabMode = false;
+        this.collabIsOwner = false;
+        this.collabSessionId = null;
+        this.collabNoteId = null;
+        this.collabPermission = 'edit';
+        this.collabNoteData = null;
+        this.collabNoteVisible = false;
+        this._activeUsers = {};
+        // Remove virtual shared note from list
+        this.notes = this.notes.filter(n => !n._isCollabNote);
+        if (this.currentNoteId && !this.notes.some(n => n.id === this.currentNoteId)) {
+            this.currentNoteId = null;
+        }
+        // Clear UI state
+        const navAvatars = document.getElementById('collabNavAvatars');
+        if (navAvatars) navAvatars.innerHTML = '';
+        const statbarPerm = document.getElementById('statbar-perm');
+        if (statbarPerm) { statbarPerm.innerHTML = ''; statbarPerm.style.display = 'none'; }
+        const statbarSepPerm = document.getElementById('statbar-sep-perm');
+        if (statbarSepPerm) statbarSepPerm.style.display = 'none';
+        document.body.classList.remove('collab-view-only', 'collab-non-owner');
+        const cursors = document.getElementById('collabCursors');
+        if (cursors) cursors.innerHTML = '';
+        this._setOwnerOnlyButtonsVisible(true);
+        const textEditor = document.getElementById('textEditor');
+        if (textEditor) textEditor.contentEditable = 'true';
+        const titleInput = document.getElementById('noteTitle');
+        if (titleInput) titleInput.disabled = false;
+        this.renderNotesList();
+        this.renderNotesCards();
+        this.showWelcomeScreenIfNeeded();
     }
 
     // Bug 11: centralized cleanup of all collab state
@@ -1404,21 +1386,51 @@ class NotesApp {
         const menu = dropdownEl.querySelector('.ms-dropdown-menu');
         const items = dropdownEl.querySelectorAll('.ms-dropdown-item');
 
-        const positionMenu = () => {
+        // Portal approach: move menu to document.body to avoid iOS overflow clipping
+        const openPortal = () => {
+            if (!menu._portalParent) {
+                menu._portalParent = menu.parentNode;
+            }
+            if (menu.parentNode !== document.body) {
+                document.body.appendChild(menu);
+            }
+            // Temporarily make visible but hidden for measurement
+            menu.style.visibility = 'hidden';
+            menu.style.display = 'block';
+            menu.style.position = 'fixed';
+            menu.style.zIndex = '99999';
+            menu.style.minWidth = '160px';
+
             const btnRect = btn.getBoundingClientRect();
             const vw = window.innerWidth;
             const vh = window.innerHeight;
-            const menuWidth = Math.max(menu.offsetWidth || 160, 160);
+            const mw = Math.max(menu.scrollWidth, 160);
+            const mh = Math.min(menu.scrollHeight, 260);
             let left = btnRect.left;
             let top = btnRect.bottom + 4;
-            // Keep within viewport horizontally
-            if (left + menuWidth > vw - 8) left = vw - menuWidth - 8;
+            if (left + mw > vw - 8) left = vw - mw - 8;
             if (left < 8) left = 8;
-            // Flip upward if not enough space below
-            if (top + 260 > vh) top = Math.max(btnRect.top - 260, 8);
+            if (top + mh > vh - 8) top = Math.max(btnRect.top - mh - 4, 8);
             menu.style.top = top + 'px';
             menu.style.left = left + 'px';
-            menu.style.width = menuWidth + 'px';
+            menu.style.width = mw + 'px';
+            menu.style.visibility = '';
+            dropdownEl.classList.add('active');
+        };
+
+        const closePortal = () => {
+            dropdownEl.classList.remove('active');
+            if (menu._portalParent && menu.parentNode === document.body) {
+                menu._portalParent.appendChild(menu);
+            }
+            menu.style.display = '';
+            menu.style.position = '';
+            menu.style.zIndex = '';
+            menu.style.top = '';
+            menu.style.left = '';
+            menu.style.width = '';
+            menu.style.minWidth = '';
+            menu.style.visibility = '';
         };
 
         btn.addEventListener('mousedown', (e) => e.preventDefault());
@@ -1427,14 +1439,30 @@ class NotesApp {
             e.stopPropagation();
             this.saveSelection();
             const wasActive = dropdownEl.classList.contains('active');
+            // Close all other open dropdowns
             document.querySelectorAll('.ms-dropdown.active').forEach(d => {
-                if (d !== dropdownEl) d.classList.remove('active');
+                if (d !== dropdownEl) {
+                    const m = d.querySelector('.ms-dropdown-menu');
+                    d.classList.remove('active');
+                    if (m) {
+                        if (m._portalParent && m.parentNode === document.body) {
+                            m._portalParent.appendChild(m);
+                        }
+                        m.style.display = '';
+                        m.style.position = '';
+                        m.style.zIndex = '';
+                        m.style.top = '';
+                        m.style.left = '';
+                        m.style.width = '';
+                        m.style.minWidth = '';
+                        m.style.visibility = '';
+                    }
+                }
             });
             if (!wasActive) {
-                dropdownEl.classList.add('active');
-                positionMenu();
+                openPortal();
             } else {
-                dropdownEl.classList.remove('active');
+                closePortal();
             }
         });
 
@@ -1452,7 +1480,7 @@ class NotesApp {
                 if (colorPreview && value) {
                     colorPreview.style.background = value;
                 }
-                dropdownEl.classList.remove('active');
+                closePortal();
                 setTimeout(() => {
                     const editor = document.getElementById('textEditor');
                     if (editor) editor.focus();
@@ -1461,6 +1489,14 @@ class NotesApp {
                 }, 10);
             });
         });
+
+        // Close portal on outside click
+        document.addEventListener('click', (e) => {
+            if (dropdownEl.classList.contains('active') &&
+                !menu.contains(e.target) && !btn.contains(e.target)) {
+                closePortal();
+            }
+        }, true);
     }
 
     // ─── Ribbon Setup (Desktop) ─────────────────────────────────────────────────
@@ -2015,11 +2051,22 @@ class NotesApp {
         const date = new Date(note.modifiedAt);
         const isLiveNote = this.collabMode && note.id === this.collabNoteId;
 
+        const showLeaveBtn = isLiveNote && !this.collabIsOwner;
+
         div.innerHTML = `
             <div class="note-item-title">${this.escapeHtml(note.title)}</div>
             <div class="note-item-preview">${this.escapeHtml(preview)}${preview.length === 150 ? '...' : ''}</div>
             <div class="note-item-date">${isLiveNote ? '<span class="note-live-dot"></span>' : ''}${this.formatDate(date)}</div>
+            ${showLeaveBtn ? '<button class="note-item-leave-btn" title="Remove shared note from your list">✕</button>' : ''}
         `;
+
+        if (showLeaveBtn) {
+            const leaveBtn = div.querySelector('.note-item-leave-btn');
+            leaveBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.leaveCollabNote();
+            });
+        }
 
         div.addEventListener('click', () => {
             this.selectNote(note.id);
