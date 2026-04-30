@@ -236,9 +236,58 @@ class NotesApp {
             window.history.replaceState({}, document.title, window.location.pathname);
             return;
         }
-        // Clean up any stale session storage from previous versions
-        try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
-        try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
+        // Owner reload: re-attach listener so live session stays active
+        try {
+            const saved = localStorage.getItem('emeraldnotes_collab_owner');
+            if (saved) {
+                const { sessionId: sid, noteId } = JSON.parse(saved);
+                if (sid) {
+                    this._dbGet(`/sharednotes/${sid}`).then(data => {
+                        if (!data || data.status === 'closed') {
+                            localStorage.removeItem('emeraldnotes_collab_owner');
+                            return;
+                        }
+                        if (data.ownerId !== this.collabUser.id) {
+                            localStorage.removeItem('emeraldnotes_collab_owner');
+                            return;
+                        }
+                        this.collabSessionId = sid;
+                        this.collabNoteId = noteId || data.noteId || null;
+                        this.collabIsOwner = true;
+                        this.collabPermission = data.permission || 'edit';
+                        this.collabMode = true;
+                        this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
+                        this._activeUsers = data.activeUsers || {};
+                        // Keep the local note in the list with the live dot
+                        if (this.collabNoteId && this.notes.some(n => n.id === this.collabNoteId)) {
+                            this.renderNotesList();
+                        }
+                        // Re-attach listener without forcing the user into the note
+                        this.collabNoteVisible = false;
+                        this.setupSessionListener();
+                        // Update owner presence silently
+                        this.updateActiveUserPresence();
+                    }).catch(() => { localStorage.removeItem('emeraldnotes_collab_owner'); });
+                }
+            }
+        } catch (_) {}
+
+        // Non-owner reload: re-join so shared note stays in sidebar
+        try {
+            const savedNO = localStorage.getItem('emeraldnotes_collab_non_owner');
+            if (savedNO) {
+                const { sessionId: sid } = JSON.parse(savedNO);
+                if (sid) {
+                    this._dbGet(`/sharednotes/${sid}`).then(data => {
+                        if (!data || data.status === 'closed') {
+                            localStorage.removeItem('emeraldnotes_collab_non_owner');
+                            return;
+                        }
+                        this.joinCollabSession(sid);
+                    }).catch(() => { localStorage.removeItem('emeraldnotes_collab_non_owner'); });
+                }
+            }
+        } catch (_) {}
     }
 
     async joinCollabSession(sessionId) {
@@ -288,6 +337,12 @@ class NotesApp {
             this.setupSessionListener();
             this.updateActiveUserPresence();
             this.renderCollabBar(data.activeUsers || {});
+            // Persist non-owner session for reload
+            if (!this.collabIsOwner) {
+                try {
+                    localStorage.setItem('emeraldnotes_collab_non_owner', JSON.stringify({ sessionId: sessionId }));
+                } catch (_) {}
+            }
             this.showToast(`Joined shared note as ${this.collabUser.name || 'Guest'}`);
         } catch (err) {
             console.error('Failed to join collab session', err);
@@ -329,9 +384,11 @@ class NotesApp {
             });
             this.setupSessionListener();
             this.renderCollabBar(this._activeUsers);
+            // Persist owner session for reload
+            try {
+                localStorage.setItem('emeraldnotes_collab_owner', JSON.stringify({ sessionId: this.collabSessionId, noteId: this.collabNoteId }));
+            } catch (_) {}
         }
-        // Remove legacy localStorage saves (no auto-rejoin)
-        try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
         const shareModal = document.getElementById('shareModal');
         const shareLink = document.getElementById('shareLink');
         const permissionSelect = document.getElementById('sharePermission');
@@ -631,6 +688,9 @@ class NotesApp {
             const el = document.getElementById(id);
             if (el) el.style.display = visible ? '' : 'none';
         });
+        // Leave button: show for non-owner, hide when restoring to owner/normal state
+        const leaveBtn = document.getElementById('leaveCollabBtn');
+        if (leaveBtn) leaveBtn.style.display = visible ? 'none' : 'inline-flex';
     }
 
     setEditorForSession(noteData, focus = true) {
@@ -779,6 +839,8 @@ class NotesApp {
     // Non-owner: leave shared note without affecting other collaborators or the owner
     leaveCollabNote() {
         if (this.collabIsOwner) return; // owners use end session, not leave
+        // Clear persisted non-owner session so it doesn't re-join on reload
+        try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
         // Remove own presence from Firebase (don't close the whole session)
         if (this.collabSessionId && this.collabUser) {
             this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`).catch(() => {});
@@ -917,6 +979,9 @@ class NotesApp {
         const deleteNoteBtn = document.getElementById('deleteNoteBtn');
         if (deleteNoteBtn) deleteNoteBtn.addEventListener('click', () => this.deleteCurrentNote());
 
+        const leaveCollabBtn = document.getElementById('leaveCollabBtn');
+        if (leaveCollabBtn) leaveCollabBtn.addEventListener('click', () => this.leaveCollabNote());
+
         const exportNoteBtn = document.getElementById('exportNoteBtn');
         if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
 
@@ -974,21 +1039,6 @@ class NotesApp {
             backdrop.className = 'sidebar-backdrop';
             backdrop.addEventListener('click', () => this.closeMobileSidebar());
             document.querySelector('.notes-app').appendChild(backdrop);
-        }
-
-        // Inject mobile back button into navbar, right after the logo link
-        if (!document.getElementById('mobileBackBtn')) {
-            const backBtn = document.createElement('button');
-            backBtn.id = 'mobileBackBtn';
-            backBtn.className = 'mobile-back-btn';
-            backBtn.title = 'Open Notes List';
-            backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`;
-            backBtn.addEventListener('click', () => this.openMobileSidebar());
-            const navContainer = document.querySelector('.nav-container');
-            const logoLink = navContainer ? navContainer.querySelector('.logo') : null;
-            if (logoLink && navContainer) {
-                logoLink.insertAdjacentElement('afterend', backBtn);
-            }
         }
 
 
@@ -1394,12 +1444,14 @@ class NotesApp {
             if (menu.parentNode !== document.body) {
                 document.body.appendChild(menu);
             }
-            // Temporarily make visible but hidden for measurement
+            // Set styles before measuring
             menu.style.visibility = 'hidden';
             menu.style.display = 'block';
             menu.style.position = 'fixed';
             menu.style.zIndex = '99999';
             menu.style.minWidth = '160px';
+            menu.style.maxHeight = '260px';
+            menu.style.overflowY = 'auto';
 
             const btnRect = btn.getBoundingClientRect();
             const vw = window.innerWidth;
@@ -1430,6 +1482,8 @@ class NotesApp {
             menu.style.left = '';
             menu.style.width = '';
             menu.style.minWidth = '';
+            menu.style.maxHeight = '';
+            menu.style.overflowY = '';
             menu.style.visibility = '';
         };
 
@@ -1455,6 +1509,8 @@ class NotesApp {
                         m.style.left = '';
                         m.style.width = '';
                         m.style.minWidth = '';
+                        m.style.maxHeight = '';
+                        m.style.overflowY = '';
                         m.style.visibility = '';
                     }
                 }
@@ -2051,22 +2107,11 @@ class NotesApp {
         const date = new Date(note.modifiedAt);
         const isLiveNote = this.collabMode && note.id === this.collabNoteId;
 
-        const showLeaveBtn = isLiveNote && !this.collabIsOwner;
-
         div.innerHTML = `
             <div class="note-item-title">${this.escapeHtml(note.title)}</div>
             <div class="note-item-preview">${this.escapeHtml(preview)}${preview.length === 150 ? '...' : ''}</div>
             <div class="note-item-date">${isLiveNote ? '<span class="note-live-dot"></span>' : ''}${this.formatDate(date)}</div>
-            ${showLeaveBtn ? '<button class="note-item-leave-btn" title="Remove shared note from your list">✕</button>' : ''}
         `;
-
-        if (showLeaveBtn) {
-            const leaveBtn = div.querySelector('.note-item-leave-btn');
-            leaveBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.leaveCollabNote();
-            });
-        }
 
         div.addEventListener('click', () => {
             this.selectNote(note.id);
