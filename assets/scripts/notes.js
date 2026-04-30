@@ -120,7 +120,8 @@ class NotesApp {
 
     saveNotesToStorage() {
         try {
-            localStorage.setItem('emeraldnotes_data', JSON.stringify(this.notes));
+            const toSave = this.notes.filter(n => !n._isCollabNote);
+            localStorage.setItem('emeraldnotes_data', JSON.stringify(toSave));
             this.showSaveIndicator('saved');
         } catch (error) {
             console.error('Error saving notes to storage:', error);
@@ -309,27 +310,45 @@ class NotesApp {
             this.collabIsOwner = data.ownerId === this.collabUser.id;
             this.collabPermission = data.permission || 'edit';
             this.collabMode = true;
-            this.collabNoteId = data.noteId || null;
             this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
-            this.setEditorForSession(this.collabNoteData);
-            this.collabNoteVisible = true;
-            if (this.collabNoteId && this.notes.some(n => n.id === this.collabNoteId)) {
-                this.currentNoteId = this.collabNoteId;
-                this.renderNotesList();
-                this.renderNotesCards();
+
+            // Determine collabNoteId: use owner's noteId if it exists in non-owner's local notes,
+            // otherwise create a virtual note entry so the shared note appears in the sidebar.
+            const ownerNoteId = data.noteId || null;
+            if (ownerNoteId && this.notes.some(n => n.id === ownerNoteId)) {
+                this.collabNoteId = ownerNoteId;
+                this.currentNoteId = ownerNoteId;
             } else {
-                this.currentNoteId = null;
+                const virtualId = '_collab_' + sessionId;
+                this.collabNoteId = virtualId;
+                // Remove any stale virtual note then insert fresh one at the top
+                this.notes = this.notes.filter(n => !n._isCollabNote);
+                this.notes.unshift({
+                    id: virtualId,
+                    title: this.collabNoteData.title || 'Shared Note',
+                    content: this.collabNoteData.content || '',
+                    color: this.collabNoteData.color || '#ffffff',
+                    modifiedAt: this.collabNoteData.modifiedAt || new Date().toISOString(),
+                    _isCollabNote: true
+                });
+                this.currentNoteId = virtualId;
             }
+
+            this.collabNoteVisible = true;
+            this.setEditorForSession(this.collabNoteData);
+            this.renderNotesList();
+            this.renderNotesCards();
             this.renderShareCollaborators(data.activeUsers || {});
             this.setupSessionListener();
             this.updateActiveUserPresence();
-            // Bug 3: Save non-owner session info so they can reconnect
+            this.renderCollabBar(data.activeUsers || {});
+            // Save non-owner session info so they can reconnect
             if (!this.collabIsOwner) {
                 try {
                     localStorage.setItem('emeraldnotes_collab_non_owner', JSON.stringify({ sessionId: sessionId }));
                 } catch (_) {}
             }
-            this.showToast(`Joined shared note as ${this.collabUser.name}`);
+            this.showToast(`Joined shared note as ${this.collabUser.name || 'Guest'}`);
         } catch (err) {
             console.error('Failed to join collab session', err);
             this.showToast('Failed to join session. Please try again.');
@@ -338,10 +357,6 @@ class NotesApp {
 
     openShareModal() {
         if (!this.currentNoteId && !this.collabMode) return;
-        if (this.collabMode && this.collabNoteId && !this.collabNoteVisible) {
-            this.showToast('⚠️ | Live collaboration is active, but this session got disconnected. Please reload.');
-            return;
-        }
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!this.collabSessionId || !this.collabMode) {
             this.collabSessionId = this.collabSessionId || this.generateId(10);
@@ -445,10 +460,13 @@ class NotesApp {
 
     async updateActiveUserPresence() {
         if (!this.collabSessionId || !this.collabUser) return;
+        const safeName = (this.collabUser.name && this.collabUser.name !== 'undefined')
+            ? this.collabUser.name
+            : ('User ' + (this.collabUser.id || '').slice(0, 4));
         await this._dbPatch(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`, {
             id: this.collabUser.id,
-            name: this.collabUser.name,
-            color: this.collabUser.color,
+            name: safeName,
+            color: this.collabUser.color || '#00b894',
             cursor: null,
             updatedAt: new Date().toISOString(),
             isOwner: this.collabIsOwner
@@ -471,7 +489,18 @@ class NotesApp {
             if (this._lastPushedModifiedAt && this._lastPushedModifiedAt === note.modifiedAt) return;
             if (!this.collabNoteData || note.modifiedAt !== this.collabNoteData.modifiedAt) {
                 this.collabNoteData = note;
-                this.setEditorForSession(note, false);
+                // Keep virtual note in sync so the sidebar title/preview updates
+                const virtualNote = this.notes.find(n => n._isCollabNote);
+                if (virtualNote) {
+                    virtualNote.title = note.title || 'Shared Note';
+                    virtualNote.content = note.content || '';
+                    virtualNote.color = note.color || '#ffffff';
+                    virtualNote.modifiedAt = note.modifiedAt;
+                    this.renderNotesList();
+                }
+                if (this.collabNoteVisible) {
+                    this.setEditorForSession(note, false);
+                }
             }
         };
         const applyPermissionUpdate = (perm) => {
@@ -544,6 +573,12 @@ class NotesApp {
         es.onerror = () => { console.warn('SSE connection lost, will auto-reconnect'); };
     }
 
+    _safeUserName(user) {
+        return (user.name && user.name !== 'undefined' && user.name.trim())
+            ? user.name
+            : ('User ' + (user.id || '???').slice(0, 4));
+    }
+
     renderShareCollaborators(activeUsers) {
         const users = Object.values(activeUsers || {});
 
@@ -552,8 +587,8 @@ class NotesApp {
             container.innerHTML = '';
             users.forEach(user => {
                 const badge = document.createElement('span');
-                badge.textContent = user.name + (user.isOwner ? ' (Owner)' : '');
-                badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:' + user.color + ';color:#fff;padding:6px 10px;border-radius:999px;font-size:13px;';
+                badge.textContent = this._safeUserName(user) + (user.isOwner ? ' (Owner)' : '');
+                badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:' + (user.color || '#00b894') + ';color:#fff;padding:6px 10px;border-radius:999px;font-size:13px;';
                 container.appendChild(badge);
             });
         }
@@ -561,18 +596,21 @@ class NotesApp {
         const cursors = document.getElementById('collabCursors');
         if (cursors) {
             cursors.innerHTML = '';
-            users.forEach(user => {
-                if (user.id === this.collabUser.id || !user.cursor) return;
-                const cursor = document.createElement('div');
-                cursor.className = 'collab-cursor';
-                cursor.style.cssText = `top:${user.cursor.top}px;left:${user.cursor.left}px;height:${user.cursor.height || 18}px;--cursor-color:${user.color || '#005fa3'};background:${user.color || '#005fa3'}`;
-                const label = document.createElement('div');
-                label.className = 'collab-cursor-label';
-                label.textContent = user.name;
-                label.style.background = user.color || '#005fa3';
-                cursor.appendChild(label);
-                cursors.appendChild(cursor);
-            });
+            // Only show other users' cursors when the collab note is visible
+            if (this.collabNoteVisible) {
+                users.forEach(user => {
+                    if (user.id === this.collabUser.id || !user.cursor) return;
+                    const cursor = document.createElement('div');
+                    cursor.className = 'collab-cursor';
+                    cursor.style.cssText = `top:${user.cursor.top}px;left:${user.cursor.left}px;height:${user.cursor.height || 18}px;--cursor-color:${user.color || '#005fa3'};background:${user.color || '#005fa3'}`;
+                    const label = document.createElement('div');
+                    label.className = 'collab-cursor-label';
+                    label.textContent = this._safeUserName(user);
+                    label.style.background = user.color || '#005fa3';
+                    cursor.appendChild(label);
+                    cursors.appendChild(cursor);
+                });
+            }
         }
 
         this.renderCollabBar(activeUsers);
@@ -588,8 +626,8 @@ class NotesApp {
         const statbarSepPerm = document.getElementById('statbar-sep-perm');
 
         const editorArea = document.querySelector('.editor-area');
-        // Only show collab indicators when in collab mode AND viewing the actual collab note
-        if (!editorArea || !this.collabMode || !this.collabNoteVisible || (this.collabNoteId && this.currentNoteId !== this.collabNoteId)) {
+        // Only show collab indicators when in collab mode AND the collab note is visible
+        if (!editorArea || !this.collabMode || !this.collabNoteVisible) {
             if (navAvatars) navAvatars.innerHTML = '';
             if (statbarPerm) { statbarPerm.innerHTML = ''; statbarPerm.style.display = 'none'; }
             if (statbarSepPerm) statbarSepPerm.style.display = 'none';
@@ -598,9 +636,10 @@ class NotesApp {
 
         const users = Object.values(activeUsers || {});
         const avatarsHtml = users.map(user => {
-            const initial = (user.name || '?')[0].toUpperCase();
+            const displayName = this._safeUserName(user);
+            const initial = displayName[0].toUpperCase();
             const isMe = user.id === this.collabUser.id;
-            return `<div class="collab-avatar${isMe ? ' collab-avatar-me' : ''}" style="background:${user.color || '#00b894'}" title="${user.name}${isMe ? ' (You)' : ''}${user.isOwner ? ' · Owner' : ''}">
+            return `<div class="collab-avatar${isMe ? ' collab-avatar-me' : ''}" style="background:${user.color || '#00b894'}" title="${displayName}${isMe ? ' (You)' : ''}${user.isOwner ? ' · Owner' : ''}">
                 ${initial}
                 ${user.isOwner ? '<span class="collab-avatar-crown" title="Session Owner">♛</span>' : ''}
             </div>`;
@@ -626,6 +665,13 @@ class NotesApp {
         if (statbarSepPerm) statbarSepPerm.style.display = '';
     }
 
+    _setOwnerOnlyButtonsVisible(visible) {
+        ['exportNoteBtn', 'deleteNoteBtn', 'noteColorDropdown', 'shareNoteBtn'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = visible ? '' : 'none';
+        });
+    }
+
     setEditorForSession(noteData, focus = true) {
         const titleInput = document.getElementById('noteTitle');
         const textEditor = document.getElementById('textEditor');
@@ -645,10 +691,15 @@ class NotesApp {
                 textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
             }
         }
-        // Bug 2: gray out ribbon for view-only collaborators
+        // Gray out ribbon for view-only collaborators
         document.body.classList.toggle('collab-view-only', isViewOnly);
-        // Bug 5: hide owner-only actions for non-owners
         document.body.classList.toggle('collab-non-owner', isNonOwner);
+        // Hide owner-only buttons for non-owners viewing the shared note
+        if (isNonOwner) {
+            this._setOwnerOnlyButtonsVisible(false);
+        } else {
+            this._setOwnerOnlyButtonsVisible(true);
+        }
         const welcomeScreen = document.getElementById('welcomeScreen');
         if (welcomeScreen) welcomeScreen.classList.add('hidden');
         const editorHeader = document.querySelector('.editor-header');
@@ -664,26 +715,30 @@ class NotesApp {
     }
 
     updateCollabNoteTitle(title) {
-        if (!this.collabMode) return;
+        if (!this.collabMode || !this.collabNoteVisible) return;
         this.collabNoteData = this.collabNoteData || {};
         this.collabNoteData.title = title.slice(0, 40) || 'Untitled Note';
         this.collabNoteData.modifiedAt = new Date().toISOString();
+        // Update the virtual/local note in the sidebar
         if (this.currentNoteId) {
             const note = this.notes.find(n => n.id === this.currentNoteId);
             if (note) {
                 note.title = this.collabNoteData.title;
                 note.modifiedAt = this.collabNoteData.modifiedAt;
                 this.renderNotesList();
-                this.renderNotesCards();
-                this.debouncedSave();
+                // Only save to storage if it's a real (non-virtual) note
+                if (!note._isCollabNote) {
+                    this.renderNotesCards();
+                    this.debouncedSave();
+                }
             }
         }
         this._debouncedCollabPush();
     }
 
     updateCollabNoteContent() {
-        if (!this.collabMode) return;
-        // Bug 6: only push if the editor is showing the collab note (not a different local note)
+        if (!this.collabMode || !this.collabNoteVisible) return;
+        // Only push if the editor is showing the collab note (not a different local note)
         if (this.collabNoteId && this.currentNoteId && this.currentNoteId !== this.collabNoteId) return;
         const textEditor = document.getElementById('textEditor');
         if (!textEditor) return;
@@ -697,8 +752,11 @@ class NotesApp {
                 note.content = this.collabNoteData.content;
                 note.modifiedAt = this.collabNoteData.modifiedAt;
                 this.renderNotesList();
-                this.renderNotesCards();
-                this.debouncedSave();
+                // Only save to local storage if it's a real (non-virtual) note
+                if (!note._isCollabNote) {
+                    this.renderNotesCards();
+                    this.debouncedSave();
+                }
             }
         }
         this._debouncedCollabPush();
@@ -774,9 +832,22 @@ class NotesApp {
         this.collabNoteVisible = false;
         this._activeUsers = {};
         this._lastPushedModifiedAt = null;
+        // Remove any virtual shared note from the notes list
+        this.notes = this.notes.filter(n => !n._isCollabNote);
+        // If currentNoteId was pointing to the virtual note, clear it
+        if (this.currentNoteId && !this.notes.some(n => n.id === this.currentNoteId)) {
+            this.currentNoteId = null;
+        }
         // Remove presence bar
         const bar = document.getElementById('collabPresenceBar');
         if (bar) bar.remove();
+        // Clear collab indicators from navbar/statusbar
+        const navAvatars = document.getElementById('collabNavAvatars');
+        if (navAvatars) navAvatars.innerHTML = '';
+        const statbarPerm = document.getElementById('statbar-perm');
+        if (statbarPerm) { statbarPerm.innerHTML = ''; statbarPerm.style.display = 'none'; }
+        const statbarSepPerm = document.getElementById('statbar-sep-perm');
+        if (statbarSepPerm) statbarSepPerm.style.display = 'none';
         // Remove body classes for view-only
         document.body.classList.remove('collab-view-only', 'collab-non-owner');
         // Remove cursor overlays
@@ -788,15 +859,15 @@ class NotesApp {
             localStorage.removeItem('emeraldnotes_collab_non_owner');
         } catch (_) {}
         // Restore all owner-only buttons
-        ['exportNoteBtn', 'deleteNoteBtn', 'noteColorDropdown', 'shareNoteBtn'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = '';
-        });
+        this._setOwnerOnlyButtonsVisible(true);
         // Re-enable the editor
         const textEditor = document.getElementById('textEditor');
         if (textEditor) textEditor.contentEditable = 'true';
         const titleInput = document.getElementById('noteTitle');
         if (titleInput) titleInput.disabled = false;
+        // Re-render the notes list without the virtual note
+        this.renderNotesList();
+        this.renderNotesCards();
         // Show welcome screen if no note is selected; otherwise stay on current note
         this.showWelcomeScreenIfNeeded();
     }
@@ -849,9 +920,9 @@ class NotesApp {
         const noteTitle = document.getElementById('noteTitle');
         if (noteTitle) {
             noteTitle.addEventListener('input', (e) => {
-                if (this.collabMode) {
+                if (this.collabMode && this.collabNoteVisible) {
                     this.updateCollabNoteTitle(e.target.value);
-                } else if (this.currentNoteId) {
+                } else if (this.currentNoteId && !this.collabNoteVisible) {
                     this.updateNoteTitle(e.target.value);
                 }
             });
@@ -861,9 +932,9 @@ class NotesApp {
         if (textEditor) {
             textEditor.addEventListener('input', () => {
                 this.updatePlaceholderState(textEditor);
-                if (this.collabMode) {
+                if (this.collabMode && this.collabNoteVisible) {
                     this.updateCollabNoteContent();
-                } else if (this.currentNoteId) {
+                } else if (this.currentNoteId && !this.collabNoteVisible) {
                     this.updateNoteContent();
                 }
             });
@@ -1693,18 +1764,32 @@ class NotesApp {
         }
 
         if (this.collabMode && noteId === this.collabNoteId) {
+            // Switching back to the shared note — restore collab view
             this.collabNoteVisible = true;
             if (this.collabNoteData) {
                 this.setEditorForSession(this.collabNoteData, false);
             } else {
                 this.setEditorForSession(note, false);
             }
+            this.renderCollabBar(this._activeUsers || {});
         } else if (this.collabMode) {
+            // Switching away from shared note to own note
             this.collabNoteVisible = false;
-            const old = document.getElementById('collabPresenceBar');
-            if (old) old.remove();
-            // Bug 2: Clear collab UI when switching to non-collab notes
+            // Clear collab UI indicators
             this.renderCollabBar({});
+            // Clear remote cursors completely
+            const cursors = document.getElementById('collabCursors');
+            if (cursors) cursors.innerHTML = '';
+            // Non-owner: restore all owner-only buttons for their own notes
+            if (!this.collabIsOwner) {
+                this._setOwnerOnlyButtonsVisible(true);
+                document.body.classList.remove('collab-non-owner', 'collab-view-only');
+            }
+            // Restore normal editor state for the local note
+            const textEditor = document.getElementById('textEditor');
+            if (textEditor) textEditor.contentEditable = 'true';
+            const titleInput = document.getElementById('noteTitle');
+            if (titleInput) titleInput.disabled = false;
         }
 
         const noteColorDropdown = document.getElementById('noteColorDropdown');
@@ -1810,6 +1895,8 @@ class NotesApp {
 
         const currentNote = this.notes.find(n => n.id === this.currentNoteId);
         if (!currentNote) return;
+        // Cannot delete a virtual shared note — it disappears when the session ends
+        if (currentNote._isCollabNote) return;
 
         const title = currentNote.title || 'Untitled Note';
         this.showDeleteModal(title, () => {
@@ -1865,7 +1952,7 @@ class NotesApp {
         const plainText = tempDiv.textContent || tempDiv.innerText || '';
         const preview = plainText.substring(0, 150);
         const date = new Date(note.modifiedAt);
-        const isLiveNote = this.collabMode && this.collabNoteVisible && note.id === this.collabNoteId;
+        const isLiveNote = this.collabMode && note.id === this.collabNoteId;
 
         div.innerHTML = `
             <div class="note-item-title">${this.escapeHtml(note.title)}</div>
