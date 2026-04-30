@@ -364,7 +364,20 @@ class NotesApp {
             this.collabIsOwner = true;
             this.collabMode = true;
             this.collabPermission = 'edit';
+            this.collabNoteVisible = true;
             this.collabNoteData = note ? { ...note } : { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
+            const safeName = (this.collabUser.name && this.collabUser.name !== 'undefined')
+                ? this.collabUser.name
+                : ('User ' + (this.collabUser.id || '').slice(0, 4));
+            const ownerEntry = {
+                id: this.collabUser.id,
+                name: safeName,
+                color: this.collabUser.color || '#00b894',
+                cursor: null,
+                updatedAt: new Date().toISOString(),
+                isOwner: true
+            };
+            this._activeUsers = { [this.collabUser.id]: ownerEntry };
             this._dbPut(`/sharednotes/${this.collabSessionId}`, {
                 ownerId: this.collabUser.id,
                 noteId: this.collabNoteId,
@@ -372,15 +385,13 @@ class NotesApp {
                 status: 'open',
                 createdAt: new Date().toISOString(),
                 note: this.collabNoteData,
-                activeUsers: {}
+                activeUsers: this._activeUsers
             });
             // Bug 7: persist owner session so reload rejoins automatically
             try {
                 localStorage.setItem('emeraldnotes_collab_owner', JSON.stringify({ sessionId: this.collabSessionId, noteId: this.collabNoteId }));
             } catch (_) {}
-            this._activeUsers = {};
             this.setupSessionListener();
-            this.updateActiveUserPresence();
             this.renderCollabBar(this._activeUsers);
         }
         const shareModal = document.getElementById('shareModal');
@@ -460,10 +471,6 @@ class NotesApp {
         const cancelBtn = document.getElementById('shareModalCancel');
         if (cancelBtn) cancelBtn.onclick = () => {
             modal.classList.remove('show');
-            // Restore defaults so openShareModal works correctly next time
-            if (permissionGroup) permissionGroup.style.display = '';
-            if (collaboratorsGroup) collaboratorsGroup.style.display = '';
-            if (copyBtn) copyBtn.style.display = 'inline-flex';
         };
     }
 
@@ -644,15 +651,21 @@ class NotesApp {
         }
 
         const users = Object.values(activeUsers || {});
-        const avatarsHtml = users.map(user => {
+        const MAX_VISIBLE = 4;
+        const visibleUsers = users.slice(0, MAX_VISIBLE);
+        const overflowCount = users.length - MAX_VISIBLE;
+        let avatarsHtml = visibleUsers.map(user => {
             const displayName = this._safeUserName(user);
             const initial = displayName[0].toUpperCase();
             const isMe = user.id === this.collabUser.id;
             return `<div class="collab-avatar${isMe ? ' collab-avatar-me' : ''}" style="background:${user.color || '#00b894'}" title="${displayName}${isMe ? ' (You)' : ''}${user.isOwner ? ' · Owner' : ''}">
                 ${initial}
-                ${user.isOwner ? '<span class="collab-avatar-crown" title="Session Owner">♛</span>' : ''}
+                ${user.isOwner ? '<span class="collab-avatar-crown" title="Session Owner">&#9813;</span>' : ''}
             </div>`;
         }).join('');
+        if (overflowCount > 0) {
+            avatarsHtml += `<div class="collab-avatar collab-avatar-overflow" title="${overflowCount} more collaborator${overflowCount > 1 ? 's' : ''}">+${overflowCount}</div>`;
+        }
 
         if (navAvatars) navAvatars.innerHTML = avatarsHtml;
 
@@ -784,6 +797,7 @@ class NotesApp {
 
     handleSelectionChange() {
         if (!this.collabMode || !this.collabSessionId || !this.collabUser) return;
+        if (!this.collabNoteVisible) return;
         const editor = document.getElementById('textEditor');
         const selection = window.getSelection();
         if (!selection || selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) return;
@@ -980,16 +994,19 @@ class NotesApp {
             document.querySelector('.notes-app').appendChild(backdrop);
         }
 
-        // Inject mobile back button into editor header
-        const editorHeader = document.querySelector('.editor-header');
-        if (editorHeader && !document.getElementById('mobileBackBtn')) {
+        // Inject mobile back button into navbar, right after the logo link
+        if (!document.getElementById('mobileBackBtn')) {
             const backBtn = document.createElement('button');
             backBtn.id = 'mobileBackBtn';
             backBtn.className = 'mobile-back-btn';
-            backBtn.title = 'Back to Notes';
+            backBtn.title = 'Open Notes List';
             backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`;
             backBtn.addEventListener('click', () => this.openMobileSidebar());
-            editorHeader.insertBefore(backBtn, editorHeader.firstChild);
+            const navContainer = document.querySelector('.nav-container');
+            const logoLink = navContainer ? navContainer.querySelector('.logo') : null;
+            if (logoLink && navContainer) {
+                logoLink.insertAdjacentElement('afterend', backBtn);
+            }
         }
 
 
@@ -1024,6 +1041,7 @@ class NotesApp {
 
     setupSwipeGesture() {
         const app = document.querySelector('.notes-app');
+        const LEFT_EDGE_ZONE = 40; // px from left edge to allow open-swipe
 
         app.addEventListener('touchstart', (e) => {
             if (!this.isMobile()) return;
@@ -1047,6 +1065,9 @@ class NotesApp {
 
             if (!this.isSwiping) return;
 
+            // Opening: only follow finger if touch started near the left edge
+            const canOpen = this.touchStartX <= LEFT_EDGE_ZONE;
+
             const sidebar = document.querySelector('.sidebar');
             const sidebarWidth = sidebar.offsetWidth;
 
@@ -1055,7 +1076,7 @@ class NotesApp {
                 const clampedDx = Math.max(dx, -sidebarWidth);
                 sidebar.style.transform = `translateX(${clampedDx}px)`;
                 sidebar.style.transition = 'none';
-            } else if (!this.sidebarOpen && dx > 0) {
+            } else if (!this.sidebarOpen && dx > 0 && canOpen) {
                 // Dragging sidebar open — follow finger from left
                 const clampedDx = Math.min(dx - sidebarWidth, 0);
                 sidebar.style.transform = `translateX(${clampedDx}px)`;
@@ -1086,12 +1107,14 @@ class NotesApp {
 
             if (!isHorizontalSwipe) return;
 
-            if (dx > 0 && !this.sidebarOpen) {
-                // Swipe right from ANYWHERE on screen — open sidebar
-                // (no left-edge restriction; entire screen is a valid swipe zone)
+            // Opening only allowed if touch started near the left edge
+            const startedAtEdge = this.touchStartX <= LEFT_EDGE_ZONE;
+
+            if (dx > 0 && !this.sidebarOpen && startedAtEdge) {
+                // Swipe right from left edge — open sidebar
                 this.openMobileSidebar();
             } else if (dx < 0 && this.sidebarOpen) {
-                // Swipe left — close sidebar
+                // Swipe left from anywhere — close sidebar
                 this.closeMobileSidebar();
             }
         }, { passive: true });
@@ -1381,14 +1404,38 @@ class NotesApp {
         const menu = dropdownEl.querySelector('.ms-dropdown-menu');
         const items = dropdownEl.querySelectorAll('.ms-dropdown-item');
 
+        const positionMenu = () => {
+            const btnRect = btn.getBoundingClientRect();
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const menuWidth = Math.max(menu.offsetWidth || 160, 160);
+            let left = btnRect.left;
+            let top = btnRect.bottom + 4;
+            // Keep within viewport horizontally
+            if (left + menuWidth > vw - 8) left = vw - menuWidth - 8;
+            if (left < 8) left = 8;
+            // Flip upward if not enough space below
+            if (top + 260 > vh) top = Math.max(btnRect.top - 260, 8);
+            menu.style.top = top + 'px';
+            menu.style.left = left + 'px';
+            menu.style.width = menuWidth + 'px';
+        };
+
         btn.addEventListener('mousedown', (e) => e.preventDefault());
+        btn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.saveSelection();
+            const wasActive = dropdownEl.classList.contains('active');
             document.querySelectorAll('.ms-dropdown.active').forEach(d => {
                 if (d !== dropdownEl) d.classList.remove('active');
             });
-            dropdownEl.classList.toggle('active');
+            if (!wasActive) {
+                dropdownEl.classList.add('active');
+                positionMenu();
+            } else {
+                dropdownEl.classList.remove('active');
+            }
         });
 
         items.forEach(item => {
@@ -1785,6 +1832,10 @@ class NotesApp {
         } else if (this.collabMode) {
             // Switching away from shared note to own note
             this.collabNoteVisible = false;
+            // Clear cursor in Firebase so others don't see it
+            if (this.collabSessionId && this.collabUser) {
+                this._dbPatch(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`, { cursor: null }).catch(() => {});
+            }
             // Clear collab UI indicators
             this.renderCollabBar({});
             // Clear remote cursors completely

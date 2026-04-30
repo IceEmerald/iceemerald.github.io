@@ -1,6 +1,11 @@
     /* EmeraldNotes CSS - Notes App Styling */
 
     /* Reset and Base Styles */
+    html, body {
+        background: #ffffff;
+        overscroll-behavior: none;
+    }
+
     .notes-app * {
         box-sizing: border-box;
     }
@@ -806,13 +811,21 @@
     .collab-avatar-me { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--bg, #00b894); }
     .collab-avatar-crown {
         position: absolute;
-        top: -11px;
+        top: -13px;
         left: 50%;
         transform: translateX(-50%);
-        font-size: 10px;
+        font-size: 14px;
         line-height: 1;
-        filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+        color: #FFD700;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
         pointer-events: none;
+    }
+    .collab-avatar-overflow {
+        background: #e5e7eb !important;
+        color: #374151 !important;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
     }
     .collab-bar-right {
         display: flex;
@@ -1463,11 +1476,12 @@
 
         .mobile-ribbon-row .ms-dropdown-menu {
             position: fixed;
-            top: auto;
-            left: auto;
+            top: 0;
+            left: 0;
             min-width: 150px;
             max-height: 260px;
             overflow-y: auto;
+            z-index: 9999;
         }
 
         /* --- SIDEBAR: slides in from left, sits BELOW the sticky navbar --- */
@@ -1639,26 +1653,28 @@
             flex-shrink: 0;
         }
 
-        /* --- MOBILE BACK BUTTON: shown as ← in editor header --- */
+        /* --- MOBILE BACK BUTTON: shown in navbar between logo and nav-links --- */
         .mobile-back-btn {
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(255, 255, 255, 0.8);
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            border-radius: 8px;
-            width: 40px;
-            height: 40px;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 7px;
+            width: 34px;
+            height: 34px;
             cursor: pointer;
-            color: rgba(44, 62, 80, 0.7);
+            color: rgba(255, 255, 255, 0.85);
             flex-shrink: 0;
             transition: all 0.2s ease;
+            margin-left: 6px;
         }
 
-        .mobile-back-btn:hover {
-            background: rgba(35, 154, 77, 0.1);
-            border-color: rgba(35, 154, 77, 0.3);
-            color: #239a4d;
+        .mobile-back-btn:hover,
+        .mobile-back-btn:active {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: #ffffff;
         }
 
 
