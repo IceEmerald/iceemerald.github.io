@@ -579,24 +579,21 @@ class NotesApp {
     }
 
     renderCollabBar(activeUsers) {
+        // Remove legacy presence bar if it somehow exists
+        const old = document.getElementById('collabPresenceBar');
+        if (old) old.remove();
+
+        const navAvatars = document.getElementById('collabNavAvatars');
+        const statbarPerm = document.getElementById('statbar-perm');
+        const statbarSepPerm = document.getElementById('statbar-sep-perm');
+
         const editorArea = document.querySelector('.editor-area');
-        // Bug 2: Only show collab bar when in collab mode AND viewing the actual collab note
+        // Only show collab indicators when in collab mode AND viewing the actual collab note
         if (!editorArea || !this.collabMode || !this.collabNoteVisible || (this.collabNoteId && this.currentNoteId !== this.collabNoteId)) {
-            const old = document.getElementById('collabPresenceBar');
-            if (old) old.remove();
+            if (navAvatars) navAvatars.innerHTML = '';
+            if (statbarPerm) { statbarPerm.innerHTML = ''; statbarPerm.style.display = 'none'; }
+            if (statbarSepPerm) statbarSepPerm.style.display = 'none';
             return;
-        }
-        let bar = document.getElementById('collabPresenceBar');
-        if (!bar) {
-            bar = document.createElement('div');
-            bar.id = 'collabPresenceBar';
-            bar.className = 'collab-presence-bar';
-            const editorHeader = editorArea.querySelector('.editor-header');
-            if (editorHeader) {
-                editorHeader.insertAdjacentElement('afterend', bar);
-            } else {
-                editorArea.prepend(bar);
-            }
         }
 
         const users = Object.values(activeUsers || {});
@@ -609,14 +606,24 @@ class NotesApp {
             </div>`;
         }).join('');
 
-        const permLabel = this.collabIsOwner
-            ? '<span class="collab-perm-badge collab-perm-owner">Owner</span>'
-            : this.collabPermission === 'edit'
-                ? '<span class="collab-perm-badge collab-perm-edit">✎ Can Edit</span>'
-                : '<span class="collab-perm-badge collab-perm-view">&#128065; View Only</span>';
+        if (navAvatars) navAvatars.innerHTML = avatarsHtml;
 
-        bar.innerHTML = `<div class="collab-bar-avatars">${avatarsHtml || '<span style="color:#9ca3af;font-size:12px">Connecting...</span>'}</div>
-            <div class="collab-bar-right"><span class="collab-session-dot"></span><span class="collab-session-label">Live</span>${permLabel}</div>`;
+        const permText = this.collabIsOwner
+            ? 'Owner'
+            : this.collabPermission === 'edit'
+                ? 'Can Edit'
+                : 'Can View';
+        const permClass = this.collabIsOwner
+            ? 'collab-perm-owner'
+            : this.collabPermission === 'edit'
+                ? 'collab-perm-edit'
+                : 'collab-perm-view';
+
+        if (statbarPerm) {
+            statbarPerm.innerHTML = `<span class="collab-perm-badge ${permClass}">${permText}</span>`;
+            statbarPerm.style.display = '';
+        }
+        if (statbarSepPerm) statbarSepPerm.style.display = '';
     }
 
     setEditorForSession(noteData, focus = true) {
@@ -1858,11 +1865,12 @@ class NotesApp {
         const plainText = tempDiv.textContent || tempDiv.innerText || '';
         const preview = plainText.substring(0, 150);
         const date = new Date(note.modifiedAt);
+        const isLiveNote = this.collabMode && this.collabNoteVisible && note.id === this.collabNoteId;
 
         div.innerHTML = `
             <div class="note-item-title">${this.escapeHtml(note.title)}</div>
             <div class="note-item-preview">${this.escapeHtml(preview)}${preview.length === 150 ? '...' : ''}</div>
-            <div class="note-item-date">${this.formatDate(date)}</div>
+            <div class="note-item-date">${isLiveNote ? '<span class="note-live-dot"></span>' : ''}${this.formatDate(date)}</div>
         `;
 
         div.addEventListener('click', () => {

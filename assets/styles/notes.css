@@ -852,6 +852,46 @@
     .collab-perm-edit  { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
     .collab-perm-view  { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
+    /* ── Collaborator Avatars in Navbar ───────────────────────── */
+    .collab-nav-avatars {
+        display: flex;
+        align-items: center;
+        margin-right: 8px;
+    }
+    .collab-nav-avatars .collab-avatar {
+        width: 26px;
+        height: 26px;
+        font-size: 11px;
+    }
+
+    /* ── Live Dot on Note List Item ───────────────────────────── */
+    .note-item-date {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .note-live-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+        flex-shrink: 0;
+        animation: collabPulse 2s ease infinite;
+    }
+
+    /* ── Permission Badge in Statusbar ────────────────────────── */
+    #statbar-perm {
+        margin-left: auto;
+        padding-right: 4px;
+    }
+    #statbar-perm .collab-perm-badge {
+        font-size: 10px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-weight: 600;
+    }
+
     /* ── Collaboration Cursors ────────────────────────────────── */
     .collab-cursors {
         position: absolute;
