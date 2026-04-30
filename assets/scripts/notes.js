@@ -394,11 +394,11 @@ class NotesApp {
         if (!shareModal || !shareLink || !permissionSelect) return;
         shareLink.value = `${window.location.origin}${window.location.pathname}?collab=${this.collabSessionId}`;
         permissionSelect.value = this.collabPermission;
-        // Bug 3: only owners see the permissions row and copy link; non-owners see read-only info
+        // Owners see all controls; non-owners only see the link field and Copy Link + Close
         if (permissionGroup) permissionGroup.style.display = this.collabIsOwner ? '' : 'none';
         if (collaboratorsGroup) collaboratorsGroup.style.display = this.collabIsOwner ? '' : 'none';
         if (closeBtn) closeBtn.style.display = this.collabIsOwner ? 'inline-flex' : 'none';
-        if (copyBtn) copyBtn.style.display = this.collabIsOwner ? 'inline-flex' : 'none';
+        if (copyBtn) copyBtn.style.display = 'inline-flex'; // everyone can copy the link
         shareModal.classList.add('show');
         const cleanup = () => {
             shareModal.classList.remove('show');
@@ -444,18 +444,27 @@ class NotesApp {
     showShareModal({ title = 'Live Collaboration', message = '', collaborators = [] } = {}) {
         const modal = document.getElementById('shareModal');
         const shareLink = document.getElementById('shareLink');
-        const permissionSelect = document.getElementById('sharePermission');
-        const collaboratorsContainer = document.getElementById('shareCollaborators');
+        const permissionGroup = document.getElementById('sharePermissionGroup');
+        const collaboratorsGroup = document.getElementById('shareCollaboratorsList');
+        const copyBtn = document.getElementById('shareModalCopy');
         const closeBtn = document.getElementById('shareModalClose');
         if (!modal) return;
-        if (closeBtn) closeBtn.style.display = 'none';
         if (title) modal.querySelector('.link-modal-title').textContent = title;
         if (shareLink) shareLink.value = message;
-        if (permissionSelect) permissionSelect.style.display = 'none';
-        if (collaboratorsContainer) collaboratorsContainer.innerHTML = collaborators.map(c => `<span style="display:inline-flex;align-items:center;gap:6px;background:${c.color};color:#fff;padding:6px 10px;border-radius:999px;">${c.name}</span>`).join('');
+        // Session-closed / info modal: hide permissions, collaborators, End Session, and Copy Link
+        if (permissionGroup) permissionGroup.style.display = 'none';
+        if (collaboratorsGroup) collaboratorsGroup.style.display = 'none';
+        if (closeBtn) closeBtn.style.display = 'none';
+        if (copyBtn) copyBtn.style.display = 'none';
         modal.classList.add('show');
         const cancelBtn = document.getElementById('shareModalCancel');
-        if (cancelBtn) cancelBtn.onclick = () => { modal.classList.remove('show'); if (permissionSelect) permissionSelect.style.display = ''; };
+        if (cancelBtn) cancelBtn.onclick = () => {
+            modal.classList.remove('show');
+            // Restore defaults so openShareModal works correctly next time
+            if (permissionGroup) permissionGroup.style.display = '';
+            if (collaboratorsGroup) collaboratorsGroup.style.display = '';
+            if (copyBtn) copyBtn.style.display = 'inline-flex';
+        };
     }
 
     async updateActiveUserPresence() {
@@ -666,7 +675,8 @@ class NotesApp {
     }
 
     _setOwnerOnlyButtonsVisible(visible) {
-        ['exportNoteBtn', 'deleteNoteBtn', 'noteColorDropdown', 'shareNoteBtn'].forEach(id => {
+        // shareNoteBtn is intentionally excluded — non-owners can open it to copy the link
+        ['exportNoteBtn', 'deleteNoteBtn', 'noteColorDropdown'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = visible ? '' : 'none';
         });
@@ -3437,13 +3447,19 @@ class NotesApp {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
         note.color = color;
-        this.debouncedSave();
-        this.renderNotesList();
-        this.renderNotesCards();
         const textEditor = document.getElementById('textEditor');
         if (textEditor) {
             textEditor.style.backgroundColor = color === '#ffffff' ? 'rgba(255, 255, 255, 0.5)' : color;
         }
+        // Sync color to collaborators in real time
+        if (this.collabMode && this.collabIsOwner && this.collabNoteData) {
+            this.collabNoteData.color = color;
+            this.collabNoteData.modifiedAt = new Date().toISOString();
+            this._debouncedCollabPush();
+        }
+        this.renderNotesList();
+        this.renderNotesCards();
+        if (!note._isCollabNote) this.debouncedSave();
     }
 
     // ─── Delete Modal ────────────────────────────────────────────────────────────

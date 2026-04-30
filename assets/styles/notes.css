@@ -538,7 +538,7 @@
         font-size: 12px;
         line-height: 1.5;
         display: -webkit-box;
-        line-clamp: 2;
+        -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
         font-family: 'DM Sans', sans-serif;
@@ -1265,7 +1265,7 @@
         margin: 0;
         line-height: 1.4;
         display: -webkit-box;
-        line-clamp: 2;
+        -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
         font-family: 'DM Sans', sans-serif;
@@ -3176,6 +3176,9 @@
     body.no-active-note .editor-content,
     body.no-active-note .editor-statusbar {
         display: none !important;
+    }
+    body.no-active-note .welcome-screen {
+        /* display: flex !important; */
     }
     body.no-active-note .ribbon,
     body.no-active-note .ribbon * {
