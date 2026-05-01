@@ -973,9 +973,9 @@ class NotesApp {
             const el = document.getElementById(id);
             if (el) el.style.display = visible ? '' : 'none';
         });
-        // Leave button: only ever show for non-owners inside an active collab session
+        // Leave button: only show for the currently active non-owner collab session.
         const leaveBtn = document.getElementById('leaveCollabBtn');
-        const showLeave = !visible && this.collabMode && !this.collabIsOwner;
+        const showLeave = !visible && this.collabMode && !this.collabIsOwner && this.collabSessionId && this.collabNoteId && this.currentNoteId === this.collabNoteId;
         if (leaveBtn) leaveBtn.style.display = showLeave ? 'inline-flex' : 'none';
     }
 
@@ -2404,7 +2404,7 @@ class NotesApp {
         const plainText = tempDiv.textContent || tempDiv.innerText || '';
         const preview = plainText.substring(0, 150);
         const date = new Date(note.modifiedAt);
-        const isLiveNote = this.collabMode && note.id === this.collabNoteId;
+        const isLiveNote = note._isCollabNote || note.id === this.collabNoteId;
 
         div.innerHTML = `
             <div class="note-item-title">${this.escapeHtml(note.title)}</div>
@@ -3893,8 +3893,8 @@ class NotesApp {
         if (textEditor) {
             textEditor.style.backgroundColor = color === '#ffffff' ? 'rgba(255, 255, 255, 0.5)' : color;
         }
-        // Sync color to collaborators in real time
-        if (this.collabMode && this.collabIsOwner && this.collabNoteData) {
+        // Sync color to collaborators only when the currently selected note is the shared collab note.
+        if (this.collabMode && this.collabIsOwner && this.collabNoteData && this.currentNoteId === this.collabNoteId) {
             this.collabNoteData.color = color;
             this.collabNoteData.modifiedAt = new Date().toISOString();
             this._debouncedCollabPush();
