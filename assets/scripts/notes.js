@@ -52,7 +52,7 @@ class NotesApp {
         this._portalDropdown = null;
         this._portalBtn = null;
 
-        // Collaboration state
+        // Collaboration state — active session (the one currently in the editor)
         this.collabSessionId = null;
         this.collabSessionRef = null;
         this.collabDb = null;
@@ -63,6 +63,10 @@ class NotesApp {
         this.collabNoteData = null;
         this.collabNoteId = null;
         this.collabNoteVisible = false;
+
+        // Multi-session: all running sessions (key = sessionId)
+        this.collabSessions = new Map();
+        this._activeCollabSessionId = null;
 
         this.init();
     }
@@ -171,6 +175,93 @@ class NotesApp {
         return `${this.dbUrl}/sharednotes/${this.collabSessionId}${path}.json`;
     }
 
+    // ─── Multi-session helpers ───────────────────────────────────────────────
+
+    _getSessionByNoteId(noteId) {
+        for (const s of this.collabSessions.values()) {
+            if (s.noteId === noteId) return s;
+        }
+        return null;
+    }
+
+    _isCollabNoteId(noteId) {
+        for (const s of this.collabSessions.values()) {
+            if (s.noteId === noteId) return true;
+        }
+        return false;
+    }
+
+    _registerSession(sessionId, data) {
+        const existing = this.collabSessions.get(sessionId) || {};
+        this.collabSessions.set(sessionId, {
+            sessionId,
+            noteId: data.noteId ?? existing.noteId ?? null,
+            isOwner: data.isOwner ?? existing.isOwner ?? false,
+            permission: data.permission ?? existing.permission ?? 'edit',
+            noteData: data.noteData ?? existing.noteData ?? null,
+            activeUsers: data.activeUsers ?? existing.activeUsers ?? {},
+            eventSource: data.eventSource ?? existing.eventSource ?? null,
+            lastPushedModifiedAt: existing.lastPushedModifiedAt ?? null
+        });
+        this._persistAllSessions();
+    }
+
+    _unregisterSession(sessionId) {
+        const s = this.collabSessions.get(sessionId);
+        if (s && s.eventSource) { try { s.eventSource.close(); } catch (_) {} }
+        this.collabSessions.delete(sessionId);
+        this._persistAllSessions();
+    }
+
+    _switchActiveSession(sessionId) {
+        // Save current state back into the outgoing active session
+        if (this._activeCollabSessionId && this.collabSessions.has(this._activeCollabSessionId)) {
+            const old = this.collabSessions.get(this._activeCollabSessionId);
+            old.noteData = this.collabNoteData;
+            old.activeUsers = this._activeUsers || {};
+            old.permission = this.collabPermission;
+            old.lastPushedModifiedAt = this._lastPushedModifiedAt;
+        }
+        const sess = this.collabSessions.get(sessionId);
+        if (!sess) return false;
+        this._activeCollabSessionId = sessionId;
+        this.collabMode = true;
+        this.collabIsOwner = sess.isOwner;
+        this.collabSessionId = sess.sessionId;
+        this.collabNoteId = sess.noteId;
+        this.collabPermission = sess.permission;
+        this.collabNoteData = sess.noteData;
+        this._activeUsers = sess.activeUsers || {};
+        this._lastPushedModifiedAt = sess.lastPushedModifiedAt || null;
+        return true;
+    }
+
+    _persistAllSessions() {
+        const sessions = [];
+        for (const s of this.collabSessions.values()) {
+            sessions.push({ sessionId: s.sessionId, noteId: s.noteId, isOwner: s.isOwner });
+        }
+        try {
+            if (sessions.length > 0) {
+                localStorage.setItem('emeraldnotes_collab_sessions', JSON.stringify(sessions));
+            } else {
+                localStorage.removeItem('emeraldnotes_collab_sessions');
+            }
+        } catch (_) {}
+    }
+
+    _clearAllSessions() {
+        for (const s of this.collabSessions.values()) {
+            if (s.eventSource) { try { s.eventSource.close(); } catch (_) {} }
+        }
+        this.collabSessions.clear();
+        this._activeCollabSessionId = null;
+        try { localStorage.removeItem('emeraldnotes_collab_sessions'); } catch (_) {}
+        // Clean up legacy keys too
+        try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
+        try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
+    }
+
     _setupConnectionMonitor() {
         this._disconnected = false;
         this._reconnectTimer = null;
@@ -179,8 +270,8 @@ class NotesApp {
         const onOffline = () => {
             if (this._disconnected) return;
             this._disconnected = true;
-            // Show persistent "Reconnecting..." toast
-            this._showReconnectingToast();
+            // Show "Reconnecting…" toast IMMEDIATELY
+            this.showToast('Reconnecting…', 99999);
             // After 15 seconds still offline → show modal
             this._reconnectTimer = setTimeout(() => {
                 if (this._disconnected) this._showDisconnectModal();
@@ -192,71 +283,55 @@ class NotesApp {
             this._disconnected = false;
             clearTimeout(this._reconnectTimer);
             this._reconnectTimer = null;
-            this._hideDisconnectModal();
-            this.showToast('Reconnected!', 3500);
+            // Clear the Reconnecting... toast and show Reconnected
+            this.showToast('Reconnected!', 4000);
+            // Modal stays visible intentionally — user should manually reload
         };
 
         window.addEventListener('offline', onOffline);
         window.addEventListener('online', onOnline);
     }
 
-    _showReconnectingToast() {
-        const toast = document.getElementById('toastNotification');
-        if (!toast) return;
-        toast.textContent = 'Reconnecting…';
-        toast.classList.add('show');
-        clearTimeout(this._toastTimer);
-        // Keep it visible until explicitly cleared
-    }
-
     _showDisconnectModal() {
         if (this._disconnectModalEl) return;
         const overlay = document.createElement('div');
         overlay.id = 'disconnectModal';
-        overlay.style.cssText = `
-            position:fixed;inset:0;z-index:99999;
-            background:rgba(0,0,0,0.55);
-            display:flex;align-items:center;justify-content:center;
-            backdrop-filter:blur(4px);
-            animation:fadeInOverlay 0.25s ease;
-        `;
+        overlay.className = 'link-modal show';
         overlay.innerHTML = `
-            <div style="
-                background:#fff;border-radius:16px;padding:36px 32px 28px;
-                box-shadow:0 20px 60px rgba(0,0,0,0.3);
-                max-width:360px;width:90%;text-align:center;
-                animation:slideUpModal 0.3s cubic-bezier(.34,1.56,.64,1);
-            ">
-                <div style="font-size:48px;margin-bottom:12px;">📡</div>
-                <h2 style="margin:0 0 10px;font-size:20px;font-weight:700;color:#1a202c;">
-                    You've been disconnected
-                </h2>
-                <p style="margin:0 0 24px;font-size:14px;color:#718096;line-height:1.6;">
-                    Your internet connection was lost. Please check your connection and reload to continue.
-                </p>
-                <button id="disconnectReloadBtn" style="
-                    width:100%;padding:13px;background:#239a4d;color:#fff;
-                    border:none;border-radius:10px;font-size:15px;font-weight:600;
-                    cursor:pointer;transition:background 0.2s;
-                ">Reload</button>
+            <div class="link-modal-content" style="max-width:380px;text-align:center;">
+                <div class="link-modal-header">
+                    <div class="link-modal-icon" style="background:#ee5a52;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="1" y1="1" x2="23" y2="23"/>
+                            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+                            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+                            <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+                            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+                            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                            <line x1="12" y1="20" x2="12.01" y2="20"/>
+                        </svg>
+                    </div>
+                    <h3 class="link-modal-title">Connection Lost</h3>
+                </div>
+                <div class="link-modal-body">
+                    <p style="font-size:14px;color:rgba(44,62,80,0.65);text-align:center;margin:0;font-family:'DM Sans',sans-serif;line-height:1.6;">
+                        Your internet connection was lost. Check your connection then reload to continue working.
+                    </p>
+                </div>
+                <div class="link-modal-actions" style="justify-content:center;">
+                    <button class="link-modal-btn link-modal-btn-create" id="disconnectReloadBtn" style="background:#239a4d;border-color:rgba(35,154,77,0.3);">Reload</button>
+                </div>
             </div>
         `;
         document.body.appendChild(overlay);
         this._disconnectModalEl = overlay;
-        overlay.querySelector('#disconnectReloadBtn').addEventListener('click', () => {
-            window.location.reload();
-        });
-        overlay.querySelector('#disconnectReloadBtn').addEventListener('mouseover', function() {
-            this.style.background = '#1a7d3d';
-        });
-        overlay.querySelector('#disconnectReloadBtn').addEventListener('mouseout', function() {
-            this.style.background = '#239a4d';
-        });
+        const reloadBtn = overlay.querySelector('#disconnectReloadBtn');
+        reloadBtn.addEventListener('click', () => window.location.reload());
+        reloadBtn.addEventListener('mouseover', function() { this.style.background = '#1a7d3d'; });
+        reloadBtn.addEventListener('mouseout', function() { this.style.background = '#239a4d'; });
     }
 
     _hideDisconnectModal() {
-        const toast = document.getElementById('toastNotification');
-        if (toast) toast.classList.remove('show');
         if (this._disconnectModalEl) {
             this._disconnectModalEl.remove();
             this._disconnectModalEl = null;
@@ -329,132 +404,192 @@ class NotesApp {
             window.history.replaceState({}, document.title, window.location.pathname);
             return;
         }
-        // Owner reload: re-attach listener so live session stays active
-        let hasOwnerRestore = false;
+
+        // Restore all sessions from unified key
+        let restored = [];
         try {
-            const saved = localStorage.getItem('emeraldnotes_collab_owner');
-            if (saved) {
-                const { sessionId: sid, noteId } = JSON.parse(saved);
-                if (sid) {
-                    hasOwnerRestore = true;
-                    // Clear any non-owner key to prevent race condition
-                    localStorage.removeItem('emeraldnotes_collab_non_owner');
-                    this._dbGet(`/sharednotes/${sid}`).then(data => {
-                        if (!data || data.status === 'closed') {
-                            localStorage.removeItem('emeraldnotes_collab_owner');
-                            return;
-                        }
-                        if (data.ownerId !== this.collabUser.id) {
-                            localStorage.removeItem('emeraldnotes_collab_owner');
-                            return;
-                        }
-                        this.collabSessionId = sid;
-                        this.collabNoteId = noteId || data.noteId || null;
-                        this.collabIsOwner = true;
-                        this.collabPermission = data.permission || 'edit';
-                        this.collabMode = true;
-                        this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
-                        this._activeUsers = data.activeUsers || {};
-                        // Keep the local note in the list with the live dot
-                        if (this.collabNoteId && this.notes.some(n => n.id === this.collabNoteId)) {
-                            this.renderNotesList();
-                        }
-                        // Re-attach listener without forcing the user into the note
-                        this.collabNoteVisible = false;
-                        // Ensure leave button stays hidden for owner
-                        this._setOwnerOnlyButtonsVisible(true);
-                        this.setupSessionListener();
-                        // Update owner presence silently
-                        this.updateActiveUserPresence();
-                    }).catch(() => { localStorage.removeItem('emeraldnotes_collab_owner'); });
-                }
-            }
+            const saved = localStorage.getItem('emeraldnotes_collab_sessions');
+            if (saved) restored = JSON.parse(saved);
         } catch (_) {}
 
-        // Non-owner reload: re-join so shared note stays in sidebar
-        // Skip if owner restore is running (prevents race condition)
-        if (!hasOwnerRestore) {
+        // Migrate legacy keys into unified format if new key is empty
+        if (restored.length === 0) {
             try {
-                const savedNO = localStorage.getItem('emeraldnotes_collab_non_owner');
-                if (savedNO) {
-                    const { sessionId: sid } = JSON.parse(savedNO);
-                    if (sid) {
-                        this._dbGet(`/sharednotes/${sid}`).then(data => {
-                            if (!data || data.status === 'closed') {
-                                localStorage.removeItem('emeraldnotes_collab_non_owner');
-                                return;
-                            }
-                            this.joinCollabSession(sid);
-                        }).catch(() => { localStorage.removeItem('emeraldnotes_collab_non_owner'); });
+                const legacyOwner = localStorage.getItem('emeraldnotes_collab_owner');
+                if (legacyOwner) {
+                    const { sessionId: sid, noteId } = JSON.parse(legacyOwner);
+                    if (sid) restored.push({ sessionId: sid, noteId, isOwner: true });
+                }
+            } catch (_) {}
+            try {
+                const legacyNO = localStorage.getItem('emeraldnotes_collab_non_owner');
+                if (legacyNO) {
+                    const { sessionId: sid } = JSON.parse(legacyNO);
+                    if (sid && !restored.some(r => r.sessionId === sid)) {
+                        restored.push({ sessionId: sid, noteId: null, isOwner: false });
                     }
                 }
             } catch (_) {}
+            // Clean up legacy keys
+            try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
+            try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
+        }
+
+        if (restored.length === 0) return;
+
+        // Restore owner sessions first (they need special treatment)
+        const ownerSessions = restored.filter(r => r.isOwner);
+        const nonOwnerSessions = restored.filter(r => !r.isOwner);
+
+        for (const sess of ownerSessions) {
+            const { sessionId: sid, noteId } = sess;
+            if (!sid) continue;
+            this._dbGet(`/sharednotes/${sid}`).then(data => {
+                if (!data || data.status === 'closed' || data.ownerId !== this.collabUser.id) {
+                    this.collabSessions.delete(sid);
+                    this._persistAllSessions();
+                    return;
+                }
+                const resolvedNoteId = noteId || data.noteId || null;
+                const noteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
+                const activeUsers = data.activeUsers || {};
+
+                // If this is the first restored session, make it active
+                const isFirstActive = !this._activeCollabSessionId;
+
+                this._registerSession(sid, {
+                    noteId: resolvedNoteId,
+                    isOwner: true,
+                    permission: data.permission || 'edit',
+                    noteData,
+                    activeUsers
+                });
+
+                if (isFirstActive) {
+                    this._activeCollabSessionId = sid;
+                    this.collabSessionId = sid;
+                    this.collabNoteId = resolvedNoteId;
+                    this.collabIsOwner = true;
+                    this.collabPermission = data.permission || 'edit';
+                    this.collabMode = true;
+                    this.collabNoteData = noteData;
+                    this._activeUsers = activeUsers;
+                    this.collabNoteVisible = false;
+                    this._setOwnerOnlyButtonsVisible(true);
+                    if (resolvedNoteId && this.notes.some(n => n.id === resolvedNoteId)) {
+                        this.renderNotesList();
+                    }
+                }
+
+                this.setupSessionListener(sid);
+                if (isFirstActive) this.updateActiveUserPresence();
+            }).catch(() => {
+                this.collabSessions.delete(sid);
+                this._persistAllSessions();
+            });
+        }
+
+        for (const sess of nonOwnerSessions) {
+            const { sessionId: sid } = sess;
+            if (!sid) continue;
+            // Silent restore: show note in sidebar but don't switch editor
+            this.joinCollabSession(sid, true).catch(() => {
+                this.collabSessions.delete(sid);
+                this._persistAllSessions();
+            });
         }
     }
 
-    async joinCollabSession(sessionId) {
-        this.collabSessionId = sessionId;
+    async joinCollabSession(sessionId, silent = false) {
         try {
             const data = await this._dbGet(`/sharednotes/${sessionId}`);
             if (!data) {
-                this.showShareModal({ title: 'Invalid Session', message: 'This live collaboration link is no longer valid.' });
+                if (!silent) this.showShareModal({ title: 'Invalid Session', message: 'This live collaboration link is no longer valid.' });
                 return;
             }
             if (data.status === 'closed') {
-                this.showShareModal({ title: 'Session Closed', message: 'This shared note session has ended.' });
+                if (!silent) this.showShareModal({ title: 'Session Closed', message: 'This shared note session has ended.' });
                 return;
             }
-            this.collabIsOwner = data.ownerId === this.collabUser.id;
-            this.collabPermission = data.permission || 'edit';
-            this.collabMode = true;
-            this.collabNoteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
 
-            // Determine collabNoteId: use owner's noteId if it exists in non-owner's local notes,
-            // otherwise create a virtual note entry so the shared note appears in the sidebar.
+            const isOwner = data.ownerId === this.collabUser.id;
+            const permission = data.permission || 'edit';
+            const noteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
+
+            // Determine noteId: use owner's noteId if it exists locally, else create a virtual note
             const ownerNoteId = data.noteId || null;
-            if (ownerNoteId && this.notes.some(n => n.id === ownerNoteId)) {
-                this.collabNoteId = ownerNoteId;
-                this.currentNoteId = ownerNoteId;
+            let noteId;
+            if (ownerNoteId && this.notes.some(n => n.id === ownerNoteId && !n._isCollabNote)) {
+                noteId = ownerNoteId;
             } else {
-                const virtualId = '_collab_' + sessionId;
-                this.collabNoteId = virtualId;
-                // Remove any stale virtual note then insert fresh one at the top
-                this.notes = this.notes.filter(n => !n._isCollabNote);
+                noteId = '_collab_' + sessionId;
+                // Remove stale virtual note for this session, then insert fresh one
+                this.notes = this.notes.filter(n => !(n._isCollabNote && n._collabSessionId === sessionId));
                 this.notes.unshift({
-                    id: virtualId,
-                    title: this.collabNoteData.title || 'Shared Note',
-                    content: this.collabNoteData.content || '',
-                    color: this.collabNoteData.color || '#ffffff',
-                    modifiedAt: this.collabNoteData.modifiedAt || new Date().toISOString(),
-                    _isCollabNote: true
+                    id: noteId,
+                    title: noteData.title || 'Shared Note',
+                    content: noteData.content || '',
+                    color: noteData.color || '#ffffff',
+                    modifiedAt: noteData.modifiedAt || new Date().toISOString(),
+                    _isCollabNote: true,
+                    _collabSessionId: sessionId
                 });
-                this.currentNoteId = virtualId;
             }
 
-            this.collabNoteVisible = true;
-            this.setEditorForSession(this.collabNoteData);
-            this.renderNotesList();
-            this.renderNotesCards();
-            this.renderShareCollaborators(data.activeUsers || {});
-            this.setupSessionListener();
-            this.updateActiveUserPresence();
-            this.renderCollabBar(data.activeUsers || {});
-            // Persist non-owner session for reload
-            if (!this.collabIsOwner) {
-                try {
-                    localStorage.setItem('emeraldnotes_collab_non_owner', JSON.stringify({ sessionId: sessionId }));
-                } catch (_) {}
+            // Register session in the Map
+            this._registerSession(sessionId, {
+                noteId,
+                isOwner,
+                permission,
+                noteData,
+                activeUsers: data.activeUsers || {}
+            });
+
+            if (!silent) {
+                // Make this the active session
+                this._activeCollabSessionId = sessionId;
+                this.collabSessionId = sessionId;
+                this.collabNoteId = noteId;
+                this.collabIsOwner = isOwner;
+                this.collabPermission = permission;
+                this.collabMode = true;
+                this.collabNoteData = noteData;
+                this._activeUsers = data.activeUsers || {};
+                this.collabNoteVisible = true;
+                this.currentNoteId = noteId;
+
+                this.setEditorForSession(noteData);
+                this.renderNotesList();
+                this.renderNotesCards();
+                this.renderShareCollaborators(data.activeUsers || {});
+                this.setupSessionListener(sessionId);
+                this.updateActiveUserPresence();
+                this.renderCollabBar(data.activeUsers || {});
+                this.showToast(`Joined shared note as ${this.collabUser.name || 'Guest'}`);
+            } else {
+                // Silent: just start listening in the background, don't disturb editor
+                this.setupSessionListener(sessionId);
+                this.renderNotesList();
+                this.renderNotesCards();
             }
-            this.showToast(`Joined shared note as ${this.collabUser.name || 'Guest'}`);
         } catch (err) {
             console.error('Failed to join collab session', err);
-            this.showToast('Failed to join session. Please try again.');
+            if (!silent) this.showToast('Failed to join session. Please try again.');
         }
     }
 
     openShareModal() {
         if (!this.currentNoteId && !this.collabMode) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
+
+        // If we already have a session for this note, just switch to it and open the modal
+        const existingSess = note ? this._getSessionByNoteId(note.id) : null;
+        if (existingSess && this._activeCollabSessionId !== existingSess.sessionId) {
+            this._switchActiveSession(existingSess.sessionId);
+            this.collabNoteVisible = true;
+            this.renderCollabBar(this._activeUsers || {});
+        }
+
         if (!this.collabSessionId || !this.collabMode) {
             this.collabSessionId = this.collabSessionId || this.generateId(10);
             this.collabNoteId = note ? note.id : null;
@@ -475,6 +610,15 @@ class NotesApp {
                 isOwner: true
             };
             this._activeUsers = { [this.collabUser.id]: ownerEntry };
+            // Register session before listener so listener can find it
+            this._registerSession(this.collabSessionId, {
+                noteId: this.collabNoteId,
+                isOwner: true,
+                permission: this.collabPermission,
+                noteData: this.collabNoteData,
+                activeUsers: this._activeUsers
+            });
+            this._activeCollabSessionId = this.collabSessionId;
             this._dbPut(`/sharednotes/${this.collabSessionId}`, {
                 ownerId: this.collabUser.id,
                 noteId: this.collabNoteId,
@@ -484,14 +628,10 @@ class NotesApp {
                 note: this.collabNoteData,
                 activeUsers: this._activeUsers
             });
-            this.setupSessionListener();
+            this.setupSessionListener(this.collabSessionId);
             this.renderCollabBar(this._activeUsers);
             // Always hide leave button for owner (guard against any stale state)
             this._setOwnerOnlyButtonsVisible(true);
-            // Persist owner session for reload
-            try {
-                localStorage.setItem('emeraldnotes_collab_owner', JSON.stringify({ sessionId: this.collabSessionId, noteId: this.collabNoteId }));
-            } catch (_) {}
         }
         const shareModal = document.getElementById('shareModal');
         const shareLink = document.getElementById('shareLink');
@@ -588,24 +728,37 @@ class NotesApp {
         });
     }
 
-    setupSessionListener() {
-        if (!this.collabSessionId) return;
-        if (this._collabEventSource) {
-            this._collabEventSource.close();
-            this._collabEventSource = null;
+    setupSessionListener(sessionId) {
+        const sid = sessionId || this.collabSessionId;
+        if (!sid) return;
+
+        // Close any existing EventSource for this session
+        const existingSess = this.collabSessions.get(sid);
+        if (existingSess && existingSess.eventSource) {
+            try { existingSess.eventSource.close(); } catch (_) {}
         }
-        if (!this._activeUsers) this._activeUsers = {};
-        const url = `${this.dbUrl}/sharednotes/${this.collabSessionId}.json`;
+
+        const isActive = () => this._activeCollabSessionId === sid;
+        const getSess = () => this.collabSessions.get(sid);
+
+        const url = `${this.dbUrl}/sharednotes/${sid}.json`;
         const es = new EventSource(url);
-        this._collabEventSource = es;
+
+        // Store in session map
+        this._registerSession(sid, { eventSource: es });
 
         const applyNoteUpdate = (note) => {
             if (!note) return;
-            if (this._lastPushedModifiedAt && this._lastPushedModifiedAt === note.modifiedAt) return;
-            if (!this.collabNoteData || note.modifiedAt !== this.collabNoteData.modifiedAt) {
-                this.collabNoteData = note;
-                // Keep virtual note in sync so the sidebar title/preview updates
-                const virtualNote = this.notes.find(n => n._isCollabNote);
+            const sess = getSess();
+            if (!sess) return;
+            const lastPushed = isActive() ? this._lastPushedModifiedAt : sess.lastPushedModifiedAt;
+            if (lastPushed && lastPushed === note.modifiedAt) return;
+            const prevData = isActive() ? this.collabNoteData : sess.noteData;
+            if (!prevData || note.modifiedAt !== prevData.modifiedAt) {
+                if (isActive()) { this.collabNoteData = note; }
+                sess.noteData = note;
+                // Find virtual note for this session
+                const virtualNote = this.notes.find(n => n._isCollabNote && n._collabSessionId === sid);
                 if (virtualNote) {
                     virtualNote.title = note.title || 'Shared Note';
                     virtualNote.content = note.content || '';
@@ -613,27 +766,58 @@ class NotesApp {
                     virtualNote.modifiedAt = note.modifiedAt;
                     this.renderNotesList();
                 }
-                if (this.collabNoteVisible) {
+                if (isActive() && this.collabNoteVisible) {
                     this.setEditorForSession(note, false);
                 }
             }
         };
+
         const applyPermissionUpdate = (perm) => {
-            if (!perm || perm === this.collabPermission) return;
-            this.collabPermission = perm;
-            if (this.collabNoteData) this.setEditorForSession(this.collabNoteData, false);
-            // Bug 4: update the presence bar badge immediately
-            this.renderCollabBar(this._activeUsers || {});
-            if (!this.collabIsOwner) {
-                this.showToast(perm === 'edit' ? 'Permission changed: You can now edit' : 'Permission changed: View only');
+            if (!perm) return;
+            const sess = getSess();
+            if (!sess) return;
+            const prev = isActive() ? this.collabPermission : sess.permission;
+            if (perm === prev) return;
+            sess.permission = perm;
+            if (isActive()) {
+                this.collabPermission = perm;
+                const nd = isActive() ? this.collabNoteData : sess.noteData;
+                if (nd) this.setEditorForSession(nd, false);
+                this.renderCollabBar(this._activeUsers || {});
+                if (!this.collabIsOwner) {
+                    this.showToast(perm === 'edit' ? 'Permission changed: You can now edit' : 'Permission changed: View only');
+                }
             }
         };
+
         const applyClose = () => {
-            if (this.collabIsOwner) return;
-            // Bug 11: non-owner full cleanup on session end
-            const msg = 'The owner has ended this session.';
-            this._resetCollabState();
-            this.showToast(msg, 5000);
+            const sess = getSess();
+            if (!sess) return;
+            if (sess.isOwner) return;
+            if (isActive()) {
+                const msg = 'The owner has ended this session.';
+                this._resetCollabState();
+                this.showToast(msg, 5000);
+            } else {
+                // Clean up background session silently
+                const virtualNote = this.notes.find(n => n._isCollabNote && n._collabSessionId === sid);
+                if (virtualNote) {
+                    this.notes = this.notes.filter(n => !(n._isCollabNote && n._collabSessionId === sid));
+                    this.renderNotesList();
+                }
+                this._unregisterSession(sid);
+            }
+        };
+
+        const applyActiveUsers = (activeUsers) => {
+            const sess = getSess();
+            if (!sess) return;
+            sess.activeUsers = activeUsers;
+            if (isActive()) {
+                this._activeUsers = activeUsers;
+                this.renderShareCollaborators(activeUsers);
+                this.renderCollabBar(activeUsers);
+            }
         };
 
         es.addEventListener('put', (event) => {
@@ -641,10 +825,10 @@ class NotesApp {
                 const msg = JSON.parse(event.data);
                 const data = msg.data;
                 if (!data) return;
-                this._activeUsers = data.activeUsers || {};
+                const users = data.activeUsers || {};
+                applyActiveUsers(users);
                 if (data.status === 'closed') { applyClose(); return; }
                 applyNoteUpdate(data.note);
-                this.renderShareCollaborators(this._activeUsers);
             } catch (e) { console.warn('SSE put parse error', e); }
         });
 
@@ -657,10 +841,7 @@ class NotesApp {
                 if (path === '/' || path === '') {
                     if (data.note) applyNoteUpdate(data.note);
                     if (data.permission) applyPermissionUpdate(data.permission);
-                    if (data.activeUsers !== undefined) {
-                        this._activeUsers = data.activeUsers || {};
-                        this.renderShareCollaborators(this._activeUsers);
-                    }
+                    if (data.activeUsers !== undefined) applyActiveUsers(data.activeUsers || {});
                     if (data.status === 'closed') applyClose();
                 } else if (path === '/note') {
                     applyNoteUpdate(data);
@@ -669,23 +850,23 @@ class NotesApp {
                 } else if (path === '/status') {
                     if (data === 'closed') applyClose();
                 } else if (path.startsWith('/activeUsers')) {
+                    const sess = getSess();
+                    if (!sess) return;
                     const parts = path.split('/').filter(Boolean);
+                    const users = isActive() ? (this._activeUsers || {}) : (sess.activeUsers || {});
                     if (parts.length === 1) {
-                        this._activeUsers = data || {};
+                        applyActiveUsers(data || {});
                     } else if (parts.length >= 2) {
                         const uid = parts[1];
-                        if (data === null) {
-                            delete this._activeUsers[uid];
-                        } else {
-                            this._activeUsers[uid] = { ...(this._activeUsers[uid] || {}), ...data };
-                        }
+                        const updated = { ...users };
+                        if (data === null) { delete updated[uid]; } else { updated[uid] = { ...(updated[uid] || {}), ...data }; }
+                        applyActiveUsers(updated);
                     }
-                    this.renderShareCollaborators(this._activeUsers);
                 }
             } catch (e) { console.warn('SSE patch parse error', e); }
         });
 
-        es.onerror = () => { console.warn('SSE connection lost, will auto-reconnect'); };
+        es.onerror = () => { console.warn(`SSE connection lost for session ${sid}, will auto-reconnect`); };
     }
 
     _safeUserName(user) {
@@ -743,22 +924,8 @@ class NotesApp {
         const editorArea = document.querySelector('.editor-area');
         // Only show collab indicators when in collab mode AND the collab note is visible
         if (!editorArea || !this.collabMode || !this.collabNoteVisible) {
-            // Fade out then hide
-            if (navAvatars && navAvatars.innerHTML !== '') {
-                navAvatars.classList.add('collab-bar-fading');
-                setTimeout(() => {
-                    navAvatars.innerHTML = '';
-                    navAvatars.classList.remove('collab-bar-fading');
-                }, 150);
-            }
-            if (statbarPerm && statbarPerm.style.display !== 'none') {
-                statbarPerm.classList.add('collab-bar-fading');
-                setTimeout(() => {
-                    statbarPerm.innerHTML = '';
-                    statbarPerm.style.display = 'none';
-                    statbarPerm.classList.remove('collab-bar-fading');
-                }, 150);
-            }
+            if (navAvatars) navAvatars.innerHTML = '';
+            if (statbarPerm) { statbarPerm.innerHTML = ''; statbarPerm.style.display = 'none'; }
             if (statbarSepPerm) statbarSepPerm.style.display = 'none';
             return;
         }
@@ -934,24 +1101,27 @@ class NotesApp {
     }
 
     leaveCollaboration() {
-        if (!this.collabSessionId || !this.collabUser) return;
-        // Bug 4: Add 30-second grace period for non-owner disconnect
-        if (!this.collabIsOwner) {
-            this._dbPatch(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`, {
-                id: this.collabUser.id,
-                name: this.collabUser.name,
-                color: this.collabUser.color,
-                cursor: null,
-                updatedAt: new Date().toISOString(),
-                isOwner: false,
-                reconnectTimeout: new Date(Date.now() + 30000).toISOString()
-            }).catch(() => {});
-            // Schedule removal after 30 seconds
-            setTimeout(() => {
-                this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`).catch(() => {});
-            }, 30000);
-        } else {
-            this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`);
+        if (!this.collabUser) return;
+        // Update presence for all active sessions
+        for (const sess of this.collabSessions.values()) {
+            const sid = sess.sessionId;
+            if (!sid) continue;
+            if (!sess.isOwner) {
+                this._dbPatch(`/sharednotes/${sid}/activeUsers/${this.collabUser.id}`, {
+                    id: this.collabUser.id,
+                    name: this.collabUser.name,
+                    color: this.collabUser.color,
+                    cursor: null,
+                    updatedAt: new Date().toISOString(),
+                    isOwner: false,
+                    reconnectTimeout: new Date(Date.now() + 30000).toISOString()
+                }).catch(() => {});
+                setTimeout(() => {
+                    this._dbDelete(`/sharednotes/${sid}/activeUsers/${this.collabUser.id}`).catch(() => {});
+                }, 30000);
+            } else {
+                this._dbDelete(`/sharednotes/${sid}/activeUsers/${this.collabUser.id}`).catch(() => {});
+            }
         }
     }
 
