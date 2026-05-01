@@ -314,7 +314,7 @@ class NotesApp {
                     <h3 class="link-modal-title">Connection Lost</h3>
                 </div>
                 <div class="link-modal-body">
-                    <p style="font-size:14px;color:rgba(44,62,80,0.65);text-align:center;margin:0;font-family:'DM Sans',sans-serif;line-height:1.6;">
+                    <p style="font-size:14px;color:#383838;text-align:center;margin:0;font-family:'DM Sans',sans-serif;line-height:1.6;">
                         Your internet connection was lost. Check your connection then reload to continue working.
                     </p>
                 </div>
@@ -2201,7 +2201,17 @@ class NotesApp {
             textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
         }
 
-        if (this.collabMode && noteId === this.collabNoteId) {
+        const sessionForNote = this._getSessionByNoteId(noteId);
+        if (sessionForNote) {
+            if (!this._activeCollabSessionId || this._activeCollabSessionId !== sessionForNote.sessionId) {
+                this._switchActiveSession(sessionForNote.sessionId);
+            }
+            this.collabNoteVisible = true;
+            this.setEditorForSession(this.collabNoteData || sessionForNote.noteData || note, false);
+            this.updateActiveUserPresence();
+            this.renderShareCollaborators(sessionForNote.activeUsers || {});
+            this.renderCollabBar(sessionForNote.activeUsers || {});
+        } else if (this.collabMode && noteId === this.collabNoteId) {
             // Switching back to the shared note — restore collab view
             this.collabNoteVisible = true;
             if (this.collabNoteData) {
