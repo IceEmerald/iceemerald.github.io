@@ -1166,6 +1166,10 @@ class NotesApp {
         if (this.collabIsOwner) return; // owners use end session, not leave
         // Clear persisted non-owner session so it doesn't re-join on reload
         try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
+        // Remove the current session from saved sessions so it won't be restored
+        if (this.collabSessionId) {
+            this._unregisterSession(this.collabSessionId);
+        }
         // Remove own presence from Firebase (don't close the whole session)
         if (this.collabSessionId && this.collabUser) {
             this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`).catch(() => {});
@@ -1174,6 +1178,7 @@ class NotesApp {
             this._collabEventSource.close();
             this._collabEventSource = null;
         }
+        this._activeCollabSessionId = null;
         this.collabMode = false;
         this.collabIsOwner = false;
         this.collabSessionId = null;
