@@ -973,10 +973,14 @@ class NotesApp {
             const el = document.getElementById(id);
             if (el) el.style.display = visible ? '' : 'none';
         });
-        // Leave button: only show for the currently active non-owner collab session.
+        this._updateLeaveButtonVisibility();
+    }
+
+    _updateLeaveButtonVisibility() {
         const leaveBtn = document.getElementById('leaveCollabBtn');
-        const showLeave = !visible && this.collabMode && !this.collabIsOwner && this.collabSessionId && this.collabNoteId && this.currentNoteId === this.collabNoteId;
-        if (leaveBtn) leaveBtn.style.display = showLeave ? 'inline-flex' : 'none';
+        if (!leaveBtn) return;
+        const showLeave = this.collabMode && !this.collabIsOwner && this.collabSessionId && this.collabNoteId && this.currentNoteId === this.collabNoteId && this.collabNoteVisible;
+        leaveBtn.style.display = showLeave ? 'inline-flex' : 'none';
     }
 
     setEditorForSession(noteData, focus = true) {
@@ -2302,6 +2306,7 @@ class NotesApp {
         this.loadDrawing();
         this.updateStatusBar();
         this._setOwnerOnlyButtonsVisible(!this.collabMode || this.collabIsOwner || !this.collabNoteVisible || this.currentNoteId !== this.collabNoteId);
+        this._updateLeaveButtonVisibility();
 
         setTimeout(() => {
             const textEditorFocus = document.getElementById('textEditor');
@@ -2524,6 +2529,7 @@ class NotesApp {
             if (sidebar) sidebar.classList.remove('appearing');
             if (editorArea) editorArea.classList.remove('appearing');
             this._setOwnerOnlyButtonsVisible(true);
+            this._updateLeaveButtonVisibility();
             // Render notes cards on welcome screen
             this.renderNotesCards();
             // Do NOT auto-open sidebar — user swipes right to open
