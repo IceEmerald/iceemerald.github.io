@@ -296,7 +296,7 @@ class NotesApp {
         if (this._disconnectModalEl) return;
         const overlay = document.createElement('div');
         overlay.id = 'disconnectModal';
-        overlay.className = 'link-modal show';
+        overlay.className = 'link-modal';
         overlay.innerHTML = `
             <div class="link-modal-content" style="max-width:380px;text-align:center;">
                 <div class="link-modal-header">
@@ -324,6 +324,7 @@ class NotesApp {
             </div>
         `;
         document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('show'));
         this._disconnectModalEl = overlay;
         const reloadBtn = overlay.querySelector('#disconnectReloadBtn');
         reloadBtn.addEventListener('click', () => window.location.reload());
