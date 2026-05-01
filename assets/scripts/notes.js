@@ -979,7 +979,11 @@ class NotesApp {
     _updateLeaveButtonVisibility() {
         const leaveBtn = document.getElementById('leaveCollabBtn');
         if (!leaveBtn) return;
-        const showLeave = this.collabMode && !this.collabIsOwner && this.collabSessionId && this.collabNoteId && this.currentNoteId === this.collabNoteId && this.collabNoteVisible;
+        const currentSession = this._activeCollabSessionId ? this.collabSessions.get(this._activeCollabSessionId) : null;
+        const note = this.notes.find(n => n.id === this.currentNoteId);
+        const isSessionNote = currentSession && this.currentNoteId && currentSession.noteId === this.currentNoteId;
+        const isVirtualSharedNote = note && note._isCollabNote && note._collabSessionId === currentSession?.sessionId;
+        const showLeave = !!currentSession && !currentSession.isOwner && this.collabMode && this.collabNoteVisible && (isSessionNote || isVirtualSharedNote);
         leaveBtn.style.display = showLeave ? 'inline-flex' : 'none';
     }
 
