@@ -1033,6 +1033,7 @@ class NotesApp {
         // Hide owner-only buttons for non-owners viewing the shared note
         if (isNonOwner) {
             this._setOwnerOnlyButtonsVisible(false);
+            this._showLeaveButton();
         } else {
             this._setOwnerOnlyButtonsVisible(true);
             this._hideLeaveButton();
