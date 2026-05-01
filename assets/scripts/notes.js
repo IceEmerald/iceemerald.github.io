@@ -1197,6 +1197,7 @@ class NotesApp {
         const cursors = document.getElementById('collabCursors');
         if (cursors) cursors.innerHTML = '';
         this._setOwnerOnlyButtonsVisible(true);
+        this._hideLeaveButton();
         const textEditor = document.getElementById('textEditor');
         if (textEditor) textEditor.contentEditable = 'true';
         const titleInput = document.getElementById('noteTitle');
@@ -1245,6 +1246,7 @@ class NotesApp {
         // Remove cursor overlays
         const cursors = document.getElementById('collabCursors');
         if (cursors) cursors.innerHTML = '';
+        this._hideLeaveButton();
         // Remove owner and non-owner sessions from localStorage
         try { 
             localStorage.removeItem('emeraldnotes_collab_owner');
