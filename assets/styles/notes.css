@@ -978,6 +978,16 @@
         display: none !important;
     }
 
+    /* Bug 6: Leave button should only show for active non-owner collab views */
+    #leaveCollabBtn {
+        display: none !important;
+    }
+
+    #leaveCollabBtn.visible,
+    body.collab-non-owner #leaveCollabBtn.visible {
+        display: inline-flex !important;
+    }
+
     .text-editor:focus {
         outline: none;
     }

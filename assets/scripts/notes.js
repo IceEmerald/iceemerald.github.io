@@ -979,12 +979,14 @@ class NotesApp {
     _hideLeaveButton() {
         const leaveBtn = document.getElementById('leaveCollabBtn');
         if (!leaveBtn) return;
+        leaveBtn.classList.remove('visible');
         leaveBtn.style.display = 'none';
     }
 
     _showLeaveButton() {
         const leaveBtn = document.getElementById('leaveCollabBtn');
         if (!leaveBtn) return;
+        leaveBtn.classList.add('visible');
         leaveBtn.style.display = 'inline-flex';
     }
 
