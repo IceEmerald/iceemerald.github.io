@@ -559,12 +559,16 @@ class NotesApp {
                 this.currentNoteId = noteId;
 
                 this.setEditorForSession(noteData);
+                if (!this.collabIsOwner) {
+                    this._showLeaveButton();
+                }
                 this.renderNotesList();
                 this.renderNotesCards();
                 this.renderShareCollaborators(data.activeUsers || {});
                 this.setupSessionListener(sessionId);
                 this.updateActiveUserPresence();
                 this.renderCollabBar(data.activeUsers || {});
+                this._updateLeaveButtonVisibility();
                 this.showToast(`Joined shared note as ${this.collabUser.name || 'Guest'}`);
             } else {
                 // Silent: just start listening in the background, don't disturb editor
