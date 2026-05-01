@@ -2301,6 +2301,7 @@ class NotesApp {
         // Load the drawing for this note (or hide canvas if none)
         this.loadDrawing();
         this.updateStatusBar();
+        this._setOwnerOnlyButtonsVisible(!this.collabMode || this.collabIsOwner || !this.collabNoteVisible || this.currentNoteId !== this.collabNoteId);
 
         setTimeout(() => {
             const textEditorFocus = document.getElementById('textEditor');
@@ -2404,7 +2405,7 @@ class NotesApp {
         const plainText = tempDiv.textContent || tempDiv.innerText || '';
         const preview = plainText.substring(0, 150);
         const date = new Date(note.modifiedAt);
-        const isLiveNote = note._isCollabNote || note.id === this.collabNoteId;
+        const isLiveNote = note._isCollabNote || this._isCollabNoteId(note.id);
 
         div.innerHTML = `
             <div class="note-item-title">${this.escapeHtml(note.title)}</div>
@@ -2522,6 +2523,7 @@ class NotesApp {
             if (ribbon) ribbon.classList.remove('entering');
             if (sidebar) sidebar.classList.remove('appearing');
             if (editorArea) editorArea.classList.remove('appearing');
+            this._setOwnerOnlyButtonsVisible(true);
             // Render notes cards on welcome screen
             this.renderNotesCards();
             // Do NOT auto-open sidebar — user swipes right to open
