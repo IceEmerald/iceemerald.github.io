@@ -976,15 +976,34 @@ class NotesApp {
         this._updateLeaveButtonVisibility();
     }
 
+    _hideLeaveButton() {
+        const leaveBtn = document.getElementById('leaveCollabBtn');
+        if (!leaveBtn) return;
+        leaveBtn.style.display = 'none';
+    }
+
+    _showLeaveButton() {
+        const leaveBtn = document.getElementById('leaveCollabBtn');
+        if (!leaveBtn) return;
+        leaveBtn.style.display = 'inline-flex';
+    }
+
     _updateLeaveButtonVisibility() {
         const leaveBtn = document.getElementById('leaveCollabBtn');
         if (!leaveBtn) return;
+        if (!this.collabMode || this.collabIsOwner || !this.collabNoteVisible) {
+            leaveBtn.style.display = 'none';
+            return;
+        }
         const currentSession = this._activeCollabSessionId ? this.collabSessions.get(this._activeCollabSessionId) : null;
         const note = this.notes.find(n => n.id === this.currentNoteId);
         const isSessionNote = currentSession && this.currentNoteId && currentSession.noteId === this.currentNoteId;
         const isVirtualSharedNote = note && note._isCollabNote && note._collabSessionId === currentSession?.sessionId;
-        const showLeave = !!currentSession && !currentSession.isOwner && this.collabMode && this.collabNoteVisible && (isSessionNote || isVirtualSharedNote);
-        leaveBtn.style.display = showLeave ? 'inline-flex' : 'none';
+        if (currentSession && !currentSession.isOwner && (isSessionNote || isVirtualSharedNote)) {
+            leaveBtn.style.display = 'inline-flex';
+        } else {
+            leaveBtn.style.display = 'none';
+        }
     }
 
     setEditorForSession(noteData, focus = true) {
@@ -1014,6 +1033,7 @@ class NotesApp {
             this._setOwnerOnlyButtonsVisible(false);
         } else {
             this._setOwnerOnlyButtonsVisible(true);
+            this._hideLeaveButton();
         }
         const welcomeScreen = document.getElementById('welcomeScreen');
         if (welcomeScreen) welcomeScreen.classList.add('hidden');
@@ -2219,6 +2239,11 @@ class NotesApp {
             this.updateActiveUserPresence();
             this.renderShareCollaborators(sessionForNote.activeUsers || {});
             this.renderCollabBar(sessionForNote.activeUsers || {});
+            if (!sessionForNote.isOwner) {
+                this._showLeaveButton();
+            } else {
+                this._hideLeaveButton();
+            }
         } else if (this.collabMode && noteId === this.collabNoteId) {
             // Switching back to the shared note — restore collab view
             this.collabNoteVisible = true;
@@ -2245,6 +2270,7 @@ class NotesApp {
                 this._setOwnerOnlyButtonsVisible(true);
                 document.body.classList.remove('collab-non-owner', 'collab-view-only');
             }
+            this._hideLeaveButton();
             // Restore normal editor state for the local note
             const textEditor = document.getElementById('textEditor');
             if (textEditor) textEditor.contentEditable = 'true';
@@ -2392,6 +2418,7 @@ class NotesApp {
         const notesList = document.getElementById('notesList');
         notesList.innerHTML = '';
         this.notes.forEach(note => notesList.appendChild(this.createNoteListItem(note)));
+        this._updateLeaveButtonVisibility();
     }
 
     createNoteListItem(note) {
@@ -2488,6 +2515,7 @@ class NotesApp {
 
             notesListDisplay.appendChild(card);
         });
+        this._updateLeaveButtonVisibility();
     }
 
     getColorClassFromHex(hex) {
