@@ -1,5 +1,15 @@
     /* EmeraldNotes CSS - Notes App Styling */
 
+    /* Global keyframes for disconnect modal and collab UI */
+    @keyframes fadeInOverlay {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+    @keyframes slideUpModal {
+        from { opacity: 0; transform: translateY(24px) scale(0.95); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
     /* Reset and Base Styles */
     html, body {
         background: #ffffff;
@@ -788,6 +798,24 @@
         display: flex;
         align-items: center;
     }
+    @keyframes collabFadeIn {
+        from { opacity: 0; transform: translateY(4px) scale(0.92); }
+        to   { opacity: 1; transform: translateY(0)   scale(1); }
+    }
+    @keyframes fadeInOverlay {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+    @keyframes slideUpModal {
+        from { opacity: 0; transform: translateY(24px) scale(0.95); }
+        to   { opacity: 1; transform: translateY(0)    scale(1); }
+    }
+    .collab-bar-fading {
+        opacity: 0 !important;
+        transition: opacity 0.15s ease !important;
+        pointer-events: none;
+    }
+
     .collab-avatar {
         width: 28px;
         height: 28px;
@@ -805,6 +833,7 @@
         cursor: default;
         transition: transform 0.15s ease, z-index 0s;
         z-index: 0;
+        animation: collabFadeIn 0.2s ease both;
     }
     .collab-avatar:first-child { margin-left: 0; }
     .collab-avatar:hover { transform: translateY(-3px) scale(1.12); z-index: 5; }
@@ -814,10 +843,8 @@
         top: -13px;
         left: 50%;
         transform: translateX(-50%);
-        font-size: 14px;
         line-height: 1;
-        color: #FFD700;
-        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+        filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
         pointer-events: none;
     }
     .collab-avatar-overflow {
@@ -860,6 +887,7 @@
         font-size: 11px;
         font-weight: 600;
         letter-spacing: 0.01em;
+        animation: collabFadeIn 0.2s ease both;
     }
     .collab-perm-owner { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
     .collab-perm-edit  { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }

@@ -142,6 +142,7 @@ class NotesApp {
         this.dbUrl = 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app';
         this.collabDb = true;
         this.collabUser = this.loadCollaboratorInfo();
+        this._setupConnectionMonitor();
         window.addEventListener('visibilitychange', () => {
             if (document.hidden) this.leaveCollaboration();
             else if (this.collabSessionId) this.updateActiveUserPresence();
@@ -168,6 +169,98 @@ class NotesApp {
 
     _sessionUrl(path = '') {
         return `${this.dbUrl}/sharednotes/${this.collabSessionId}${path}.json`;
+    }
+
+    _setupConnectionMonitor() {
+        this._disconnected = false;
+        this._reconnectTimer = null;
+        this._disconnectModalEl = null;
+
+        const onOffline = () => {
+            if (this._disconnected) return;
+            this._disconnected = true;
+            // Show persistent "Reconnecting..." toast
+            this._showReconnectingToast();
+            // After 15 seconds still offline → show modal
+            this._reconnectTimer = setTimeout(() => {
+                if (this._disconnected) this._showDisconnectModal();
+            }, 15000);
+        };
+
+        const onOnline = () => {
+            if (!this._disconnected) return;
+            this._disconnected = false;
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
+            this._hideDisconnectModal();
+            this.showToast('Reconnected!', 3500);
+        };
+
+        window.addEventListener('offline', onOffline);
+        window.addEventListener('online', onOnline);
+    }
+
+    _showReconnectingToast() {
+        const toast = document.getElementById('toastNotification');
+        if (!toast) return;
+        toast.textContent = 'Reconnecting…';
+        toast.classList.add('show');
+        clearTimeout(this._toastTimer);
+        // Keep it visible until explicitly cleared
+    }
+
+    _showDisconnectModal() {
+        if (this._disconnectModalEl) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'disconnectModal';
+        overlay.style.cssText = `
+            position:fixed;inset:0;z-index:99999;
+            background:rgba(0,0,0,0.55);
+            display:flex;align-items:center;justify-content:center;
+            backdrop-filter:blur(4px);
+            animation:fadeInOverlay 0.25s ease;
+        `;
+        overlay.innerHTML = `
+            <div style="
+                background:#fff;border-radius:16px;padding:36px 32px 28px;
+                box-shadow:0 20px 60px rgba(0,0,0,0.3);
+                max-width:360px;width:90%;text-align:center;
+                animation:slideUpModal 0.3s cubic-bezier(.34,1.56,.64,1);
+            ">
+                <div style="font-size:48px;margin-bottom:12px;">📡</div>
+                <h2 style="margin:0 0 10px;font-size:20px;font-weight:700;color:#1a202c;">
+                    You've been disconnected
+                </h2>
+                <p style="margin:0 0 24px;font-size:14px;color:#718096;line-height:1.6;">
+                    Your internet connection was lost. Please check your connection and reload to continue.
+                </p>
+                <button id="disconnectReloadBtn" style="
+                    width:100%;padding:13px;background:#239a4d;color:#fff;
+                    border:none;border-radius:10px;font-size:15px;font-weight:600;
+                    cursor:pointer;transition:background 0.2s;
+                ">Reload</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        this._disconnectModalEl = overlay;
+        overlay.querySelector('#disconnectReloadBtn').addEventListener('click', () => {
+            window.location.reload();
+        });
+        overlay.querySelector('#disconnectReloadBtn').addEventListener('mouseover', function() {
+            this.style.background = '#1a7d3d';
+        });
+        overlay.querySelector('#disconnectReloadBtn').addEventListener('mouseout', function() {
+            this.style.background = '#239a4d';
+        });
+    }
+
+    _hideDisconnectModal() {
+        const toast = document.getElementById('toastNotification');
+        if (toast) toast.classList.remove('show');
+        if (this._disconnectModalEl) {
+            this._disconnectModalEl.remove();
+            this._disconnectModalEl = null;
+        }
     }
 
     async _dbGet(path = '') {
@@ -237,11 +330,15 @@ class NotesApp {
             return;
         }
         // Owner reload: re-attach listener so live session stays active
+        let hasOwnerRestore = false;
         try {
             const saved = localStorage.getItem('emeraldnotes_collab_owner');
             if (saved) {
                 const { sessionId: sid, noteId } = JSON.parse(saved);
                 if (sid) {
+                    hasOwnerRestore = true;
+                    // Clear any non-owner key to prevent race condition
+                    localStorage.removeItem('emeraldnotes_collab_non_owner');
                     this._dbGet(`/sharednotes/${sid}`).then(data => {
                         if (!data || data.status === 'closed') {
                             localStorage.removeItem('emeraldnotes_collab_owner');
@@ -264,6 +361,8 @@ class NotesApp {
                         }
                         // Re-attach listener without forcing the user into the note
                         this.collabNoteVisible = false;
+                        // Ensure leave button stays hidden for owner
+                        this._setOwnerOnlyButtonsVisible(true);
                         this.setupSessionListener();
                         // Update owner presence silently
                         this.updateActiveUserPresence();
@@ -273,21 +372,24 @@ class NotesApp {
         } catch (_) {}
 
         // Non-owner reload: re-join so shared note stays in sidebar
-        try {
-            const savedNO = localStorage.getItem('emeraldnotes_collab_non_owner');
-            if (savedNO) {
-                const { sessionId: sid } = JSON.parse(savedNO);
-                if (sid) {
-                    this._dbGet(`/sharednotes/${sid}`).then(data => {
-                        if (!data || data.status === 'closed') {
-                            localStorage.removeItem('emeraldnotes_collab_non_owner');
-                            return;
-                        }
-                        this.joinCollabSession(sid);
-                    }).catch(() => { localStorage.removeItem('emeraldnotes_collab_non_owner'); });
+        // Skip if owner restore is running (prevents race condition)
+        if (!hasOwnerRestore) {
+            try {
+                const savedNO = localStorage.getItem('emeraldnotes_collab_non_owner');
+                if (savedNO) {
+                    const { sessionId: sid } = JSON.parse(savedNO);
+                    if (sid) {
+                        this._dbGet(`/sharednotes/${sid}`).then(data => {
+                            if (!data || data.status === 'closed') {
+                                localStorage.removeItem('emeraldnotes_collab_non_owner');
+                                return;
+                            }
+                            this.joinCollabSession(sid);
+                        }).catch(() => { localStorage.removeItem('emeraldnotes_collab_non_owner'); });
+                    }
                 }
-            }
-        } catch (_) {}
+            } catch (_) {}
+        }
     }
 
     async joinCollabSession(sessionId) {
@@ -384,6 +486,8 @@ class NotesApp {
             });
             this.setupSessionListener();
             this.renderCollabBar(this._activeUsers);
+            // Always hide leave button for owner (guard against any stale state)
+            this._setOwnerOnlyButtonsVisible(true);
             // Persist owner session for reload
             try {
                 localStorage.setItem('emeraldnotes_collab_owner', JSON.stringify({ sessionId: this.collabSessionId, noteId: this.collabNoteId }));
@@ -639,8 +743,22 @@ class NotesApp {
         const editorArea = document.querySelector('.editor-area');
         // Only show collab indicators when in collab mode AND the collab note is visible
         if (!editorArea || !this.collabMode || !this.collabNoteVisible) {
-            if (navAvatars) navAvatars.innerHTML = '';
-            if (statbarPerm) { statbarPerm.innerHTML = ''; statbarPerm.style.display = 'none'; }
+            // Fade out then hide
+            if (navAvatars && navAvatars.innerHTML !== '') {
+                navAvatars.classList.add('collab-bar-fading');
+                setTimeout(() => {
+                    navAvatars.innerHTML = '';
+                    navAvatars.classList.remove('collab-bar-fading');
+                }, 150);
+            }
+            if (statbarPerm && statbarPerm.style.display !== 'none') {
+                statbarPerm.classList.add('collab-bar-fading');
+                setTimeout(() => {
+                    statbarPerm.innerHTML = '';
+                    statbarPerm.style.display = 'none';
+                    statbarPerm.classList.remove('collab-bar-fading');
+                }, 150);
+            }
             if (statbarSepPerm) statbarSepPerm.style.display = 'none';
             return;
         }
@@ -655,7 +773,7 @@ class NotesApp {
             const isMe = user.id === this.collabUser.id;
             return `<div class="collab-avatar${isMe ? ' collab-avatar-me' : ''}" style="background:${user.color || '#00b894'}" title="${displayName}${isMe ? ' (You)' : ''}${user.isOwner ? ' · Owner' : ''}">
                 ${initial}
-                ${user.isOwner ? '<span class="collab-avatar-crown" title="Session Owner">&#9813;</span>' : ''}
+                ${user.isOwner ? `<span class="collab-avatar-crown" title="Session Owner"><svg width="13" height="10" viewBox="0 0 13 10" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 8.5L2.5 3.5L5.5 6.5L6.5 1L7.5 6.5L10.5 3.5L12 8.5H1Z" stroke="#FFD700" stroke-width="1.4" stroke-linejoin="round" fill="rgba(255,215,0,0.15)"/></svg></span>` : ''}
             </div>`;
         }).join('');
         if (overflowCount > 0) {
@@ -688,9 +806,10 @@ class NotesApp {
             const el = document.getElementById(id);
             if (el) el.style.display = visible ? '' : 'none';
         });
-        // Leave button: show for non-owner, hide when restoring to owner/normal state
+        // Leave button: only ever show for non-owners inside an active collab session
         const leaveBtn = document.getElementById('leaveCollabBtn');
-        if (leaveBtn) leaveBtn.style.display = visible ? 'none' : 'inline-flex';
+        const showLeave = !visible && this.collabMode && !this.collabIsOwner;
+        if (leaveBtn) leaveBtn.style.display = showLeave ? 'inline-flex' : 'none';
     }
 
     setEditorForSession(noteData, focus = true) {
