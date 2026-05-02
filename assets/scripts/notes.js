@@ -1807,6 +1807,9 @@ class NotesApp {
             if (menu.parentNode !== document.body) {
                 document.body.appendChild(menu);
             }
+            // Cancel any in-progress close animation
+            menu.classList.remove('ms-portal-closing');
+            clearTimeout(menu._closeTimer);
             // Set styles before measuring
             menu.style.visibility = 'hidden';
             menu.style.display = 'block';
@@ -1830,24 +1833,33 @@ class NotesApp {
             menu.style.left = left + 'px';
             menu.style.width = mw + 'px';
             menu.style.visibility = '';
+            // Trigger fade-in animation inline (menu is portaled, CSS class won't reach it)
+            menu.style.animation = 'dropdownFadeIn 0.2s ease';
             dropdownEl.classList.add('active');
         };
 
         const closePortal = () => {
             dropdownEl.classList.remove('active');
-            if (menu._portalParent && menu.parentNode === document.body) {
-                menu._portalParent.appendChild(menu);
-            }
-            menu.style.display = '';
-            menu.style.position = '';
-            menu.style.zIndex = '';
-            menu.style.top = '';
-            menu.style.left = '';
-            menu.style.width = '';
-            menu.style.minWidth = '';
-            menu.style.maxHeight = '';
-            menu.style.overflowY = '';
-            menu.style.visibility = '';
+            // Trigger fade-out animation, then actually remove after it finishes
+            menu.style.animation = '';
+            menu.classList.add('ms-portal-closing');
+            menu._closeTimer = setTimeout(() => {
+                menu.classList.remove('ms-portal-closing');
+                if (menu._portalParent && menu.parentNode === document.body) {
+                    menu._portalParent.appendChild(menu);
+                }
+                menu.style.display = '';
+                menu.style.position = '';
+                menu.style.zIndex = '';
+                menu.style.top = '';
+                menu.style.left = '';
+                menu.style.width = '';
+                menu.style.minWidth = '';
+                menu.style.maxHeight = '';
+                menu.style.overflowY = '';
+                menu.style.visibility = '';
+                menu.style.animation = '';
+            }, 150);
         };
 
         btn.addEventListener('mousedown', (e) => e.preventDefault());
