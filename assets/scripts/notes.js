@@ -513,6 +513,12 @@ class NotesApp {
                 return;
             }
 
+            // Limit: one collaboration session per person — block joining a second session
+            if (!this.collabSessions.has(sessionId) && this.collabSessions.size >= 1) {
+                if (!silent) this.showShareModal({ title: 'Limit Reached', message: 'You already have an active collaboration note. You can only participate in 1 at a time. Leave your current session to join another.' });
+                return;
+            }
+
             const isOwner = data.ownerId === this.collabUser.id;
             const permission = data.permission || 'edit';
             const noteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
@@ -593,6 +599,12 @@ class NotesApp {
             this._switchActiveSession(existingSess.sessionId);
             this.collabNoteVisible = true;
             this.renderCollabBar(this._activeUsers || {});
+        }
+
+        // Limit: one collaboration session per person — block creating a second session
+        if (!existingSess && this.collabSessions.size >= 1) {
+            this.showToast('You already have an active collaboration note. You can only have 1 at a time.');
+            return;
         }
 
         if (!this.collabSessionId || !this.collabMode) {
