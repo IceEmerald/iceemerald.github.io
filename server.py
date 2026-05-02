@@ -1,13 +1,18 @@
 import http.server
 import os
+from urllib.parse import urlparse
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-        path = self.translate_path(self.path)
-        if not os.path.exists(path) and not os.path.isfile(path):
-            html_path = path + ".html"
-            if os.path.isfile(html_path):
-                self.path = self.path.rstrip("/") + ".html"
+        parsed = urlparse(self.path)
+        clean_path = parsed.path
+        disk_path = self.translate_path(clean_path)
+        if not os.path.exists(disk_path) or not os.path.isfile(disk_path):
+            html_disk = self.translate_path(clean_path.rstrip("/") + ".html")
+            if os.path.isfile(html_disk):
+                self.path = clean_path.rstrip("/") + ".html"
+                if parsed.query:
+                    self.path += "?" + parsed.query
         super().do_GET()
 
     def log_message(self, format, *args):
