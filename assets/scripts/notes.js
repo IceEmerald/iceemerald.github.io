@@ -1269,7 +1269,14 @@ class NotesApp {
         try { 
             localStorage.removeItem('emeraldnotes_collab_owner');
             localStorage.removeItem('emeraldnotes_collab_non_owner');
+            localStorage.removeItem('emeraldnotes_collab_sessions');
         } catch (_) {}
+        // Clear the sessions Map so the 1-session limit resets properly
+        for (const s of this.collabSessions.values()) {
+            if (s.eventSource) { try { s.eventSource.close(); } catch (_) {} }
+        }
+        this.collabSessions.clear();
+        this._activeCollabSessionId = null;
         // Restore all owner-only buttons
         this._setOwnerOnlyButtonsVisible(true);
         // Re-enable the editor
