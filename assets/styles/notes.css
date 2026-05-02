@@ -1852,7 +1852,6 @@
         .welcome-btn,
         .font-family,
         .font-size,
-        .sidebar-backdrop,
         .delete-modal-content,
         .table-modal-content,
         .link-modal-content {
@@ -1904,6 +1903,7 @@
 
         .sidebar.mobile-open {
             box-shadow: 3px 0 20px rgba(0,0,0,0.15);
+            z-index: 9999;
         }
 
         /* Backdrop: keep blur and fade */
