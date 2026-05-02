@@ -553,7 +553,9 @@ function updateToolbarState() {
 
     // font family
     try {
-        const ff = document.queryCommandValue('fontName').replace(/"/g, '').replace(/'/g, '');
+        let ff = document.queryCommandValue('fontName').replace(/"/g, '').replace(/'/g, '');
+        // trim fallbacks (e.g. "Calibri, DM Sans, sans-serif" -> "Calibri")
+        ff = ff.split(',')[0].trim();
         const ffBtn = document.querySelector('#fontFamilyDropdown .dropdown-value');
         if (ffBtn && ff) ffBtn.textContent = ff;
     } catch (e) {}
@@ -1092,7 +1094,7 @@ function highlightTableGrid(rows, cols) {
    ================================================ */
 const SPECIAL_CHARS = [
     '©','®','™','§','¶','†','‡','•','·','…','–','—',
-    '«','»','"','"',''',''','„','‚',
+    '\u00AB','\u00BB','\u201C','\u201D','\u2018','\u2019','\u201E','\u201A',
     '½','¼','¾','⅓','⅔','⅛','⅜','⅝','⅞',
     '°','±','×','÷','≠','≤','≥','≈','∞','√','∑','∏',
     'α','β','γ','δ','ε','θ','λ','μ','π','σ','τ','φ','ω',
@@ -1508,6 +1510,13 @@ document.addEventListener('click', e => {
    ================================================ */
 function init() {
     State.docId = getDocId();
+
+    // Auto-fit zoom to viewport width
+    const viewportW = window.innerWidth;
+    const pageW = PAGE_SIZES['a4'].w;
+    const padding = 120; // left + right padding
+    const fittedZoom = Math.min(1, (viewportW - padding) / pageW);
+    State.zoom = parseFloat(Math.max(0.5, fittedZoom).toFixed(2));
 
     // Create first page
     const firstPageEl = createPage(0);
