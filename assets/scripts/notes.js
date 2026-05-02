@@ -1411,6 +1411,7 @@ class NotesApp {
             const hint = document.createElement('div');
             hint.id = 'swipeHint';
             hint.className = 'swipe-hint';
+            hint.addEventListener('click', () => this.openMobileSidebar());
             document.querySelector('.notes-app').appendChild(hint);
         }
     }

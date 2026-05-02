@@ -1499,15 +1499,13 @@
             overflow-y: auto;
         }
 
-        /* --- SIDEBAR: slides in from left, sits BELOW the sticky navbar --- */
+        /* --- SIDEBAR: slides in from left, covers full screen including navbar --- */
         .sidebar {
             position: fixed;
-            /* sit below the .navbar which is sticky-top at 4rem (64px) */
-            top: 64px;
+            top: 0;
             left: 0;
             width: 85vw;
             max-width: 340px;
-            /* fill remaining screen below navbar */
             height: 100%;
             z-index: 2000;
             transform: translateX(-100%);
@@ -1566,23 +1564,26 @@
             -webkit-overflow-scrolling: touch;
         }
 
-        /* Backdrop overlay when sidebar is open — also sits below navbar */
+        /* Backdrop overlay when sidebar is open — covers full screen */
         .sidebar-backdrop {
-            display: none;
+            display: block;
             position: fixed;
-            top: 64px;
+            top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.45);
+            background: rgba(0, 0, 0, 0.5);
             z-index: 1999;
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
-            animation: fadeIn 0.2s ease;
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
         }
 
         .sidebar-backdrop.visible {
-            display: block;
+            opacity: 1;
+            pointer-events: auto;
         }
 
         /* --- EDITOR AREA: full width, sits correctly in remaining space --- */
@@ -1670,19 +1671,36 @@
 
 
 
-        /* Swipe hint indicator at left edge */
+        /* Swipe hint indicator at left edge — clickable */
         .swipe-hint {
             position: fixed;
             left: 0;
             top: 50%;
             transform: translateY(-50%);
-            width: 4px;
+            width: 20px;
             height: 48px;
-            background: rgba(35, 154, 77, 0.3);
+            background: transparent;
             border-radius: 0 4px 4px 0;
             z-index: 100;
-            pointer-events: none;
+            pointer-events: auto;
+            cursor: pointer;
             transition: opacity 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .swipe-hint::after {
+            content: '';
+            display: block;
+            width: 4px;
+            height: 48px;
+            background: rgba(35, 154, 77, 0.35);
+            border-radius: 0 4px 4px 0;
+            transition: background 0.2s ease, width 0.2s ease;
+        }
+        .swipe-hint:hover::after, .swipe-hint:active::after {
+            background: rgba(35, 154, 77, 0.65);
+            width: 6px;
         }
 
         /* Text editor smaller padding on mobile */
@@ -1888,11 +1906,9 @@
             box-shadow: 3px 0 20px rgba(0,0,0,0.15);
         }
 
-        /* Backdrop: simple fade, no blur */
+        /* Backdrop: keep blur and fade */
         .sidebar-backdrop {
-            background: rgba(0,0,0,0.4) !important;
-            backdrop-filter: none !important;
-            -webkit-backdrop-filter: none !important;
+            background: rgba(0,0,0,0.5) !important;
         }
 
         /* ── Promote scroll containers to own compositor layer ── */
@@ -1909,10 +1925,6 @@
             transform: none;
         }
 
-        /* ── Remove animation from backdrop — just show instantly ── */
-        .sidebar-backdrop.visible {
-            animation: none;
-        }
     }
 
     /* =============================================
