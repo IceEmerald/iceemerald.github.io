@@ -496,10 +496,11 @@ button, a, [role="button"] {
    ================================================ */
 .doc-workspace {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: auto;
     background: #e8e8e8;
-    padding: 32px 0 48px;
+    padding: 32px 60px 64px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -514,8 +515,9 @@ button, a, [role="button"] {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
-    width: 100%;
+    gap: 24px;
+    width: max-content;
+    min-width: 100%;
 }
 
 /* THE PAGE */

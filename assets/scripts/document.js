@@ -357,21 +357,21 @@ function updateHeaderFooter(pageEl, pageNum, total) {
 }
 
 function applyZoom() {
-    const workspace = document.getElementById('docWorkspace');
     const container = document.getElementById('pagesContainer');
     if (!container) return;
     container.style.transform = `scale(${State.zoom})`;
     container.style.transformOrigin = 'top center';
 
-    const { w } = getPageDimensions();
-    const scaledW = w * State.zoom;
-    container.style.marginLeft = 'auto';
-    container.style.marginRight = 'auto';
+    const { w, h } = getPageDimensions();
+    const gap = 20;
+    const totalPages = State.pages.length;
 
-    // adjust workspace padding to account for scale
-    const { h } = getPageDimensions();
-    const totalH = (h * State.zoom + 20) * State.pages.length;
-    container.style.marginBottom = (totalH * (1 - State.zoom)) + 'px';
+    // When scaling down, transform-scale shrinks the visual size but the DOM layout space
+    // stays full-size. We compensate with negative margin-bottom to collapse the extra space.
+    const scaledH = h * State.zoom;
+    const naturalH = h;
+    const diff = (naturalH - scaledH) * totalPages;
+    container.style.marginBottom = -diff + 'px';
 
     document.getElementById('zoomLabel').textContent = Math.round(State.zoom * 100) + '%';
     document.getElementById('statZoom').textContent = Math.round(State.zoom * 100) + '%';
