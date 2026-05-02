@@ -443,7 +443,9 @@
         background: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(0, 0, 0, 0.08);
         border-radius: 8px;
-        padding: 8px;
+        padding: 0;
+        width: 36px;
+        height: 36px;
         cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
         display: flex;
         align-items: center;
@@ -477,7 +479,9 @@
         color: white;
         border: none;
         border-radius: 8px;
-        padding: 10px;
+        padding: 0;
+        width: 36px;
+        height: 36px;
         cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
         display: flex;
         align-items: center;
