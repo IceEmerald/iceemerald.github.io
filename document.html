@@ -7,45 +7,51 @@
     <meta name="description" content="A powerful web-based document editor — like MS Word & Google Docs">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Caveat:wght@400;700&family=Comfortaa:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Dancing+Script:wght@400;700&family=DM+Mono:ital,wght@0,400;0,500&family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;700&family=Georgia&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;700&family=Inconsolata:wght@400;700&family=Josefin+Sans:wght@400;700&family=Kalam:wght@400;700&family=Karla:wght@400;700&family=Lato:ital,wght@0,400;0,700;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lobster&family=Lora:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700&family=Mulish:wght@400;700&family=Noto+Sans:wght@400;700&family=Noto+Serif:wght@400;700&family=Nunito:wght@400;700&family=Open+Sans:wght@400;700&family=Oswald:wght@400;700&family=Pacifico&family=Permanent+Marker&family=Poppins:wght@400;700&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Quicksand:wght@400;700&family=Raleway:wght@400;700&family=Roboto:wght@400;700&family=Source+Code+Pro:wght@400;700&family=Source+Sans+3:wght@400;700&family=Spectral:wght@400;700&family=Ubuntu:wght@400;700&family=Vollkorn:wght@400;700&family=Work+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Architects+Daughter&family=Caveat:wght@400;700&family=Comfortaa:wght@400;700&family=Cookie&family=Courgette&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Dancing+Script:wght@400;700&family=DM+Mono:ital,wght@0,400;0,500&family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&family=Dosis:wght@400;700&family=Fira+Code:wght@400;500&family=Fira+Sans:wght@400;700&family=Fredoka+One&family=Great+Vibes&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;700&family=Inconsolata:wght@400;700&family=Indie+Flower&family=Josefin+Sans:wght@400;700&family=Kalam:wght@400;700&family=Karla:wght@400;700&family=Kaushan+Script&family=Lato:ital,wght@0,400;0,700;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Lobster&family=Lora:ital,wght@0,400;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700&family=Mulish:wght@400;700&family=Noto+Sans:wght@400;700&family=Noto+Serif:wght@400;700&family=Nunito:wght@400;700&family=Nunito+Sans:wght@400;700&family=Open+Sans:wght@400;700&family=Oswald:wght@400;700&family=Oxygen:wght@400;700&family=Pacifico&family=Permanent+Marker&family=Poppins:wght@400;700&family=PT+Serif:ital,wght@0,400;0,700;1,400&family=Quicksand:wght@400;700&family=Raleway:wght@400;700&family=Righteous&family=Roboto:wght@400;700&family=Sacramento&family=Shadows+Into+Light&family=Source+Code+Pro:wght@400;700&family=Source+Sans+3:wght@400;700&family=Spectral:wght@400;700&family=Teko:wght@400;700&family=Titillium+Web:wght@400;700&family=Ubuntu:wght@400;700&family=Varela+Round&family=Vollkorn:wght@400;700&family=Work+Sans:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/styles/style.css" />
     <link rel="stylesheet" href="/assets/styles/document.css" />
     <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+    <!-- PDF.js for proper PDF text extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- mammoth.js for DOCX import -->
+    <script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
+    <!-- html-docx-js for DOCX export -->
+    <script src="https://unpkg.com/html-docx-js@0.3.1/dist/html-docx.js"></script>
 </head>
 <body>
 <div class="doc-app">
 
     <!-- Navbar -->
-    <header class="doc-navbar">
-        <div class="doc-nav-left">
-            <a href="/" class="logo">
-                <img src="/assets/images/favicon.webp" width="28" height="28" alt="EmeraldNetwork">
-                <span class="logo-text">EmeraldNetwork</span>
-            </a>
-            <div class="doc-title-wrap">
-                <input type="text" id="docTitle" class="doc-title-input" value="Untitled Document" maxlength="100" spellcheck="false">
-                <div class="doc-title-meta">
-                    <span class="doc-saved-badge" id="savedBadge">All changes saved</span>
+    <header class="notes-header">
+        <div class="header-content">
+            <div class="doc-nav-left">
+                <a href="/" class="logo app-logo" title="Back to EmeraldNetwork">
+                    <img src="/assets/images/favicon.webp" width="28" height="28" alt="EmeraldNetwork">
+                    <span class="logo-text app-title">EmeraldNetwork</span>
+                </a>
+                <div class="doc-title-wrap">
+                    <input type="text" id="docTitle" class="doc-title-input" value="Untitled Document" maxlength="100" spellcheck="false" autocomplete="off">
+                    <div class="doc-title-meta">
+                        <span class="save-indicator" id="savedBadge">All changes saved</span>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="doc-nav-right">
-            <div id="collabAvatars" class="collab-avatars"></div>
-            <button class="doc-nav-btn share-btn" id="shareBtn" title="Share / Collaborate">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                Share
-            </button>
-            <div class="doc-export-group">
+            <div class="doc-nav-right">
+                <div id="collabAvatars" class="collab-nav-avatars"></div>
+                <button class="doc-nav-btn share-btn" id="shareBtn" title="Share / Collaborate">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    Share
+                </button>
                 <button class="doc-nav-btn" id="exportPdfBtn" title="Export as PDF">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                     PDF
                 </button>
                 <button class="doc-nav-btn" id="exportDocxBtn" title="Export as DOCX">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     DOCX
                 </button>
                 <button class="doc-nav-btn" id="importBtn" title="Import Document">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Import
                 </button>
                 <input type="file" id="importFile" accept=".docx,.pdf,.txt,.html,.htm" style="display:none">
@@ -54,10 +60,10 @@
     </header>
 
     <!-- Toast -->
-    <div id="docToast" class="doc-toast"></div>
+    <div id="docToast" class="custom-toast"></div>
 
-    <!-- Ribbon -->
-    <div class="doc-ribbon" id="docRibbon">
+    <!-- Ribbon (floating, matches notes.html) -->
+    <div class="ribbon" id="docRibbon">
         <div class="ribbon-tabs">
             <button class="ribbon-tab active" data-tab="home">Home</button>
             <button class="ribbon-tab" data-tab="insert">Insert</button>
@@ -65,235 +71,214 @@
             <button class="ribbon-tab" data-tab="styles">Styles</button>
         </div>
 
-        <!-- HOME TAB -->
-        <div class="ribbon-panel active" id="tab-home">
+        <div class="ribbon-content">
 
-            <!-- Clipboard -->
-            <div class="ribbon-group">
-                <div class="ribbon-controls">
-                    <button class="ribbon-btn" id="cutBtn" title="Cut (Ctrl+X)">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
-                        <span>Cut</span>
-                    </button>
-                    <button class="ribbon-btn" id="copyBtn" title="Copy (Ctrl+C)">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                        <span>Copy</span>
-                    </button>
-                    <button class="ribbon-btn" id="pasteBtn" title="Paste (Ctrl+V)">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-                        <span>Paste</span>
-                    </button>
+            <!-- HOME TAB -->
+            <div class="ribbon-panel active" id="tab-home">
+
+                <!-- Clipboard -->
+                <div class="ribbon-group">
+                    <div class="group-label">Clipboard</div>
+                    <div class="ribbon-controls">
+                        <button class="ribbon-btn" id="cutBtn" title="Cut (Ctrl+X)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                            <span>Cut</span>
+                        </button>
+                        <button class="ribbon-btn" id="copyBtn" title="Copy (Ctrl+C)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            <span>Copy</span>
+                        </button>
+                        <button class="ribbon-btn" id="pasteBtn" title="Paste (Ctrl+V)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                            <span>Paste</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="group-label">Clipboard</div>
-            </div>
 
-            <!-- Font -->
-            <div class="ribbon-group">
-                <div class="ribbon-controls" style="flex-wrap:wrap;gap:4px;">
-                    <div class="ms-dropdown" id="fontFamilyDropdown">
-                        <button class="ms-dropdown-btn" type="button" style="min-width:130px;">
-                            <span class="dropdown-value">Calibri</span>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                        </button>
-                        <div class="ms-dropdown-menu font-menu">
-                            <div class="ms-dropdown-item font-category">Sans-Serif</div>
-                            <div class="ms-dropdown-item" data-value="Calibri" style="font-family:Calibri,sans-serif;">Calibri</div>
-                            <div class="ms-dropdown-item" data-value="Arial" style="font-family:Arial,sans-serif;">Arial</div>
-                            <div class="ms-dropdown-item" data-value="Roboto" style="font-family:Roboto,sans-serif;">Roboto</div>
-                            <div class="ms-dropdown-item" data-value="Open Sans" style="font-family:'Open Sans',sans-serif;">Open Sans</div>
-                            <div class="ms-dropdown-item" data-value="Lato" style="font-family:Lato,sans-serif;">Lato</div>
-                            <div class="ms-dropdown-item" data-value="Montserrat" style="font-family:Montserrat,sans-serif;">Montserrat</div>
-                            <div class="ms-dropdown-item" data-value="Poppins" style="font-family:Poppins,sans-serif;">Poppins</div>
-                            <div class="ms-dropdown-item" data-value="Raleway" style="font-family:Raleway,sans-serif;">Raleway</div>
-                            <div class="ms-dropdown-item" data-value="Nunito" style="font-family:Nunito,sans-serif;">Nunito</div>
-                            <div class="ms-dropdown-item" data-value="Ubuntu" style="font-family:Ubuntu,sans-serif;">Ubuntu</div>
-                            <div class="ms-dropdown-item" data-value="Mulish" style="font-family:Mulish,sans-serif;">Mulish</div>
-                            <div class="ms-dropdown-item" data-value="Noto Sans" style="font-family:'Noto Sans',sans-serif;">Noto Sans</div>
-                            <div class="ms-dropdown-item" data-value="Karla" style="font-family:Karla,sans-serif;">Karla</div>
-                            <div class="ms-dropdown-item" data-value="Oswald" style="font-family:Oswald,sans-serif;">Oswald</div>
-                            <div class="ms-dropdown-item" data-value="Work Sans" style="font-family:'Work Sans',sans-serif;">Work Sans</div>
-                            <div class="ms-dropdown-item" data-value="Quicksand" style="font-family:Quicksand,sans-serif;">Quicksand</div>
-                            <div class="ms-dropdown-item" data-value="Fira Sans" style="font-family:'Fira Sans',sans-serif;">Fira Sans</div>
-                            <div class="ms-dropdown-item" data-value="IBM Plex Sans" style="font-family:'IBM Plex Sans',sans-serif;">IBM Plex Sans</div>
-                            <div class="ms-dropdown-item" data-value="Josefin Sans" style="font-family:'Josefin Sans',sans-serif;">Josefin Sans</div>
-                            <div class="ms-dropdown-item font-category">Serif</div>
-                            <div class="ms-dropdown-item" data-value="Georgia" style="font-family:Georgia,serif;">Georgia</div>
-                            <div class="ms-dropdown-item" data-value="Times New Roman" style="font-family:'Times New Roman',serif;">Times New Roman</div>
-                            <div class="ms-dropdown-item" data-value="Merriweather" style="font-family:Merriweather,serif;">Merriweather</div>
-                            <div class="ms-dropdown-item" data-value="Lora" style="font-family:Lora,serif;">Lora</div>
-                            <div class="ms-dropdown-item" data-value="Libre Baskerville" style="font-family:'Libre Baskerville',serif;">Libre Baskerville</div>
-                            <div class="ms-dropdown-item" data-value="Noto Serif" style="font-family:'Noto Serif',serif;">Noto Serif</div>
-                            <div class="ms-dropdown-item" data-value="PT Serif" style="font-family:'PT Serif',serif;">PT Serif</div>
-                            <div class="ms-dropdown-item" data-value="Crimson Text" style="font-family:'Crimson Text',serif;">Crimson Text</div>
-                            <div class="ms-dropdown-item" data-value="Vollkorn" style="font-family:Vollkorn,serif;">Vollkorn</div>
-                            <div class="ms-dropdown-item" data-value="Spectral" style="font-family:Spectral,serif;">Spectral</div>
-                            <div class="ms-dropdown-item" data-value="DM Serif Display" style="font-family:'DM Serif Display',serif;">DM Serif Display</div>
-                            <div class="ms-dropdown-item" data-value="Abril Fatface" style="font-family:'Abril Fatface',serif;">Abril Fatface</div>
-                            <div class="ms-dropdown-item font-category">Monospace</div>
-                            <div class="ms-dropdown-item" data-value="Courier New" style="font-family:'Courier New',monospace;">Courier New</div>
-                            <div class="ms-dropdown-item" data-value="Fira Code" style="font-family:'Fira Code',monospace;">Fira Code</div>
-                            <div class="ms-dropdown-item" data-value="Inconsolata" style="font-family:Inconsolata,monospace;">Inconsolata</div>
-                            <div class="ms-dropdown-item" data-value="IBM Plex Mono" style="font-family:'IBM Plex Mono',monospace;">IBM Plex Mono</div>
-                            <div class="ms-dropdown-item" data-value="DM Mono" style="font-family:'DM Mono',monospace;">DM Mono</div>
-                            <div class="ms-dropdown-item" data-value="Source Code Pro" style="font-family:'Source Code Pro',monospace;">Source Code Pro</div>
-                            <div class="ms-dropdown-item font-category">Handwriting</div>
-                            <div class="ms-dropdown-item" data-value="Dancing Script" style="font-family:'Dancing Script',cursive;">Dancing Script</div>
-                            <div class="ms-dropdown-item" data-value="Pacifico" style="font-family:Pacifico,cursive;">Pacifico</div>
-                            <div class="ms-dropdown-item" data-value="Lobster" style="font-family:Lobster,cursive;">Lobster</div>
-                            <div class="ms-dropdown-item" data-value="Caveat" style="font-family:Caveat,cursive;">Caveat</div>
-                            <div class="ms-dropdown-item" data-value="Kalam" style="font-family:Kalam,cursive;">Kalam</div>
-                            <div class="ms-dropdown-item" data-value="Permanent Marker" style="font-family:'Permanent Marker',cursive;">Permanent Marker</div>
-                            <div class="ms-dropdown-item" data-value="Comfortaa" style="font-family:Comfortaa,cursive;">Comfortaa</div>
-                        </div>
-                    </div>
-                    <div class="ms-dropdown" id="fontSizeDropdown">
-                        <button class="ms-dropdown-btn" type="button" style="min-width:56px;">
-                            <span class="dropdown-value">11</span>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                        </button>
-                        <div class="ms-dropdown-menu" style="min-width:80px;">
-                            <div class="ms-dropdown-item" data-value="8">8</div>
-                            <div class="ms-dropdown-item" data-value="9">9</div>
-                            <div class="ms-dropdown-item" data-value="10">10</div>
-                            <div class="ms-dropdown-item" data-value="11">11</div>
-                            <div class="ms-dropdown-item" data-value="12">12</div>
-                            <div class="ms-dropdown-item" data-value="14">14</div>
-                            <div class="ms-dropdown-item" data-value="16">16</div>
-                            <div class="ms-dropdown-item" data-value="18">18</div>
-                            <div class="ms-dropdown-item" data-value="20">20</div>
-                            <div class="ms-dropdown-item" data-value="24">24</div>
-                            <div class="ms-dropdown-item" data-value="28">28</div>
-                            <div class="ms-dropdown-item" data-value="32">32</div>
-                            <div class="ms-dropdown-item" data-value="36">36</div>
-                            <div class="ms-dropdown-item" data-value="48">48</div>
-                            <div class="ms-dropdown-item" data-value="72">72</div>
-                        </div>
-                    </div>
-                    <div class="font-format-row">
-                        <button class="ribbon-btn fmt-btn" data-command="bold" id="boldBtn" title="Bold (Ctrl+B)"><b>B</b></button>
-                        <button class="ribbon-btn fmt-btn" data-command="italic" id="italicBtn" title="Italic (Ctrl+I)"><i>I</i></button>
-                        <button class="ribbon-btn fmt-btn" data-command="underline" id="underlineBtn" title="Underline (Ctrl+U)"><u>U</u></button>
-                        <button class="ribbon-btn fmt-btn" data-command="strikeThrough" id="strikeBtn" title="Strikethrough"><s>S</s></button>
-                        <button class="ribbon-btn fmt-btn" data-command="subscript" id="subBtn" title="Subscript">X<sub>2</sub></button>
-                        <button class="ribbon-btn fmt-btn" data-command="superscript" id="supBtn" title="Superscript">X<sup>2</sup></button>
-                        <!-- Font Color -->
-                        <div class="ms-dropdown" id="fontColorDropdown">
-                            <button class="ms-dropdown-btn color-btn" type="button" title="Font Color">
-                                <span class="color-swatch" id="fontColorSwatch" style="background:#000000;"></span>
-                                <span style="font-size:11px;">A</span>
-                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                <!-- Font -->
+                <div class="ribbon-group">
+                    <div class="group-label">Font</div>
+                    <div class="ribbon-controls">
+                        <div class="ms-dropdown" id="fontFamilyDropdown">
+                            <button class="ms-dropdown-btn" type="button" style="min-width:120px;">
+                                <span class="dropdown-value">Arial</span>
                             </button>
-                            <div class="ms-dropdown-menu color-menu">
-                                <div class="color-grid">
-                                    <button class="color-cell" data-color="#000000" style="background:#000000;" title="Black"></button>
-                                    <button class="color-cell" data-color="#434343" style="background:#434343;" title="Dark Gray 4"></button>
-                                    <button class="color-cell" data-color="#666666" style="background:#666666;" title="Dark Gray 3"></button>
-                                    <button class="color-cell" data-color="#999999" style="background:#999999;" title="Dark Gray 2"></button>
-                                    <button class="color-cell" data-color="#b7b7b7" style="background:#b7b7b7;" title="Dark Gray 1"></button>
-                                    <button class="color-cell" data-color="#cccccc" style="background:#cccccc;" title="Gray"></button>
-                                    <button class="color-cell" data-color="#d9d9d9" style="background:#d9d9d9;" title="Light Gray 3"></button>
-                                    <button class="color-cell" data-color="#efefef" style="background:#efefef;border:1px solid #ddd;" title="Light Gray 2"></button>
-                                    <button class="color-cell" data-color="#f3f3f3" style="background:#f3f3f3;border:1px solid #ddd;" title="Light Gray 1"></button>
-                                    <button class="color-cell" data-color="#ffffff" style="background:#ffffff;border:1px solid #ddd;" title="White"></button>
-                                    <button class="color-cell" data-color="#ff0000" style="background:#ff0000;" title="Red"></button>
-                                    <button class="color-cell" data-color="#ff9900" style="background:#ff9900;" title="Orange"></button>
-                                    <button class="color-cell" data-color="#ffff00" style="background:#ffff00;" title="Yellow"></button>
-                                    <button class="color-cell" data-color="#00ff00" style="background:#00ff00;" title="Green"></button>
-                                    <button class="color-cell" data-color="#00ffff" style="background:#00ffff;" title="Cyan"></button>
-                                    <button class="color-cell" data-color="#4a86e8" style="background:#4a86e8;" title="Cornflower Blue"></button>
-                                    <button class="color-cell" data-color="#0000ff" style="background:#0000ff;" title="Blue"></button>
-                                    <button class="color-cell" data-color="#9900ff" style="background:#9900ff;" title="Purple"></button>
-                                    <button class="color-cell" data-color="#ff00ff" style="background:#ff00ff;" title="Magenta"></button>
-                                    <button class="color-cell" data-color="#e06666" style="background:#e06666;" title="Light Red 1"></button>
-                                    <button class="color-cell" data-color="#f6b26b" style="background:#f6b26b;" title="Light Orange 1"></button>
-                                    <button class="color-cell" data-color="#ffd966" style="background:#ffd966;" title="Light Yellow 1"></button>
-                                    <button class="color-cell" data-color="#93c47d" style="background:#93c47d;" title="Light Green 1"></button>
-                                    <button class="color-cell" data-color="#76a5af" style="background:#76a5af;" title="Light Cyan 1"></button>
-                                    <button class="color-cell" data-color="#6fa8dc" style="background:#6fa8dc;" title="Light Blue 1"></button>
-                                    <button class="color-cell" data-color="#8e7cc3" style="background:#8e7cc3;" title="Light Purple 1"></button>
-                                    <button class="color-cell" data-color="#c27ba0" style="background:#c27ba0;" title="Light Magenta 1"></button>
-                                    <button class="color-cell" data-color="#cc0000" style="background:#cc0000;" title="Dark Red 1"></button>
-                                    <button class="color-cell" data-color="#e69138" style="background:#e69138;" title="Dark Orange 1"></button>
-                                    <button class="color-cell" data-color="#f1c232" style="background:#f1c232;" title="Dark Yellow 1"></button>
-                                    <button class="color-cell" data-color="#6aa84f" style="background:#6aa84f;" title="Dark Green 1"></button>
-                                    <button class="color-cell" data-color="#45818e" style="background:#45818e;" title="Dark Cyan 1"></button>
-                                    <button class="color-cell" data-color="#3d85c8" style="background:#3d85c8;" title="Dark Blue 1"></button>
-                                    <button class="color-cell" data-color="#674ea7" style="background:#674ea7;" title="Dark Purple 1"></button>
-                                    <button class="color-cell" data-color="#a64d79" style="background:#a64d79;" title="Dark Magenta 1"></button>
-                                </div>
-                                <div class="color-custom-row">
-                                    <label>Custom: <input type="color" id="fontColorCustom" value="#000000"></label>
-                                </div>
+                            <div class="ms-dropdown-menu font-menu" style="min-width:180px;max-height:300px;">
+                                <div class="ms-dropdown-item font-category">Sans-Serif</div>
+                                <div class="ms-dropdown-item" data-value="Arial" style="font-family:Arial,sans-serif;">Arial</div>
+                                <div class="ms-dropdown-item" data-value="Helvetica" style="font-family:Helvetica,sans-serif;">Helvetica</div>
+                                <div class="ms-dropdown-item" data-value="Calibri" style="font-family:Calibri,sans-serif;">Calibri</div>
+                                <div class="ms-dropdown-item" data-value="Roboto" style="font-family:Roboto,sans-serif;">Roboto</div>
+                                <div class="ms-dropdown-item" data-value="Open Sans" style="font-family:'Open Sans',sans-serif;">Open Sans</div>
+                                <div class="ms-dropdown-item" data-value="Lato" style="font-family:Lato,sans-serif;">Lato</div>
+                                <div class="ms-dropdown-item" data-value="Montserrat" style="font-family:Montserrat,sans-serif;">Montserrat</div>
+                                <div class="ms-dropdown-item" data-value="Poppins" style="font-family:Poppins,sans-serif;">Poppins</div>
+                                <div class="ms-dropdown-item" data-value="Raleway" style="font-family:Raleway,sans-serif;">Raleway</div>
+                                <div class="ms-dropdown-item" data-value="Nunito" style="font-family:Nunito,sans-serif;">Nunito</div>
+                                <div class="ms-dropdown-item" data-value="Nunito Sans" style="font-family:'Nunito Sans',sans-serif;">Nunito Sans</div>
+                                <div class="ms-dropdown-item" data-value="Ubuntu" style="font-family:Ubuntu,sans-serif;">Ubuntu</div>
+                                <div class="ms-dropdown-item" data-value="Mulish" style="font-family:Mulish,sans-serif;">Mulish</div>
+                                <div class="ms-dropdown-item" data-value="Noto Sans" style="font-family:'Noto Sans',sans-serif;">Noto Sans</div>
+                                <div class="ms-dropdown-item" data-value="IBM Plex Sans" style="font-family:'IBM Plex Sans',sans-serif;">IBM Plex Sans</div>
+                                <div class="ms-dropdown-item" data-value="Fira Sans" style="font-family:'Fira Sans',sans-serif;">Fira Sans</div>
+                                <div class="ms-dropdown-item" data-value="Karla" style="font-family:Karla,sans-serif;">Karla</div>
+                                <div class="ms-dropdown-item" data-value="Oswald" style="font-family:Oswald,sans-serif;">Oswald</div>
+                                <div class="ms-dropdown-item" data-value="Work Sans" style="font-family:'Work Sans',sans-serif;">Work Sans</div>
+                                <div class="ms-dropdown-item" data-value="Quicksand" style="font-family:Quicksand,sans-serif;">Quicksand</div>
+                                <div class="ms-dropdown-item" data-value="Josefin Sans" style="font-family:'Josefin Sans',sans-serif;">Josefin Sans</div>
+                                <div class="ms-dropdown-item" data-value="Comfortaa" style="font-family:Comfortaa,sans-serif;">Comfortaa</div>
+                                <div class="ms-dropdown-item font-category">Serif</div>
+                                <div class="ms-dropdown-item" data-value="Georgia" style="font-family:Georgia,serif;">Georgia</div>
+                                <div class="ms-dropdown-item" data-value="Times New Roman" style="font-family:'Times New Roman',serif;">Times New Roman</div>
+                                <div class="ms-dropdown-item" data-value="Merriweather" style="font-family:Merriweather,serif;">Merriweather</div>
+                                <div class="ms-dropdown-item" data-value="Lora" style="font-family:Lora,serif;">Lora</div>
+                                <div class="ms-dropdown-item" data-value="Libre Baskerville" style="font-family:'Libre Baskerville',serif;">Libre Baskerville</div>
+                                <div class="ms-dropdown-item" data-value="Noto Serif" style="font-family:'Noto Serif',serif;">Noto Serif</div>
+                                <div class="ms-dropdown-item" data-value="PT Serif" style="font-family:'PT Serif',serif;">PT Serif</div>
+                                <div class="ms-dropdown-item" data-value="Crimson Text" style="font-family:'Crimson Text',serif;">Crimson Text</div>
+                                <div class="ms-dropdown-item" data-value="Vollkorn" style="font-family:Vollkorn,serif;">Vollkorn</div>
+                                <div class="ms-dropdown-item" data-value="Spectral" style="font-family:Spectral,serif;">Spectral</div>
+                                <div class="ms-dropdown-item" data-value="DM Serif Display" style="font-family:'DM Serif Display',serif;">DM Serif Display</div>
+                                <div class="ms-dropdown-item" data-value="Abril Fatface" style="font-family:'Abril Fatface',serif;">Abril Fatface</div>
+                                <div class="ms-dropdown-item font-category">Monospace</div>
+                                <div class="ms-dropdown-item" data-value="Courier New" style="font-family:'Courier New',monospace;">Courier New</div>
+                                <div class="ms-dropdown-item" data-value="Fira Code" style="font-family:'Fira Code',monospace;">Fira Code</div>
+                                <div class="ms-dropdown-item" data-value="Inconsolata" style="font-family:Inconsolata,monospace;">Inconsolata</div>
+                                <div class="ms-dropdown-item" data-value="IBM Plex Mono" style="font-family:'IBM Plex Mono',monospace;">IBM Plex Mono</div>
+                                <div class="ms-dropdown-item" data-value="DM Mono" style="font-family:'DM Mono',monospace;">DM Mono</div>
+                                <div class="ms-dropdown-item" data-value="Source Code Pro" style="font-family:'Source Code Pro',monospace;">Source Code Pro</div>
+                                <div class="ms-dropdown-item font-category">Handwriting</div>
+                                <div class="ms-dropdown-item" data-value="Dancing Script" style="font-family:'Dancing Script',cursive;">Dancing Script</div>
+                                <div class="ms-dropdown-item" data-value="Pacifico" style="font-family:Pacifico,cursive;">Pacifico</div>
+                                <div class="ms-dropdown-item" data-value="Lobster" style="font-family:Lobster,cursive;">Lobster</div>
+                                <div class="ms-dropdown-item" data-value="Caveat" style="font-family:Caveat,cursive;">Caveat</div>
+                                <div class="ms-dropdown-item" data-value="Kalam" style="font-family:Kalam,cursive;">Kalam</div>
+                                <div class="ms-dropdown-item" data-value="Permanent Marker" style="font-family:'Permanent Marker',cursive;">Permanent Marker</div>
+                                <div class="ms-dropdown-item" data-value="Indie Flower" style="font-family:'Indie Flower',cursive;">Indie Flower</div>
+                                <div class="ms-dropdown-item" data-value="Shadows Into Light" style="font-family:'Shadows Into Light',cursive;">Shadows Into Light</div>
+                                <div class="ms-dropdown-item" data-value="Sacramento" style="font-family:Sacramento,cursive;">Sacramento</div>
+                                <div class="ms-dropdown-item" data-value="Great Vibes" style="font-family:'Great Vibes',cursive;">Great Vibes</div>
+                                <div class="ms-dropdown-item" data-value="Kaushan Script" style="font-family:'Kaushan Script',cursive;">Kaushan Script</div>
                             </div>
                         </div>
-                        <!-- Highlight -->
-                        <div class="ms-dropdown" id="highlightDropdown">
-                            <button class="ms-dropdown-btn color-btn" type="button" title="Highlight Color">
-                                <span class="color-swatch" id="highlightSwatch" style="background:#ffff00;"></span>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                        <div class="ms-dropdown" id="fontSizeDropdown">
+                            <button class="ms-dropdown-btn" type="button" style="min-width:60px;">
+                                <span class="dropdown-value">12</span>
                             </button>
-                            <div class="ms-dropdown-menu color-menu">
-                                <div class="color-grid">
-                                    <button class="color-cell" data-color="#ffff00" style="background:#ffff00;" title="Yellow"></button>
-                                    <button class="color-cell" data-color="#00ff00" style="background:#00ff00;" title="Green"></button>
-                                    <button class="color-cell" data-color="#00ffff" style="background:#00ffff;" title="Cyan"></button>
-                                    <button class="color-cell" data-color="#ff00ff" style="background:#ff00ff;" title="Magenta"></button>
-                                    <button class="color-cell" data-color="#ff0000" style="background:#ff0000;" title="Red"></button>
-                                    <button class="color-cell" data-color="#0000ff" style="background:#0000ff;" title="Blue"></button>
-                                    <button class="color-cell" data-color="#ffd966" style="background:#ffd966;" title="Light Yellow"></button>
-                                    <button class="color-cell" data-color="#93c47d" style="background:#93c47d;" title="Light Green"></button>
-                                    <button class="color-cell" data-color="#6fa8dc" style="background:#6fa8dc;" title="Light Blue"></button>
-                                    <button class="color-cell" data-color="#e06666" style="background:#e06666;" title="Light Red"></button>
-                                    <button class="color-cell" data-color="transparent" style="background:linear-gradient(135deg,#fff 45%,#f00 45%,#f00 55%,#fff 55%);border:1px solid #ccc;" title="None"></button>
+                            <div class="ms-dropdown-menu" style="min-width:80px;">
+                                <div class="ms-dropdown-item" data-value="8">8</div>
+                                <div class="ms-dropdown-item" data-value="9">9</div>
+                                <div class="ms-dropdown-item" data-value="10">10</div>
+                                <div class="ms-dropdown-item" data-value="11">11</div>
+                                <div class="ms-dropdown-item" data-value="12">12</div>
+                                <div class="ms-dropdown-item" data-value="14">14</div>
+                                <div class="ms-dropdown-item" data-value="16">16</div>
+                                <div class="ms-dropdown-item" data-value="18">18</div>
+                                <div class="ms-dropdown-item" data-value="20">20</div>
+                                <div class="ms-dropdown-item" data-value="24">24</div>
+                                <div class="ms-dropdown-item" data-value="28">28</div>
+                                <div class="ms-dropdown-item" data-value="32">32</div>
+                                <div class="ms-dropdown-item" data-value="36">36</div>
+                                <div class="ms-dropdown-item" data-value="48">48</div>
+                                <div class="ms-dropdown-item" data-value="72">72</div>
+                            </div>
+                        </div>
+                        <div class="font-controls">
+                            <button class="ribbon-btn format-btn" id="boldBtn" data-command="bold" title="Bold (Ctrl+B)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+                            </button>
+                            <button class="ribbon-btn format-btn" id="italicBtn" data-command="italic" title="Italic (Ctrl+I)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+                            </button>
+                            <button class="ribbon-btn format-btn" id="underlineBtn" data-command="underline" title="Underline (Ctrl+U)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+                            </button>
+                            <button class="ribbon-btn format-btn" id="strikeBtn" data-command="strikeThrough" title="Strikethrough">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><path d="M16 6C14.5 4 12 4 12 4C9.5 4 7.5 5.5 7.5 7.5C7.5 9.5 9 10.5 12 11.5"/><path d="M8.5 16.5C9.5 18.5 12 20 12 20C14.5 20 16.5 18.5 16.5 16.5"/></svg>
+                            </button>
+                            <button class="ribbon-btn format-btn" id="subBtn" data-command="subscript" title="Subscript">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5l8 8m0-8L4 13"/><text x="13" y="19" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>
+                            </button>
+                            <button class="ribbon-btn format-btn" id="supBtn" data-command="superscript" title="Superscript">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9l8 8m0-8L4 17"/><text x="13" y="9" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>
+                            </button>
+                            <!-- Font Color -->
+                            <div class="ms-dropdown" id="fontColorDropdown">
+                                <button class="ms-dropdown-btn" type="button" style="min-width:80px;">
+                                    <span class="color-preview" id="fontColorSwatch" style="background:#000000;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:4px;border:1px solid rgba(0,0,0,0.2);"></span>
+                                    <span class="dropdown-value">Text</span>
+                                </button>
+                                <div class="ms-dropdown-menu color-menu">
+                                    <div class="ms-dropdown-item" data-value="#000000" data-label="Black"><span class="color-preview" style="background:#000000;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Black</div>
+                                    <div class="ms-dropdown-item" data-value="#333333" data-label="Dark Gray"><span class="color-preview" style="background:#333333;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Dark Gray</div>
+                                    <div class="ms-dropdown-item" data-value="#ffffff" data-label="White"><span class="color-preview" style="background:#ffffff;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #ddd;"></span>White</div>
+                                    <div class="ms-dropdown-item" data-value="#e74c3c" data-label="Red"><span class="color-preview" style="background:#e74c3c;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Red</div>
+                                    <div class="ms-dropdown-item" data-value="#e67e22" data-label="Orange"><span class="color-preview" style="background:#e67e22;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Orange</div>
+                                    <div class="ms-dropdown-item" data-value="#f1c40f" data-label="Yellow"><span class="color-preview" style="background:#f1c40f;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Yellow</div>
+                                    <div class="ms-dropdown-item" data-value="#239a4d" data-label="Green"><span class="color-preview" style="background:#239a4d;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Green</div>
+                                    <div class="ms-dropdown-item" data-value="#3498db" data-label="Blue"><span class="color-preview" style="background:#3498db;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Blue</div>
+                                    <div class="ms-dropdown-item" data-value="#9b59b6" data-label="Purple"><span class="color-preview" style="background:#9b59b6;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Purple</div>
+                                    <div class="ms-dropdown-item" data-value="#1abc9c" data-label="Teal"><span class="color-preview" style="background:#1abc9c;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Teal</div>
+                                    <div style="padding:6px 12px;border-top:1px solid #eee;margin-top:4px;">
+                                        <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:6px;">Custom: <input type="color" id="fontColorCustom" value="#000000" style="width:32px;height:22px;padding:0;border:1px solid #ddd;border-radius:3px;"></label>
+                                    </div>
                                 </div>
-                                <div class="color-custom-row">
-                                    <label>Custom: <input type="color" id="highlightCustom" value="#ffff00"></label>
+                            </div>
+                            <!-- Highlight -->
+                            <div class="ms-dropdown" id="highlightDropdown">
+                                <button class="ms-dropdown-btn" type="button" style="min-width:60px;">
+                                    <span class="color-preview" id="highlightSwatch" style="background:#ffff00;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:4px;border:1px solid rgba(0,0,0,0.15);"></span>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                </button>
+                                <div class="ms-dropdown-menu color-menu">
+                                    <div class="ms-dropdown-item" data-value="#ffff00" data-hl="1"><span class="color-preview" style="background:#ffff00;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #ddd;"></span>Yellow</div>
+                                    <div class="ms-dropdown-item" data-value="#90ee90" data-hl="1"><span class="color-preview" style="background:#90ee90;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Light Green</div>
+                                    <div class="ms-dropdown-item" data-value="#87ceeb" data-hl="1"><span class="color-preview" style="background:#87ceeb;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Light Blue</div>
+                                    <div class="ms-dropdown-item" data-value="#ffb6c1" data-hl="1"><span class="color-preview" style="background:#ffb6c1;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Pink</div>
+                                    <div class="ms-dropdown-item" data-value="#ffa500" data-hl="1"><span class="color-preview" style="background:#ffa500;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Orange</div>
+                                    <div class="ms-dropdown-item" data-value="#dda0dd" data-hl="1"><span class="color-preview" style="background:#dda0dd;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Plum</div>
+                                    <div class="ms-dropdown-item" data-value="transparent" data-hl="1"><span class="color-preview" style="background:linear-gradient(135deg,#fff 45%,#f00 45%,#f00 55%,#fff 55%);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #ccc;"></span>None</div>
+                                    <div style="padding:6px 12px;border-top:1px solid #eee;margin-top:4px;">
+                                        <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:6px;">Custom: <input type="color" id="highlightCustom" value="#ffff00" style="width:32px;height:22px;padding:0;border:1px solid #ddd;border-radius:3px;"></label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="group-label">Font</div>
-            </div>
 
-            <!-- Paragraph -->
-            <div class="ribbon-group">
-                <div class="ribbon-controls" style="flex-wrap:wrap;gap:4px;">
-                    <div class="align-row">
-                        <button class="ribbon-btn fmt-btn" data-command="justifyLeft" id="alignLeftBtn" title="Align Left">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+                <!-- Paragraph -->
+                <div class="ribbon-group">
+                    <div class="group-label">Paragraph</div>
+                    <div class="ribbon-controls">
+                        <button class="ribbon-btn format-btn" data-command="justifyLeft" id="alignLeftBtn" title="Align Left">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
                         </button>
-                        <button class="ribbon-btn fmt-btn" data-command="justifyCenter" id="alignCenterBtn" title="Center">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
+                        <button class="ribbon-btn format-btn" data-command="justifyCenter" id="alignCenterBtn" title="Center">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
                         </button>
-                        <button class="ribbon-btn fmt-btn" data-command="justifyRight" id="alignRightBtn" title="Align Right">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+                        <button class="ribbon-btn format-btn" data-command="justifyRight" id="alignRightBtn" title="Align Right">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
                         </button>
-                        <button class="ribbon-btn fmt-btn" data-command="justifyFull" id="alignJustifyBtn" title="Justify">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+                        <button class="ribbon-btn format-btn" data-command="justifyFull" id="alignJustifyBtn" title="Justify">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
                         </button>
-                    </div>
-                    <div class="align-row">
-                        <button class="ribbon-btn fmt-btn" data-command="insertUnorderedList" id="bulletBtn" title="Bullet List">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        <button class="ribbon-btn format-btn" data-command="insertUnorderedList" id="bulletBtn" title="Bullet List">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                         </button>
-                        <button class="ribbon-btn fmt-btn" data-command="insertOrderedList" id="numberedBtn" title="Numbered List">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+                        <button class="ribbon-btn format-btn" data-command="insertOrderedList" id="numberedBtn" title="Numbered List">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
                         </button>
-                        <button class="ribbon-btn fmt-btn" data-command="outdent" title="Decrease Indent">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="7" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/><polyline points="11 8 7 10 11 12"/></svg>
+                        <button class="ribbon-btn format-btn" data-command="outdent" title="Decrease Indent">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="7" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/><polyline points="11 8 7 10 11 12"/></svg>
                         </button>
-                        <button class="ribbon-btn fmt-btn" data-command="indent" title="Increase Indent">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="7" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/><polyline points="7 8 11 10 7 12"/></svg>
+                        <button class="ribbon-btn format-btn" data-command="indent" title="Increase Indent">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="7" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/><polyline points="7 8 11 10 7 12"/></svg>
                         </button>
-                    </div>
-                    <div class="align-row">
                         <div class="ms-dropdown" id="lineSpacingDropdown">
-                            <button class="ms-dropdown-btn" type="button" title="Line Spacing" style="min-width:100px;">
+                            <button class="ms-dropdown-btn" type="button" style="min-width:90px;">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="12" x2="3" y2="12"/><line x1="21" y1="18" x2="3" y2="18"/><polyline points="7 9 3 6 7 3"/><polyline points="7 21 3 18 7 15"/></svg>
                                 <span class="dropdown-value" style="margin-left:4px;">1.15</span>
-                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                             </button>
                             <div class="ms-dropdown-menu" style="min-width:120px;">
                                 <div class="ms-dropdown-item" data-value="1">Single (1.0)</div>
@@ -306,182 +291,172 @@
                         </div>
                     </div>
                 </div>
-                <div class="group-label">Paragraph</div>
-            </div>
 
-            <!-- Delete -->
-            <div class="ribbon-group">
-                <div class="ribbon-controls">
-                    <button class="ribbon-btn danger-btn" id="clearFormatBtn" title="Clear Formatting">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/><line x1="18" y1="18" x2="21" y2="21"/></svg>
-                        <span>Clear Fmt</span>
-                    </button>
-                    <button class="ribbon-btn danger-btn" id="deletePageBtn" title="Delete Current Page Content">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                        <span>Delete</span>
-                    </button>
-                </div>
-                <div class="group-label">Delete</div>
-            </div>
-        </div>
-
-        <!-- INSERT TAB -->
-        <div class="ribbon-panel" id="tab-insert">
-            <div class="ribbon-group">
-                <div class="ribbon-controls">
-                    <button class="ribbon-btn" id="insertTableBtn" title="Insert Table">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
-                        <span>Table</span>
-                    </button>
-                    <button class="ribbon-btn" id="insertImageBtn" title="Insert Image">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                        <span>Image</span>
-                    </button>
-                    <input type="file" id="insertImageInput" accept="image/*" style="display:none">
-                    <button class="ribbon-btn" id="insertLinkBtn" title="Insert Hyperlink">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
-                        <span>Link</span>
-                    </button>
-                    <button class="ribbon-btn" id="insertHrBtn" title="Insert Horizontal Rule">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/></svg>
-                        <span>Line</span>
-                    </button>
-                    <button class="ribbon-btn" id="insertPageBreakBtn" title="Insert Page Break">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><line x1="3" y1="13" x2="21" y2="13" stroke-dasharray="4 2"/></svg>
-                        <span>Page Break</span>
-                    </button>
-                    <button class="ribbon-btn" id="insertSpecialCharBtn" title="Special Characters">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
-                        <span>Symbol</span>
-                    </button>
-                </div>
-                <div class="group-label">Insert</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-controls">
-                    <button class="ribbon-btn" id="headerFooterBtn" title="Edit Header & Footer">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="8" x2="21" y2="8"/><line x1="3" y1="16" x2="21" y2="16"/></svg>
-                        <span>Header/Footer</span>
-                    </button>
-                    <button class="ribbon-btn" id="insertPageNumBtn" title="Insert Page Number">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><text x="9" y="17" font-size="7" fill="currentColor" stroke="none">#1</text></svg>
-                        <span>Page #</span>
-                    </button>
-                </div>
-                <div class="group-label">Header & Footer</div>
-            </div>
-        </div>
-
-        <!-- LAYOUT TAB -->
-        <div class="ribbon-panel" id="tab-layout">
-            <div class="ribbon-group">
-                <div class="ribbon-controls">
-                    <div class="ms-dropdown" id="pageSizeDropdown">
-                        <button class="ms-dropdown-btn" type="button" style="min-width:110px;">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="1"/></svg>
-                            <span class="dropdown-value" style="margin-left:4px;">A4</span>
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                <!-- Delete -->
+                <div class="ribbon-group">
+                    <div class="group-label">Delete</div>
+                    <div class="ribbon-controls">
+                        <button class="ribbon-btn" id="clearFormatBtn" title="Clear Formatting">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/><line x1="18" y1="18" x2="21" y2="21"/></svg>
+                            <span>Clear Fmt</span>
                         </button>
-                        <div class="ms-dropdown-menu">
-                            <div class="ms-dropdown-item" data-value="a4">A4 (210×297mm)</div>
-                            <div class="ms-dropdown-item" data-value="letter">Letter (8.5×11in)</div>
-                            <div class="ms-dropdown-item" data-value="legal">Legal (8.5×14in)</div>
-                            <div class="ms-dropdown-item" data-value="a3">A3 (297×420mm)</div>
-                            <div class="ms-dropdown-item" data-value="a5">A5 (148×210mm)</div>
-                            <div class="ms-dropdown-item" data-value="b5">B5 (176×250mm)</div>
-                        </div>
+                        <button class="ribbon-btn delete-btn" id="deletePageBtn" title="Delete Page">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                            <span>Delete</span>
+                        </button>
                     </div>
-                    <div class="ms-dropdown" id="orientationDropdown">
-                        <button class="ms-dropdown-btn" type="button" style="min-width:110px;">
-                            <span class="dropdown-value">Portrait</span>
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+
+            <!-- INSERT TAB -->
+            <div class="ribbon-panel" id="tab-insert">
+                <div class="ribbon-group">
+                    <div class="group-label">Insert</div>
+                    <div class="ribbon-controls">
+                        <button class="ribbon-btn" id="insertTableBtn" title="Insert Table">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+                            <span>Table</span>
                         </button>
-                        <div class="ms-dropdown-menu">
-                            <div class="ms-dropdown-item" data-value="portrait">Portrait</div>
-                            <div class="ms-dropdown-item" data-value="landscape">Landscape</div>
+                        <button class="ribbon-btn" id="insertImageBtn" title="Insert Image">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                            <span>Image</span>
+                        </button>
+                        <input type="file" id="insertImageInput" accept="image/*" style="display:none">
+                        <button class="ribbon-btn" id="insertDrawBtn" title="Draw on Page">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            <span>Draw</span>
+                        </button>
+                        <button class="ribbon-btn" id="insertLinkBtn" title="Insert Hyperlink">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                            <span>Link</span>
+                        </button>
+                        <button class="ribbon-btn" id="insertHrBtn" title="Insert Horizontal Rule">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/></svg>
+                            <span>Line</span>
+                        </button>
+                        <button class="ribbon-btn" id="insertPageBreakBtn" title="Insert Page Break">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><line x1="3" y1="13" x2="21" y2="13" stroke-dasharray="4 2"/></svg>
+                            <span>Break</span>
+                        </button>
+                        <button class="ribbon-btn" id="insertSpecialCharBtn" title="Special Characters">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+                            <span>Symbol</span>
+                        </button>
+                        <button class="ribbon-btn" id="headerFooterBtn" title="Edit Header & Footer">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="8" x2="21" y2="8"/><line x1="3" y1="16" x2="21" y2="16"/></svg>
+                            <span>Header/Footer</span>
+                        </button>
+                        <button class="ribbon-btn" id="insertPageNumBtn" title="Insert Page Number">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><text x="9" y="17" font-size="7" fill="currentColor" stroke="none">#1</text></svg>
+                            <span>Page #</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LAYOUT TAB -->
+            <div class="ribbon-panel" id="tab-layout">
+                <div class="ribbon-group">
+                    <div class="group-label">Page Size</div>
+                    <div class="ribbon-controls">
+                        <div class="ms-dropdown" id="pageSizeDropdown">
+                            <button class="ms-dropdown-btn" type="button" style="min-width:110px;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="1"/></svg>
+                                <span class="dropdown-value" style="margin-left:4px;">A4</span>
+                            </button>
+                            <div class="ms-dropdown-menu">
+                                <div class="ms-dropdown-item" data-value="a4">A4 (210×297mm)</div>
+                                <div class="ms-dropdown-item" data-value="letter">Letter (8.5×11in)</div>
+                                <div class="ms-dropdown-item" data-value="legal">Legal (8.5×14in)</div>
+                                <div class="ms-dropdown-item" data-value="a3">A3 (297×420mm)</div>
+                                <div class="ms-dropdown-item" data-value="a5">A5 (148×210mm)</div>
+                                <div class="ms-dropdown-item" data-value="b5">B5 (176×250mm)</div>
+                            </div>
+                        </div>
+                        <div class="ms-dropdown" id="orientationDropdown">
+                            <button class="ms-dropdown-btn" type="button" style="min-width:110px;">
+                                <span class="dropdown-value">Portrait</span>
+                            </button>
+                            <div class="ms-dropdown-menu">
+                                <div class="ms-dropdown-item" data-value="portrait">Portrait</div>
+                                <div class="ms-dropdown-item" data-value="landscape">Landscape</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="group-label">Page Size</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-controls">
-                    <button class="ribbon-btn" id="marginsBtn" title="Page Margins">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><rect x="6" y="6" width="12" height="12" rx="0" stroke-dasharray="2 1"/></svg>
-                        <span>Margins</span>
-                    </button>
-                    <div class="ms-dropdown" id="columnsDropdown">
-                        <button class="ms-dropdown-btn" type="button" style="min-width:100px;">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>
-                            <span class="dropdown-value" style="margin-left:4px;">1 Column</span>
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                <div class="ribbon-group">
+                    <div class="group-label">Layout</div>
+                    <div class="ribbon-controls">
+                        <button class="ribbon-btn" id="marginsBtn" title="Page Margins">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><rect x="6" y="6" width="12" height="12" rx="0" stroke-dasharray="2 1"/></svg>
+                            <span>Margins</span>
                         </button>
-                        <div class="ms-dropdown-menu">
-                            <div class="ms-dropdown-item" data-value="1">One column</div>
-                            <div class="ms-dropdown-item" data-value="2">Two columns</div>
-                            <div class="ms-dropdown-item" data-value="3">Three columns</div>
+                        <div class="ms-dropdown" id="columnsDropdown">
+                            <button class="ms-dropdown-btn" type="button" style="min-width:100px;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>
+                                <span class="dropdown-value" style="margin-left:4px;">1 Column</span>
+                            </button>
+                            <div class="ms-dropdown-menu">
+                                <div class="ms-dropdown-item" data-value="1">One column</div>
+                                <div class="ms-dropdown-item" data-value="2">Two columns</div>
+                                <div class="ms-dropdown-item" data-value="3">Three columns</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="group-label">Layout</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-controls">
-                    <button class="ribbon-btn" id="zoomInBtn" title="Zoom In">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                        <span>Zoom In</span>
-                    </button>
-                    <span class="zoom-label" id="zoomLabel">100%</span>
-                    <button class="ribbon-btn" id="zoomOutBtn" title="Zoom Out">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                        <span>Zoom Out</span>
-                    </button>
+                <div class="ribbon-group">
+                    <div class="group-label">Zoom</div>
+                    <div class="ribbon-controls">
+                        <button class="ribbon-btn" id="zoomOutBtn" title="Zoom Out">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                        </button>
+                        <span class="zoom-label" id="zoomLabel">100%</span>
+                        <button class="ribbon-btn" id="zoomInBtn" title="Zoom In">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                        </button>
+                    </div>
                 </div>
-                <div class="group-label">Zoom</div>
             </div>
-        </div>
 
-        <!-- STYLES TAB -->
-        <div class="ribbon-panel" id="tab-styles">
-            <div class="ribbon-group" style="border-right:none;">
-                <div class="ribbon-controls styles-gallery">
-                    <button class="style-btn active" data-style="p" data-label="Normal" title="Normal">
-                        <span style="font-size:13px;font-weight:400;">Normal</span>
-                    </button>
-                    <button class="style-btn" data-style="h1" data-label="Heading 1" title="Heading 1">
-                        <span style="font-size:20px;font-weight:700;">H1</span>
-                    </button>
-                    <button class="style-btn" data-style="h2" data-label="Heading 2" title="Heading 2">
-                        <span style="font-size:17px;font-weight:700;">H2</span>
-                    </button>
-                    <button class="style-btn" data-style="h3" data-label="Heading 3" title="Heading 3">
-                        <span style="font-size:14px;font-weight:700;">H3</span>
-                    </button>
-                    <button class="style-btn" data-style="h4" data-label="Heading 4" title="Heading 4">
-                        <span style="font-size:13px;font-weight:700;">H4</span>
-                    </button>
-                    <button class="style-btn" data-style="blockquote" data-label="Quote" title="Quote">
-                        <span style="font-size:13px;font-style:italic;border-left:3px solid #888;padding-left:4px;">Quote</span>
-                    </button>
-                    <button class="style-btn" data-style="pre" data-label="Code" title="Code">
-                        <span style="font-size:12px;font-family:monospace;background:#f3f3f3;padding:2px 4px;border-radius:3px;">Code</span>
-                    </button>
-                    <button class="style-btn" data-style="p-caption" data-label="Caption" title="Caption">
-                        <span style="font-size:11px;color:#888;font-style:italic;">Caption</span>
-                    </button>
-                    <button class="style-btn" data-style="p-subtitle" data-label="Subtitle" title="Subtitle">
-                        <span style="font-size:14px;color:#555;">Subtitle</span>
-                    </button>
-                    <button class="style-btn" data-style="p-title" data-label="Title" title="Title">
-                        <span style="font-size:22px;font-weight:700;letter-spacing:-0.5px;">Title</span>
-                    </button>
+            <!-- STYLES TAB -->
+            <div class="ribbon-panel" id="tab-styles">
+                <div class="ribbon-group" style="border-right:none;">
+                    <div class="group-label">Paragraph Styles</div>
+                    <div class="ribbon-controls styles-gallery">
+                        <button class="style-btn active" data-style="p" title="Normal"><span style="font-size:13px;font-weight:400;">Normal</span></button>
+                        <button class="style-btn" data-style="h1" title="Heading 1"><span style="font-size:20px;font-weight:700;">H1</span></button>
+                        <button class="style-btn" data-style="h2" title="Heading 2"><span style="font-size:16px;font-weight:700;">H2</span></button>
+                        <button class="style-btn" data-style="h3" title="Heading 3"><span style="font-size:13px;font-weight:700;">H3</span></button>
+                        <button class="style-btn" data-style="h4" title="Heading 4"><span style="font-size:12px;font-weight:700;">H4</span></button>
+                        <button class="style-btn" data-style="blockquote" title="Quote"><span style="font-size:13px;font-style:italic;border-left:3px solid #888;padding-left:4px;">Quote</span></button>
+                        <button class="style-btn" data-style="pre" title="Code"><span style="font-size:12px;font-family:monospace;background:#f3f3f3;padding:2px 4px;border-radius:3px;">Code</span></button>
+                        <button class="style-btn" data-style="p-caption" title="Caption"><span style="font-size:11px;color:#888;font-style:italic;">Caption</span></button>
+                        <button class="style-btn" data-style="p-subtitle" title="Subtitle"><span style="font-size:14px;color:#555;">Subtitle</span></button>
+                        <button class="style-btn" data-style="p-title" title="Title"><span style="font-size:20px;font-weight:700;letter-spacing:-0.5px;">Title</span></button>
+                    </div>
                 </div>
-                <div class="group-label">Paragraph Styles</div>
             </div>
-        </div>
 
+        </div>
     </div>
     <!-- /ribbon -->
+
+    <!-- Draw toolbar (visible when draw mode active) -->
+    <div class="draw-toolbar" id="drawToolbar" style="display:none;">
+        <span class="draw-toolbar-label">Draw Mode</span>
+        <input type="color" id="drawColor" value="#000000" title="Pen color">
+        <input type="range" id="drawSize" min="1" max="20" value="3" title="Pen size">
+        <button class="ribbon-btn" id="drawEraserBtn" title="Eraser">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16l10-10 7 7-2.5 2.5"/><path d="M6.5 17.5l5-5"/></svg>
+        </button>
+        <button class="ribbon-btn" id="drawClearBtn" title="Clear Drawing">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </button>
+        <button class="ribbon-btn delete-btn" id="drawExitBtn" title="Exit Draw Mode">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Exit Draw
+        </button>
+    </div>
 
     <!-- Ruler -->
     <div class="doc-ruler" id="docRuler">
@@ -490,12 +465,7 @@
 
     <!-- Main Editor Area -->
     <div class="doc-workspace" id="docWorkspace">
-
-        <!-- Pages container -->
-        <div class="pages-container" id="pagesContainer">
-            <!-- Pages are rendered here by JS -->
-        </div>
-
+        <div class="pages-container" id="pagesContainer"></div>
     </div>
 
     <!-- Status Bar -->
@@ -507,12 +477,25 @@
         <span id="statChars">0 characters</span>
         <span class="statbar-sep">|</span>
         <span id="statLang">English (US)</span>
-        <span class="statbar-right">
-            <span id="statZoom">100%</span>
-        </span>
+        <span class="statbar-right"><span id="statZoom">100%</span></span>
     </div>
 
 </div>
+
+<!-- Table Toolbar (fixed, context on table cells) -->
+<div id="tableToolbar" style="display:none;position:fixed;z-index:8000;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.14);padding:4px 6px;gap:4px;align-items:center;flex-wrap:wrap;">
+    <button class="tbl-btn" data-tbl="addRowAbove">+ Row ↑</button>
+    <button class="tbl-btn" data-tbl="addRowBelow">+ Row ↓</button>
+    <button class="tbl-btn" data-tbl="addColLeft">+ Col ←</button>
+    <button class="tbl-btn" data-tbl="addColRight">+ Col →</button>
+    <button class="tbl-btn" data-tbl="mergeCells">Merge</button>
+    <button class="tbl-btn" data-tbl="setBorder">Border</button>
+    <button class="tbl-btn tbl-btn-danger" data-tbl="deleteRow">Del Row</button>
+    <button class="tbl-btn tbl-btn-danger" data-tbl="deleteCol">Del Col</button>
+</div>
+
+<!-- Dropdown Portal (fixed position, appended to body by JS) -->
+<div id="ddPortal" style="display:none;position:fixed;z-index:99999;background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.14);overflow-y:auto;max-height:320px;padding:4px 0;"></div>
 
 <!-- ===== MODALS ===== -->
 
@@ -588,8 +571,8 @@
         </div>
         <div class="doc-modal-body">
             <label class="modal-label">Display text</label>
-            <input type="text" id="linkText" class="modal-input" placeholder="Link text">
-            <label class="modal-label" style="margin-top:10px;">URL</label>
+            <input type="text" id="linkText" class="modal-input" placeholder="Link text" style="margin-bottom:10px;">
+            <label class="modal-label">URL</label>
             <input type="url" id="linkUrl" class="modal-input" placeholder="https://example.com">
         </div>
         <div class="doc-modal-footer">
@@ -601,23 +584,22 @@
 
 <!-- Share Modal -->
 <div class="doc-modal-overlay" id="shareModal">
-    <div class="doc-modal" style="max-width:420px;">
+    <div class="doc-modal" style="max-width:440px;">
         <div class="doc-modal-header">
             <h3>Share Document</h3>
             <button class="doc-modal-close" data-modal="shareModal">&times;</button>
         </div>
         <div class="doc-modal-body">
             <label class="modal-label">Share link (read-only view)</label>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;margin-bottom:14px;">
                 <input type="text" id="shareLink" class="modal-input" readonly style="flex:1;">
-                <button class="modal-btn primary" id="copyShareLink" style="white-space:nowrap;">Copy</button>
+                <button class="modal-btn primary" id="copyShareLink">Copy</button>
             </div>
-            <label class="modal-label" style="margin-top:14px;">Collaboration session</label>
-            <div style="display:flex;gap:8px;align-items:center;">
+            <label class="modal-label">Collaboration session</label>
+            <div style="display:flex;gap:8px;">
                 <input type="text" id="collabLink" class="modal-input" readonly style="flex:1;">
-                <button class="modal-btn primary" id="copyCollabLink" style="white-space:nowrap;">Copy</button>
+                <button class="modal-btn primary" id="copyCollabLink">Copy</button>
             </div>
-            <div id="collabUsersList" style="margin-top:14px;font-size:13px;color:#555;"></div>
         </div>
         <div class="doc-modal-footer">
             <button class="modal-btn cancel" data-modal="shareModal">Close</button>
@@ -627,7 +609,7 @@
 
 <!-- Special Char Modal -->
 <div class="doc-modal-overlay" id="specialCharModal">
-    <div class="doc-modal" style="max-width:460px;">
+    <div class="doc-modal" style="max-width:480px;">
         <div class="doc-modal-header">
             <h3>Special Characters &amp; Symbols</h3>
             <button class="doc-modal-close" data-modal="specialCharModal">&times;</button>
@@ -635,29 +617,28 @@
         <div class="doc-modal-body">
             <div class="special-char-grid" id="specialCharGrid"></div>
         </div>
+        <div class="doc-modal-footer">
+            <button class="modal-btn cancel" data-modal="specialCharModal">Close</button>
+        </div>
     </div>
 </div>
 
 <!-- Header/Footer Modal -->
 <div class="doc-modal-overlay" id="headerFooterModal">
-    <div class="doc-modal" style="max-width:500px;">
+    <div class="doc-modal" style="max-width:460px;">
         <div class="doc-modal-header">
             <h3>Header &amp; Footer</h3>
             <button class="doc-modal-close" data-modal="headerFooterModal">&times;</button>
         </div>
         <div class="doc-modal-body">
             <label class="modal-label">Header text</label>
-            <input type="text" id="headerText" class="modal-input" placeholder="Document header...">
-            <div style="display:flex;gap:8px;margin-top:6px;">
-                <label style="display:flex;align-items:center;gap:4px;font-size:13px;"><input type="checkbox" id="headerPageNum"> Include page number</label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:13px;"><input type="checkbox" id="headerDate"> Include date</label>
-            </div>
-            <label class="modal-label" style="margin-top:14px;">Footer text</label>
-            <input type="text" id="footerText" class="modal-input" placeholder="Document footer...">
-            <div style="display:flex;gap:8px;margin-top:6px;">
-                <label style="display:flex;align-items:center;gap:4px;font-size:13px;"><input type="checkbox" id="footerPageNum" checked> Include page number</label>
-                <label style="display:flex;align-items:center;gap:4px;font-size:13px;"><input type="checkbox" id="footerDate"> Include date</label>
-            </div>
+            <input type="text" id="headerText" class="modal-input" placeholder="Header text…" style="margin-bottom:8px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;margin-bottom:12px;"><input type="checkbox" id="headerPageNum"> Include page number in header</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;margin-bottom:14px;"><input type="checkbox" id="headerDate"> Include date in header</label>
+            <label class="modal-label">Footer text</label>
+            <input type="text" id="footerText" class="modal-input" placeholder="Footer text…" style="margin-bottom:8px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;margin-bottom:8px;"><input type="checkbox" id="footerPageNum" checked> Include page number in footer</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#555;"><input type="checkbox" id="footerDate"> Include date in footer</label>
         </div>
         <div class="doc-modal-footer">
             <button class="modal-btn cancel" data-modal="headerFooterModal">Cancel</button>
@@ -666,32 +647,6 @@
     </div>
 </div>
 
-<!-- Print styles for PDF export -->
-<style id="printStyles">
-@media print {
-    body * { visibility: hidden; }
-    .print-area, .print-area * { visibility: visible; }
-    .print-area {
-        position: fixed;
-        left: 0; top: 0; width: 100%;
-    }
-    .doc-page {
-        box-shadow: none !important;
-        margin: 0 !important;
-        page-break-after: always;
-    }
-    .doc-page:last-child { page-break-after: avoid; }
-    .page-header, .page-footer { display: block !important; }
-    .doc-navbar, .doc-ribbon, .doc-ruler, .doc-statusbar, .doc-modal-overlay { display: none !important; }
-}
-</style>
-
-<!-- Libraries for DOCX import/export -->
-<script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
-<script src="https://unpkg.com/html-docx-js@0.3.1/dist/html-docx.js"></script>
-
 <script src="/assets/scripts/document.js"></script>
-<script src="/assets/scripts/dropdown.js"></script>
-<script src="/assets/scripts/rightclick.js"></script>
 </body>
 </html>
