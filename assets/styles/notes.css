@@ -1555,8 +1555,9 @@
             gap: 12px;
         }
 
-        /* Sidebar header on mobile */
+        /* Sidebar header on mobile — match editor-header height */
         .sidebar-header {
+            padding: 10px 12px;
             border-radius: 0 16px 0 0;
             flex-shrink: 0;
         }
