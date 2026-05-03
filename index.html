@@ -164,7 +164,6 @@
                         <div style="margin-bottom: 2rem;"></div>
                     </div>
                 </div>
-                <div>
                 <div class="news-carousel-wrapper">
                     <div class="news-carousel-track" id="newsCarouselTrack">
                         <div class="news-carousel-item">
@@ -181,7 +180,8 @@
                         </div>
                         <div class="news-carousel-item">
                             <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
-                        </div><div class="news-carousel-item">
+                        </div>
+                        <div class="news-carousel-item">
                             <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
                         </div>
                         <div class="news-carousel-item">
@@ -192,18 +192,17 @@
                         </div>
                     </div>
                 </div>
-                    <div class="news-carousel-controls">
-                        <button class="news-carousel-btn" id="newsPrev" aria-label="Previous">
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                <path d="M12.5 15L7.5 10L12.5 5" stroke="rgba(44, 62, 80, 0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                        <button class="news-carousel-btn" id="newsNext" aria-label="Next">
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                <path d="M7.5 5L12.5 10L7.5 15" stroke="rgba(44, 62, 80, 0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                    </div>
+                <div class="news-carousel-controls">
+                    <button class="news-carousel-btn" id="newsPrev" aria-label="Previous">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M12.5 15L7.5 10L12.5 5" stroke="rgba(44, 62, 80, 0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <button class="news-carousel-btn" id="newsNext" aria-label="Next">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M7.5 5L12.5 10L7.5 15" stroke="rgba(44, 62, 80, 0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
                 </div>
                 <div style="margin-bottom: 3rem;"></div>
             </section>
@@ -356,7 +355,8 @@
                           }
                         </script>
     <script>
-      (function () {
+      window.addEventListener('load', function () {
+        const wrapper = document.querySelector('.news-carousel-wrapper');
         const track = document.getElementById('newsCarouselTrack');
         const prevBtn = document.getElementById('newsPrev');
         const nextBtn = document.getElementById('newsNext');
@@ -365,26 +365,28 @@
         const items = track.querySelectorAll('.news-carousel-item');
         let currentIndex = 0;
         const gap = 16;
+        const visibleCount = 3;
 
         function getItemWidth() {
           return items[0] ? items[0].offsetWidth : 280;
         }
 
-        function getVisible() {
-          const w = window.innerWidth;
-          if (w <= 500) return 1;
-          if (w <= 800) return 2;
-          return 3;
+        function getCenterOffset() {
+          const wrapperWidth = wrapper.offsetWidth;
+          const itemWidth = getItemWidth();
+          const totalVisible = visibleCount * itemWidth + (visibleCount - 1) * gap;
+          return Math.max(0, (wrapperWidth - totalVisible) / 2);
         }
 
         function maxIndex() {
-          return Math.max(0, items.length - getVisible());
+          return Math.max(0, items.length - visibleCount);
         }
 
         function updateCarousel() {
           const itemWidth = getItemWidth();
-          const offset = currentIndex * (itemWidth + gap);
-          track.style.transform = 'translateX(-' + offset + 'px)';
+          const centerOffset = getCenterOffset();
+          const slideOffset = currentIndex * (itemWidth + gap);
+          track.style.transform = 'translateX(' + (centerOffset - slideOffset) + 'px)';
           prevBtn.disabled = currentIndex === 0;
           nextBtn.disabled = currentIndex >= maxIndex();
         }
@@ -409,7 +411,7 @@
         });
 
         updateCarousel();
-      })();
+      });
     </script>
 
 
