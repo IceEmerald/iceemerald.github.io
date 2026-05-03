@@ -11,9 +11,27 @@ window.addEventListener("contextmenu", function (e) {
   const sel = window.getSelection();
   selectedText = sel ? sel.toString().trim() : "";
 
-  contextMenu.style.top = `${e.pageY}px`;
-  contextMenu.style.left = `${e.pageX}px`;
   contextMenu.style.display = "block";
+
+  const menuWidth = contextMenu.offsetWidth;
+  const menuHeight = contextMenu.offsetHeight;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
+  let left = e.pageX;
+  let top = e.pageY;
+
+  if (e.clientX + menuWidth > viewportWidth) {
+    left = scrollX + viewportWidth - menuWidth - 8;
+  }
+  if (e.clientY + menuHeight > viewportHeight) {
+    top = scrollY + viewportHeight - menuHeight - 8;
+  }
+
+  contextMenu.style.left = `${left}px`;
+  contextMenu.style.top = `${top}px`;
 });
 
 window.addEventListener("click", () => {
