@@ -163,33 +163,46 @@
                         ">The latest from EmeraldNetwork</h2>
                         <div style="margin-bottom: 2rem;"></div>
                     </div>
-
-                    <div class="news-grid animate-on-scroll">
-
-                        <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
-                              <img 
-                                src="/assets/images/news/news1.webp" 
-                                class="hover-zoom hover-img" 
-                                style="width: 100%;"
-                                alt="">
+                    <div class="news-carousel-wrapper">
+                        <div class="news-carousel-track" id="newsCarouselTrack">
+                            <div class="news-carousel-item">
+                                <div class="news-card">
+                                    <img src="/assets/images/why/why1.webp" class="hover-zoom hover-img" style="width: 100%; border-radius: 12px;" alt="">
+                                </div>
                             </div>
-
-                            <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
-                              <img 
-                                src="/assets/images/news/news2.webp" 
-                                class="hover-zoom hover-img" 
-                                style="width: 100%;"
-                                alt="">
+                            <div class="news-carousel-item">
+                                <div class="news-card">
+                                    <img src="/assets/images/why/why2.webp" class="hover-zoom hover-img" style="width: 100%; border-radius: 12px;" alt="">
+                                </div>
                             </div>
-
-                            <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
-                              <img 
-                                src="/assets/images/news/news3.webp" 
-                                class="hover-zoom hover-img" 
-                                style="width: 100%;"
-                                alt="">
+                            <div class="news-carousel-item">
+                                <div class="news-card">
+                                    <img src="/assets/images/why/why3.webp" class="hover-zoom hover-img" style="width: 100%; border-radius: 12px;" alt="">
+                                </div>
                             </div>
-
+                            <div class="news-carousel-item">
+                                <div class="news-card">
+                                    <img src="/assets/images/why/why3.webp" class="hover-zoom hover-img" style="width: 100%; border-radius: 12px;" alt="">
+                                </div>
+                            </div>
+                            <div class="news-carousel-item">
+                                <div class="news-card">
+                                    <img src="/assets/images/why/why3.webp" class="hover-zoom hover-img" style="width: 100%; border-radius: 12px;" alt="">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="news-carousel-controls">
+                            <button class="news-carousel-btn" id="newsPrev" aria-label="Previous">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M12.5 15L7.5 10L12.5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <button class="news-carousel-btn" id="newsNext" aria-label="Next">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M7.5 5L12.5 10L7.5 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <div style="margin-bottom: 3rem;"></div>
                 </div>
@@ -342,6 +355,58 @@
                             });
                           }
                         </script>
+    <script>
+      (function () {
+        const track = document.getElementById('newsCarouselTrack');
+        const prevBtn = document.getElementById('newsPrev');
+        const nextBtn = document.getElementById('newsNext');
+        if (!track || !prevBtn || !nextBtn) return;
+
+        const items = track.querySelectorAll('.news-carousel-item');
+        let currentIndex = 0;
+
+        function getVisible() {
+          const w = window.innerWidth;
+          if (w <= 580) return 1;
+          if (w <= 900) return 2;
+          return 3;
+        }
+
+        function maxIndex() {
+          return Math.max(0, items.length - getVisible());
+        }
+
+        function updateCarousel() {
+          const itemWidth = items[0].getBoundingClientRect().width;
+          const gap = 24;
+          const offset = currentIndex * (itemWidth + gap);
+          track.style.transform = `translateX(-${offset}px)`;
+          prevBtn.disabled = currentIndex === 0;
+          nextBtn.disabled = currentIndex >= maxIndex();
+        }
+
+        prevBtn.addEventListener('click', function () {
+          if (currentIndex > 0) {
+            currentIndex--;
+            updateCarousel();
+          }
+        });
+
+        nextBtn.addEventListener('click', function () {
+          if (currentIndex < maxIndex()) {
+            currentIndex++;
+            updateCarousel();
+          }
+        });
+
+        window.addEventListener('resize', function () {
+          currentIndex = Math.min(currentIndex, maxIndex());
+          updateCarousel();
+        });
+
+        updateCarousel();
+      })();
+    </script>
 
 
 </body>
