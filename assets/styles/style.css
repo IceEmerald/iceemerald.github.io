@@ -1091,22 +1091,22 @@ p.animate-on-scroll {
     width: 48px;
     height: 48px;
     border-radius: 50% !important;
-    background: #2a2a3e !important;
-    border: none !important;
+    background: #f0f0f0 !important;
+    border: 1px solid #d0d0d0 !important;
     outline: none;
-    color: white !important;
+    color: #383838 !important;
     display: flex !important;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     flex-shrink: 0;
     padding: 0;
 }
 
 .news-carousel-btn:hover {
-    background: #3d3d58 !important;
+    background: #e0e0e0 !important;
     transform: scale(1.08);
 }
 
