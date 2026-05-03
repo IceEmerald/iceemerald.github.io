@@ -2,7 +2,7 @@
 
 
 .rightclick-menu {
-    position: absolute;
+    position: fixed;
     display: none;
     background: rgba(255, 255, 255, 0.95);
     border: 1px solid rgba(0, 0, 0, 0.1);

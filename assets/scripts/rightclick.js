@@ -17,17 +17,15 @@ window.addEventListener("contextmenu", function (e) {
   const menuHeight = contextMenu.offsetHeight;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const scrollX = window.scrollX;
-  const scrollY = window.scrollY;
 
-  let left = e.pageX;
-  let top = e.pageY;
+  let left = e.clientX;
+  let top = e.clientY;
 
-  if (e.clientX + menuWidth > viewportWidth) {
-    left = scrollX + viewportWidth - menuWidth - 8;
+  if (left + menuWidth > viewportWidth) {
+    left = viewportWidth - menuWidth - 8;
   }
-  if (e.clientY + menuHeight > viewportHeight) {
-    top = scrollY + viewportHeight - menuHeight - 8;
+  if (top + menuHeight > viewportHeight) {
+    top = viewportHeight - menuHeight - 8;
   }
 
   contextMenu.style.left = `${left}px`;
