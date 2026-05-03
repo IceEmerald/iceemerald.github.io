@@ -364,11 +364,12 @@
 
         const items = track.querySelectorAll('.news-carousel-item');
         let currentIndex = 0;
+        const gap = 24;
 
         function getVisible() {
-          const w = window.innerWidth;
-          if (w <= 580) return 1;
-          if (w <= 900) return 2;
+          const w = track.parentElement.offsetWidth;
+          if (w <= 500) return 1;
+          if (w <= 800) return 2;
           return 3;
         }
 
@@ -376,11 +377,24 @@
           return Math.max(0, items.length - getVisible());
         }
 
+        function sizeItems() {
+          const wrapper = track.parentElement;
+          const wrapperWidth = wrapper.offsetWidth;
+          const visible = getVisible();
+          const maxItemWidth = 352;
+          const rawWidth = (wrapperWidth - gap * (visible - 1)) / visible;
+          const itemWidth = Math.min(rawWidth, maxItemWidth);
+          items.forEach(function (item) {
+            item.style.width = itemWidth + 'px';
+            item.style.flexBasis = itemWidth + 'px';
+          });
+          return itemWidth;
+        }
+
         function updateCarousel() {
-          const itemWidth = items[0].getBoundingClientRect().width;
-          const gap = 24;
+          const itemWidth = sizeItems();
           const offset = currentIndex * (itemWidth + gap);
-          track.style.transform = `translateX(-${offset}px)`;
+          track.style.transform = 'translateX(-' + offset + 'px)';
           prevBtn.disabled = currentIndex === 0;
           nextBtn.disabled = currentIndex >= maxIndex();
         }

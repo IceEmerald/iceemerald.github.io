@@ -1060,32 +1060,20 @@ p.animate-on-scroll {
 .news-carousel-wrapper {
     position: relative;
     overflow: hidden;
-    padding: 30px 0;
-    margin: -30px 0;
 }
 
 .news-carousel-track {
     display: flex;
     gap: 1.5rem;
+    padding: 30px 0;
     transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform;
 }
 
 .news-carousel-item {
-    flex: 0 0 calc(33.333% - 1rem);
+    flex: 0 0 auto;
     min-width: 0;
-}
-
-@media (max-width: 900px) {
-    .news-carousel-item {
-        flex: 0 0 calc(50% - 0.75rem);
-    }
-}
-
-@media (max-width: 580px) {
-    .news-carousel-item {
-        flex: 0 0 100%;
-    }
+    max-width: 22rem;
 }
 
 .news-carousel-controls {
