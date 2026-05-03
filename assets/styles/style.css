@@ -1074,7 +1074,7 @@ p.animate-on-scroll {
 .news-carousel-item {
     flex: 0 0 auto;
     min-width: 0;
-    width: 280px;
+    width: 21rem;
 }
 
 .news-carousel-controls {
