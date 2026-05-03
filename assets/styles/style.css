@@ -1119,6 +1119,11 @@ p.animate-on-scroll {
     transform: none;
 }
 
+.news-carousel-img-wrap {
+    overflow: hidden;
+    border-radius: 12px;
+}
+
 .news-card,
 .news-card:link,
 .news-card:visited,
