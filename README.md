@@ -16,14 +16,6 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Custom CSS with Inter font family from Google Fonts, responsive design principles
 - **Navigation**: Sticky header with dropdown menus and smooth scrolling between sections
 
-### Page Structure
-- **Main Pages**: 
-  - `index.html` - Homepage with hero section and project showcase
-  - `404.html` - Custom error page
-  - `discordemeraldbot.html` - Discord bot landing page
-  - `discordemeraldbotcmds.html` - Bot commands documentation
-- **Shared Components**: Common header navigation, footer, and styling across all pages
-
 ### Interactive Features
 - **Animation System**: Intersection Observer API for scroll-triggered animations (`animationvisible.js`)
 - **Custom Scrolling**: Smooth scroll implementation with physics-based momentum (`scrollice.js`)
@@ -36,7 +28,6 @@ Preferred communication style: Simple, everyday language.
 - **Images**: Static assets stored in `/assets/images/`
 
 ### Visual Design
-- **Color Scheme**: Dark mode support with dynamic theming (dark backgrounds for bot pages)
 - **Typography**: Inter font family for modern, clean appearance
 - **Icons**: SVG icons for scalable, crisp graphics
 - **Responsive Design**: Mobile-first approach with flexible layouts
@@ -51,9 +42,6 @@ Preferred communication style: Simple, everyday language.
 - **Intersection Observer**: For scroll-based animation triggers
 - **Clipboard API**: For copy-to-clipboard functionality in context menu
 - **History API**: For smooth scrolling navigation state management
-
-### Development Tools
-- **Semgrep**: Security scanning configuration for Bicep files (though not directly used in this HTML project)
 
 ### CDN Resources
 - Google Fonts CDN for web font delivery
