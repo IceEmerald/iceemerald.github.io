@@ -151,7 +151,7 @@
                 <div style="margin-bottom: 4rem;"></div>
             </section>
 
-            <section id="news" style="background-color: #F8F8F8" class="section">
+            <section id="news" style="background-color: #F8F8F8; overflow: hidden;" class="section">
                 <div class="container">
                     <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
                         <h2 style="
@@ -163,49 +163,79 @@
                         ">The latest from EmeraldNetwork</h2>
                         <div style="margin-bottom: 2rem;"></div>
                     </div>
-                    <div class="news-carousel-wrapper">
-                        <div class="news-carousel-track" id="newsCarouselTrack">
-                            <div class="news-carousel-item">
+                </div>
+                <div class="news-carousel-wrapper">
+                    <div class="news-carousel-track" id="newsCarouselTrack">
+                        <div class="news-carousel-item">
+                            <div class="news-card">
                                 <div class="news-carousel-img-wrap">
-                                    <img src="/assets/images/why/why1.webp" class="hover-zoom hover-img" style="width: 100%;" alt="">
+                                    <img src="/assets/images/why/why1.webp" style="width: 100%; display: block;" alt="">
                                 </div>
-                            </div>
-                            <div class="news-carousel-item">
-                                <div class="news-carousel-img-wrap">
-                                    <img src="/assets/images/why/why2.webp" class="hover-zoom hover-img" style="width: 100%;" alt="">
-                                </div>
-                            </div>
-                            <div class="news-carousel-item">
-                                <div class="news-carousel-img-wrap">
-                                    <img src="/assets/images/why/why3.webp" class="hover-zoom hover-img" style="width: 100%;" alt="">
-                                </div>
-                            </div>
-                            <div class="news-carousel-item">
-                                <div class="news-carousel-img-wrap">
-                                    <img src="/assets/images/why/why3.webp" class="hover-zoom hover-img" style="width: 100%;" alt="">
-                                </div>
-                            </div>
-                            <div class="news-carousel-item">
-                                <div class="news-carousel-img-wrap">
-                                    <img src="/assets/images/why/why3.webp" class="hover-zoom hover-img" style="width: 100%;" alt="">
+                                <div class="news-card-body">
+                                    <p class="news-title">Faster than others</p>
+                                    <p class="news-excerpt">EmeraldNetwork uses EmeraldCore which has faster speed than others*</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="news-carousel-controls">
-                            <button class="news-carousel-btn" id="newsPrev" aria-label="Previous">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                    <path d="M12.5 15L7.5 10L12.5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
-                            <button class="news-carousel-btn" id="newsNext" aria-label="Next">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                    <path d="M7.5 5L12.5 10L7.5 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </button>
+                        <div class="news-carousel-item">
+                            <div class="news-card">
+                                <div class="news-carousel-img-wrap">
+                                    <img src="/assets/images/why/why2.webp" style="width: 100%; display: block;" alt="">
+                                </div>
+                                <div class="news-card-body">
+                                    <p class="news-title">Simple and friendly</p>
+                                    <p class="news-excerpt">EmeraldNetwork has a simple and easy to use app</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="news-carousel-item">
+                            <div class="news-card">
+                                <div class="news-carousel-img-wrap">
+                                    <img src="/assets/images/why/why3.webp" style="width: 100%; display: block;" alt="">
+                                </div>
+                                <div class="news-card-body">
+                                    <p class="news-title">Simple and friendly</p>
+                                    <p class="news-excerpt">EmeraldNetwork has a simple and easy to use app</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="news-carousel-item">
+                            <div class="news-card">
+                                <div class="news-carousel-img-wrap">
+                                    <img src="/assets/images/why/why2.webp" style="width: 100%; display: block;" alt="">
+                                </div>
+                                <div class="news-card-body">
+                                    <p class="news-title">Simple and friendly</p>
+                                    <p class="news-excerpt">EmeraldNetwork has a simple and easy to use app</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="news-carousel-item">
+                            <div class="news-card">
+                                <div class="news-carousel-img-wrap">
+                                    <img src="/assets/images/why/why3.webp" style="width: 100%; display: block;" alt="">
+                                </div>
+                                <div class="news-card-body">
+                                    <p class="news-title">Simple and friendly</p>
+                                    <p class="news-excerpt">EmeraldNetwork has a simple and easy to use app</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div style="margin-bottom: 3rem;"></div>
+                    <div class="news-carousel-controls">
+                        <button class="news-carousel-btn" id="newsPrev" aria-label="Previous">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M12.5 15L7.5 10L12.5 5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <button class="news-carousel-btn" id="newsNext" aria-label="Next">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M7.5 5L12.5 10L7.5 15" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
+                <div style="margin-bottom: 3rem;"></div>
             </section>
 
             <div id="white-cover"></div>
@@ -366,8 +396,12 @@
         let currentIndex = 0;
         const gap = 24;
 
+        function getItemWidth() {
+          return items[0] ? items[0].offsetWidth : 280;
+        }
+
         function getVisible() {
-          const w = track.parentElement.offsetWidth;
+          const w = window.innerWidth;
           if (w <= 500) return 1;
           if (w <= 800) return 2;
           return 3;
@@ -377,22 +411,8 @@
           return Math.max(0, items.length - getVisible());
         }
 
-        function sizeItems() {
-          const wrapper = track.parentElement;
-          const wrapperWidth = wrapper.offsetWidth;
-          const visible = getVisible();
-          const maxItemWidth = 352;
-          const rawWidth = (wrapperWidth - gap * (visible - 1)) / visible;
-          const itemWidth = Math.min(rawWidth, maxItemWidth);
-          items.forEach(function (item) {
-            item.style.width = itemWidth + 'px';
-            item.style.flexBasis = itemWidth + 'px';
-          });
-          return itemWidth;
-        }
-
         function updateCarousel() {
-          const itemWidth = sizeItems();
+          const itemWidth = getItemWidth();
           const offset = currentIndex * (itemWidth + gap);
           track.style.transform = 'translateX(-' + offset + 'px)';
           prevBtn.disabled = currentIndex === 0;

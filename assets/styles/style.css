@@ -1059,7 +1059,7 @@ p.animate-on-scroll {
 /* News Carousel */
 .news-carousel-wrapper {
     position: relative;
-    overflow: hidden;
+    padding-left: max(1rem, calc((100vw - 1100px) / 2 + 1rem));
 }
 
 .news-carousel-track {
@@ -1074,7 +1074,7 @@ p.animate-on-scroll {
 .news-carousel-item {
     flex: 0 0 auto;
     min-width: 0;
-    max-width: 22rem;
+    width: 280px;
 }
 
 .news-carousel-controls {
@@ -1082,6 +1082,7 @@ p.animate-on-scroll {
     justify-content: center;
     gap: 0.75rem;
     margin-top: 2rem;
+    padding-right: max(1rem, calc((100vw - 1100px) / 2 + 1rem));
 }
 
 .news-carousel-btn {
