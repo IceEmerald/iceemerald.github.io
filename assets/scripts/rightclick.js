@@ -11,22 +11,22 @@ window.addEventListener("contextmenu", function (e) {
   const sel = window.getSelection();
   selectedText = sel ? sel.toString().trim() : "";
 
+  contextMenu.style.top = "-9999px";
+  contextMenu.style.left = "-9999px";
   contextMenu.style.display = "block";
 
-  const menuWidth = contextMenu.offsetWidth;
-  const menuHeight = contextMenu.offsetHeight;
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
+  const menuWidth = contextMenu.offsetWidth || 260;
+  const menuHeight = contextMenu.offsetHeight || 160;
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
 
   let left = e.clientX;
   let top = e.clientY;
 
-  if (left + menuWidth > viewportWidth) {
-    left = viewportWidth - menuWidth - 8;
-  }
-  if (top + menuHeight > viewportHeight) {
-    top = viewportHeight - menuHeight - 8;
-  }
+  if (left + menuWidth > viewportWidth) left = viewportWidth - menuWidth - 8;
+  if (left < 8) left = 8;
+  if (top + menuHeight > viewportHeight) top = viewportHeight - menuHeight - 8;
+  if (top < 8) top = 8;
 
   contextMenu.style.left = `${left}px`;
   contextMenu.style.top = `${top}px`;
