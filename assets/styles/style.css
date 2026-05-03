@@ -1064,6 +1064,7 @@ p.animate-on-scroll {
 
 .news-carousel-track {
     display: flex;
+    flex-wrap: nowrap;
     gap: 1.5rem;
     padding: 30px 0;
     transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1084,29 +1085,39 @@ p.animate-on-scroll {
 }
 
 .news-carousel-btn {
+    -webkit-appearance: none;
+    appearance: none;
     width: 48px;
     height: 48px;
-    border-radius: 50%;
-    background: #1a1a2e;
-    border: 1.5px solid rgba(255, 255, 255, 0.15);
-    color: white;
-    display: flex;
+    border-radius: 50% !important;
+    background: #2a2a3e !important;
+    border: none !important;
+    outline: none;
+    color: white !important;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    flex-shrink: 0;
+    padding: 0;
 }
 
 .news-carousel-btn:hover {
-    background: #2d2d4e;
+    background: #3d3d58 !important;
     transform: scale(1.08);
 }
 
 .news-carousel-btn:disabled {
-    opacity: 0.35;
+    opacity: 0.3;
     cursor: default;
     transform: none;
+}
+
+.news-carousel-btn svg {
+    display: block;
+    pointer-events: none;
 }
 
 .news-carousel-img-wrap {
