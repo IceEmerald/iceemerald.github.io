@@ -814,6 +814,63 @@ p.animate-on-scroll {
 
 
 
+/* News Carousel */
+.news-carousel-wrapper {
+    position: relative;
+    overflow: hidden;
+}
+
+.news-carousel-track {
+    display: flex;
+    gap: 1rem;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.news-carousel-item {
+    min-width: 21rem;
+    max-width: 21rem;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: transparent;
+    box-shadow: none;
+}
+
+.news-carousel-item img {
+    width: 100%;
+    display: block;
+}
+
+.news-carousel-controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.news-carousel-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    border: 1px solid rgba(44, 62, 80, 0.15);
+    background: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    box-shadow: none;
+}
+
+.news-carousel-btn:hover:not(:disabled) {
+    background: rgba(44, 62, 80, 0.08);
+    border-color: rgba(44, 62, 80, 0.3);
+}
+
+.news-carousel-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
 /* Section Base */
 .section {
     width: 100%;
@@ -1093,62 +1150,4 @@ p.animate-on-scroll {
     --foreground-values: 225, 39%, 18%;
     --border-values: 214, 25%, 85%;
     --primary-hsl-values: 180, 100%, 20%;
-}
-
-/* News Carousel */
-.news-carousel-wrapper {
-    overflow: hidden;
-    position: relative;
-    padding: 1rem 2rem 2rem;
-}
-
-.news-carousel-track {
-    display: flex;
-    gap: 24px;
-    transition: transform 0.4s ease;
-    will-change: transform;
-}
-
-.news-carousel-item {
-    flex: 0 0 280px;
-    width: 280px;
-    background: #fff;
-    border-radius: 1rem;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.07);
-    overflow: hidden;
-    cursor: pointer;
-}
-
-.news-carousel-item img {
-    width: 100%;
-    display: block;
-}
-
-.news-carousel-controls {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    margin-top: 1.5rem;
-}
-
-.news-carousel-btn {
-    background: #fff;
-    border: 1px solid rgba(0,0,0,0.1);
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.news-carousel-btn:hover {
-    background: #f0f0f0;
-}
-
-.news-carousel-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
 }

@@ -58,7 +58,7 @@
 
                       <div id="custom-toast" class="custom-toast"></div>
 
-                        
+
         <main>
             <section id="hero" class="section about-section" style="position: relative; overflow: hidden;">
 
@@ -113,7 +113,7 @@
               </div>
 
             </section>
-    
+
             <section id="benefits" class="section">
                 <div class="container">
                     <div class="section-header" style="margin-top: 3rem;">
@@ -164,12 +164,34 @@
                         <div style="margin-bottom: 2rem;"></div>
                     </div>
                 </div>
+                <div>
                 <div class="news-carousel-wrapper">
                     <div class="news-carousel-track" id="newsCarouselTrack">
-                        <div class="news-carousel-item hover-zoom hover-img">
-                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll" style="width: 100%;" alt="">
+                        <div class="news-carousel-item">
+                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
+                        </div>
+                        <div class="news-carousel-item">
+                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
+                        </div>
+                        <div class="news-carousel-item">
+                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
+                        </div>
+                        <div class="news-carousel-item">
+                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
+                        </div>
+                        <div class="news-carousel-item">
+                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
+                        </div><div class="news-carousel-item">
+                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
+                        </div>
+                        <div class="news-carousel-item">
+                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
+                        </div>
+                        <div class="news-carousel-item">
+                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
                         </div>
                     </div>
+                </div>
                     <div class="news-carousel-controls">
                         <button class="news-carousel-btn" id="newsPrev" aria-label="Previous">
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -342,7 +364,7 @@
 
         const items = track.querySelectorAll('.news-carousel-item');
         let currentIndex = 0;
-        const gap = 24;
+        const gap = 16;
 
         function getItemWidth() {
           return items[0] ? items[0].offsetWidth : 280;
