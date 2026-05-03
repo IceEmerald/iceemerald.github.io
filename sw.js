@@ -1,4 +1,4 @@
-const CACHE_NAME = "emeraldnetwork.emeraldcore.offlineHandler.0.0.1";
+const CACHE_NAME = "emeraldnetwork.emeraldcore.offlineHandler.0.0.2";
 const OFFLINE_URL = "./offline.html";
 
 const ASSETS_TO_CACHE = [
