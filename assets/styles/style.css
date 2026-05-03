@@ -835,6 +835,11 @@ p.animate-on-scroll {
     overflow: hidden;
     background: transparent;
     box-shadow: none;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.news-carousel-item:hover {
+    transform: scale(1.04);
 }
 
 .news-carousel-item img {
