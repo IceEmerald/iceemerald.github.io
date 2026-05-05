@@ -851,7 +851,6 @@ p.animate-on-scroll {
     color: var(--accent-foreground);
     border-color: var(--accent);
 }
-.about-section {}
 .about-container {
     display: grid;
     align-items: center;
