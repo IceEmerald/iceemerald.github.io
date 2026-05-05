@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,7 +14,6 @@
     <link rel="stylesheet" href="/assets/styles/notes.css" />
     <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
 </head>
-
 <body class="no-active-note">
     <div class="notes-app">
         <header class="navbar sticky-top">
@@ -36,7 +34,6 @@
                 </nav>
             </div>
         </header>
-
         <div id="custom-context-menu" class="rightclick-menu">
             <div class="context-section">
                 <span class="context-title">🔧 Tools</span>
@@ -45,10 +42,7 @@
                 <a onclick="showElementInfo()">Show Element Info</a>
             </div>
         </div>
-
         <div id="custom-toast" class="custom-toast"></div>
-
-        <!-- Ribbon/Toolbar -->
         <div class="ribbon">
             <div class="ribbon-content">
                 <div class="ribbon-panel active">
@@ -85,7 +79,6 @@
                             </button>
                         </div>
                     </div>
-
                     <div class="ribbon-group">
                         <div class="group-label">Font</div>
                         <div class="ribbon-controls">
@@ -409,7 +402,6 @@
                             </div>
                         </div>
                     </div>
-
                     <div class="ribbon-group">
                         <div class="group-label">Paragraph</div>
                         <div class="ribbon-controls">
@@ -513,10 +505,7 @@
                 </div>
             </div>
         </div>
-
-        <!-- Main Content Area -->
         <div class="main-content">
-            <!-- Sidebar -->
             <aside class="sidebar">
                 <div class="sidebar-header">
                     <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
@@ -537,11 +526,8 @@
                     </button>
                 </div>
                 <div class="notes-list" id="notesList">
-                    <!-- Notes will be dynamically added here -->
                 </div>
             </aside>
-
-            <!-- Editor Area -->
             <main class="editor-area">
                 <div class="editor-header">
                     <input type="text" class="note-title" id="noteTitle" placeholder="Untitled Note" maxlength="70" />
@@ -614,11 +600,9 @@
                         </button>
                     </div>
                 </div>
-                <!-- editor-content: flex scroll container -->
                 <div class="editor-content">
                     <div style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column;">
                         <div class="text-editor" id="textEditor" contenteditable="true" spellcheck="true">
-
                         </div>
                         <div id="collabCursors" class="collab-cursors"></div>
                         <input type="file" id="insertImageInput" accept="image/*" style="display:none;">
@@ -635,8 +619,6 @@
                     <span class="statbar-sep" id="statbar-sep-perm" style="display:none;">|</span>
                     <span class="statbar-item" id="statbar-perm" style="display:none;"></span>
                 </div>
-
-                <!-- Welcome screen for when no note is selected -->
                 <div class="welcome-screen" id="welcomeScreen">
                     <div class="welcome-content">
                         <div class="welcome-header">
@@ -660,7 +642,6 @@
                         </div>
                         <div class="notes-section">
                             <div class="notes-list-display" id="notesListDisplay">
-                                <!-- Notes will be displayed as cards here -->
                             </div>
                             <div class="no-notes-container" id="noNotesContainer">
                                 <div style="margin-top: 4rem;"></div>
@@ -674,10 +655,6 @@
             </main>
         </div>
     </div>
-
-
-
-    <!-- Custom Delete Confirmation Modal -->
     <div class="delete-modal" id="deleteModal">
         <div class="delete-modal-content">
             <div class="delete-modal-header">
@@ -693,8 +670,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Custom Table Creation Modal -->
     <div class="table-modal" id="tableModal">
         <div class="table-modal-content">
             <div class="table-modal-header">
@@ -717,9 +692,6 @@
             </div>
         </div>
     </div>
-
-
-
     <div class="link-modal" id="exportModal">
         <div class="link-modal-content">
             <div class="link-modal-header">
@@ -738,7 +710,6 @@
             </div>
         </div>
     </div>
-
     <div class="link-modal" id="importModal">
         <div class="link-modal-content">
             <div class="link-modal-header">
@@ -753,7 +724,6 @@
             </div>
         </div>
     </div>
-
     <div class="link-modal" id="shareModal">
         <div class="link-modal-content">
             <div class="link-modal-header">
@@ -786,9 +756,6 @@
             </div>
         </div>
     </div>
-
-
-    <!-- Floating Draw Toolbar (fixed at bottom, light/white theme) -->
     <div class="draw-toolbar" id="drawToolbar">
         <button class="draw-tool-btn active" id="drawPenBtn" title="Pen">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -854,13 +821,11 @@
         <button class="draw-tool-btn draw-clear-btn" id="drawClearBtn" title="Clear Drawing">Clear</button>
         <button class="draw-tool-btn draw-done-btn" id="drawDoneBtn" title="Done">✓ Done</button>
     </div>
-
     <script src="/assets/scripts/notes.js"></script>
     <script src="/assets/scripts/dropdown.js"></script>
     <script src="/assets/scripts/rightclick.js"></script>
     <script src="/assets/scripts/animationvisible.js"></script>
     <script src="/assets/scripts/scrollice.js"></script>
-
     <div id="tableToolbar"
         style="display:none;position:fixed;z-index:8000;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.18);padding:4px 6px;gap:3px;align-items:center;">
         <button class="tbl-btn" data-tbl="addRowAbove" title="Add Row Above">+ Row ↑</button>
@@ -872,5 +837,4 @@
         <button class="tbl-btn tbl-btn-danger" data-tbl="deleteCol" title="Delete Column">&minus; Col</button>
     </div>
 </body>
-
 </html>

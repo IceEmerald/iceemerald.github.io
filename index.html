@@ -11,11 +11,6 @@
     <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
 </head>
 <body>
-
-    <!--
-        Welcome to the EmeraldNetwork Website!
-    -->
-
         <header class="navbar sticky-top">
             <div class="navcontainer nav-container">
                 <a href="#" class="logo">
@@ -45,8 +40,6 @@
                         </nav>
             </div>
         </header>
-
-
                       <div id="custom-context-menu" class="rightclick-menu">
                         <div class="context-section">
                           <span class="context-title">🔧 Tools</span>
@@ -55,14 +48,9 @@
                           <a onclick="showElementInfo()">Show Element Info</a>
                         </div>
                       </div>
-
                       <div id="custom-toast" class="custom-toast"></div>
-
-
         <main>
             <section id="hero" class="section about-section" style="position: relative; overflow: hidden;">
-
-              <!-- Background div with image, full size and behind -->
               <div 
                 class="hero-background" 
                 style="
@@ -74,8 +62,6 @@
                   z-index: -1;
                   ">
               </div>
-
-              <!-- Content for phone -->
               <div class="show-phone-only">
                 <div class="hover-zoom animate-on-scroll" 
                      style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 0;">
@@ -89,8 +75,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Content for desktop -->
               <div class="show-desktop-only">
                 <div class="hover-zoom animate-on-scroll" 
                      style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 0;">
@@ -101,19 +85,15 @@
                     <h1 class="animate-on-scroll" style="font-size: 3.5rem; background: linear-gradient(90deg, #808080, #5a5a5a, #3a3a3a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; margin-left: 0;">
                       EmeraldNetwork
                     </h1>
-
                     <p style="max-width: 600px; text-align: left; line-height: 1.6; margin-left: 0;">
                         Empowering the World Through Innovative Networks, Shaping the Future of Connection, Intelligence, and Digital Possibility.
                     </p>
-
                     <div style="margin-bottom: 3rem;"></div>
                     <div style="margin-bottom: 3rem;"></div>
                   </div>
                 </div>
               </div>
-
             </section>
-
             <section id="benefits" class="section">
                 <div class="container">
                     <div class="section-header" style="margin-top: 3rem;">
@@ -127,7 +107,6 @@
                             style="width: 100%;"
                             alt="">
                         </div>
-
                         <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
                           <img 
                             src="/assets/images/why/why2.webp" 
@@ -135,7 +114,6 @@
                             style="width: 100%;"
                             alt="">
                         </div>
-
                         <div class="animate-on-scroll" style="max-width: 21rem; overflow: hidden; display: inline-block;">
                           <img 
                             src="/assets/images/why/why3.webp" 
@@ -143,14 +121,12 @@
                             style="width: 100%;"
                             alt="">
                         </div>
-
                     </div>
                     <div style="margin-bottom: 2rem;"></div>
                     <h4 class="animate-on-scroll" style="text-align: center;">*Based on performance tests comparing EmeraldCore with other common backend infrastructures.</h4>
                 </div>
                 <div style="margin-bottom: 4rem;"></div>
             </section>
-
             <section id="news" style="background-color: #F8F8F8; overflow: hidden;" class="section">
                 <div class="container">
                     <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
@@ -194,9 +170,7 @@
                 </div>
                 <div style="margin-bottom: 3rem;"></div>
             </section>
-
             <div id="white-cover"></div>
-
             <section style="background-image: url('/assets/images/trustbackground.webp');" id="apps" class="section">
                 <div class="container">
                     <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
@@ -267,7 +241,6 @@
                     </div>
                 </div>
             </section>
-
             <section id="about" style="background-color: #F8F8F8" class="section about-section">
                 <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 2rem; flex-direction: row-reverse;">
                     <div class="animate-on-scroll about-content" style="flex: 1;">
@@ -280,10 +253,7 @@
                     </div>
                 </div>
             </section>
-
             <div id="white-cover"></div>
-
-
             <section id="about" style="background-color: #F8F8F8" class="section about-section">
                 <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 8rem;">
                     <div class="animate-on-scroll about-image-container">
@@ -306,7 +276,6 @@
                 <div style="margin-bottom: 4rem;"></div>
             </section>
         </main>
-
         <footer class="footer">
             <div class="container footer-container">
                 <p>&copy; <span id="current-year"></span> EmeraldNetwork - IceEmerald</p>
@@ -317,7 +286,6 @@
                              <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon>
                          </svg>
                      </a>
-
                      <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
@@ -349,27 +317,22 @@
         const prevBtn = document.getElementById('newsPrev');
         const nextBtn = document.getElementById('newsNext');
         if (!track || !prevBtn || !nextBtn) return;
-
         const items = track.querySelectorAll('.news-carousel-item');
         let currentIndex = 0;
         const gap = 16;
         const visibleCount = 3;
-
         function getItemWidth() {
           return items[0] ? items[0].offsetWidth : 280;
         }
-
         function getCenterOffset() {
           const wrapperWidth = wrapper.offsetWidth;
           const itemWidth = getItemWidth();
           const totalVisible = visibleCount * itemWidth + (visibleCount - 1) * gap;
           return Math.max(0, (wrapperWidth - totalVisible) / 2);
         }
-
         function maxIndex() {
           return Math.max(0, items.length - visibleCount);
         }
-
         function updateCarousel() {
           const itemWidth = getItemWidth();
           const centerOffset = getCenterOffset();
@@ -378,30 +341,24 @@
           prevBtn.disabled = currentIndex === 0;
           nextBtn.disabled = currentIndex >= maxIndex();
         }
-
         prevBtn.addEventListener('click', function () {
           if (currentIndex > 0) {
             currentIndex--;
             updateCarousel();
           }
         });
-
         nextBtn.addEventListener('click', function () {
           if (currentIndex < maxIndex()) {
             currentIndex++;
             updateCarousel();
           }
         });
-
         window.addEventListener('resize', function () {
           currentIndex = Math.min(currentIndex, maxIndex());
           updateCarousel();
         });
-
         updateCarousel();
       });
     </script>
-
-
 </body>
 </html>

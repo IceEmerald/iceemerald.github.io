@@ -1,6 +1,3 @@
-// EmeraldNotes JavaScript - Note Taking App Functionality
-
-// Compress a string to a URL-safe token using browser-native deflate (no library needed)
 async function compressToUrl(str) {
     const bytes = new TextEncoder().encode(str);
     const cs = new CompressionStream('deflate-raw');
@@ -13,8 +10,6 @@ async function compressToUrl(str) {
     for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
-
-// Decompress a URL-safe token back to the original string
 async function decompressFromUrl(token) {
     const b64 = token.replace(/-/g, '+').replace(/_/g, '/');
     const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
@@ -28,7 +23,6 @@ async function decompressFromUrl(token) {
     const out = await new Response(ds.readable).arrayBuffer();
     return new TextDecoder().decode(out);
 }
-
 class NotesApp {
     constructor() {
         this.notes = [];
@@ -36,23 +30,15 @@ class NotesApp {
         this.saveTimeout = null;
         this.isInitialized = false;
         this.savedSelection = null;
-
-        // Mobile state
         this.isMobile = () => window.innerWidth <= 1023;
         this.sidebarOpen = false;
-
-        // Touch / swipe state
         this.touchStartX = 0;
         this.touchStartY = 0;
         this.touchStartTime = 0;
         this.isSwiping = false;
-
-        // Dropdown portal state
         this._portalMenu = null;
         this._portalDropdown = null;
         this._portalBtn = null;
-
-        // Collaboration state — active session (the one currently in the editor)
         this.collabSessionId = null;
         this.collabSessionRef = null;
         this.collabDb = null;
@@ -63,14 +49,10 @@ class NotesApp {
         this.collabNoteData = null;
         this.collabNoteId = null;
         this.collabNoteVisible = false;
-
-        // Multi-session: all running sessions (key = sessionId)
         this.collabSessions = new Map();
         this._activeCollabSessionId = null;
-
         this.init();
     }
-
     init() {
         this.loadNotesFromStorage();
         this.initializeCollaboration();
@@ -92,9 +74,6 @@ class NotesApp {
         this.setupSwipeGesture();
         this.isInitialized = true;
     }
-
-    // ─── Storage ────────────────────────────────────────────────────────────────
-
     loadNotesFromStorage() {
         try {
             const stored = localStorage.getItem('emeraldnotes_data');
@@ -121,7 +100,6 @@ class NotesApp {
             this.notes = [];
         }
     }
-
     saveNotesToStorage() {
         try {
             const toSave = this.notes.filter(n => !n._isCollabNote);
@@ -132,7 +110,6 @@ class NotesApp {
             this.showSaveIndicator('error');
         }
     }
-
     showToast(message, duration = 3000) {
         const toast = document.getElementById('custom-toast');
         if (!toast) { console.warn(message); return; }
@@ -153,7 +130,6 @@ class NotesApp {
         clearTimeout(this._toastTimer);
         this._toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
     }
-
     initializeCollaboration() {
         this.dbUrl = 'https://emeraldnetwork-web-default-rtdb.asia-southeast1.firebasedatabase.app';
         this.collabDb = true;
@@ -182,27 +158,21 @@ class NotesApp {
             }
         });
     }
-
     _sessionUrl(path = '') {
         return `${this.dbUrl}/sharednotes/${this.collabSessionId}${path}.json`;
     }
-
-    // ─── Multi-session helpers ───────────────────────────────────────────────
-
     _getSessionByNoteId(noteId) {
         for (const s of this.collabSessions.values()) {
             if (s.noteId === noteId) return s;
         }
         return null;
     }
-
     _isCollabNoteId(noteId) {
         for (const s of this.collabSessions.values()) {
             if (s.noteId === noteId) return true;
         }
         return false;
     }
-
     _registerSession(sessionId, data) {
         const existing = this.collabSessions.get(sessionId) || {};
         this.collabSessions.set(sessionId, {
@@ -217,16 +187,13 @@ class NotesApp {
         });
         this._persistAllSessions();
     }
-
     _unregisterSession(sessionId) {
         const s = this.collabSessions.get(sessionId);
         if (s && s.eventSource) { try { s.eventSource.close(); } catch (_) {} }
         this.collabSessions.delete(sessionId);
         this._persistAllSessions();
     }
-
     _switchActiveSession(sessionId) {
-        // Save current state back into the outgoing active session
         if (this._activeCollabSessionId && this.collabSessions.has(this._activeCollabSessionId)) {
             const old = this.collabSessions.get(this._activeCollabSessionId);
             old.noteData = this.collabNoteData;
@@ -247,7 +214,6 @@ class NotesApp {
         this._lastPushedModifiedAt = sess.lastPushedModifiedAt || null;
         return true;
     }
-
     _persistAllSessions() {
         const sessions = [];
         for (const s of this.collabSessions.values()) {
@@ -261,7 +227,6 @@ class NotesApp {
             }
         } catch (_) {}
     }
-
     _clearAllSessions() {
         for (const s of this.collabSessions.values()) {
             if (s.eventSource) { try { s.eventSource.close(); } catch (_) {} }
@@ -269,41 +234,31 @@ class NotesApp {
         this.collabSessions.clear();
         this._activeCollabSessionId = null;
         try { localStorage.removeItem('emeraldnotes_collab_sessions'); } catch (_) {}
-        // Clean up legacy keys too
         try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
         try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
     }
-
     _setupConnectionMonitor() {
         this._disconnected = false;
         this._reconnectTimer = null;
         this._disconnectModalEl = null;
-
         const onOffline = () => {
             if (this._disconnected) return;
             this._disconnected = true;
-            // Show "Reconnecting…" toast IMMEDIATELY
             this.showToast('Reconnecting…', 99999);
-            // After 15 seconds still offline → show modal
             this._reconnectTimer = setTimeout(() => {
                 if (this._disconnected) this._showDisconnectModal();
             }, 15000);
         };
-
         const onOnline = () => {
             if (!this._disconnected) return;
             this._disconnected = false;
             clearTimeout(this._reconnectTimer);
             this._reconnectTimer = null;
-            // Clear the Reconnecting... toast and show Reconnected
             this.showToast('Reconnected!', 4000);
-            // Modal stays visible intentionally — user should manually reload
         };
-
         window.addEventListener('offline', onOffline);
         window.addEventListener('online', onOnline);
     }
-
     _showDisconnectModal() {
         if (this._disconnectModalEl) return;
         const overlay = document.createElement('div');
@@ -343,20 +298,17 @@ class NotesApp {
         reloadBtn.addEventListener('mouseover', function() { this.style.background = '#1a7d3d'; });
         reloadBtn.addEventListener('mouseout', function() { this.style.background = '#239a4d'; });
     }
-
     _hideDisconnectModal() {
         if (this._disconnectModalEl) {
             this._disconnectModalEl.remove();
             this._disconnectModalEl = null;
         }
     }
-
     async _dbGet(path = '') {
         const res = await fetch(`${this.dbUrl}${path}.json`);
         if (!res.ok) throw new Error(`DB GET failed: ${res.status}`);
         return res.json();
     }
-
     async _dbPut(path = '', data) {
         await fetch(`${this.dbUrl}${path}.json`, {
             method: 'PUT',
@@ -364,7 +316,6 @@ class NotesApp {
             body: JSON.stringify(data)
         });
     }
-
     async _dbPatch(path = '', data) {
         await fetch(`${this.dbUrl}${path}.json`, {
             method: 'PATCH',
@@ -372,17 +323,14 @@ class NotesApp {
             body: JSON.stringify(data)
         });
     }
-
     async _dbDelete(path = '') {
         await fetch(`${this.dbUrl}${path}.json`, { method: 'DELETE' });
     }
-
     loadCollaboratorInfo() {
         try {
             const stored = localStorage.getItem('emeraldnotes_collaborator');
             if (stored) {
                 const parsed = JSON.parse(stored);
-                // Ensure name is never undefined
                 if (parsed && parsed.id && parsed.name && parsed.color) {
                     return parsed;
                 }
@@ -399,7 +347,6 @@ class NotesApp {
             name: `${randomName} ${randomNumber}`,
             color: colors[Math.floor(Math.random() * colors.length)]
         };
-        // Ensure name is always valid
         if (!collaborator.name || collaborator.name.trim() === '') {
             collaborator.name = 'User ' + Math.floor(Math.random() * 9999);
         }
@@ -408,7 +355,6 @@ class NotesApp {
         } catch (_) {}
         return collaborator;
     }
-
     checkShareSessionFromURL() {
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get('collab');
@@ -417,15 +363,11 @@ class NotesApp {
             window.history.replaceState({}, document.title, window.location.pathname);
             return;
         }
-
-        // Restore all sessions from unified key
         let restored = [];
         try {
             const saved = localStorage.getItem('emeraldnotes_collab_sessions');
             if (saved) restored = JSON.parse(saved);
         } catch (_) {}
-
-        // Migrate legacy keys into unified format if new key is empty
         if (restored.length === 0) {
             try {
                 const legacyOwner = localStorage.getItem('emeraldnotes_collab_owner');
@@ -443,17 +385,12 @@ class NotesApp {
                     }
                 }
             } catch (_) {}
-            // Clean up legacy keys
             try { localStorage.removeItem('emeraldnotes_collab_owner'); } catch (_) {}
             try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
         }
-
         if (restored.length === 0) return;
-
-        // Restore owner sessions first (they need special treatment)
         const ownerSessions = restored.filter(r => r.isOwner);
         const nonOwnerSessions = restored.filter(r => !r.isOwner);
-
         for (const sess of ownerSessions) {
             const { sessionId: sid, noteId } = sess;
             if (!sid) continue;
@@ -466,10 +403,7 @@ class NotesApp {
                 const resolvedNoteId = noteId || data.noteId || null;
                 const noteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
                 const activeUsers = data.activeUsers || {};
-
-                // If this is the first restored session, make it active
                 const isFirstActive = !this._activeCollabSessionId;
-
                 this._registerSession(sid, {
                     noteId: resolvedNoteId,
                     isOwner: true,
@@ -477,7 +411,6 @@ class NotesApp {
                     noteData,
                     activeUsers
                 });
-
                 if (isFirstActive) {
                     this._activeCollabSessionId = sid;
                     this.collabSessionId = sid;
@@ -493,7 +426,6 @@ class NotesApp {
                         this.renderNotesList();
                     }
                 }
-
                 this.setupSessionListener(sid);
                 if (isFirstActive) this.updateActiveUserPresence();
             }).catch(() => {
@@ -501,18 +433,15 @@ class NotesApp {
                 this._persistAllSessions();
             });
         }
-
         for (const sess of nonOwnerSessions) {
             const { sessionId: sid } = sess;
             if (!sid) continue;
-            // Silent restore: show note in sidebar but don't switch editor
             this.joinCollabSession(sid, true).catch(() => {
                 this.collabSessions.delete(sid);
                 this._persistAllSessions();
             });
         }
     }
-
     async joinCollabSession(sessionId, silent = false) {
         try {
             const data = await this._dbGet(`/sharednotes/${sessionId}`);
@@ -524,25 +453,19 @@ class NotesApp {
                 if (!silent) this.showShareModal({ title: 'Session Closed', message: 'This shared note session has ended.' });
                 return;
             }
-
-            // Limit: one collaboration session per person — block joining a second session
             if (!this.collabSessions.has(sessionId) && this.collabSessions.size >= 1) {
                 if (!silent) this.showShareModal({ title: 'Limit Reached', message: 'You already have an active collaboration note. You can only participate in 1 at a time. Leave your current session to join another.' });
                 return;
             }
-
             const isOwner = data.ownerId === this.collabUser.id;
             const permission = data.permission || 'edit';
             const noteData = data.note || { title: 'Untitled Note', content: '', color: '#ffffff', modifiedAt: new Date().toISOString() };
-
-            // Determine noteId: use owner's noteId if it exists locally, else create a virtual note
             const ownerNoteId = data.noteId || null;
             let noteId;
             if (ownerNoteId && this.notes.some(n => n.id === ownerNoteId && !n._isCollabNote)) {
                 noteId = ownerNoteId;
             } else {
                 noteId = '_collab_' + sessionId;
-                // Remove stale virtual note for this session, then insert fresh one
                 this.notes = this.notes.filter(n => !(n._isCollabNote && n._collabSessionId === sessionId));
                 this.notes.unshift({
                     id: noteId,
@@ -554,8 +477,6 @@ class NotesApp {
                     _collabSessionId: sessionId
                 });
             }
-
-            // Register session in the Map
             this._registerSession(sessionId, {
                 noteId,
                 isOwner,
@@ -563,9 +484,7 @@ class NotesApp {
                 noteData,
                 activeUsers: data.activeUsers || {}
             });
-
             if (!silent) {
-                // Make this the active session
                 this._activeCollabSessionId = sessionId;
                 this.collabSessionId = sessionId;
                 this.collabNoteId = noteId;
@@ -576,7 +495,6 @@ class NotesApp {
                 this._activeUsers = data.activeUsers || {};
                 this.collabNoteVisible = true;
                 this.currentNoteId = noteId;
-
                 this.setEditorForSession(noteData);
                 if (!this.collabIsOwner) {
                     this._showLeaveButton();
@@ -590,7 +508,6 @@ class NotesApp {
                 this._updateLeaveButtonVisibility();
                 this.showToast(`Joined shared note as ${this.collabUser.name || 'Guest'}`);
             } else {
-                // Silent: just start listening in the background, don't disturb editor
                 this.setupSessionListener(sessionId);
                 this.renderNotesList();
                 this.renderNotesCards();
@@ -600,25 +517,19 @@ class NotesApp {
             if (!silent) this.showToast('Failed to join session. Please try again.');
         }
     }
-
     openShareModal() {
         if (!this.currentNoteId && !this.collabMode) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
-
-        // If we already have a session for this note, just switch to it and open the modal
         const existingSess = note ? this._getSessionByNoteId(note.id) : null;
         if (existingSess && this._activeCollabSessionId !== existingSess.sessionId) {
             this._switchActiveSession(existingSess.sessionId);
             this.collabNoteVisible = true;
             this.renderCollabBar(this._activeUsers || {});
         }
-
-        // Limit: one collaboration session per person — block creating a second session
         if (!existingSess && this.collabSessions.size >= 1) {
             this.showToast('You already have an active collaboration note. You can only have 1 at a time.');
             return;
         }
-
         if (!this.collabSessionId || !this.collabMode) {
             this.collabSessionId = this.collabSessionId || this.generateId(10);
             this.collabNoteId = note ? note.id : null;
@@ -639,7 +550,6 @@ class NotesApp {
                 isOwner: true
             };
             this._activeUsers = { [this.collabUser.id]: ownerEntry };
-            // Register session before listener so listener can find it
             this._registerSession(this.collabSessionId, {
                 noteId: this.collabNoteId,
                 isOwner: true,
@@ -659,7 +569,6 @@ class NotesApp {
             });
             this.setupSessionListener(this.collabSessionId);
             this.renderCollabBar(this._activeUsers);
-            // Always hide leave button for owner (guard against any stale state)
             this._setOwnerOnlyButtonsVisible(true);
         }
         const shareModal = document.getElementById('shareModal');
@@ -673,11 +582,10 @@ class NotesApp {
         if (!shareModal || !shareLink || !permissionSelect) return;
         shareLink.value = `${window.location.origin}${window.location.pathname}?collab=${this.collabSessionId}`;
         permissionSelect.value = this.collabPermission;
-        // Owners see all controls; non-owners only see the link field and Copy Link + Close
         if (permissionGroup) permissionGroup.style.display = this.collabIsOwner ? '' : 'none';
         if (collaboratorsGroup) collaboratorsGroup.style.display = this.collabIsOwner ? '' : 'none';
         if (closeBtn) closeBtn.style.display = this.collabIsOwner ? 'inline-flex' : 'none';
-        if (copyBtn) copyBtn.style.display = 'inline-flex'; // everyone can copy the link
+        if (copyBtn) copyBtn.style.display = 'inline-flex'; 
         shareModal.classList.add('show');
         const cleanup = () => {
             shareModal.classList.remove('show');
@@ -711,7 +619,6 @@ class NotesApp {
             await this._dbPatch(`/sharednotes/${this.collabSessionId}`, { status: 'closed', closedAt: new Date().toISOString() });
             this.showToast('Session closed');
             cleanup();
-            // Bug 11: owner resets collab state immediately
             this._resetCollabState();
         };
         cancelBtn.addEventListener('click', cleanup);
@@ -719,7 +626,6 @@ class NotesApp {
         if (copyBtn) copyBtn.addEventListener('click', handleCopy);
         permissionSelect.addEventListener('change', handlePermissionChange);
     }
-
     showShareModal({ title = 'Live Collaboration', message = '', collaborators = [] } = {}) {
         const modal = document.getElementById('shareModal');
         const shareLink = document.getElementById('shareLink');
@@ -730,7 +636,6 @@ class NotesApp {
         if (!modal) return;
         if (title) modal.querySelector('.link-modal-title').textContent = title;
         if (shareLink) shareLink.value = message;
-        // Session-closed / info modal: hide permissions, collaborators, End Session, and Copy Link
         if (permissionGroup) permissionGroup.style.display = 'none';
         if (collaboratorsGroup) collaboratorsGroup.style.display = 'none';
         if (closeBtn) closeBtn.style.display = 'none';
@@ -741,7 +646,6 @@ class NotesApp {
             modal.classList.remove('show');
         };
     }
-
     async updateActiveUserPresence() {
         if (!this.collabSessionId || !this.collabUser) return;
         const safeName = (this.collabUser.name && this.collabUser.name !== 'undefined')
@@ -756,26 +660,18 @@ class NotesApp {
             isOwner: this.collabIsOwner
         });
     }
-
     setupSessionListener(sessionId) {
         const sid = sessionId || this.collabSessionId;
         if (!sid) return;
-
-        // Close any existing EventSource for this session
         const existingSess = this.collabSessions.get(sid);
         if (existingSess && existingSess.eventSource) {
             try { existingSess.eventSource.close(); } catch (_) {}
         }
-
         const isActive = () => this._activeCollabSessionId === sid;
         const getSess = () => this.collabSessions.get(sid);
-
         const url = `${this.dbUrl}/sharednotes/${sid}.json`;
         const es = new EventSource(url);
-
-        // Store in session map
         this._registerSession(sid, { eventSource: es });
-
         const applyNoteUpdate = (note) => {
             if (!note) return;
             const sess = getSess();
@@ -786,7 +682,6 @@ class NotesApp {
             if (!prevData || note.modifiedAt !== prevData.modifiedAt) {
                 if (isActive()) { this.collabNoteData = note; }
                 sess.noteData = note;
-                // Find virtual note for this session
                 const virtualNote = this.notes.find(n => n._isCollabNote && n._collabSessionId === sid);
                 if (virtualNote) {
                     virtualNote.title = note.title || 'Shared Note';
@@ -800,7 +695,6 @@ class NotesApp {
                 }
             }
         };
-
         const applyPermissionUpdate = (perm) => {
             if (!perm) return;
             const sess = getSess();
@@ -818,7 +712,6 @@ class NotesApp {
                 }
             }
         };
-
         const applyClose = () => {
             const sess = getSess();
             if (!sess) return;
@@ -828,7 +721,6 @@ class NotesApp {
                 this._resetCollabState();
                 this.showToast(msg, 5000);
             } else {
-                // Clean up background session silently
                 const virtualNote = this.notes.find(n => n._isCollabNote && n._collabSessionId === sid);
                 if (virtualNote) {
                     this.notes = this.notes.filter(n => !(n._isCollabNote && n._collabSessionId === sid));
@@ -837,7 +729,6 @@ class NotesApp {
                 this._unregisterSession(sid);
             }
         };
-
         const applyActiveUsers = (activeUsers) => {
             const sess = getSess();
             if (!sess) return;
@@ -848,7 +739,6 @@ class NotesApp {
                 this.renderCollabBar(activeUsers);
             }
         };
-
         es.addEventListener('put', (event) => {
             try {
                 const msg = JSON.parse(event.data);
@@ -860,13 +750,11 @@ class NotesApp {
                 applyNoteUpdate(data.note);
             } catch (e) { console.warn('SSE put parse error', e); }
         });
-
         es.addEventListener('patch', (event) => {
             try {
                 const msg = JSON.parse(event.data);
                 const path = msg.path || '/';
                 const data = msg.data;
-
                 if (path === '/' || path === '') {
                     if (data.note) applyNoteUpdate(data.note);
                     if (data.permission) applyPermissionUpdate(data.permission);
@@ -894,19 +782,15 @@ class NotesApp {
                 }
             } catch (e) { console.warn('SSE patch parse error', e); }
         });
-
         es.onerror = () => { console.warn(`SSE connection lost for session ${sid}, will auto-reconnect`); };
     }
-
     _safeUserName(user) {
         return (user.name && user.name !== 'undefined' && user.name.trim())
             ? user.name
             : ('User ' + (user.id || '???').slice(0, 4));
     }
-
     renderShareCollaborators(activeUsers) {
         const users = Object.values(activeUsers || {});
-
         const container = document.getElementById('shareCollaborators');
         if (container) {
             container.innerHTML = '';
@@ -917,11 +801,9 @@ class NotesApp {
                 container.appendChild(badge);
             });
         }
-
         const cursors = document.getElementById('collabCursors');
         if (cursors) {
             cursors.innerHTML = '';
-            // Only show other users' cursors when the collab note is visible
             if (this.collabNoteVisible) {
                 users.forEach(user => {
                     if (user.id === this.collabUser.id || !user.cursor) return;
@@ -937,28 +819,21 @@ class NotesApp {
                 });
             }
         }
-
         this.renderCollabBar(activeUsers);
     }
-
     renderCollabBar(activeUsers) {
-        // Remove legacy presence bar if it somehow exists
         const old = document.getElementById('collabPresenceBar');
         if (old) old.remove();
-
         const navAvatars = document.getElementById('collabNavAvatars');
         const statbarPerm = document.getElementById('statbar-perm');
         const statbarSepPerm = document.getElementById('statbar-sep-perm');
-
         const editorArea = document.querySelector('.editor-area');
-        // Only show collab indicators when in collab mode AND the collab note is visible
         if (!editorArea || !this.collabMode || !this.collabNoteVisible) {
             if (navAvatars) navAvatars.innerHTML = '';
             if (statbarPerm) { statbarPerm.innerHTML = ''; statbarPerm.style.display = 'none'; }
             if (statbarSepPerm) statbarSepPerm.style.display = 'none';
             return;
         }
-
         const users = Object.values(activeUsers || {});
         const MAX_VISIBLE = 4;
         const visibleUsers = users.slice(0, MAX_VISIBLE);
@@ -975,9 +850,7 @@ class NotesApp {
         if (overflowCount > 0) {
             avatarsHtml += `<div class="collab-avatar collab-avatar-overflow" title="${overflowCount} more collaborator${overflowCount > 1 ? 's' : ''}">+${overflowCount}</div>`;
         }
-
         if (navAvatars) navAvatars.innerHTML = avatarsHtml;
-
         const permText = this.collabIsOwner
             ? 'Owner'
             : this.collabPermission === 'edit'
@@ -988,37 +861,31 @@ class NotesApp {
             : this.collabPermission === 'edit'
                 ? 'collab-perm-edit'
                 : 'collab-perm-view';
-
         if (statbarPerm) {
             statbarPerm.innerHTML = `<span class="collab-perm-badge ${permClass}">${permText}</span>`;
             statbarPerm.style.display = '';
         }
         if (statbarSepPerm) statbarSepPerm.style.display = '';
     }
-
     _setOwnerOnlyButtonsVisible(visible) {
-        // shareNoteBtn is intentionally excluded — non-owners can open it to copy the link
         ['exportNoteBtn', 'deleteNoteBtn', 'noteColorDropdown'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = visible ? '' : 'none';
         });
         this._updateLeaveButtonVisibility();
     }
-
     _hideLeaveButton() {
         const leaveBtn = document.getElementById('leaveCollabBtn');
         if (!leaveBtn) return;
         leaveBtn.classList.remove('visible');
         leaveBtn.style.display = 'none';
     }
-
     _showLeaveButton() {
         const leaveBtn = document.getElementById('leaveCollabBtn');
         if (!leaveBtn) return;
         leaveBtn.classList.add('visible');
         leaveBtn.style.display = 'inline-flex';
     }
-
     _updateLeaveButtonVisibility() {
         const leaveBtn = document.getElementById('leaveCollabBtn');
         if (!leaveBtn) return;
@@ -1036,7 +903,6 @@ class NotesApp {
             leaveBtn.style.display = 'none';
         }
     }
-
     setEditorForSession(noteData, focus = true) {
         const titleInput = document.getElementById('noteTitle');
         const textEditor = document.getElementById('textEditor');
@@ -1056,10 +922,8 @@ class NotesApp {
                 textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
             }
         }
-        // Gray out ribbon for view-only collaborators
         document.body.classList.toggle('collab-view-only', isViewOnly);
         document.body.classList.toggle('collab-non-owner', isNonOwner);
-        // Hide owner-only buttons for non-owners viewing the shared note
         if (isNonOwner) {
             this._setOwnerOnlyButtonsVisible(false);
             this._showLeaveButton();
@@ -1080,20 +944,17 @@ class NotesApp {
             textEditor.focus();
         }
     }
-
     updateCollabNoteTitle(title) {
         if (!this.collabMode || !this.collabNoteVisible) return;
         this.collabNoteData = this.collabNoteData || {};
         this.collabNoteData.title = title.slice(0, 40) || 'Untitled Note';
         this.collabNoteData.modifiedAt = new Date().toISOString();
-        // Update the virtual/local note in the sidebar
         if (this.currentNoteId) {
             const note = this.notes.find(n => n.id === this.currentNoteId);
             if (note) {
                 note.title = this.collabNoteData.title;
                 note.modifiedAt = this.collabNoteData.modifiedAt;
                 this.renderNotesList();
-                // Only save to storage if it's a real (non-virtual) note
                 if (!note._isCollabNote) {
                     this.renderNotesCards();
                     this.debouncedSave();
@@ -1102,10 +963,8 @@ class NotesApp {
         }
         this._debouncedCollabPush();
     }
-
     updateCollabNoteContent() {
         if (!this.collabMode || !this.collabNoteVisible) return;
-        // Only push if the editor is showing the collab note (not a different local note)
         if (this.collabNoteId && this.currentNoteId && this.currentNoteId !== this.collabNoteId) return;
         const textEditor = document.getElementById('textEditor');
         if (!textEditor) return;
@@ -1119,7 +978,6 @@ class NotesApp {
                 note.content = this.collabNoteData.content;
                 note.modifiedAt = this.collabNoteData.modifiedAt;
                 this.renderNotesList();
-                // Only save to local storage if it's a real (non-virtual) note
                 if (!note._isCollabNote) {
                     this.renderNotesCards();
                     this.debouncedSave();
@@ -1128,7 +986,6 @@ class NotesApp {
         }
         this._debouncedCollabPush();
     }
-
     _debouncedCollabPush() {
         if (this._collabPushTimer) clearTimeout(this._collabPushTimer);
         this._collabPushTimer = setTimeout(() => {
@@ -1138,7 +995,6 @@ class NotesApp {
             }
         }, 400);
     }
-
     handleSelectionChange() {
         if (!this.collabMode || !this.collabSessionId || !this.collabUser) return;
         if (!this.collabNoteVisible) return;
@@ -1159,10 +1015,8 @@ class NotesApp {
             this._dbPatch(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`, { cursor: position, updatedAt: new Date().toISOString() });
         }, 200);
     }
-
     leaveCollaboration() {
         if (!this.collabUser) return;
-        // Update presence for all active sessions
         for (const sess of this.collabSessions.values()) {
             const sid = sess.sessionId;
             if (!sid) continue;
@@ -1184,17 +1038,12 @@ class NotesApp {
             }
         }
     }
-
-    // Non-owner: leave shared note without affecting other collaborators or the owner
     leaveCollabNote() {
-        if (this.collabIsOwner) return; // owners use end session, not leave
-        // Clear persisted non-owner session so it doesn't re-join on reload
+        if (this.collabIsOwner) return; 
         try { localStorage.removeItem('emeraldnotes_collab_non_owner'); } catch (_) {}
-        // Remove the current session from saved sessions so it won't be restored
         if (this.collabSessionId) {
             this._unregisterSession(this.collabSessionId);
         }
-        // Remove own presence from Firebase (don't close the whole session)
         if (this.collabSessionId && this.collabUser) {
             this._dbDelete(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`).catch(() => {});
         }
@@ -1211,12 +1060,10 @@ class NotesApp {
         this.collabNoteData = null;
         this.collabNoteVisible = false;
         this._activeUsers = {};
-        // Remove virtual shared note from list
         this.notes = this.notes.filter(n => !n._isCollabNote);
         if (this.currentNoteId && !this.notes.some(n => n.id === this.currentNoteId)) {
             this.currentNoteId = null;
         }
-        // Clear UI state
         const navAvatars = document.getElementById('collabNavAvatars');
         if (navAvatars) navAvatars.innerHTML = '';
         const statbarPerm = document.getElementById('statbar-perm');
@@ -1236,8 +1083,6 @@ class NotesApp {
         this.renderNotesCards();
         this.showWelcomeScreenIfNeeded();
     }
-
-    // Bug 11: centralized cleanup of all collab state
     _resetCollabState() {
         if (this._collabEventSource) {
             this._collabEventSource.close();
@@ -1255,54 +1100,41 @@ class NotesApp {
         this.collabNoteVisible = false;
         this._activeUsers = {};
         this._lastPushedModifiedAt = null;
-        // Remove any virtual shared note from the notes list
         this.notes = this.notes.filter(n => !n._isCollabNote);
-        // If currentNoteId was pointing to the virtual note, clear it
         if (this.currentNoteId && !this.notes.some(n => n.id === this.currentNoteId)) {
             this.currentNoteId = null;
         }
-        // Remove presence bar
         const bar = document.getElementById('collabPresenceBar');
         if (bar) bar.remove();
-        // Clear collab indicators from navbar/statusbar
         const navAvatars = document.getElementById('collabNavAvatars');
         if (navAvatars) navAvatars.innerHTML = '';
         const statbarPerm = document.getElementById('statbar-perm');
         if (statbarPerm) { statbarPerm.innerHTML = ''; statbarPerm.style.display = 'none'; }
         const statbarSepPerm = document.getElementById('statbar-sep-perm');
         if (statbarSepPerm) statbarSepPerm.style.display = 'none';
-        // Remove body classes for view-only
         document.body.classList.remove('collab-view-only', 'collab-non-owner');
-        // Remove cursor overlays
         const cursors = document.getElementById('collabCursors');
         if (cursors) cursors.innerHTML = '';
         this._hideLeaveButton();
-        // Remove owner and non-owner sessions from localStorage
         try { 
             localStorage.removeItem('emeraldnotes_collab_owner');
             localStorage.removeItem('emeraldnotes_collab_non_owner');
             localStorage.removeItem('emeraldnotes_collab_sessions');
         } catch (_) {}
-        // Clear the sessions Map so the 1-session limit resets properly
         for (const s of this.collabSessions.values()) {
             if (s.eventSource) { try { s.eventSource.close(); } catch (_) {} }
         }
         this.collabSessions.clear();
         this._activeCollabSessionId = null;
-        // Restore all owner-only buttons
         this._setOwnerOnlyButtonsVisible(true);
-        // Re-enable the editor
         const textEditor = document.getElementById('textEditor');
         if (textEditor) textEditor.contentEditable = 'true';
         const titleInput = document.getElementById('noteTitle');
         if (titleInput) titleInput.disabled = false;
-        // Re-render the notes list without the virtual note
         this.renderNotesList();
         this.renderNotesCards();
-        // Show welcome screen if no note is selected; otherwise stay on current note
         this.showWelcomeScreenIfNeeded();
     }
-
     showSaveIndicator(status) {
         const indicator = document.getElementById('saveIndicator');
         if (!indicator) {
@@ -1324,33 +1156,24 @@ class NotesApp {
                 break;
         }
     }
-
     debouncedSave() {
         this.showSaveIndicator('saving');
         if (this.saveTimeout) clearTimeout(this.saveTimeout);
         this.saveTimeout = setTimeout(() => this.saveNotesToStorage(), 1000);
     }
-
-    // ─── Event Listeners ────────────────────────────────────────────────────────
-
     setupEventListeners() {
         const newNoteBtn = document.getElementById('newNoteBtn');
         const welcomeNewNoteBtn = document.getElementById('welcomeNewNoteBtn');
         if (newNoteBtn) newNoteBtn.addEventListener('click', () => this.createNewNote());
         if (welcomeNewNoteBtn) welcomeNewNoteBtn.addEventListener('click', () => this.createNewNote());
-
         const deleteNoteBtn = document.getElementById('deleteNoteBtn');
         if (deleteNoteBtn) deleteNoteBtn.addEventListener('click', () => this.deleteCurrentNote());
-
         const leaveCollabBtn = document.getElementById('leaveCollabBtn');
         if (leaveCollabBtn) leaveCollabBtn.addEventListener('click', () => this.leaveCollabNote());
-
         const exportNoteBtn = document.getElementById('exportNoteBtn');
         if (exportNoteBtn) exportNoteBtn.addEventListener('click', () => this.exportNoteAsLink());
-
         const shareNoteBtn = document.getElementById('shareNoteBtn');
         if (shareNoteBtn) shareNoteBtn.addEventListener('click', () => this.openShareModal());
-
         const noteTitle = document.getElementById('noteTitle');
         if (noteTitle) {
             noteTitle.addEventListener('input', (e) => {
@@ -1361,7 +1184,6 @@ class NotesApp {
                 }
             });
         }
-
         const textEditor = document.getElementById('textEditor');
         if (textEditor) {
             textEditor.addEventListener('input', () => {
@@ -1373,29 +1195,21 @@ class NotesApp {
                 }
             });
         }
-
         document.addEventListener('selectionchange', () => this.handleSelectionChange());
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
-
         document.querySelectorAll('.ribbon-btn, .ribbon-tab').forEach(el => {
             el.addEventListener('mousedown', (e) => e.preventDefault());
         });
-
         document.querySelectorAll('.ms-dropdown-item, .color-swatch').forEach(el => {
             el.addEventListener('mousedown', (e) => e.preventDefault());
         });
-
         this.setupMSDropdowns();
         this.setupCustomContextMenu();
         this.setupEditorPlaceholder();
         this.setupSidebarToggle();
         this.setupTableToolbar();
     }
-
-    // ─── Mobile UI ──────────────────────────────────────────────────────────────
-
     setupMobileUI() {
-        // Inject backdrop element for sidebar overlay
         if (!document.getElementById('sidebarBackdrop')) {
             const backdrop = document.createElement('div');
             backdrop.id = 'sidebarBackdrop';
@@ -1403,10 +1217,6 @@ class NotesApp {
             backdrop.addEventListener('click', () => this.closeMobileSidebar());
             document.querySelector('.notes-app').appendChild(backdrop);
         }
-
-
-
-        // Inject swipe hint strip
         if (!document.getElementById('swipeHint')) {
             const hint = document.createElement('div');
             hint.id = 'swipeHint';
@@ -1415,7 +1225,6 @@ class NotesApp {
             document.querySelector('.notes-app').appendChild(hint);
         }
     }
-
     openMobileSidebar() {
         if (!this.isMobile()) return;
         const sidebar = document.querySelector('.sidebar');
@@ -1424,7 +1233,6 @@ class NotesApp {
         backdrop.classList.add('visible');
         this.sidebarOpen = true;
     }
-
     closeMobileSidebar() {
         const sidebar = document.querySelector('.sidebar');
         const backdrop = document.getElementById('sidebarBackdrop');
@@ -1432,13 +1240,9 @@ class NotesApp {
         backdrop.classList.remove('visible');
         this.sidebarOpen = false;
     }
-
-    // ─── Swipe Gesture ──────────────────────────────────────────────────────────
-
     setupSwipeGesture() {
         const app = document.querySelector('.notes-app');
-        const LEFT_EDGE_ZONE = 40; // px from left edge to allow open-swipe
-
+        const LEFT_EDGE_ZONE = 40; 
         app.addEventListener('touchstart', (e) => {
             if (!this.isMobile()) return;
             const touch = e.touches[0];
@@ -1447,113 +1251,78 @@ class NotesApp {
             this.touchStartTime = Date.now();
             this.isSwiping = false;
         }, { passive: true });
-
         app.addEventListener('touchmove', (e) => {
             if (!this.isMobile()) return;
             const touch = e.touches[0];
             const dx = touch.clientX - this.touchStartX;
             const dy = touch.clientY - this.touchStartY;
-
-            // Only track horizontal swipes (more horizontal than vertical)
             if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
                 this.isSwiping = true;
             }
-
             if (!this.isSwiping) return;
-
-            // Opening: only follow finger if touch started near the left edge
             const canOpen = this.touchStartX <= LEFT_EDGE_ZONE;
-
             const sidebar = document.querySelector('.sidebar');
             const sidebarWidth = sidebar.offsetWidth;
-
             if (this.sidebarOpen && dx < 0) {
-                // Dragging sidebar closed — follow finger
                 const clampedDx = Math.max(dx, -sidebarWidth);
                 sidebar.style.transform = `translateX(${clampedDx}px)`;
                 sidebar.style.transition = 'none';
             } else if (!this.sidebarOpen && dx > 0 && canOpen) {
-                // Dragging sidebar open — follow finger from left
                 const clampedDx = Math.min(dx - sidebarWidth, 0);
                 sidebar.style.transform = `translateX(${clampedDx}px)`;
                 sidebar.style.transition = 'none';
             }
         }, { passive: true });
-
         app.addEventListener('touchend', (e) => {
             if (!this.isMobile()) return;
             const touch = e.changedTouches[0];
             const dx = touch.clientX - this.touchStartX;
             const dy = touch.clientY - this.touchStartY;
             const dt = Date.now() - this.touchStartTime;
-
-            // Always restore CSS transition and clear inline transform/transition
             const sidebar = document.querySelector('.sidebar');
             sidebar.style.transition = '';
             sidebar.style.transform = '';
-
-            const THRESHOLD = 50;         // minimum px to trigger action
-            const MAX_VERTICAL = 80;      // maximum vertical drift allowed
-            const MAX_TIME = 600;         // maximum ms for swipe
-
+            const THRESHOLD = 50;         
+            const MAX_VERTICAL = 80;      
+            const MAX_TIME = 600;         
             const isHorizontalSwipe =
                 Math.abs(dx) > THRESHOLD &&
                 Math.abs(dy) < MAX_VERTICAL &&
                 dt < MAX_TIME;
-
             if (!isHorizontalSwipe) return;
-
-            // Opening only allowed if touch started near the left edge
             const startedAtEdge = this.touchStartX <= LEFT_EDGE_ZONE;
-
             if (dx > 0 && !this.sidebarOpen && startedAtEdge) {
-                // Swipe right from left edge — open sidebar
                 this.openMobileSidebar();
             } else if (dx < 0 && this.sidebarOpen) {
-                // Swipe left from anywhere — close sidebar
                 this.closeMobileSidebar();
             }
         }, { passive: true });
     }
-
-    // ─── Mobile Ribbon ──────────────────────────────────────────────────────────
-
     setupMobileRibbon() {
-        // Only runs if we are on mobile; re-checks on resize
         this.buildMobileRibbon();
         window.addEventListener('resize', () => {
             this.buildMobileRibbon();
         });
     }
-
     buildMobileRibbon() {
         const ribbonContent = document.querySelector('.ribbon-content');
         if (!ribbonContent) return;
-
         if (!this.isMobile()) {
-            // Restore desktop ribbon — remove mobile row if it exists
             const mobileRow = document.getElementById('mobileRibbonRow');
             if (mobileRow) mobileRow.remove();
             const morePanel = document.getElementById('mobileMorePanel');
             if (morePanel) morePanel.remove();
             return;
         }
-
-        // Already built
         if (document.getElementById('mobileRibbonRow')) return;
-
-        // Build the mobile ribbon row
         const row = document.createElement('div');
         row.id = 'mobileRibbonRow';
         row.className = 'mobile-ribbon-row';
-
-        // Essential mobile toolbar buttons: clipboard, text formatting, undo/redo, lists, alignment
         const clipboard = [
             { command: 'cut', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>`, title: 'Cut' },
             { command: 'copy', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`, title: 'Copy' },
             { command: 'paste', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`, title: 'Paste' },
         ];
-
         const formatting = [
             { command: 'bold', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>`, title: 'Bold' },
             { command: 'italic', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>`, title: 'Italic' },
@@ -1562,33 +1331,25 @@ class NotesApp {
             { command: 'subscript', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5l8 8m0-8L4 13"/><text x="13" y="19" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>`, title: 'Subscript' },
             { command: 'superscript', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9l8 8m0-8L4 17"/><text x="13" y="9" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>`, title: 'Superscript' },
         ];
-
         const div0 = document.createElement('div');
         div0.className = 'mobile-ribbon-divider';
-
         const undoRedo = [
             { command: 'undo', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`, title: 'Undo' },
             { command: 'redo', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`, title: 'Redo' },
         ];
-
         const div1 = document.createElement('div');
         div1.className = 'mobile-ribbon-divider';
-
         const secondary = [
             { command: 'insertUnorderedList', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`, title: 'Bullet List' },
             { command: 'insertOrderedList', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>`, title: 'Numbered List' },
         ];
-
         const div2 = document.createElement('div');
         div2.className = 'mobile-ribbon-divider';
-
         const tertiary = [
             { command: 'justifyLeft', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>`, title: 'Align Left' },
             { command: 'justifyCenter', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>`, title: 'Center' },
             { command: 'justifyRight', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>`, title: 'Align Right' },
         ];
-
-        // Helper to create a command button
         const makeBtn = (command, icon, title, cls = 'ribbon-btn format-btn') => {
             const btn = document.createElement('button');
             btn.className = cls;
@@ -1603,8 +1364,6 @@ class NotesApp {
             });
             return btn;
         };
-
-        // Build buttons
         [...clipboard].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
         row.appendChild(div0);
         [...formatting].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
@@ -1614,20 +1373,15 @@ class NotesApp {
         [...secondary].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
         row.appendChild(div2);
         [...tertiary].forEach(({ command, icon, title }) => row.appendChild(makeBtn(command, icon, title)));
-
-        // Divider before insert buttons
         const div3 = document.createElement('div');
         div3.className = 'mobile-ribbon-divider';
         row.appendChild(div3);
-
-        // Insert buttons directly in row (icon only, matching other ribbon buttons)
         const insertDefs = [
             { id: 'mobileInsertTableBtn', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>`, title: 'Table' },
             { id: 'mobileInsertImageBtn', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`, title: 'Image' },
             { id: 'mobileInsertTodoBtn', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="4" height="4" rx="1"/><line x1="10" y1="7" x2="21" y2="7"/><rect x="3" y="13" width="4" height="4" rx="1"/><line x1="10" y1="15" x2="21" y2="15"/><polyline points="3,19 5,21 9,17"/></svg>`, title: 'To-Do' },
             { id: 'mobileDrawBtn', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`, title: 'Draw' },
         ];
-
         insertDefs.forEach(({ id, icon, title }) => {
             const btn = document.createElement('button');
             btn.className = 'ribbon-btn';
@@ -1637,13 +1391,9 @@ class NotesApp {
             btn.addEventListener('mousedown', (e) => e.preventDefault());
             row.appendChild(btn);
         });
-
-        // Divider before font/color dropdowns
         const div4 = document.createElement('div');
         div4.className = 'mobile-ribbon-divider';
         row.appendChild(div4);
-
-        // Inline font family dropdown
         const fontFamilyWrapper = document.createElement('div');
         fontFamilyWrapper.id = 'mobileFontFamilyDropdown';
         fontFamilyWrapper.className = 'ms-dropdown';
@@ -1680,8 +1430,6 @@ class NotesApp {
             </div>
         `;
         row.appendChild(fontFamilyWrapper);
-
-        // Inline font size dropdown
         const fontSizeWrapper = document.createElement('div');
         fontSizeWrapper.id = 'mobileFontSizeDropdown';
         fontSizeWrapper.className = 'ms-dropdown';
@@ -1705,8 +1453,6 @@ class NotesApp {
             </div>
         `;
         row.appendChild(fontSizeWrapper);
-
-        // Inline font color dropdown
         const fontColorWrapper = document.createElement('div');
         fontColorWrapper.id = 'mobileFontColorDropdown';
         fontColorWrapper.className = 'ms-dropdown';
@@ -1729,8 +1475,6 @@ class NotesApp {
             </div>
         `;
         row.appendChild(fontColorWrapper);
-
-        // Inline highlight dropdown
         const highlightWrapper = document.createElement('div');
         highlightWrapper.id = 'mobileHighlightDropdown';
         highlightWrapper.className = 'ms-dropdown';
@@ -1749,8 +1493,6 @@ class NotesApp {
             </div>
         `;
         row.appendChild(highlightWrapper);
-
-        // Wire up inline dropdowns
         this.wireMobileDropdown(fontFamilyWrapper, (value) => {
             this.restoreSelection();
             this.executeCommand('fontName', value);
@@ -1767,14 +1509,11 @@ class NotesApp {
             this.restoreSelection();
             this.executeCommand('hiliteColor', value);
         });
-
-        // Wire insert buttons
         const mobileInsertTableBtn = row.querySelector('#mobileInsertTableBtn');
         const mobileInsertImageBtn = row.querySelector('#mobileInsertImageBtn');
         const mobileInsertTodoBtn = row.querySelector('#mobileInsertTodoBtn');
         const mobileDrawBtn = row.querySelector('#mobileDrawBtn');
         const desktopImageInput = document.getElementById('insertImageInput');
-
         if (mobileInsertTableBtn) {
             mobileInsertTableBtn.addEventListener('click', () => this.insertTable());
         }
@@ -1790,17 +1529,13 @@ class NotesApp {
         if (mobileDrawBtn) {
             mobileDrawBtn.addEventListener('click', () => this.toggleDrawMode());
         }
-
         ribbonContent.appendChild(row);
     }
-
     wireMobileDropdown(dropdownEl, onSelect) {
         if (!dropdownEl) return;
         const btn = dropdownEl.querySelector('.ms-dropdown-btn');
         const menu = dropdownEl.querySelector('.ms-dropdown-menu');
         const items = dropdownEl.querySelectorAll('.ms-dropdown-item');
-
-        // Portal approach: move menu to document.body to avoid iOS overflow clipping
         const openPortal = () => {
             if (!menu._portalParent) {
                 menu._portalParent = menu.parentNode;
@@ -1808,10 +1543,8 @@ class NotesApp {
             if (menu.parentNode !== document.body) {
                 document.body.appendChild(menu);
             }
-            // Cancel any in-progress close animation
             menu.classList.remove('ms-portal-closing');
             clearTimeout(menu._closeTimer);
-            // Set styles before measuring
             menu.style.visibility = 'hidden';
             menu.style.display = 'block';
             menu.style.position = 'fixed';
@@ -1819,7 +1552,6 @@ class NotesApp {
             menu.style.minWidth = '160px';
             menu.style.maxHeight = '260px';
             menu.style.overflowY = 'auto';
-
             const btnRect = btn.getBoundingClientRect();
             const vw = window.innerWidth;
             const vh = window.innerHeight;
@@ -1834,14 +1566,11 @@ class NotesApp {
             menu.style.left = left + 'px';
             menu.style.width = mw + 'px';
             menu.style.visibility = '';
-            // Trigger fade-in animation inline (menu is portaled, CSS class won't reach it)
             menu.style.animation = 'dropdownFadeIn 0.2s ease';
             dropdownEl.classList.add('active');
         };
-
         const closePortal = () => {
             dropdownEl.classList.remove('active');
-            // Trigger fade-out animation, then actually remove after it finishes
             menu.style.animation = '';
             menu.classList.add('ms-portal-closing');
             menu._closeTimer = setTimeout(() => {
@@ -1862,14 +1591,12 @@ class NotesApp {
                 menu.style.animation = '';
             }, 150);
         };
-
         btn.addEventListener('mousedown', (e) => e.preventDefault());
         btn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.saveSelection();
             const wasActive = dropdownEl.classList.contains('active');
-            // Close all other open dropdowns
             document.querySelectorAll('.ms-dropdown.active').forEach(d => {
                 if (d !== dropdownEl) {
                     const m = d.querySelector('.ms-dropdown-menu');
@@ -1897,14 +1624,13 @@ class NotesApp {
                 closePortal();
             }
         });
-
         items.forEach(item => {
             item.addEventListener('mousedown', (e) => e.preventDefault());
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 const value = item.dataset.value;
-                if (value === undefined || value === null || value === '') return; // Skip group labels
+                if (value === undefined || value === null || value === '') return; 
                 const label = item.dataset.label || item.textContent.trim();
                 const valueSpan = btn.querySelector('.dropdown-value');
                 if (valueSpan) valueSpan.textContent = label;
@@ -1921,8 +1647,6 @@ class NotesApp {
                 }, 10);
             });
         });
-
-        // Close portal on outside click
         document.addEventListener('click', (e) => {
             if (dropdownEl.classList.contains('active') &&
                 !menu.contains(e.target) && !btn.contains(e.target)) {
@@ -1930,9 +1654,6 @@ class NotesApp {
             }
         }, true);
     }
-
-    // ─── Ribbon Setup (Desktop) ─────────────────────────────────────────────────
-
     setupRibbon() {
         document.querySelectorAll('.ribbon-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
@@ -1940,7 +1661,6 @@ class NotesApp {
                 this.switchRibbonTab(tabName);
             });
         });
-
         document.querySelectorAll('.format-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -1949,14 +1669,12 @@ class NotesApp {
                 this.updateButtonStates();
             });
         });
-
         const cutBtn = document.getElementById('cutBtn');
         const copyBtn = document.getElementById('copyBtn');
         const pasteBtn = document.getElementById('pasteBtn');
         if (cutBtn) cutBtn.addEventListener('click', () => this.executeCommand('cut'));
         if (copyBtn) copyBtn.addEventListener('click', () => this.executeCommand('copy'));
         if (pasteBtn) pasteBtn.addEventListener('click', () => this.executeCommand('paste'));
-
         const insertTableBtn = document.getElementById('insertTableBtn');
         const insertTodoBtn = document.getElementById('insertTodoBtn');
         const drawBtn = document.getElementById('drawBtn');
@@ -1964,9 +1682,6 @@ class NotesApp {
         const insertImageInput = document.getElementById('insertImageInput');
         if (insertTableBtn) insertTableBtn.addEventListener('click', () => this.insertTable());
         if (insertTodoBtn) insertTodoBtn.addEventListener('click', () => this.insertTodo());
-        // Save the editor selection before any toolbar button steals focus.
-        // mousedown fires before the click handler runs and before focus
-        // moves to the button, so we capture the in-editor caret first.
         const ribbonRoot = document.querySelector('.ribbon');
         if (ribbonRoot) {
             ribbonRoot.addEventListener('mousedown', (e) => {
@@ -1988,21 +1703,15 @@ class NotesApp {
             if (file) { this.insertImage(file); }
             insertImageInput.value = '';
         });
-
         const zoomInBtn = document.getElementById('zoomInBtn');
         const zoomOutBtn = document.getElementById('zoomOutBtn');
         if (zoomInBtn) zoomInBtn.addEventListener('click', () => this.zoomIn());
         if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => this.zoomOut());
     }
-
-    // ─── Text Editor ────────────────────────────────────────────────────────────
-
     setupTextEditor() {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
-
         editor.addEventListener('wheel', (e) => e.stopPropagation(), false);
-
         editor.addEventListener('mouseup', () => {
             this.saveSelection();
             this.updateButtonStates();
@@ -2011,10 +1720,7 @@ class NotesApp {
             this.saveSelection();
             this.updateButtonStates();
         });
-
         editor.addEventListener('blur', () => this.saveSelection());
-
-        // Handle Enter key in todo items - move cursor below the todo item
         editor.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter') return;
             const sel = window.getSelection();
@@ -2023,12 +1729,9 @@ class NotesApp {
             const label = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
             const todoLabel = label && label.closest ? label.closest('.todo-label') : null;
             if (!todoLabel) return;
-
             e.preventDefault();
             const todoItem = todoLabel.closest('.todo-item');
             if (!todoItem) return;
-
-            // Insert an empty div after the todo item and move cursor there
             const newBlock = document.createElement('div');
             newBlock.innerHTML = '<br>';
             const next = todoItem.nextSibling;
@@ -2037,8 +1740,6 @@ class NotesApp {
             } else {
                 todoItem.parentNode.appendChild(newBlock);
             }
-
-            // Place cursor in the new block
             const newRange = document.createRange();
             newRange.setStart(newBlock, 0);
             newRange.collapse(true);
@@ -2046,15 +1747,12 @@ class NotesApp {
             sel.addRange(newRange);
             this.updateNoteContent();
         });
-
         editor.addEventListener('paste', (e) => {
             setTimeout(() => {
                 this.updatePlaceholderState(editor);
                 this.updateNoteContent();
             }, 10);
         });
-
-        // Handle checkbox clicks in todo items
         editor.addEventListener('click', (e) => {
             if (e.target.type === 'checkbox' && e.target.closest('.todo-item')) {
                 setTimeout(() => {
@@ -2068,14 +1766,12 @@ class NotesApp {
             }
         });
     }
-
     saveSelection() {
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
             this.savedSelection = selection.getRangeAt(0).cloneRange();
         }
     }
-
     restoreSelection() {
         if (this.savedSelection) {
             const editor = document.getElementById('textEditor');
@@ -2085,7 +1781,6 @@ class NotesApp {
             selection.addRange(this.savedSelection.cloneRange());
         }
     }
-
     switchRibbonTab(tabName) {
         document.querySelectorAll('.ribbon-tab').forEach(tab => {
             tab.classList.toggle('active', tab.dataset.tab === tabName);
@@ -2094,10 +1789,8 @@ class NotesApp {
             panel.classList.toggle('active', panel.dataset.panel === tabName);
         });
     }
-
     executeCommand(command, value = null) {
         document.getElementById('textEditor').focus();
-
         try {
             if (command === 'cut') { this.modernCut(); return; }
             if (command === 'copy') { this.modernCopy(); return; }
@@ -2106,7 +1799,6 @@ class NotesApp {
             if (command === 'fontSize') { this.modernFontSize(value); return; }
             if (command === 'foreColor') { this.modernTextColor(value); return; }
             if (command === 'hiliteColor') { this.modernHighlightColor(value); return; }
-
             if (value) {
                 document.execCommand(command, false, value);
             } else {
@@ -2115,14 +1807,11 @@ class NotesApp {
         } catch (error) {
             console.error('Error executing command:', command, error);
         }
-
         this.updateNoteContent();
     }
-
     updateButtonStates() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const commands = ['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList'];
         commands.forEach(command => {
             const btns = document.querySelectorAll(`[data-command="${command}"]`);
@@ -2132,25 +1821,19 @@ class NotesApp {
                 } catch { btn.classList.remove('active'); }
             });
         });
-
         this.updateFontStateFromDOM();
     }
-
     updateFontStateFromDOM() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
-
         const range = selection.getRangeAt(0);
         let currentNode = range.commonAncestorContainer;
         if (currentNode.nodeType === Node.TEXT_NODE) currentNode = currentNode.parentElement;
-
         let fontFamily = '', fontSize = '', textColor = '', backgroundColor = '';
         let element = currentNode;
-
         while (element && element !== document.getElementById('textEditor')) {
             const styles = window.getComputedStyle(element);
             if (!fontFamily && styles.fontFamily && styles.fontFamily !== 'inherit') {
-                // Extract first font name, strip quotes and fallback fonts
                 const raw = styles.fontFamily.replace(/['"]/g, '').split(',')[0].trim();
                 fontFamily = raw;
             }
@@ -2165,7 +1848,6 @@ class NotesApp {
                 textColor = element.getAttribute('color');
             element = element.parentElement;
         }
-
         const fontFamilyDropdown = document.getElementById('fontFamilyDropdown');
         if (fontFamilyDropdown && fontFamily) {
             const valueSpan = fontFamilyDropdown.querySelector('.dropdown-value');
@@ -2180,19 +1862,16 @@ class NotesApp {
                 if (matchingItem) valueSpan.textContent = matchingItem.textContent.trim();
             }
         }
-
         const fontSizeDropdown = document.getElementById('fontSizeDropdown');
         if (fontSizeDropdown && fontSize) {
             const valueSpan = fontSizeDropdown.querySelector('.dropdown-value');
             if (valueSpan) valueSpan.textContent = fontSize; // no 'px' suffix
         }
-
         const fontColorDropdown = document.getElementById('fontColorDropdown');
         if (fontColorDropdown && textColor) {
             const colorPreview = fontColorDropdown.querySelector('.color-preview');
             if (colorPreview) { colorPreview.style.background = textColor; colorPreview.setAttribute('data-color', textColor); }
         }
-
         const highlightColorDropdown = document.getElementById('highlightColorDropdown');
         if (highlightColorDropdown) {
             const colorPreview = highlightColorDropdown.querySelector('.color-preview');
@@ -2207,9 +1886,7 @@ class NotesApp {
             }
         }
     }
-
     // ─── Keyboard Shortcuts ──────────────────────────────────────────────────────
-
     handleKeyboardShortcuts(e) {
         if (e.ctrlKey || e.metaKey) {
             switch (e.key.toLowerCase()) {
@@ -2227,13 +1904,10 @@ class NotesApp {
             }
         }
     }
-
     isEditorFocused() {
         return document.getElementById('textEditor').contains(document.activeElement);
     }
-
     // ─── Notes CRUD ──────────────────────────────────────────────────────────────
-
     createNewNote() {
         const note = {
             id: this.generateId(),
@@ -2242,13 +1916,11 @@ class NotesApp {
             createdAt: new Date().toISOString(),
             modifiedAt: new Date().toISOString()
         };
-
         this.notes.unshift(note);
         this.selectNote(note.id);
         this.renderNotesList();
         this.renderNotesCards();
         this.debouncedSave();
-
         setTimeout(() => {
             const titleInput = document.getElementById('noteTitle');
             if (!titleInput) {
@@ -2257,17 +1929,13 @@ class NotesApp {
             }
             titleInput.select();
         }, 100);
-
         // On mobile, close sidebar after selecting/creating a note
         if (this.isMobile()) this.closeMobileSidebar();
     }
-
     selectNote(noteId) {
         const note = this.notes.find(n => n.id === noteId);
         if (!note) return;
-
         this.currentNoteId = noteId;
-
         const noteTitle = document.getElementById('noteTitle');
         if (!noteTitle) {
             console.warn('Expected DOM element not found: noteTitle');
@@ -2280,14 +1948,12 @@ class NotesApp {
             return;
         }
         textEditorInit.innerHTML = this.sanitizeHtml(note.content);
-
         const textEditor = document.getElementById('textEditor');
         if (note.color && note.color !== '#ffffff') {
             textEditor.style.backgroundColor = note.color;
         } else {
             textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
         }
-
         const sessionForNote = this._getSessionByNoteId(noteId);
         if (sessionForNote) {
             if (!this._activeCollabSessionId || this._activeCollabSessionId !== sessionForNote.sessionId) {
@@ -2319,24 +1985,19 @@ class NotesApp {
             if (this.collabSessionId && this.collabUser) {
                 this._dbPatch(`/sharednotes/${this.collabSessionId}/activeUsers/${this.collabUser.id}`, { cursor: null }).catch(() => {});
             }
-            // Clear collab UI indicators
             this.renderCollabBar({});
-            // Clear remote cursors completely
             const cursors = document.getElementById('collabCursors');
             if (cursors) cursors.innerHTML = '';
-            // Non-owner: restore all owner-only buttons for their own notes
             if (!this.collabIsOwner) {
                 this._setOwnerOnlyButtonsVisible(true);
                 document.body.classList.remove('collab-non-owner', 'collab-view-only');
             }
             this._hideLeaveButton();
-            // Restore normal editor state for the local note
             const textEditor = document.getElementById('textEditor');
             if (textEditor) textEditor.contentEditable = 'true';
             const titleInput = document.getElementById('noteTitle');
             if (titleInput) titleInput.disabled = false;
         }
-
         const noteColorDropdown = document.getElementById('noteColorDropdown');
         if (noteColorDropdown) {
             const colorPreview = noteColorDropdown.querySelector('.color-preview');
@@ -2348,11 +2009,9 @@ class NotesApp {
                 dropdownValue.textContent = colorItem ? (colorItem.dataset.label || 'Default') : 'Default';
             }
         }
-
         document.querySelectorAll('.note-item').forEach(item => {
             item.classList.toggle('active', item.dataset.noteId === noteId);
         });
-
         const wasWelcome = document.body.classList.contains('no-active-note');
         const welcomeScreen = document.getElementById('welcomeScreen');
         if (welcomeScreen) {
@@ -2375,28 +2034,20 @@ class NotesApp {
         const _sb = document.getElementById('editorStatusbar');
         if (_sb) _sb.style.display = '';
         document.body.classList.remove('no-active-note');
-
-        // Only animate the ribbon when opening from the welcome screen
         if (wasWelcome) {
             const ribbon = document.querySelector('.ribbon');
             if (ribbon) {
                 ribbon.classList.remove('entering');
-                void ribbon.offsetWidth; // Force reflow to restart animation
+                void ribbon.offsetWidth; 
                 ribbon.classList.add('entering');
             }
         }
-
-        // On mobile, close sidebar when a note is selected
         if (this.isMobile()) this.closeMobileSidebar();
-
-        // If in draw mode, exit it
         if (this.isDrawMode) { this.isDrawMode = false; const tb = document.getElementById('drawToolbar'); if (tb) tb.classList.remove('visible'); const db = document.getElementById('drawBtn'); if (db) db.classList.remove('active'); const te = document.getElementById('textEditor'); if (te) te.contentEditable = 'true'; }
-        // Load the drawing for this note (or hide canvas if none)
         this.loadDrawing();
         this.updateStatusBar();
         this._setOwnerOnlyButtonsVisible(!this.collabMode || this.collabIsOwner || !this.collabNoteVisible || this.currentNoteId !== this.collabNoteId);
         this._updateLeaveButtonVisibility();
-
         setTimeout(() => {
             const textEditorFocus = document.getElementById('textEditor');
             if (textEditorFocus) {
@@ -2406,11 +2057,9 @@ class NotesApp {
             }
         }, 100);
     }
-
     updateNoteTitle(title) {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (note) {
-            // Hard cap title to 40 chars (in case maxlength bypassed)
             let t = (title || '').slice(0, 40);
             if (title && title.length > 70) {
                 const titleEl = document.getElementById('noteTitle');
@@ -2423,7 +2072,6 @@ class NotesApp {
             this.debouncedSave();
         }
     }
-
     updateNoteContent() {
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (note) {
@@ -2436,25 +2084,19 @@ class NotesApp {
             this.debouncedSave();
         }
     }
-
     deleteCurrentNote() {
         if (!this.currentNoteId) return;
-
         const currentNote = this.notes.find(n => n.id === this.currentNoteId);
         if (!currentNote) return;
-        // Cannot delete a virtual shared note — it disappears when the session ends
         if (currentNote._isCollabNote) return;
-
         const title = currentNote.title || 'Untitled Note';
         this.showDeleteModal(title, () => {
             if (this.collabMode && this.collabIsOwner && this.currentNoteId === this.collabNoteId) {
                 this._dbPatch(`/sharednotes/${this.collabSessionId}`, { status: 'closed', closedAt: new Date().toISOString() }).catch(() => {});
                 this._resetCollabState();
             }
-
             const currentIndex = this.notes.findIndex(n => n.id === this.currentNoteId);
             this.notes = this.notes.filter(note => note.id !== this.currentNoteId);
-
             if (this.notes.length > 0) {
                 const nextIndex = currentIndex < this.notes.length ? currentIndex : this.notes.length - 1;
                 this.selectNote(this.notes[nextIndex].id);
@@ -2466,26 +2108,22 @@ class NotesApp {
                 if (noteTitle) noteTitle.value = '';
                 if (textEditor) { textEditor.innerHTML = ''; textEditor.style.backgroundColor = 'rgba(255, 255, 255, 0.5)'; }
             }
-
             this.saveNotesToStorage();
             this.renderNotesList();
             this.renderNotesCards();
         });
     }
-
     renderNotesList() {
         const notesList = document.getElementById('notesList');
         notesList.innerHTML = '';
         this.notes.forEach(note => notesList.appendChild(this.createNoteListItem(note)));
         this._updateLeaveButtonVisibility();
     }
-
     createNoteListItem(note) {
         const div = document.createElement('div');
         div.className = 'note-item';
         div.dataset.noteId = note.id;
         if (note.id === this.currentNoteId) div.classList.add('active');
-
         if (note.color && note.color !== '#ffffff') {
             div.style.backgroundColor = note.color;
             div.style.borderColor = note.color;
@@ -2494,100 +2132,75 @@ class NotesApp {
             div.addEventListener('mouseenter', () => { div.style.boxShadow = `0 8px 24px ${this.hexToRgba(note.color, 0.4)}`; });
             div.addEventListener('mouseleave', () => { div.style.boxShadow = `0 4px 16px ${this.hexToRgba(note.color, 0.3)}`; });
         }
-
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = note.content;
         const plainText = tempDiv.textContent || tempDiv.innerText || '';
         const preview = plainText.substring(0, 150);
         const date = new Date(note.modifiedAt);
         const isLiveNote = note._isCollabNote || this._isCollabNoteId(note.id);
-
         div.innerHTML = `
             <div class="note-item-title">${this.escapeHtml(note.title)}</div>
             <div class="note-item-preview">${this.escapeHtml(preview)}${preview.length === 150 ? '...' : ''}</div>
             <div class="note-item-date">${isLiveNote ? '<span class="note-live-dot"></span>' : ''}${this.formatDate(date)}</div>
         `;
-
         div.addEventListener('click', () => {
             this.selectNote(note.id);
-            // Close sidebar on mobile when note is tapped
             if (this.isMobile()) this.closeMobileSidebar();
         });
-
         return div;
     }
-
     renderNotesCards() {
         const notesListDisplay = document.getElementById('notesListDisplay');
         const noNotesContainer = document.getElementById('noNotesContainer');
-
         if (!notesListDisplay) return;
-
         notesListDisplay.innerHTML = '';
-
         if (this.notes.length === 0) {
             notesListDisplay.style.display = 'none';
             noNotesContainer.style.display = 'flex';
             return;
         }
-
         notesListDisplay.style.display = 'grid';
         noNotesContainer.style.display = 'none';
-
         const colorClasses = ['pink', 'blue', 'green', 'yellow', 'purple'];
-
         this.notes.forEach((note, index) => {
             const card = document.createElement('div');
             card.className = 'note-card';
             card.dataset.noteId = note.id;
-
-            // Only apply color if the note has a color set AND it's not white (#ffffff)
             if (note.color && note.color !== '#ffffff') {
                 const colorIndex = this.getColorClassFromHex(note.color);
                 if (colorIndex !== -1) {
                     card.classList.add(colorClasses[colorIndex]);
                 }
             }
-
-            // Extract preview text
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = note.content;
             const plainText = tempDiv.textContent || tempDiv.innerText || '';
             const preview = plainText.substring(0, 100);
-
-            // Format date
             const date = new Date(note.modifiedAt);
             const formattedDate = this.formatDate(date);
-
-            // Create title - default to "Untitled Note" if empty
             const title = note.title || 'Untitled Note';
-
             card.innerHTML = `
                 <h4 class="note-card-title">${this.escapeHtml(title)}</h4>
                 <p class="note-card-preview">${this.escapeHtml(preview)}</p>
                 <p class="note-card-date">${formattedDate}</p>
             `;
-
             card.addEventListener('click', () => {
                 this.selectNote(note.id);
             });
-
             notesListDisplay.appendChild(card);
         });
         this._updateLeaveButtonVisibility();
     }
-
     getColorClassFromHex(hex) {
         const colorMap = {
-            '#ffe4e1': 0, // pink
-            '#e6f3ff': 1, // blue
-            '#e8f5e8': 2, // green
-            '#fff9e6': 3, // yellow
-            '#f3e6ff': 4  // purple
+            '#ffe4e1': 0, 
+            '#e6f3ff': 1, 
+            '#e8f5e8': 2, 
+            '#fff9e6': 3, 
+            '#f3e6ff': 4  
         };
         return colorMap[hex] !== undefined ? colorMap[hex] : -1;
     }
-
     showWelcomeScreenIfNeeded() {
         const hasNotes = this.notes.length > 0;
         const welcomeScreen = document.getElementById('welcomeScreen');
@@ -2597,14 +2210,12 @@ class NotesApp {
         const ribbon = document.querySelector('.ribbon');
         const sidebar = document.querySelector('.sidebar');
         const editorArea = document.querySelector('.editor-area');
-
         if (hasNotes && this.currentNoteId) {
             welcomeScreen.classList.add('hidden');
             editorHeader.style.display = 'flex';
             editorContent.style.display = 'flex';
             if (statusbar) statusbar.style.display = '';
             document.body.classList.remove('no-active-note');
-            // Trigger animations
             if (ribbon) { ribbon.classList.remove('entering'); void ribbon.offsetWidth; ribbon.classList.add('entering'); }
             if (sidebar) { sidebar.classList.remove('appearing'); void sidebar.offsetWidth; sidebar.classList.add('appearing'); }
             if (editorArea) { editorArea.classList.remove('appearing'); void editorArea.offsetWidth; editorArea.classList.add('appearing'); }
@@ -2615,28 +2226,18 @@ class NotesApp {
             if (statusbar) statusbar.style.display = 'none';
             document.body.classList.add('no-active-note');
             this.currentNoteId = null;
-            // Clear animation classes
             if (ribbon) ribbon.classList.remove('entering');
             if (sidebar) sidebar.classList.remove('appearing');
             if (editorArea) editorArea.classList.remove('appearing');
             this._setOwnerOnlyButtonsVisible(true);
             this._updateLeaveButtonVisibility();
-            // Render notes cards on welcome screen
             this.renderNotesCards();
-            // Do NOT auto-open sidebar — user swipes right to open
         }
     }
-
-    // ─── Insert Operations ──────────────────────────────────────────────────────
-
     insertTable() { this.saveSelection(); this.showTableModal(); }
-
     insertTodo() {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
-
-        // Make sure the cursor is inside the note editor — never replace
-        // selected text outside it (ribbon, title, sidebar, etc.).
         const selection = window.getSelection();
         let useRange = null;
         if (selection && selection.rangeCount > 0) {
@@ -2653,7 +2254,6 @@ class NotesApp {
             sel2.addRange(this.savedSelection.cloneRange());
             useRange = sel2.getRangeAt(0);
         }
-
         const div = document.createElement('div');
         div.className = 'todo-item';
         const checkbox = document.createElement('input');
@@ -2665,7 +2265,6 @@ class NotesApp {
         div.appendChild(checkbox);
         div.appendChild(label);
         const br = document.createElement('br');
-
         if (useRange) {
             useRange.deleteContents();
             useRange.insertNode(br);
@@ -2689,7 +2288,6 @@ class NotesApp {
         }
         this.updateNoteContent();
     }
-
     insertImage(file) {
         const editor = document.getElementById('textEditor');
         if (!file || !editor) return;
@@ -2697,7 +2295,7 @@ class NotesApp {
             this.showToast('Please select an image file.');
             return;
         }
-        const maxSize = 5 * 1024 * 1024; // 5 MB
+        const maxSize = 5 * 1024 * 1024; 
         if (file.size > maxSize) {
             this.showToast('Image too large. Please use images under 5 MB.');
             return;
@@ -2707,7 +2305,6 @@ class NotesApp {
             const dataUrl = e.target.result;
             const img = `<img src="${dataUrl}" alt="${file.name}" style="max-width:100%;height:auto;border-radius:6px;">`;
             this.restoreSelection();
-            // If we have a saved selection, use insertHTML; otherwise append
             const sel = window.getSelection();
             if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
                 this.executeCommand('insertHTML', img);
@@ -2720,11 +2317,9 @@ class NotesApp {
         reader.onerror = () => { this.showToast('Failed to read image file.'); };
         reader.readAsDataURL(file);
     }
-
     setupImageDragDrop() {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
-
         editor.addEventListener('dragover', (e) => {
             if (e.dataTransfer && Array.from(e.dataTransfer.items).some(i => i.kind === 'file' && i.type.startsWith('image/'))) {
                 e.preventDefault();
@@ -2732,13 +2327,11 @@ class NotesApp {
                 editor.classList.add('drag-over');
             }
         });
-
         editor.addEventListener('dragleave', (e) => {
             if (!editor.contains(e.relatedTarget)) {
                 editor.classList.remove('drag-over');
             }
         });
-
         editor.addEventListener('drop', (e) => {
             editor.classList.remove('drag-over');
             const files = e.dataTransfer && e.dataTransfer.files;
@@ -2754,17 +2347,14 @@ class NotesApp {
             });
         });
     }
-
     setupTableResize() {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
-
         let resizing = false;
         let startX = 0;
         let startW = 0;
         let targetCell = null;
         let nextCell = null;
-
         editor.addEventListener('mousemove', (e) => {
             if (resizing) return;
             const th = e.target.closest('th, td');
@@ -2777,14 +2367,12 @@ class NotesApp {
                 editor.style.cursor = '';
             }
         });
-
         editor.addEventListener('mousedown', (e) => {
             const th = e.target.closest('th, td');
             if (!th) return;
             const rect = th.getBoundingClientRect();
             const nearRight = e.clientX > rect.right - 6 && e.clientX < rect.right + 4;
             if (!nearRight) return;
-
             e.preventDefault();
             resizing = true;
             startX = e.clientX;
@@ -2796,7 +2384,6 @@ class NotesApp {
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
         });
-
         document.addEventListener('mousemove', (e) => {
             if (!resizing || !targetCell) return;
             const diff = e.clientX - startX;
@@ -2804,7 +2391,6 @@ class NotesApp {
             targetCell.style.width = newW + 'px';
             if (nextCell) nextCell.style.width = '';
         });
-
         document.addEventListener('mouseup', () => {
             if (!resizing) return;
             resizing = false;
@@ -2814,8 +2400,6 @@ class NotesApp {
             this.updateNoteContent();
         });
     }
-
-    // ─── Status Bar (Ln, Col, Words, Characters) ─────────────────────────────
     setupStatusBar() {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
@@ -2830,22 +2414,17 @@ class NotesApp {
                 update();
             }
         });
-        // Initial render
         this.updateStatusBar();
     }
-
     updateStatusBar() {
         const editor = document.getElementById('textEditor');
         const lineEl = document.getElementById('statbar-line');
         const wordsEl = document.getElementById('statbar-words');
         const charsEl = document.getElementById('statbar-chars');
         if (!editor || !lineEl || !wordsEl || !charsEl) return;
-
         const text = editor.innerText || '';
         const words = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
         const chars = text.replace(/\r/g, '').length;
-
-        // Compute caret line/column relative to plain text content
         let line = 1, col = 1;
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
@@ -2853,7 +2432,6 @@ class NotesApp {
             const pre = range.cloneRange();
             pre.selectNodeContents(editor);
             pre.setEnd(range.endContainer, range.endOffset);
-            // Approximate plain text up to the caret using a temporary container
             const frag = pre.cloneContents();
             const tmp = document.createElement('div');
             tmp.appendChild(frag);
@@ -2866,16 +2444,11 @@ class NotesApp {
         wordsEl.textContent = `${words} word${words === 1 ? '' : 's'}`;
         charsEl.textContent = `${chars} character${chars === 1 ? '' : 's'}`;
     }
-
-    // ─── Inline Image Interactions (click to select, drag, resize) ───────────
     setupImageInteractions() {
         const editor = document.getElementById('textEditor');
         if (!editor) return;
-
-        // Click on an image: wrap in a resize wrapper if needed and select it.
         editor.addEventListener('click', (e) => {
             const img = e.target && e.target.tagName === 'IMG' ? e.target : null;
-            // Clear previous selection
             editor.querySelectorAll('.img-resize-wrapper.selected').forEach(w => {
                 if (w !== (img && img.parentElement)) w.classList.remove('selected');
             });
@@ -2891,7 +2464,6 @@ class NotesApp {
             img.classList.add('img-selected');
         });
     }
-
     _wrapImageForResize(img) {
         if (!img) return;
         let wrapper = img.parentElement;
@@ -2904,8 +2476,6 @@ class NotesApp {
         const handle = document.createElement('span');
         handle.className = 'img-resize-handle';
         wrapper.appendChild(handle);
-
-        // Resize via the corner handle
         let resizing = false, sX = 0, sY = 0, sW = 0, sH = 0, ar = 1;
         handle.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -2920,7 +2490,6 @@ class NotesApp {
         const moveH = (e) => {
             if (!resizing) return;
             const dx = e.clientX - sX;
-            // Maintain aspect ratio based on horizontal drag
             const newW = Math.max(40, sW + dx);
             const newH = Math.max(40, Math.round(newW / ar));
             img.style.width = newW + 'px';
@@ -2936,8 +2505,6 @@ class NotesApp {
         };
         document.addEventListener('mousemove', moveH);
         document.addEventListener('mouseup', upH);
-
-        // Drag to move within the editor (HTML5 drag for caret-aware drop)
         img.draggable = true;
         img.addEventListener('dragstart', (e) => {
             if (e.dataTransfer) {
@@ -2947,7 +2514,6 @@ class NotesApp {
             this._draggingImg = img;
         });
         img.addEventListener('dragend', () => { this._draggingImg = null; });
-
         const editor = document.getElementById('textEditor');
         if (editor && !editor.dataset.imgDropWired) {
             editor.dataset.imgDropWired = '1';
@@ -2981,21 +2547,17 @@ class NotesApp {
         }
         return wrapper;
     }
-
     setupCanvasDragHandle() {
         const canvas = document.getElementById('drawingCanvas');
         const editorContent = canvas ? canvas.parentElement : null;
         if (!canvas || !editorContent) return;
-
         const handle = document.createElement('div');
         handle.id = 'canvasDragHandle';
         handle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5H10V7H8V5ZM14 5H16V7H14V5ZM8 11H10V13H8V11ZM14 11H16V13H14V11ZM8 17H10V19H8V17ZM14 17H16V19H14V17Z"/></svg> Move`;
         editorContent.appendChild(handle);
-
         const resizeHandle = document.createElement('div');
         resizeHandle.id = 'canvasResizeHandle';
         editorContent.appendChild(resizeHandle);
-
         const positionOverlays = () => {
             const top = parseInt(canvas.style.top || '0') || 0;
             const left = parseInt(canvas.style.left || '0') || 0;
@@ -3007,10 +2569,8 @@ class NotesApp {
             resizeHandle.style.top = (top + h - 8) + 'px';
             resizeHandle.style.left = (left + w - 8) + 'px';
         };
-
         let dragging = false;
         let startX, startY, initTop = 0, initLeft = 0;
-
         handle.addEventListener('mousedown', (e) => {
             e.preventDefault();
             dragging = true;
@@ -3020,7 +2580,6 @@ class NotesApp {
             initLeft = parseInt(canvas.style.left || '0') || 0;
             document.body.style.userSelect = 'none';
         });
-
         document.addEventListener('mousemove', (e) => {
             if (!dragging) return;
             const dx = e.clientX - startX;
@@ -3029,7 +2588,6 @@ class NotesApp {
             canvas.style.left = (initLeft + dx) + 'px';
             positionOverlays();
         });
-
         document.addEventListener('mouseup', () => {
             if (!dragging) return;
             dragging = false;
@@ -3037,8 +2595,6 @@ class NotesApp {
             this._persistDrawingMeta();
             this.debouncedSave();
         });
-
-        // Resize handle (bottom-right)
         let resizing = false;
         let rStartX, rStartY, rStartW = 0, rStartH = 0;
         resizeHandle.addEventListener('mousedown', (e) => {
@@ -3065,12 +2621,10 @@ class NotesApp {
             if (!resizing) return;
             resizing = false;
             document.body.style.cursor = '';
-            // Re-bake the canvas bitmap to new size so rendering stays crisp
             this._rebakeCanvasToCSSSize();
             this._persistDrawingMeta();
             this.debouncedSave();
         });
-
         const update = () => {
             const isVisible = canvas.style.display !== 'none' && !this.isDrawMode;
             if (isVisible) {
@@ -3086,14 +2640,12 @@ class NotesApp {
         observer.observe(canvas, { attributes: true, attributeFilter: ['style'] });
         this._updateCanvasOverlays = update;
     }
-
     _rebakeCanvasToCSSSize() {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas || !this.drawCtx) return;
         const dpr = window.devicePixelRatio || 1;
         const cssW = canvas.offsetWidth || parseInt(canvas.style.width || '0') || canvas.width;
         const cssH = canvas.offsetHeight || parseInt(canvas.style.height || '0') || canvas.height;
-        // Synchronous via offscreen canvas
         const off = document.createElement('canvas');
         off.width = canvas.width;
         off.height = canvas.height;
@@ -3109,7 +2661,6 @@ class NotesApp {
         this.drawCtx.clearRect(0, 0, cssW, cssH);
         this.drawCtx.drawImage(off, 0, 0, cssW, cssH);
     }
-
     showTableModal() {
         const modal = document.getElementById('tableModal');
         const cancelBtn = document.getElementById('tableModalCancel');
@@ -3119,7 +2670,6 @@ class NotesApp {
         if (!modal) return;
         modal.classList.add('show');
         setTimeout(() => rowsInput.focus(), 100);
-
         const cleanup = () => {
             modal.classList.remove('show');
             cancelBtn.removeEventListener('click', cleanup);
@@ -3135,7 +2685,6 @@ class NotesApp {
         const handleBackdrop = (e) => { if (e.target === modal) cleanup(); };
         const handleEscape = (e) => { if (e.key === 'Escape') cleanup(); };
         const handleEnter = (e) => { if (e.key === 'Enter') handleCreate(); };
-
         cancelBtn.addEventListener('click', cleanup);
         createBtn.addEventListener('click', handleCreate);
         modal.addEventListener('click', handleBackdrop);
@@ -3143,7 +2692,6 @@ class NotesApp {
         rowsInput.addEventListener('keydown', handleEnter);
         colsInput.addEventListener('keydown', handleEnter);
     }
-
     createTable(rows, cols) {
         let tableHTML = '<table>';
         tableHTML += '<tr>';
@@ -3155,16 +2703,13 @@ class NotesApp {
             tableHTML += '</tr>';
         }
         tableHTML += '</table><br>';
-        // Restore cursor to where user was before opening the modal
         this.restoreSelection();
         this.executeCommand('insertHTML', tableHTML);
     }
-
     setupDrawing() {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas) return;
         this.drawCtx = canvas.getContext('2d');
-        // Smoother lines
         this.drawCtx.imageSmoothingEnabled = true;
         this.drawCtx.imageSmoothingQuality = 'high';
         this.isDrawMode = false;
@@ -3172,17 +2717,12 @@ class NotesApp {
         this.drawTool = 'pen';
         this.drawColor = '#000000';
         this.drawSize = 2;
-        // Stroke point buffer for midpoint-quadratic smoothing
         this._drawPoints = [];
-        // Cached drawing meta for the active note { x, y, w, h, dataUrl }
         this._drawingMeta = null;
-
         canvas.addEventListener('mousedown', (e) => this.startDraw(e));
         canvas.addEventListener('mousemove', (e) => this.drawLine(e));
         canvas.addEventListener('mouseup', () => this.endDraw());
         canvas.addEventListener('mouseleave', () => this.endDraw());
-
-        // Allow scrolling in draw mode - only prevent default when actually drawing
         canvas.addEventListener('touchstart', (e) => {
             this.startDraw(e.touches[0]);
         }, { passive: true });
@@ -3191,15 +2731,12 @@ class NotesApp {
             this.drawLine(e.touches[0]);
         }, { passive: false });
         canvas.addEventListener('touchend', () => this.endDraw());
-
         const penBtn = document.getElementById('drawPenBtn');
         const eraserBtn = document.getElementById('drawEraserBtn');
         const clearBtn = document.getElementById('drawClearBtn');
         const doneBtn = document.getElementById('drawDoneBtn');
-
         const colorSection = document.querySelector('.draw-color-section');
         const colorDivider = colorSection ? colorSection.previousElementSibling : null;
-
         if (penBtn) penBtn.addEventListener('click', () => {
             this.drawTool = 'pen';
             penBtn.classList.add('active');
@@ -3221,8 +2758,6 @@ class NotesApp {
             if (c && this.drawCtx) this.drawCtx.clearRect(0, 0, c.width, c.height);
         });
         if (doneBtn) doneBtn.addEventListener('click', () => this.finishDrawing());
-
-        // Color swatches
         const colorPresets = document.getElementById('drawColorPresets');
         if (colorPresets) {
             colorPresets.addEventListener('click', (e) => {
@@ -3234,18 +2769,13 @@ class NotesApp {
                 }
             });
         }
-
-        // Custom color picker
         const colorPicker = document.getElementById('drawColorPicker');
         if (colorPicker) {
             colorPicker.addEventListener('input', () => {
                 this.drawColor = colorPicker.value;
-                // Remove active from all swatches since it's a custom color
                 if (colorPresets) colorPresets.querySelectorAll('.draw-color-swatch').forEach(s => s.classList.remove('active'));
             });
         }
-
-        // Size preset buttons
         const toolbar = document.getElementById('drawToolbar');
         if (toolbar) {
             toolbar.addEventListener('click', (e) => {
@@ -3260,10 +2790,6 @@ class NotesApp {
             });
         }
     }
-
-    // Configure the canvas backing store for HiDPI rendering at the given
-    // CSS size (in CSS pixels). Sets a transform so all drawing commands
-    // continue to use CSS-pixel coordinates.
     _configureCanvasForCss(cssW, cssH) {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas || !this.drawCtx) return;
@@ -3279,7 +2805,6 @@ class NotesApp {
         this.drawCtx.lineCap = 'round';
         this.drawCtx.lineJoin = 'round';
     }
-
     resizeCanvas() {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas) return;
@@ -3287,7 +2812,6 @@ class NotesApp {
         if (!container) return;
         const cssW = container.offsetWidth || container.clientWidth || 800;
         const cssH = Math.max(container.offsetHeight || container.clientHeight || 600, 600);
-        // Snapshot current drawing first
         let snapshot = null;
         try { snapshot = canvas.width > 0 ? canvas.toDataURL() : null; } catch (_) {}
         this._configureCanvasForCss(cssW, cssH);
@@ -3299,17 +2823,13 @@ class NotesApp {
             img.src = snapshot;
         }
     }
-
     toggleDrawMode() {
         this.isDrawMode = !this.isDrawMode;
         const canvas = document.getElementById('drawingCanvas');
         const toolbar = document.getElementById('drawToolbar');
         const textEditor = document.getElementById('textEditor');
         const drawBtn = document.getElementById('drawBtn');
-
         if (this.isDrawMode) {
-            // Enter draw mode: expand the canvas to cover the whole editor and
-            // restore any previous drawing at its saved bbox position.
             if (canvas) {
                 canvas.style.pointerEvents = 'all';
                 canvas.style.display = 'block';
@@ -3331,8 +2851,6 @@ class NotesApp {
             if (toolbar) toolbar.classList.add('visible');
             if (drawBtn) drawBtn.classList.add('active');
         } else {
-            // Exit draw mode: crop to the bounding box of pixels drawn,
-            // shrink the canvas to that bbox and reposition it.
             this._cropAndPersistDrawing();
             if (canvas) { canvas.style.pointerEvents = 'none'; }
             if (textEditor) { textEditor.contentEditable = 'true'; }
@@ -3341,21 +2859,17 @@ class NotesApp {
             if (this._updateCanvasOverlays) this._updateCanvasOverlays();
         }
     }
-
     finishDrawing() { if (this.isDrawMode) this.toggleDrawMode(); }
-
     _eventToCssXY(e) {
         const canvas = document.getElementById('drawingCanvas');
         const rect = canvas.getBoundingClientRect();
         return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
-
     startDraw(e) {
         if (!this.isDrawMode || !this.drawCtx) return;
         this.isDrawing = true;
         const { x, y } = this._eventToCssXY(e);
         this._drawPoints = [{ x, y }];
-        // Configure stroke style up front
         const thickness = this.drawSize || 2;
         if (this.drawTool === 'eraser') {
             this.drawCtx.globalCompositeOperation = 'destination-out';
@@ -3365,7 +2879,6 @@ class NotesApp {
             this.drawCtx.strokeStyle = this.drawColor || '#000000';
             this.drawCtx.lineWidth = thickness;
         }
-        // Render a dot so single-clicks produce a visible mark
         this.drawCtx.beginPath();
         this.drawCtx.arc(x, y, Math.max(0.5, this.drawCtx.lineWidth / 2), 0, Math.PI * 2);
         this.drawCtx.fillStyle = this.drawTool === 'eraser' ? '#000' : (this.drawColor || '#000000');
@@ -3373,14 +2886,11 @@ class NotesApp {
         this.drawCtx.beginPath();
         this.drawCtx.moveTo(x, y);
     }
-
     drawLine(e) {
         if (!this.isDrawMode || !this.isDrawing || !this.drawCtx) return;
         const { x, y } = this._eventToCssXY(e);
         const pts = this._drawPoints;
         pts.push({ x, y });
-        // Smooth using mid-point quadratic curves: draw from previous mid-point
-        // to current point with the previous point as the control point.
         if (pts.length >= 3) {
             const p0 = pts[pts.length - 3];
             const p1 = pts[pts.length - 2];
@@ -3394,7 +2904,6 @@ class NotesApp {
             this.drawCtx.quadraticCurveTo(p1.x, p1.y, mid2x, mid2y);
             this.drawCtx.stroke();
         } else {
-            // Two points so far — straight segment
             const p0 = pts[0];
             const p1 = pts[1];
             this.drawCtx.beginPath();
@@ -3403,11 +2912,9 @@ class NotesApp {
             this.drawCtx.stroke();
         }
     }
-
     endDraw() {
         if (!this.isDrawing) return;
         this.isDrawing = false;
-        // Draw the trailing segment so the very last pixel doesn't get cut
         const pts = this._drawPoints;
         if (pts.length >= 2 && this.drawCtx) {
             const p1 = pts[pts.length - 2];
@@ -3421,9 +2928,6 @@ class NotesApp {
         }
         this._drawPoints = [];
     }
-
-    // Compute a tight bounding box of non-transparent pixels and return a
-    // cropped data URL plus its position/size in CSS pixels.
     _computeDrawingBBox() {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas || !this.drawCtx) return null;
@@ -3447,7 +2951,6 @@ class NotesApp {
         }
         if (maxX < 0) return null;
         const dpr = window.devicePixelRatio || 1;
-        // Add a small padding so strokes near the edge aren't clipped
         const padCss = 4;
         const padDev = Math.round(padCss * dpr);
         const x0 = Math.max(0, minX - padDev);
@@ -3456,7 +2959,6 @@ class NotesApp {
         const y1 = Math.min(H - 1, maxY + padDev);
         const wDev = x1 - x0 + 1;
         const hDev = y1 - y0 + 1;
-        // Crop into an offscreen canvas
         const off = document.createElement('canvas');
         off.width = wDev;
         off.height = hDev;
@@ -3469,29 +2971,21 @@ class NotesApp {
             dataUrl: off.toDataURL('image/png')
         };
     }
-
     _cropAndPersistDrawing() {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas || !this.drawCtx) return;
         if (!this.currentNoteId) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
         if (!note) return;
-
         const bbox = this._computeDrawingBBox();
-        // Always hide and clear the overlay canvas — drawings live inside the editor now
         canvas.style.display = 'none';
         if (this.drawCtx) this.drawCtx.clearRect(0, 0, canvas.width, canvas.height);
         note.drawing = null;
         this._drawingMeta = null;
-
         if (!bbox) {
             this.debouncedSave();
             return;
         }
-
-        // Insert the cropped drawing as an inline image inside the editor so
-        // it scrolls with the note content and behaves like other images
-        // (drag, resize via the image-resize-wrapper).
         const editor = document.getElementById('textEditor');
         if (editor) {
             const img = document.createElement('img');
@@ -3501,9 +2995,6 @@ class NotesApp {
             img.style.height = 'auto';
             img.style.borderRadius = '6px';
             img.setAttribute('data-drawing', '1');
-
-            // Drop the image at the saved selection if it lives in the editor;
-            // otherwise append at the end.
             let placed = false;
             if (this.savedSelection && editor.contains(this.savedSelection.commonAncestorContainer)) {
                 try {
@@ -3517,13 +3008,9 @@ class NotesApp {
                 editor.appendChild(img);
             }
             this.updateNoteContent();
-            // Bug 8: sync drawing to collab session
             if (this.collabMode) this.updateCollabNoteContent();
         }
     }
-
-    // Save just position/size (e.g. after a drag or resize of the persisted
-    // drawing block, without re-cropping).
     _persistDrawingMeta() {
         if (!this.currentNoteId) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
@@ -3536,8 +3023,6 @@ class NotesApp {
         const y = parseInt(canvas.style.top || '0') || 0;
         const w = canvas.offsetWidth || meta.w;
         const h = canvas.offsetHeight || meta.h;
-        // Re-bake current canvas pixels at the new size into the data URL so
-        // resize is preserved, but only when the canvas size actually changed.
         try {
             const dataUrl = canvas.toDataURL('image/png');
             note.drawing = { dataUrl, x, y, w, h };
@@ -3547,9 +3032,6 @@ class NotesApp {
             this._drawingMeta = note.drawing;
         }
     }
-
-    // Back-compat: old notes stored note.drawing as a string (full editor-sized
-    // dataUrl). Normalize to { dataUrl, x, y, w, h }.
     _getDrawingMeta(note) {
         if (!note || !note.drawing) return null;
         if (typeof note.drawing === 'string') {
@@ -3557,13 +3039,9 @@ class NotesApp {
         }
         return note.drawing;
     }
-
     saveDrawing() {
-        // Kept for compatibility — when called outside crop flow, just persist
-        // current canvas as a meta object using current canvas position/size.
         this._cropAndPersistDrawing();
     }
-
     loadDrawing() {
         const canvas = document.getElementById('drawingCanvas');
         if (!canvas) return;
@@ -3571,8 +3049,6 @@ class NotesApp {
         this._drawingMeta = null;
         if (this._updateCanvasOverlays) this._updateCanvasOverlays();
         if (!this.currentNoteId) return;
-
-        // Migrate legacy floating drawing into the editor as an inline image.
         const note = this.notes.find(n => n.id === this.currentNoteId);
         const meta = this._getDrawingMeta(note);
         if (meta && meta.dataUrl) {
@@ -3591,25 +3067,17 @@ class NotesApp {
             this.updateNoteContent();
         }
     }
-
-
-
     zoomIn() {
         const editor = document.getElementById('textEditor');
         editor.style.fontSize = (parseFloat(getComputedStyle(editor).fontSize) * 1.1) + 'px';
     }
-
     zoomOut() {
         const editor = document.getElementById('textEditor');
         editor.style.fontSize = (parseFloat(getComputedStyle(editor).fontSize) * 0.9) + 'px';
     }
-
-    // ─── Utility ─────────────────────────────────────────────────────────────────
-
     generateId() {
         return 'note_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
-
     formatDate(date) {
         const now = new Date();
         const diff = now - date;
@@ -3622,13 +3090,11 @@ class NotesApp {
         if (minutes > 0) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
         return 'Just now';
     }
-
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-
     hexToRgba(hex, opacity) {
         hex = hex.replace('#', '');
         const r = parseInt(hex.substring(0, 2), 16);
@@ -3636,7 +3102,6 @@ class NotesApp {
         const b = parseInt(hex.substring(4, 6), 16);
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     }
-
     sanitizeHtml(html) {
         if (!html) return '';
         const allowedTags = [
@@ -3697,25 +3162,16 @@ class NotesApp {
             return div.innerHTML;
         }
     }
-
-    // ─── MS Dropdowns ────────────────────────────────────────────────────────────
-
-    // Close and return the portal menu to its original dropdown
     _closePortal(animate = true) {
         if (!this._portalMenu) return;
-
         const menu = this._portalMenu;
         const dropdown = this._portalDropdown;
         const btn = this._portalBtn;
-
-        // Clear state immediately so re-opening works without waiting
         this._portalMenu = null;
         this._portalDropdown = null;
         this._portalBtn = null;
-
         dropdown.classList.remove('active');
         btn.setAttribute('aria-expanded', 'false');
-
         let done = false;
         const cleanup = () => {
             if (done) return;
@@ -3725,55 +3181,42 @@ class NotesApp {
             menu.style.cssText = '';
             dropdown.appendChild(menu);
         };
-
         if (animate) {
             menu.classList.add('ms-portal-closing');
             menu.addEventListener('animationend', cleanup);
-            setTimeout(cleanup, 220); // Safety fallback
+            setTimeout(cleanup, 220); 
         } else {
             cleanup();
         }
     }
-
-    // Move menu to body and position it below (or above) the button
     _openPortal(dropdown, btn, menu) {
-        this._closePortal(false); // Close any existing without animation
-
-        // Attach to body so no ancestor's overflow can clip it
+        this._closePortal(false); 
         document.body.appendChild(menu);
         this._portalMenu = menu;
         this._portalDropdown = dropdown;
         this._portalBtn = btn;
         dropdown.classList.add('active');
         btn.setAttribute('aria-expanded', 'true');
-
-        // Measure position after attaching (hidden so no flash)
         const maxH = Math.min(320, window.innerHeight * 0.6);
         menu.style.cssText = `position:fixed;visibility:hidden;display:block;z-index:999999;margin:0;max-height:${maxH}px;overflow-y:auto;`;
-
         const btnRect = btn.getBoundingClientRect();
         const mW = menu.offsetWidth || 180;
         const mH = menu.offsetHeight || 260;
         const vW = window.innerWidth;
         const vH = window.innerHeight;
-
         let top = btnRect.bottom + 4;
         if (top + mH > vH - 8) top = btnRect.top - mH - 4;
         if (top < 8) top = btnRect.bottom + 4;
-
         let left = btnRect.left;
         if (left + mW > vW - 8) left = vW - mW - 8;
         if (left < 8) left = 8;
-
         menu.style.cssText = `position:fixed;display:block;visibility:visible;z-index:999999;margin:0;left:${left}px;top:${top}px;max-height:${maxH}px;overflow-y:auto;animation:dropdownFadeIn 0.18s ease;`;
     }
-
     setupMSDropdowns() {
         document.querySelectorAll('.ms-dropdown').forEach(dropdown => {
             const btn = dropdown.querySelector('.ms-dropdown-btn');
             const menu = dropdown.querySelector('.ms-dropdown-menu');
             const items = dropdown.querySelectorAll('.ms-dropdown-item');
-
             btn.setAttribute('aria-expanded', 'false');
             btn.setAttribute('aria-haspopup', 'listbox');
             menu.setAttribute('role', 'listbox');
@@ -3782,11 +3225,9 @@ class NotesApp {
                 item.setAttribute('tabindex', '-1');
                 item.id = `dropdown-item-${dropdown.id}-${index}`;
             });
-
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.saveSelection();
-                // Toggle: if already open, close it
                 if (this._portalDropdown === dropdown) {
                     this._closePortal();
                     return;
@@ -3794,12 +3235,10 @@ class NotesApp {
                 this._openPortal(dropdown, btn, menu);
                 if (items[0]) items[0].focus();
             });
-
             btn.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
                 else if (e.key === 'ArrowDown') { e.preventDefault(); btn.click(); }
             });
-
             items.forEach((item, index) => {
                 item.addEventListener('keydown', (e) => {
                     if (e.key === 'ArrowDown') { e.preventDefault(); (items[index + 1] || items[0]).focus(); }
@@ -3808,15 +3247,13 @@ class NotesApp {
                     else if (e.key === 'Escape') { e.preventDefault(); this._closePortal(); btn.focus(); }
                 });
             });
-
             items.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.stopPropagation(); e.preventDefault();
                     const value = item.dataset.value;
-                    if (value === undefined || value === null || value === '') return; // Skip group labels
+                    if (value === undefined || value === null || value === '') return; 
                     const label = item.dataset.label || item.textContent;
                     const valueSpan = btn.querySelector('.dropdown-value');
-                    // For color-only dropdowns, keep the permanent label (e.g. "Text", "Highlight")
                     const isColorOnlyDropdown = dropdown.id === 'fontColorDropdown' || dropdown.id === 'highlightColorDropdown';
                     if (valueSpan && !isColorOnlyDropdown) valueSpan.textContent = label;
                     const colorPreview = btn.querySelector('.color-preview');
@@ -3846,8 +3283,6 @@ class NotesApp {
                 });
             });
         });
-
-        // Close portal when clicking anywhere outside the open menu/button
         document.addEventListener('click', (e) => {
             if (this._portalMenu &&
                 !this._portalMenu.contains(e.target) &&
@@ -3856,14 +3291,10 @@ class NotesApp {
             }
         });
     }
-
-    // ─── Context Menu ────────────────────────────────────────────────────────────
-
     setupCustomContextMenu() {
         const contextMenu = document.getElementById('customContextMenu');
         const textEditor = document.getElementById('textEditor');
         if (!contextMenu || !textEditor) return;
-
         textEditor.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             this.saveSelection();
@@ -3874,7 +3305,6 @@ class NotesApp {
             if (rect.right > window.innerWidth) contextMenu.style.left = (e.pageX - rect.width) + 'px';
             if (rect.bottom > window.innerHeight) contextMenu.style.top = (e.pageY - rect.height) + 'px';
         });
-
         contextMenu.addEventListener('click', (e) => {
             const item = e.target.closest('.context-menu-item');
             if (!item) return;
@@ -3889,27 +3319,19 @@ class NotesApp {
             }
             contextMenu.style.display = 'none';
         });
-
         document.addEventListener('click', (e) => { if (!contextMenu.contains(e.target)) contextMenu.style.display = 'none'; });
         document.addEventListener('scroll', () => { contextMenu.style.display = 'none'; });
     }
-
-    // ─── Table Toolbar ───────────────────────────────────────────────────────────
-
     setupTableToolbar() {
         const toolbar = document.getElementById('tableToolbar');
         const editor = document.getElementById('textEditor');
         if (!toolbar || !editor) return;
-
         let activeCell = null;
-
-        // Show toolbar when user clicks inside a table cell
         editor.addEventListener('click', (e) => {
             const cell = e.target.closest('td, th');
             if (cell && editor.contains(cell)) {
                 activeCell = cell;
                 toolbar.style.display = 'flex';
-                // Position toolbar above the table
                 const table = cell.closest('table');
                 const tableRect = table.getBoundingClientRect();
                 const tbH = 36;
@@ -3921,8 +3343,6 @@ class NotesApp {
                 if (!toolbar.contains(e.target)) { toolbar.style.display = 'none'; activeCell = null; }
             }
         });
-
-        // Handle toolbar button actions
         toolbar.addEventListener('click', (e) => {
             const btn = e.target.closest('.tbl-btn');
             if (!btn || !activeCell) return;
@@ -3930,9 +3350,7 @@ class NotesApp {
             const row = activeCell.parentElement;
             const table = row ? row.closest('table') : null;
             if (!table) return;
-
             const colIndex = Array.from(row.children).indexOf(activeCell);
-
             if (action === 'addRowAbove') {
                 const newRow = this._makeTableRow(row.cells.length, row.querySelector('th') ? 'th' : 'td');
                 row.parentNode.insertBefore(newRow, row);
@@ -3962,15 +3380,12 @@ class NotesApp {
             }
             this.updateNoteContent();
         });
-
-        // Hide toolbar when clicking outside editor
         document.addEventListener('click', (e) => {
             if (!editor.contains(e.target) && !toolbar.contains(e.target)) {
                 toolbar.style.display = 'none'; activeCell = null;
             }
         });
     }
-
     _makeTableRow(colCount, cellTag = 'td') {
         const row = document.createElement('tr');
         for (let i = 0; i < colCount; i++) {
@@ -3980,9 +3395,6 @@ class NotesApp {
         }
         return row;
     }
-
-    // ─── Note Color ──────────────────────────────────────────────────────────────
-
     updateNoteColor(color) {
         if (!this.currentNoteId) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
@@ -3992,7 +3404,6 @@ class NotesApp {
         if (textEditor) {
             textEditor.style.backgroundColor = color === '#ffffff' ? 'rgba(255, 255, 255, 0.5)' : color;
         }
-        // Sync color to collaborators only when the currently selected note is the shared collab note.
         if (this.collabMode && this.collabIsOwner && this.collabNoteData && this.currentNoteId === this.collabNoteId) {
             this.collabNoteData.color = color;
             this.collabNoteData.modifiedAt = new Date().toISOString();
@@ -4002,9 +3413,6 @@ class NotesApp {
         this.renderNotesCards();
         if (!note._isCollabNote) this.debouncedSave();
     }
-
-    // ─── Delete Modal ────────────────────────────────────────────────────────────
-
     showDeleteModal(noteTitle, onConfirm) {
         const modal = document.getElementById('deleteModal');
         const message = document.getElementById('deleteModalMessage');
@@ -4012,7 +3420,6 @@ class NotesApp {
         const confirmBtn = document.getElementById('deleteModalConfirm');
         message.textContent = `Are you sure you want to delete "${noteTitle}"? This action cannot be undone.`;
         modal.classList.add('show');
-
         const cleanup = () => {
             modal.classList.remove('show');
             cancelBtn.removeEventListener('click', cleanup);
@@ -4023,46 +3430,35 @@ class NotesApp {
         const handleConfirm = () => { cleanup(); onConfirm(); };
         const handleBackdrop = (e) => { if (e.target === modal) cleanup(); };
         const handleEscape = (e) => { if (e.key === 'Escape') cleanup(); };
-
         cancelBtn.addEventListener('click', cleanup);
         confirmBtn.addEventListener('click', handleConfirm);
         modal.addEventListener('click', handleBackdrop);
         document.addEventListener('keydown', handleEscape);
     }
-
-    // ─── Sidebar Toggle (Desktop) ────────────────────────────────────────────────
-
     setupSidebarToggle() {
         const toggleBtn = document.getElementById('sidebarToggle');
         const sidebar = document.querySelector('.sidebar');
         if (!toggleBtn || !sidebar) return;
-
         toggleBtn.addEventListener('click', (e) => {
             e.preventDefault(); e.stopPropagation();
-
             if (this.isMobile()) {
-                // On mobile, toggle acts as open/close
                 if (this.sidebarOpen) this.closeMobileSidebar();
                 else this.openMobileSidebar();
                 return;
             }
-
             sidebar.classList.toggle('collapsed');
             const isCollapsed = sidebar.classList.contains('collapsed');
             localStorage.setItem('sidebarCollapsed', isCollapsed.toString());
             this.updateToggleIcon(toggleBtn, isCollapsed);
         });
-
         const savedState = localStorage.getItem('sidebarCollapsed');
         if (savedState === 'true' && !this.isMobile()) {
             sidebar.classList.add('collapsed');
             this.updateToggleIcon(toggleBtn, true);
         }
-
         toggleBtn.style.opacity = '1';
         toggleBtn.style.pointerEvents = 'auto';
     }
-
     updateToggleIcon(toggleBtn, isCollapsed) {
         const svg = toggleBtn.querySelector('svg');
         if (!svg) return;
@@ -4074,9 +3470,6 @@ class NotesApp {
             toggleBtn.title = 'Collapse Sidebar';
         }
     }
-
-    // ─── Editor Empty Detection ──────────────────────────────────────────────────
-
     isEditorEmpty(editor) {
         const content = editor.innerHTML.trim();
         const textContent = editor.textContent.trim();
@@ -4088,12 +3481,10 @@ class NotesApp {
         const emptyPatterns = ['', '<br>', '<div></div>', '<p></p>', '<div><br></div>', '<p><br></p>', '<div>\u00A0</div>', '<p>\u00A0</p>', '<p>Start typing your note here...</p>', '<ul></ul>', '<ol></ol>', '<ul><li></li></ul>', '<ol><li></li></ol>'];
         return emptyPatterns.includes(content);
     }
-
     updatePlaceholderState(editor) {
         if (this.isEditorEmpty(editor)) editor.setAttribute('data-empty', 'true');
         else editor.removeAttribute('data-empty');
     }
-
     setupEditorPlaceholder() {
         const textEditor = document.getElementById('textEditor');
         if (!textEditor) return;
@@ -4105,9 +3496,6 @@ class NotesApp {
         });
         this.updatePlaceholderState(textEditor);
     }
-
-    // ─── Clipboard ───────────────────────────────────────────────────────────────
-
     async modernCut() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
@@ -4124,7 +3512,6 @@ class NotesApp {
             } catch { try { document.execCommand('cut'); this.updateNoteContent(); } catch (err) { console.error('Cut failed:', err); } }
         }
     }
-
     async modernCopy() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
@@ -4138,7 +3525,6 @@ class NotesApp {
             } catch { try { document.execCommand('copy'); } catch (err) { console.error('Copy failed:', err); } }
         }
     }
-
     async modernPaste() {
         try {
             const items = await navigator.clipboard.read();
@@ -4161,7 +3547,6 @@ class NotesApp {
             }
         }
     }
-
     modernFontFamily(font) {
         this.restoreSelection();
         const selection = window.getSelection();
@@ -4191,7 +3576,6 @@ class NotesApp {
         }
         this.updateNoteContent();
     }
-
     modernFontSize(size) {
         this.restoreSelection();
         const selection = window.getSelection();
@@ -4221,7 +3605,6 @@ class NotesApp {
         }
         this.updateNoteContent();
     }
-
     modernTextColor(color) {
         this.restoreSelection();
         const selection = window.getSelection();
@@ -4251,7 +3634,6 @@ class NotesApp {
         }
         this.updateNoteContent();
     }
-
     modernHighlightColor(color) {
         this.restoreSelection();
         const selection = window.getSelection();
@@ -4273,7 +3655,6 @@ class NotesApp {
             }
         } else {
             if (isNone) {
-                // In-place removal: walk up ancestors and within selection to clear background-color
                 const editor = document.getElementById('textEditor');
                 const unwrapSpan = (el) => {
                     const parent = el.parentNode;
@@ -4281,8 +3662,6 @@ class NotesApp {
                     while (el.firstChild) parent.insertBefore(el.firstChild, el);
                     parent.removeChild(el);
                 };
-
-                // 1. Walk up ancestors of selection start to clear parent highlight spans
                 let ancestor = range.commonAncestorContainer;
                 if (ancestor.nodeType === Node.TEXT_NODE) ancestor = ancestor.parentElement;
                 let cur = ancestor;
@@ -4298,8 +3677,6 @@ class NotesApp {
                     }
                     cur = cur.parentElement;
                 }
-
-                // 2. Clear highlight from all descendant elements within the range
                 if (ancestor && ancestor !== editor) {
                     const spans = Array.from(ancestor.querySelectorAll('span[style]'));
                     for (let i = spans.length - 1; i >= 0; i--) {
@@ -4325,7 +3702,6 @@ class NotesApp {
         }
         this.updateNoteContent();
     }
-
     insertTextAtSelection(text) {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
@@ -4338,7 +3714,6 @@ class NotesApp {
         selection.removeAllRanges();
         selection.addRange(range);
     }
-
     getSelectedHtml() {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return '';
@@ -4346,7 +3721,6 @@ class NotesApp {
         div.appendChild(selection.getRangeAt(0).cloneContents());
         return div.innerHTML;
     }
-
     insertHtmlAtSelection(html) {
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
@@ -4358,12 +3732,10 @@ class NotesApp {
         selection.removeAllRanges();
         selection.addRange(range);
     }
-
     setupTempFormatting(span, styles) {
         const editor = document.getElementById('textEditor');
         this.tempFormattingStyles = styles;
         this.tempFormattingSpan = span;
-
         const handleInput = (e) => {
             if (e.inputType === 'insertText' || e.inputType === 'insertCompositionText') {
                 const range = window.getSelection().getRangeAt(0);
@@ -4387,7 +3759,6 @@ class NotesApp {
                 editor.removeEventListener('input', handleInput);
             }
         };
-
         const cleanupHandler = () => {
             if (this.tempFormattingSpan && this.tempFormattingSpan.parentNode) {
                 this.tempFormattingSpan.parentNode.removeChild(this.tempFormattingSpan);
@@ -4399,16 +3770,12 @@ class NotesApp {
             editor.removeEventListener('input', handleInput);
             editor.removeEventListener('click', cleanupHandler);
         };
-
         editor.addEventListener('input', handleInput, { once: true });
         editor.addEventListener('click', cleanupHandler, { once: true });
         editor.addEventListener('keydown', (e) => {
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) cleanupHandler();
         }, { once: true });
     }
-
-    // ─── Export / Import ─────────────────────────────────────────────────────────
-
     async exportNoteAsLink() {
         if (!this.currentNoteId) return;
         const note = this.notes.find(n => n.id === this.currentNoteId);
@@ -4420,14 +3787,10 @@ class NotesApp {
             const copyBtn = document.getElementById('exportModalCopy');
             if (!exportModal) return;
             this.saveSelection();
-
-            // Reject notes whose compressed URL would exceed the maximum URL length.
-            // Maximum URL length is 8215 characters (common browser limit).
             const MAX_URL_LENGTH = 8215;
             const baseUrl = `${window.location.origin}${window.location.pathname}?s=`;
             const token = await compressToUrl(JSON.stringify({ t: note.title, c: note.content }));
             const fullUrl = baseUrl + token;
-
             if (fullUrl.length > MAX_URL_LENGTH) {
                 exportModal.classList.add('show');
                 exportLink.value = 'This note is too long to share with a link.';
@@ -4449,7 +3812,6 @@ class NotesApp {
             exportModal.classList.add('show');
             exportLink.value = shareLink;
             exportLink.select();
-
             const cleanup = () => {
                 exportModal.classList.remove('show');
                 cancelBtn.removeEventListener('click', cleanup);
@@ -4480,7 +3842,6 @@ class NotesApp {
             copyBtn.addEventListener('click', handleCopy);
         } catch (error) { console.error('Error encoding note:', error); }
     }
-
     async importNoteFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const token = params.get('s');
@@ -4504,7 +3865,6 @@ class NotesApp {
             setTimeout(() => this.showImportModal(data.t || 'Untitled'), 150);
         } catch (error) { console.error('Error importing note:', error); }
     }
-
     showImportModal(noteTitle) {
         const modal = document.getElementById('importModal');
         const message = document.getElementById('importModalMessage');
@@ -4518,14 +3878,10 @@ class NotesApp {
         if (continueBtn) continueBtn.onclick = close;
     }
 }
-
-// ─── Init ──────────────────────────────────────────────────────────────────────
-
 document.addEventListener('DOMContentLoaded', () => {
     window.notesApp = new NotesApp();
     window.notesApp.importNoteFromUrl();
 });
-
 window.addEventListener('beforeunload', () => {
     const app = window.notesApp;
     if (app && app.saveTimeout) { clearTimeout(app.saveTimeout); app.saveNotesToStorage(); }

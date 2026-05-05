@@ -2,82 +2,61 @@ const contextMenu = document.getElementById("custom-context-menu");
 const toast = document.getElementById("custom-toast");
 let clickedElement = null;
 let selectedText = "";
-
 window.addEventListener("contextmenu", function (e) {
   e.preventDefault();
   clickedElement = e.target;
-
-  // Capture selected text when right-click is triggered
   const sel = window.getSelection();
   selectedText = sel ? sel.toString().trim() : "";
-
   contextMenu.style.top = "-9999px";
   contextMenu.style.left = "-9999px";
   contextMenu.style.display = "block";
-
   const menuWidth = contextMenu.offsetWidth || 260;
   const menuHeight = contextMenu.offsetHeight || 160;
   const viewportWidth = document.documentElement.clientWidth;
   const viewportHeight = document.documentElement.clientHeight;
-
   let left = e.clientX;
   let top = e.clientY;
-
   if (left + menuWidth > viewportWidth) left = viewportWidth - menuWidth - 8;
   if (left < 8) left = 8;
   if (top + menuHeight > viewportHeight) top = viewportHeight - menuHeight - 8;
   if (top < 8) top = 8;
-
   contextMenu.style.left = `${left}px`;
   contextMenu.style.top = `${top}px`;
 });
-
 window.addEventListener("click", () => {
   contextMenu.style.display = "none";
 });
-
-let toastTimer; // Global timer reference
-
+let toastTimer; 
 function showToast(message) {
   const toast = document.getElementById("custom-toast");
   toast.innerHTML = message;
   toast.classList.add("show");
-
-  // Clear previous timer
   clearTimeout(toastTimer);
-
-  // Start new 5-second timer
   toastTimer = setTimeout(() => {
     toast.classList.remove("show");
   }, 5000);
 }
-
 function copyPageLink() {
   navigator.clipboard.writeText(location.href);
   showToast("📎 Page link copied!");
 }
-
 function truncate(str, maxLength = 100) {
   return str.length > maxLength ? str.slice(0, maxLength) + "..." : str;
 }
-
 function copyTextContent() {
   if (selectedText) {
     navigator.clipboard.writeText(selectedText);
-
     const preview = truncate(selectedText.trim(), 100);
     showToast(`📋 Copied: "${preview}"`);
   } else {
     showToast("⚠️ No text selected.");
   }
 }
-
 function showElementInfo() {
   if (!clickedElement) {
     showToast("⚠️ No element selected.");
     return;
   }
-
   const tag = clickedElement.tagName;
   const id = clickedElement.id ? `#${truncate(clickedElement.id, 100)}` : null;
   const classList = clickedElement.className
@@ -87,11 +66,9 @@ function showElementInfo() {
         .map(cls => `.${truncate(cls, 100)}`)
         .join(" ")
     : null;
-
   const rawText = clickedElement.textContent || "";
   const cleanText = rawText.trim().replace(/\s+/g, " ");
   const text = cleanText ? `“${truncate(cleanText, 100)}”` : null;
-
   const attributes = {
     href: truncate(clickedElement.getAttribute("href") || "", 100),
     src: truncate(clickedElement.getAttribute("src") || "", 100),
@@ -107,20 +84,16 @@ function showElementInfo() {
       : null,
     ariaLabel: truncate(clickedElement.getAttribute("aria-label") || "", 100)
   };
-
   const dataset = Object.entries(clickedElement.dataset || {})
     .map(([k, v]) => `data-${k}="${truncate(v, 100)}"`)
     .join(", ");
   const truncatedDataset = dataset ? truncate(dataset, 100) : null;
-
   const rect = clickedElement.getBoundingClientRect();
   const width = Math.round(rect.width);
   const height = Math.round(rect.height);
   const size = (width && height) ? `${width}×${height}px` : null;
-
   const childIndex = Array.from(clickedElement.parentNode?.children || []).indexOf(clickedElement);
   const inlineStyle = truncate(clickedElement.getAttribute("style") || "", 100);
-
   const infoLines = [
     `🔖 <strong>Tag:</strong> ${tag}`,
     id ? `🆔 <strong>ID:</strong> ${id}` : null,
@@ -141,10 +114,6 @@ function showElementInfo() {
     size ? `📏 <strong>Size:</strong> ${size}` : null,
     `🧭 <strong>Child Index:</strong> ${childIndex}`,
     inlineStyle ? `🎨 <strong>Inline Style:</strong> ${inlineStyle}` : null
-  ].filter(Boolean); // remove null entries
-
+  ].filter(Boolean); 
   showToast(infoLines.join("<br>"));
 }
-
-
-
