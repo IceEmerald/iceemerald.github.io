@@ -915,15 +915,26 @@ p.animate-on-scroll {
   }
 }
 
-/* Section animation (JS will add 'visible' class) */
-.animate-on-scroll {
-    opacity: 0;
-    transform: translateY(100px);
-    transition: opacity 1s ease-out, transform 1s ease-out;
+/* Section animation — JS handles all state via inline styles and .anim-word spans */
+.animate-on-scroll.no-animation {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
 }
-.animate-on-scroll.visible, .animate-on-scroll.no-animation {
+
+.anim-word {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(20px);
+    filter: blur(5px);
+    transition: opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out;
+    will-change: opacity, transform, filter;
+}
+
+.anim-word.visible {
     opacity: 1;
     transform: translateY(0);
+    filter: blur(0px);
 }
 
 
