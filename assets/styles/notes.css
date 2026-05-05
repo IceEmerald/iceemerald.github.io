@@ -16,6 +16,10 @@
         overscroll-behavior: none;
     }
 
+    html {
+        scrollbar-gutter: stable;
+    }
+
     .notes-app * {
         box-sizing: border-box;
     }
