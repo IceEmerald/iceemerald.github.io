@@ -4,9 +4,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const originalHTML       = new WeakMap();
   const splitState         = new WeakMap();
   const managedByContainer = new WeakSet();
+  const pendingRafs        = new Map();
+
+  function cancelPending(el) {
+    if (pendingRafs.has(el)) {
+      cancelAnimationFrame(pendingRafs.get(el));
+      pendingRafs.delete(el);
+    }
+  }
+
   function isTextEl(el)     { return ALL_TEXT_TAGS.has(el.tagName); }
   function isGradient(el)   { return el.style.webkitTextFillColor === 'transparent'; }
   function hasChildEls(el)  { return Array.from(el.childNodes).some(n => n.nodeType === 1); }
+
   function splitWords(el, baseDelay) {
     if (splitState.get(el) || hasChildEls(el)) return;
     originalHTML.set(el, el.innerHTML);
@@ -27,16 +37,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     splitState.set(el, true);
   }
+
   function showWords(el) {
-    requestAnimationFrame(() =>
-      el.querySelectorAll('.anim-word').forEach(s => s.classList.add('visible'))
-    );
+    const id = requestAnimationFrame(() => {
+      pendingRafs.delete(el);
+      el.querySelectorAll('.anim-word').forEach(s => s.classList.add('visible'));
+    });
+    pendingRafs.set(el, id);
   }
+
   function restoreText(el) {
     if (!splitState.get(el)) return;
     el.innerHTML = originalHTML.get(el) ?? '';
     splitState.set(el, false);
   }
+
   function initWhole(el) {
     el.style.opacity    = '0';
     el.style.transform  = 'translateY(20px)';
@@ -44,24 +59,33 @@ document.addEventListener('DOMContentLoaded', () => {
     el.style.transition = 'opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out';
     el.style.willChange = 'opacity, transform, filter';
   }
+
   function showWhole(el, delay) {
+    cancelPending(el);
     el.style.transitionDelay = (delay || 0) + 's';
-    requestAnimationFrame(() => {
+    const id = requestAnimationFrame(() => {
+      pendingRafs.delete(el);
       el.style.opacity   = '1';
       el.style.transform = 'translateY(0)';
       el.style.filter    = 'blur(0px)';
     });
+    pendingRafs.set(el, id);
   }
+
   function resetWhole(el) {
+    cancelPending(el);
     el.style.transition      = 'none';
     el.style.transitionDelay = '0s';
     el.style.opacity         = '0';
     el.style.transform       = 'translateY(20px)';
     el.style.filter          = 'blur(5px)';
-    requestAnimationFrame(() => {
+    const id = requestAnimationFrame(() => {
+      pendingRafs.delete(el);
       el.style.transition = 'opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out';
     });
+    pendingRafs.set(el, id);
   }
+
   function siblingIdx(el) {
     const parent = el.parentElement;
     if (!parent) return 0;
@@ -73,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const i = sibs.indexOf(el);
     return i < 0 ? 0 : i;
   }
+
   function initBlock(el) {
     el.style.opacity    = '0';
     el.style.transform  = 'translateY(30px)';
@@ -80,58 +105,83 @@ document.addEventListener('DOMContentLoaded', () => {
     el.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out, filter 0.5s ease-out';
     el.style.willChange = 'opacity, transform, filter';
   }
+
   function showBlock(el) {
+    cancelPending(el);
     el.style.transitionDelay = (siblingIdx(el) * 0.1) + 's';
-    requestAnimationFrame(() => {
+    const id = requestAnimationFrame(() => {
+      pendingRafs.delete(el);
       el.style.opacity   = '1';
       el.style.transform = 'translateY(0)';
       el.style.filter    = 'blur(0px)';
     });
+    pendingRafs.set(el, id);
   }
+
   function resetBlock(el) {
+    cancelPending(el);
     el.style.transition      = 'none';
     el.style.transitionDelay = '0s';
     el.style.opacity         = '0';
     el.style.transform       = 'translateY(30px)';
     el.style.filter          = 'blur(4px)';
-    requestAnimationFrame(() => {
+    const id = requestAnimationFrame(() => {
+      pendingRafs.delete(el);
       el.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out, filter 0.5s ease-out';
     });
+    pendingRafs.set(el, id);
   }
+
   function findTextKids(container) {
     const result = [];
     function walk(node) {
       for (const child of node.children) {
         if (child.classList.contains('no-animation')) continue;
         if (BLOCK_TEXT_TAGS.has(child.tagName)) {
-          result.push(child);            
+          result.push(child);
         } else if (!child.classList.contains('animate-on-scroll')) {
-          walk(child);                   
+          walk(child);
         }
       }
     }
     walk(container);
     return result;
   }
+
   function animChild(child, delay) {
     if (isGradient(child)) {
       showWhole(child, delay);
     } else {
+      cancelPending(child);
       splitWords(child, delay);
-      delay === 0
-        ? showWords(child)
-        : setTimeout(() => showWords(child), delay * 1000);
+      if (delay === 0) {
+        showWords(child);
+      } else {
+        const t = setTimeout(() => showWords(child), delay * 1000);
+        pendingRafs.set(child, { isTimeout: true, id: t });
+      }
     }
   }
+
   function resetChild(child) {
+    if (pendingRafs.has(child)) {
+      const pending = pendingRafs.get(child);
+      if (pending && pending.isTimeout) {
+        clearTimeout(pending.id);
+      } else {
+        cancelAnimationFrame(pending);
+      }
+      pendingRafs.delete(child);
+    }
     if (isGradient(child)) {
       resetWhole(child);
     } else {
       restoreText(child);
     }
   }
+
   const allEls = Array.from(document.querySelectorAll('.animate-on-scroll:not(.no-animation)'));
-  const containerKids = new WeakMap(); 
+  const containerKids = new WeakMap();
   allEls.forEach(el => {
     if (!isTextEl(el)) {
       const kids = findTextKids(el);
@@ -139,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
         containerKids.set(el, kids);
         kids.forEach(kid => {
           managedByContainer.add(kid);
-          if (isGradient(kid)) initWhole(kid); 
+          if (isGradient(kid)) initWhole(kid);
         });
       } else {
         initBlock(el);
@@ -148,12 +198,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isGradient(el)) initWhole(el);
     }
   });
+
   const toObserve = allEls.filter(el => !managedByContainer.has(el));
+
   function onEnter(el) {
     if (isTextEl(el)) {
       if (isGradient(el)) {
         showWhole(el, 0);
       } else {
+        cancelPending(el);
         splitWords(el);
         showWords(el);
       }
@@ -166,10 +219,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
+
   function onExit(el) {
     if (isTextEl(el)) {
       if (isGradient(el)) resetWhole(el);
-      else restoreText(el);
+      else {
+        cancelPending(el);
+        restoreText(el);
+      }
     } else {
       const kids = containerKids.get(el);
       if (kids && kids.length > 0) {
@@ -179,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
+
   if ('IntersectionObserver' in window) {
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
@@ -190,6 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     toObserve.forEach(el => setTimeout(() => onEnter(el), 100));
   }
+
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
       const href = this.getAttribute('href');
@@ -207,6 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
   const yearEl = document.getElementById('current-year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 });
