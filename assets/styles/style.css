@@ -210,6 +210,11 @@
     .command-content {
       flex: 1;
       overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .command-content::-webkit-scrollbar {
+      display: none;
     }
     .command-table {
       width: 100%;
