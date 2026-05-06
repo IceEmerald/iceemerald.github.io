@@ -1,9 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const BLOCK_TEXT_TAGS = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P']);
-  const ALL_TEXT_TAGS   = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN']);
+  const BLOCK_TEXT_TAGS  = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P']);
+  const ALL_TEXT_TAGS    = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN']);
+  const BLOCK_CHILD_TAGS = new Set(['A', 'BUTTON', 'IMG', 'FIGURE', 'SVG']);
+
   const originalHTML       = new WeakMap();
   const splitState         = new WeakMap();
   const managedByContainer = new WeakSet();
+  const isBlockKid         = new WeakSet();
   const pendingRafs        = new Map();
 
   function cancelPending(el) {
@@ -13,9 +16,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function isTextEl(el)     { return ALL_TEXT_TAGS.has(el.tagName); }
-  function isGradient(el)   { return el.style.webkitTextFillColor === 'transparent'; }
-  function hasChildEls(el)  { return Array.from(el.childNodes).some(n => n.nodeType === 1); }
+  function isTextEl(el)      { return ALL_TEXT_TAGS.has(el.tagName); }
+  function isBlockChildEl(el){ return BLOCK_CHILD_TAGS.has(el.tagName); }
+  function isGradient(el)    { return el.style.webkitTextFillColor === 'transparent'; }
+  function hasChildEls(el)   { return Array.from(el.childNodes).some(n => n.nodeType === 1); }
+
+  /* ── word-split helpers ──────────────────────────────────────────── */
 
   function splitWords(el, baseDelay) {
     if (splitState.get(el) || hasChildEls(el)) return;
@@ -51,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
     el.innerHTML = originalHTML.get(el) ?? '';
     splitState.set(el, false);
   }
+
+  /* ── whole-element (block) helpers ───────────────────────────────── */
 
   function initWhole(el) {
     el.style.opacity    = '0';
@@ -132,12 +140,14 @@ document.addEventListener('DOMContentLoaded', () => {
     pendingRafs.set(el, id);
   }
 
-  function findTextKids(container) {
+  /* ── child discovery ─────────────────────────────────────────────── */
+
+  function findAnimatableKids(container) {
     const result = [];
     function walk(node) {
       for (const child of node.children) {
         if (child.classList.contains('no-animation')) continue;
-        if (BLOCK_TEXT_TAGS.has(child.tagName)) {
+        if (BLOCK_TEXT_TAGS.has(child.tagName) || BLOCK_CHILD_TAGS.has(child.tagName)) {
           result.push(child);
         } else if (!child.classList.contains('animate-on-scroll')) {
           walk(child);
@@ -148,8 +158,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return result;
   }
 
+  /* ── per-child animate / reset ───────────────────────────────────── */
+
   function animChild(child, delay) {
-    if (isGradient(child)) {
+    if (isBlockKid.has(child)) {
+      showWhole(child, delay);
+    } else if (isGradient(child)) {
       showWhole(child, delay);
     } else {
       cancelPending(child);
@@ -173,23 +187,33 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       pendingRafs.delete(child);
     }
-    if (isGradient(child)) {
+    if (isBlockKid.has(child)) {
+      resetWhole(child);
+    } else if (isGradient(child)) {
       resetWhole(child);
     } else {
       restoreText(child);
     }
   }
 
+  /* ── init all animate-on-scroll elements ─────────────────────────── */
+
   const allEls = Array.from(document.querySelectorAll('.animate-on-scroll:not(.no-animation)'));
   const containerKids = new WeakMap();
+
   allEls.forEach(el => {
     if (!isTextEl(el)) {
-      const kids = findTextKids(el);
+      const kids = findAnimatableKids(el);
       if (kids.length > 0) {
         containerKids.set(el, kids);
         kids.forEach(kid => {
           managedByContainer.add(kid);
-          if (isGradient(kid)) initWhole(kid);
+          if (BLOCK_CHILD_TAGS.has(kid.tagName)) {
+            isBlockKid.add(kid);
+            initWhole(kid);
+          } else if (isGradient(kid)) {
+            initWhole(kid);
+          }
         });
       } else {
         initBlock(el);
@@ -200,6 +224,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const toObserve = allEls.filter(el => !managedByContainer.has(el));
+
+  /* ── enter / exit handlers ───────────────────────────────────────── */
 
   function onEnter(el) {
     if (isTextEl(el)) {
@@ -237,6 +263,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  /* ── intersection observer ───────────────────────────────────────── */
+
   if ('IntersectionObserver' in window) {
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
@@ -248,6 +276,8 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     toObserve.forEach(el => setTimeout(() => onEnter(el), 100));
   }
+
+  /* ── smooth scroll for anchor links ─────────────────────────────── */
 
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
