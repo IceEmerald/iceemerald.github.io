@@ -142,18 +142,6 @@
                 </div>
                 <div class="news-carousel-wrapper">
                     <div class="news-carousel-track" id="newsCarouselTrack">
-                        <div class="news-carousel-item">
-                            <img src="/assets/images/news/news1.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
-                        </div>
-                        <div class="news-carousel-item">
-                            <img src="/assets/images/news/news2.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
-                        </div>
-                        <div class="news-carousel-item">
-                            <img src="/assets/images/news/news3.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
-                        </div>
-                        <div class="news-carousel-item">
-                            <img src="/assets/images/news/news4.webp" class="animate-on-scroll hover-zoom hover-img" alt="">
-                        </div>
                     </div>
                 </div>
                 <div class="news-carousel-controls">
@@ -317,11 +305,16 @@
         const prevBtn = document.getElementById('newsPrev');
         const nextBtn = document.getElementById('newsNext');
         if (!track || !prevBtn || !nextBtn) return;
-        const items = track.querySelectorAll('.news-carousel-item');
+
         let currentIndex = 0;
         const gap = 16;
         const visibleCount = 3;
+
+        function getItems() {
+          return track.querySelectorAll('.news-carousel-item');
+        }
         function getItemWidth() {
+          const items = getItems();
           return items[0] ? items[0].offsetWidth : 280;
         }
         function getCenterOffset() {
@@ -331,7 +324,7 @@
           return Math.max(0, (wrapperWidth - totalVisible) / 2);
         }
         function maxIndex() {
-          return Math.max(0, items.length - visibleCount);
+          return Math.max(0, getItems().length - visibleCount);
         }
         function updateCarousel() {
           const itemWidth = getItemWidth();
@@ -341,23 +334,39 @@
           prevBtn.disabled = currentIndex === 0;
           nextBtn.disabled = currentIndex >= maxIndex();
         }
-        prevBtn.addEventListener('click', function () {
-          if (currentIndex > 0) {
-            currentIndex--;
-            updateCarousel();
-          }
-        });
-        nextBtn.addEventListener('click', function () {
-          if (currentIndex < maxIndex()) {
-            currentIndex++;
-            updateCarousel();
-          }
-        });
-        window.addEventListener('resize', function () {
-          currentIndex = Math.min(currentIndex, maxIndex());
+
+        function initCarousel() {
           updateCarousel();
-        });
-        updateCarousel();
+          prevBtn.addEventListener('click', function () {
+            if (currentIndex > 0) { currentIndex--; updateCarousel(); }
+          });
+          nextBtn.addEventListener('click', function () {
+            if (currentIndex < maxIndex()) { currentIndex++; updateCarousel(); }
+          });
+          window.addEventListener('resize', function () {
+            currentIndex = Math.min(currentIndex, maxIndex());
+            updateCarousel();
+          });
+        }
+
+        fetch('/api/news-images')
+          .then(function (res) { return res.json(); })
+          .then(function (images) {
+            images.forEach(function (src) {
+              const item = document.createElement('div');
+              item.className = 'news-carousel-item';
+              const img = document.createElement('img');
+              img.src = src;
+              img.className = 'animate-on-scroll hover-zoom hover-img';
+              img.alt = '';
+              item.appendChild(img);
+              track.appendChild(item);
+            });
+            initCarousel();
+          })
+          .catch(function () {
+            initCarousel();
+          });
       });
     </script>
 </body>
