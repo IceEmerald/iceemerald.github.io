@@ -665,9 +665,12 @@ p.animate-on-scroll {
 }
 .news-carousel-wrapper {
     position: relative;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: hidden;
     width: 100%;
     box-sizing: border-box;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
 }
 .news-carousel-track {
     display: flex;
