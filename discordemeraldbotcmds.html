@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork | Discord Bot Commands</title>
+    <meta name="description" content="EmeraldBot Commands. Explore the full list of commands to see how EmeraldBot can help you manage and engage your community effectively.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles/style.css" />
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+    <link rel="icon" href="/assets/images/favicon.ico" sizes="any">
+    <style>
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-track { background: #1a1a1a; }
+      ::-webkit-scrollbar-thumb { background: #313131; border-radius: 5px; }
+      
+      .cmd-tabs {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin-bottom: 1.25rem;
+      }
+
+      .cmd-tab {
+        background: transparent;
+        border: 1px solid #313131;
+        color: #ccc;
+        padding: 8px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: background 0.2s, color 0.2s, border-color 0.2s;
+        list-style: none;
+      }
+
+      .cmd-tab:hover {
+        color: #00ff99;
+        border-color: rgba(35, 154, 77, 0.3);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      }
+
+      .cmd-tab.active {
+        background: rgba(0, 255, 153, 0.15);
+        border-color: #00ff99;
+        color: #00ff99;
+        font-weight: 600;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+      }
+
+      .cmd-search-input {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1px solid #313131;
+        background: #222;
+        color: #f0f0f0;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .cmd-search-input:focus {
+        border-color: #00ff99;
+      }
+
+      .cmd-card-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+
+      @media (max-width: 768px) {
+        .cmd-card-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+
+      @media (max-width: 480px) {
+        .cmd-card-grid { grid-template-columns: 1fr; }
+      }
+
+      .cmd-card {
+        background: #222;
+        border: 1px solid #313131;
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition: all 0.2s ease;
+      }
+
+      .cmd-card:hover {
+        border-color: rgba(35, 154, 77, 0.3);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      }
+
+      .cmd-card-name {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #00ff99;
+      }
+
+      .cmd-card-desc {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.875rem;
+        color: #ccc;
+        line-height: 1.4;
+      }
+
+      .cmd-card-usage {
+        font-family: 'DM Sans';
+        font-size: 0.8rem;
+        color: #888;
+        background: #1a1a1a;
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin-top: 4px;
+        display: inline-block;
+        max-width: 100%;
+        word-break: break-all;
+      }
+
+      .cmd-no-results {
+        grid-column: 1 / -1;
+        text-align: center;
+        color: #888;
+        padding: 2rem;
+        font-family: 'DM Sans', sans-serif;
+      }
+
+      .command-docs {
+        padding: 2rem 1rem;
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+    </style>
+</head>
+<body style="background-color: #1a1a1a;">
+    <header style="background-color: rgba(32, 32, 32, 0.4); border-bottom: 1px solid #313131 !important;" class="navbar sticky-top">
+        <div class="navcontainer nav-container">
+            <a href="/" class="logo">
+                <img href="/" src="/assets/images/favicon.webp" width="30" height="30" class="icon-primary">
+                <span href="/" style="color: #f0f0f0" class="logo-text">EmeraldNetwork</span>
+            </a>
+            <nav class="nav-links">
+                <a style="color: #f0f0f0" href="https://discord.com/oauth2/authorize?client_id=1197553424724660254&permissions=275364670576&integration_type=0&scope=bot">Invite</a>
+                <a style="color: #f0f0f0" href="discordemeraldbot">Back</a>
+            </nav>
+        </div>
+    </header>
+
+    <div id="custom-context-menu" class="rightclick-menu">
+        <div class="context-section">
+            <span class="context-title">🔧 Tools</span>
+            <a onclick="copyTextContent()">Copy Text</a>
+            <a onclick="copyPageLink()">Copy Page Link</a>
+            <a onclick="showElementInfo()">Show Element Info</a>
+        </div>
+    </div>
+    <div id="custom-toast" class="custom-toast"></div>
+
+    <main>
+        <div style="margin-bottom: 5rem;"></div>
+        <section class="container command-docs animate-on-scroll">
+          <h2 style="background: linear-gradient(90deg, #c0c0c0, #7a7a7a, #4a4a4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; justify-content: center; align-items: center; display: flex; margin-bottom: 2rem; margin-top: 1.5rem;">EmeraldBot Commands</h2>
+            <div class="cmd-tabs">
+                <button class="cmd-tab active" onclick="showCategory('utility')">Utility</button>
+                <button class="cmd-tab" onclick="showCategory('info')">Info</button>
+                <button class="cmd-tab" onclick="showCategory('moderation')">Moderation</button>
+                <button class="cmd-tab" onclick="showCategory('fun')">Fun</button>
+                <button class="cmd-tab" onclick="showCategory('music')">Music</button>
+            </div>
+            <input type="text" id="cmdSearch" class="cmd-search-input" placeholder="🔍  Search commands..." oninput="filterCards(this.value)" />
+            <div id="cmdCardGrid" class="cmd-card-grid"></div>
+        </section>
+        <div style="margin-bottom: 5rem;"></div>
+
+        <script>
+        // Escapes plain text so it's safe to inject via innerHTML
+        function escapeHtml(str) {
+          return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        var cmdData = {
+          utility: [
+            { cmd: 'e!setbirthday',   desc: 'Set your birthday',              usage: 'e!setbirthday <dd/mm/yyyy | dd/mm>' },
+            { cmd: 'e!removebirthday',desc: 'Remove your birthday',            usage: 'e!removebirthday' },
+            { cmd: 'e!nextbirthday',  desc: 'Check whose birthday is next',    usage: 'e!nextbirthday' },
+            { cmd: 'e!afk',           desc: 'Set AFK status',                  usage: 'e!afk [reason]' },
+            { cmd: 'e!poll',          desc: 'Create a poll',                   usage: 'e!poll <question>' },
+            { cmd: 'e!voiceprivate',  desc: 'Toggle voice private mode',       usage: 'e!voiceprivate' },
+            { cmd: 'e!calc',          desc: 'Solve math problems',             usage: 'e!calc <expression>' },
+            { cmd: 'e!ai',            desc: 'Chat with EmeraldBot',            usage: 'e!ai <prompt>' },
+            { cmd: 'e!resetai',       desc: 'Reset EmeraldBot memories',       usage: 'e!resetai' }
+          ],
+          info: [
+            { cmd: 'e!banwordlist',   desc: 'View the banned word list on user', usage: 'e!banwordlist <user>' },
+            { cmd: 'e!help',          desc: 'Show help menu',                    usage: 'e!help' },
+            { cmd: 'e!ping',          desc: "Check bot's latency",               usage: 'e!ping' },
+            { cmd: 'e!roleinfo',      desc: 'Get details about a role',          usage: 'e!roleinfo <role>' },
+            { cmd: 'e!serverinfo',    desc: 'Show server details',               usage: 'e!serverinfo' },
+            { cmd: 'e!avatar',        desc: "Show a user's avatar",              usage: 'e!avatar [user]' },
+            { cmd: 'e!userinfo',      desc: "View a user's information",         usage: 'e!userinfo [user]' }
+          ],
+          moderation: [
+            { cmd: 'e!banworduser',   desc: 'Ban users from saying specific words.', usage: 'e!banworduser <user> <bannedword>' },
+            { cmd: 'e!unbanworduser', desc: 'Allow banned words again.',             usage: 'e!unbanworduser <user>' },
+            { cmd: 'e!renamerole',    desc: 'Rename a role.',                        usage: 'e!renamerole <role> <newname>' },
+            { cmd: 'e!autorole',      desc: 'Assign roles to new members.',          usage: 'e!autorole <enable | disable> <role>' },
+            { cmd: 'e!mute',          desc: 'Mute a user.',                          usage: 'e!mute <user> [reason]' },
+            { cmd: 'e!unmute',        desc: 'Unmute a user.',                        usage: 'e!unmute <user>' },
+            { cmd: 'e!chatmod',       desc: 'Toggle chat moderation.',               usage: 'e!chatmod' },
+            { cmd: 'e!voicekick',     desc: 'Kick a user from voice channels.',      usage: 'e!voicekick <user>' },
+            { cmd: 'e!purge',         desc: 'Delete multiple messages.',             usage: 'e!purge <amount>' },
+            { cmd: 'e!voicelock',     desc: 'Lock voice channels.',                  usage: 'e!voicelock' },
+            { cmd: 'e!chatlock',      desc: 'Lock text channels.',                   usage: 'e!chatlock' },
+            { cmd: 'e!log',           desc: 'Log server events.',                    usage: 'e!log <enable | disable> <channel>' },
+            { cmd: 'e!joinleave',     desc: 'Create welcome and goodbye messages.',  usage: 'e!joinleave <enable | disable> <channel>' }
+          ],
+          fun: [
+            { cmd: 'e!coinflip', desc: 'Flip a coin.',               usage: 'e!coinflip' },
+            { cmd: 'e!dice',     desc: 'Roll a six-sided dice.',      usage: 'e!dice' },
+            { cmd: 'e!say',      desc: 'Repeat your message.',        usage: 'e!say <text>' },
+            { cmd: 'e!rps',      desc: 'Play rock-paper-scissors.',   usage: 'e!rps' }
+          ],
+          music: [
+            { cmd: 'e!play',       desc: 'Play a song or playlist.',              usage: 'e!play <query | url>' },
+            { cmd: 'e!skip',       desc: 'Skip the current song or multiple songs.', usage: 'e!skip [amount]' },
+            { cmd: 'e!stop',       desc: 'Stop playback and clear the queue.',    usage: 'e!stop' },
+            { cmd: 'e!pause',      desc: 'Pause the current playback.',           usage: 'e!pause' },
+            { cmd: 'e!resume',     desc: 'Resume the paused song.',               usage: 'e!resume' },
+            { cmd: 'e!queue',      desc: 'Show the current music queue.',         usage: 'e!queue [page]' },
+            { cmd: 'e!nowplaying', desc: 'Display the currently playing track.',  usage: 'e!nowplaying' }
+          ]
+        };
+
+        var currentCat = 'utility';
+
+        function renderCards(list) {
+          var grid = document.getElementById('cmdCardGrid');
+          if (!list || list.length === 0) {
+            grid.innerHTML = '<div class="cmd-no-results">No commands found.</div>';
+            return;
+          }
+          grid.innerHTML = list.map(function(c) {
+            return '<div class="cmd-card">' +
+              '<div class="cmd-card-name">'   + escapeHtml(c.cmd)   + '</div>' +
+              '<div class="cmd-card-desc">'   + escapeHtml(c.desc)  + '</div>' +
+              '<div class="cmd-card-usage">'  + escapeHtml(c.usage) + '</div>' +
+              '</div>';
+          }).join('');
+        }
+
+        function showCategory(cat) {
+          currentCat = cat;
+          document.getElementById('cmdSearch').value = '';
+          document.querySelectorAll('.cmd-tab').forEach(function(btn) {
+            btn.classList.toggle('active', btn.textContent.toLowerCase() === cat);
+          });
+          renderCards(cmdData[cat]);
+          history.replaceState(null, '', '#' + cat);
+        }
+
+        function filterCards(query) {
+          var q = query.toLowerCase();
+          if (!q) { renderCards(cmdData[currentCat]); return; }
+          var filtered = cmdData[currentCat].filter(function(c) {
+            return c.cmd.toLowerCase().indexOf(q)   !== -1 ||
+                   c.desc.toLowerCase().indexOf(q)  !== -1 ||
+                   c.usage.toLowerCase().indexOf(q) !== -1;
+          });
+          renderCards(filtered);
+        }
+
+        window.addEventListener('DOMContentLoaded', function() {
+          var hash  = window.location.hash.replace('#', '').toLowerCase();
+          var valid = ['utility','info','moderation','fun','music'];
+          showCategory(valid.indexOf(hash) !== -1 ? hash : 'utility');
+        });
+        </script>
+
+        <section style="background-color: #7289da; background-repeat: no-repeat; background-position: center center; background-size: auto; background-attachment: local;" class="section">
+            <div class="container">
+                <div class="animate-on-scroll section-header" style="margin-top: 3rem;">
+                    <h3 class="animate-on-scroll" style="background: #FFFFFF; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-align: center; width: 100%; display: block;">
+                        Level up your Discord server with EmeraldBot
+                    </h3>
+                    <div style="margin-bottom: 2rem;"></div>
+                    <div style="align-items: center; justify-content: center; display: flex">
+                        <div class="animate-on-scroll hero-buttons" style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
+                            <a style="color:white;" href="https://discord.com/oauth2/authorize?client_id=1197553424724660254&permissions=275364670576&integration_type=0&scope=bot" class="button">
+                                Invite
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                    <polyline points="12 5 19 12 12 19"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="animate-on-scroll">
+                    <div style="margin-bottom: 4rem;"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer footer--dark">
+        <div class="container footer-container">
+            <div class="footer-brand">
+                <img src="/assets/images/favicon.webp" alt="EmeraldNetwork logo" class="footer-logo">
+                <div>
+                    <p class="footer-brand-name">EmeraldNetwork</p>
+                    <p class="footer-brand-tagline">Shaping the future of connection, intelligence, and digital possibility.</p>
+                </div>
+            </div>
+            <div class="footer-social-links">
+                <a href="https://youtube.com/iceemerald" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="YouTube">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2A29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></svg>
+                </a>
+                <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/></svg>
+                </a>
+                <a href="mailto:hello@emeraldnetwork.groups.id" class="social-icon-button-footer" aria-label="Email">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </a>
+            </div>
+        </div>
+        <div class="footer-splitter"></div>
+        <div class="footer-bottom">
+            <p>&copy; <span id="current-year"></span> EmeraldNetwork · IceEmerald</p>
+            <div class="footer-links">
+                <a href="terms">Terms of Use</a>
+                <a href="privacy">Privacy Policy</a>
+                <a href="status">System status</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/assets/scripts/animationvisible.js"></script>
+    <script src="/assets/scripts/scrollice.js"></script>
+    <script src="/assets/scripts/dropdown.js"></script>
+    <script src="/assets/scripts/rightclick.js"></script>
+    <script>
+      var el = document.getElementById('current-year');
+      if (el) el.textContent = new Date().getFullYear();
+    </script>
+</body>
+</html>

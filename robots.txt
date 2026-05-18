@@ -1,0 +1,10 @@
+# #######################################################
+# ############## EmeraldNetwork robots.txt ##############
+# #######################################################
+
+User-agent: *
+Allow: /
+
+Disallow: /offline.html
+Disallow: /404.html
+Disallow: /sw.js

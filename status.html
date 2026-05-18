@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork | System Status</title>
+    <meta name="description" content="Check the current system status of EmeraldNetwork services, including uptime, incidents, and maintenance.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="/assets/styles/style.css" />
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+    <link rel="icon" href="/assets/images/favicon.ico" sizes="any">
+    <style>
+        .status-page { max-width: 860px; margin: 0 auto; padding: 4rem 1.5rem 5rem; }
+        .status-hero { text-align: center; margin-bottom: 3rem; }
+        .status-hero-icon { width: 52px; height: 52px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.1rem; }
+        .status-hero-icon svg { width: 28px; height: 28px; color: #fff; }
+        .status-hero h1 {
+            margin-bottom: 0.4rem;
+            font-size: 3.5rem;
+            background: linear-gradient(90deg, #808080, #5a5a5a, #3a3a3a);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+        .status-hero p { font-size: 1.125rem; }
+        #last-updated { display: inline-flex; justify-content: center; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        @media (max-width: 560px) {
+            #last-updated { gap: 0.5rem; }
+        }
+
+        .status-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+        .status-card-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; cursor: pointer; user-select: none; transition: background 0.15s; }
+        .status-card-header:hover { background: rgba(0,0,0,0.02); }
+        .status-card-title { color: var(--foreground); font-weight: 500; }
+        .status-badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.82rem; font-weight: 500; }
+        .badge-operational { background: #dcfce7; color: #15803d; }
+        .badge-degraded { background: #fef9c3; color: #a16207; }
+        .badge-outage { background: #fee2e2; color: #b91c1c; }
+        .badge-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .dot-operational { background: #16a34a; }
+        .dot-degraded { background: #ca8a04; }
+        .dot-outage { background: #dc2626; }
+        .chevron { width: 16px; height: 16px; color: var(--muted-foreground); transition: transform 0.25s ease; flex-shrink: 0; margin-left: 0.5rem; }
+        .chevron.open { transform: rotate(180deg); }
+
+        .status-card-body {
+            max-height: 0;
+            overflow: hidden;
+            padding: 0 1.25rem;
+            transition: max-height 0.35s ease, padding 0.35s ease, border-top 0.35s ease;
+            border-top: 0px solid var(--border);
+        }
+        .status-card-body.open {
+            max-height: 400px;
+            padding: 1rem 1.25rem 1.25rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .service-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; }
+        .service-row-name { display: flex; align-items: center; gap: 0.5rem; color: var(--foreground); font-size: 0.9rem; font-weight: 500; }
+        .service-uptime-label { color: #10b981; font-size: 0.82rem; font-weight: 600; }
+
+        .uptime-bar-wrap { position: relative; margin-top: 0.35rem; margin-bottom: 0.25rem; }
+        .uptime-bar { display: flex; gap: 2px; height: 28px; }
+        .uptime-bar-seg { flex: 1; border-radius: 2px; background: #10b981; cursor: pointer; transition: opacity 0.15s; position: relative; }
+        .uptime-bar-seg:hover { opacity: 0.75; cursor: url('/assets/images/cursor.png'), pointer; }
+        .uptime-bar-seg.incident { background: #f59e0b; }
+        .uptime-bar-seg.outage { background: #dc2626; }
+        .uptime-bar-labels { display: flex; justify-content: space-between; margin-top: 0.35rem; }
+        .uptime-bar-labels span { font-size: 0.75rem; color: var(--muted-foreground); }
+        .seg-tooltip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: 6px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 100; }
+        .uptime-bar-seg:hover .seg-tooltip { opacity: 1; }
+
+        .section-label { color: var(--foreground); margin: 2.5rem 0 1rem; font-size: 1.15rem; font-weight: 700; }
+        .incident-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.25rem; margin-bottom: 0.85rem; }
+        .incident-date { font-size: 0.78rem; color: var(--muted-foreground); margin-bottom: 0.6rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+        .incident-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+        .incident-title { font-size: 0.9rem; font-weight: 600; color: var(--foreground); margin-bottom: 0.3rem; }
+        .incident-desc { font-size: 0.875rem; color: var(--muted-foreground); line-height: 1.6; }
+        .incident-meta { font-size: 0.78rem; color: var(--muted-foreground); margin-top: 0.4rem; }
+        .badge-resolved { background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+        .badge-ongoing { background: #fef9c3; color: #a16207; font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+        .status-no-incidents { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem 1.25rem; text-align: center; color: var(--muted-foreground); font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <header class="navbar sticky-top">
+        <div class="navcontainer nav-container">
+            <a href="/" class="logo">
+                <img src="/assets/images/favicon.webp" width="30" height="30" class="icon-primary">
+                <span class="logo-text">EmeraldNetwork</span>
+            </a>
+            <nav class="nav-links">
+                <a href="/">Home</a>
+                <a href="#incidents-list">Incidents</a>
+            </nav>
+        </div>
+    </header>
+    <div id="custom-context-menu" class="rightclick-menu">
+        <div class="context-section">
+            <span class="context-title">🔧 Tools</span>
+            <a onclick="copyTextContent()">Copy Text</a>
+            <a onclick="copyPageLink()">Copy Page Link</a>
+            <a onclick="showElementInfo()">Show Element Info</a>
+        </div>
+    </div>
+    <div id="custom-toast" class="custom-toast"></div>
+    <main>
+        <div class="status-page">
+            <div class="status-hero animate-on-scroll">
+                <div class="status-hero-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <h1 class="animate-on-scroll" style="-webkit-text-fill-color: transparent;">All systems operational</h1>
+                <p class="animate-on-scroll" id="last-updated">Last updated:<span id="update-time"></span></p>
+            </div>
+
+            <div class="status-card animate-on-scroll" id="card-core">
+                <div class="status-card-header" onclick="toggleCard('core')">
+                    <span class="status-card-title">EmeraldCore</span>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span class="status-badge badge-operational"><span class="badge-dot dot-operational"></span> Operational</span>
+                        <svg class="chevron" id="chevron-core" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                </div>
+                <div class="status-card-body" id="body-core">
+                    <div class="service-row">
+                        <span class="service-row-name"><span class="badge-dot dot-operational"></span> EmeraldCore System</span>
+                        <span class="service-uptime-label">100% uptime</span>
+                    </div>
+                    <div class="uptime-bar-wrap">
+                        <div class="uptime-bar" id="bar-core"></div>
+                        <div class="uptime-bar-labels"><span>90 days ago</span><span>Today</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-card animate-on-scroll" id="card-website">
+                <div class="status-card-header" onclick="toggleCard('website')">
+                    <span class="status-card-title">Website</span>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span class="status-badge badge-operational"><span class="badge-dot dot-operational"></span> Operational</span>
+                        <svg class="chevron" id="chevron-website" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                </div>
+                <div class="status-card-body" id="body-website">
+                    <div class="service-row">
+                        <span class="service-row-name"><span class="badge-dot dot-operational"></span> EmeraldNetwork Website</span>
+                        <span class="service-uptime-label">100% uptime</span>
+                    </div>
+                    <div class="uptime-bar-wrap">
+                        <div class="uptime-bar" id="bar-website"></div>
+                        <div class="uptime-bar-labels"><span>90 days ago</span><span>Today</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-card animate-on-scroll" id="card-bot">
+                <div class="status-card-header" onclick="toggleCard('bot')">
+                    <span class="status-card-title">EmeraldBot</span>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span class="status-badge badge-operational"><span class="badge-dot dot-operational"></span> Operational</span>
+                        <svg class="chevron" id="chevron-bot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                </div>
+                <div class="status-card-body" id="body-bot">
+                    <div class="service-row">
+                        <span class="service-row-name"><span class="badge-dot dot-operational"></span> Discord EmeraldBot</span>
+                        <span class="service-uptime-label">97.8% uptime</span>
+                    </div>
+                    <div class="uptime-bar-wrap">
+                        <div class="uptime-bar" id="bar-bot"></div>
+                        <div class="uptime-bar-labels"><span>90 days ago</span><span>Today</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-label animate-on-scroll">Previous incidents</div>
+            <div id="incidents-list"></div>
+        </div>
+    </main>
+    <footer class="footer">
+        <div class="container footer-container">
+            <div class="footer-brand">
+                <img src="/assets/images/favicon.webp" alt="EmeraldNetwork logo" class="footer-logo">
+                <div>
+                    <p class="footer-brand-name">EmeraldNetwork</p>
+                    <p class="footer-brand-tagline">Shaping the future of connection, intelligence, and digital possibility.</p>
+                </div>
+            </div>
+            <div class="footer-social-links">
+                <a href="https://youtube.com/iceemerald" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="YouTube">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2A29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></svg>
+                </a>
+                <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.5" y2="6.5"/></svg>
+                </a>
+                <a href="mailto:hello@emeraldnetwork.groups.id" class="social-icon-button-footer" aria-label="Email">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </a>
+            </div>
+        </div>
+        <div class="footer-splitter"></div>
+        <div class="footer-bottom">
+            <p>&copy; <span id="current-year"></span> EmeraldNetwork · IceEmerald</p>
+            <div class="footer-links">
+                <a href="terms">Terms of Use</a>
+                <a href="privacy">Privacy Policy</a>
+                <a href="status">System Status</a>
+            </div>
+        </div>
+    </footer>
+    <script src="/assets/scripts/animationvisible.js"></script>
+    <script src="/assets/scripts/scrollice.js"></script>
+    <script src="/assets/scripts/dropdown.js"></script>
+    <script src="/assets/scripts/rightclick.js"></script>
+    <script>
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+
+        const now = new Date();
+        document.getElementById('update-time').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        function toggleCard(id) {
+            const body = document.getElementById('body-' + id);
+            const chevron = document.getElementById('chevron-' + id);
+            if (!body || !chevron) return;
+            const isOpen = body.classList.contains('open');
+            body.classList.toggle('open', !isOpen);
+            chevron.classList.toggle('open', !isOpen);
+        }
+
+        function buildUptimeBars() {
+            const incidentDays = {
+                core: [],
+                website: [],
+                bot: [
+                    { date: '2026-05-13', type: 'outage' },
+                    { date: '2026-03-14', type: 'incident' }
+                ]
+            };
+
+            const today = new Date();
+            const formatDate = date => date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            const normalizeDate = date => new Date(date + 'T00:00:00');
+
+            ['core', 'website', 'bot'].forEach(service => {
+                const bar = document.getElementById('bar-' + service);
+                if (!bar) return;
+                bar.innerHTML = '';
+
+                const incidents = (incidentDays[service] || []).map(incident => ({
+                    ...incident,
+                    date: normalizeDate(incident.date).toISOString().split('T')[0]
+                }));
+
+                const totalDays = 90;
+                for (let i = 0; i <= totalDays; i++) {
+                    const daysAgo = totalDays - i;
+                    const segmentDate = new Date(today);
+                    segmentDate.setDate(today.getDate() - daysAgo);
+                    const segmentDateKey = segmentDate.toISOString().split('T')[0];
+                    const incident = incidents.find(inc => inc.date === segmentDateKey);
+                    const isIncident = !!incident;
+                    const type = incident ? incident.type : '';
+
+                    const seg = document.createElement('div');
+                    seg.className = 'uptime-bar-seg' + (isIncident ? ' ' + type : '');
+
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'seg-tooltip';
+                    tooltip.textContent = daysAgo === 0
+                        ? 'Today'
+                        : daysAgo === 1
+                        ? 'Yesterday'
+                        : `${formatDate(segmentDate)} (${daysAgo} days ago)`;
+                    seg.appendChild(tooltip);
+                    bar.appendChild(seg);
+                }
+            });
+        }
+        buildUptimeBars();
+
+        const statusData = {
+            incidents: [
+                {
+                    date: 'May 12, 2026',
+                    title: 'EmeraldBot Slash Commands Update',
+                    desc: 'EmeraldBot is offline due to a full restart. No data was affected and the issue was fully resolved.',
+                    duration: 'Duration: ~15 min',
+                    status: 'resolved'
+                },
+                {
+                    date: 'Mar 13, 2026',
+                    title: 'EmeraldBot AI Response Delays',
+                    desc: 'EmeraldBot responses were delayed by 5–8 seconds due to incorrect settings. Normal performance was restored after configuration adjustments.',
+                    duration: 'Duration: ~2 hrs',
+                    status: 'resolved'
+                }
+            ]
+        };
+
+        function renderIncidents() {
+            const list = document.getElementById('incidents-list');
+            if (!list) return;
+            if (!statusData.incidents || statusData.incidents.length === 0) {
+                list.innerHTML = '<div class="status-no-incidents animate-on-scroll">No incidents reported in the last 90 days.</div>';
+                return;
+            }
+            list.innerHTML = statusData.incidents.map(inc => `
+                <div class="incident-card animate-on-scroll">
+                    <div class="incident-date">${inc.date}</div>
+                    <div class="incident-row">
+                        <div>
+                            <div class="incident-title">${inc.title}</div>
+                            <div class="incident-desc">${inc.desc}</div>
+                            <div class="incident-meta">${inc.duration}</div>
+                        </div>
+                        <span class="badge-${inc.status}">${inc.status === 'resolved' ? 'Resolved' : 'Ongoing'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        renderIncidents();
+    </script>
+</body>
+</html>

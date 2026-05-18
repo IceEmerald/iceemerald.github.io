@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork | Offline</title>
+    <meta name="description" content="You are offline. Please check your internet connection and try again.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles/style.css" />
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+    <link rel="icon" href="/assets/images/favicon.ico" sizes="any">
+</head>
+<body>
+        <div id="custom-context-menu" class="rightclick-menu">
+                        <div class="context-section">
+                          <span class="context-title">🔧 Tools</span>
+                          <a onclick="copyTextContent()">Copy Text</a>
+                          <a onclick="copyPageLink()">Copy Page Link</a>
+                          <a onclick="showElementInfo()">Show Element Info</a>
+                        </div>
+                      </div>
+                      <div id="custom-toast" class="custom-toast"></div>
+        <main style="display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+            <section
+              id="notfound"
+            >
+                <div class="container hero-container" style="transform: none; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: auto; text-align: center;">
+                    <div class="notfound-content">
+                        <div class="animate-on-scroll about-image-container">
+                            <img class="show-desktop-only" src="/assets/images/nointernet.webp" style="max-width: 700px; height: auto;" data-ai-hint="work desk technology">
+                        </div>
+                        <h1 class="show-phone-only" style="color:#8D0000; text-align: center;">404</h1>
+                        <p style="text-align: center;">You are not connected to the internet.</p>
+                        <div style="margin-top: 1rem;"></div>
+                        <a href="#" id="reloadBtn" class="button">
+                            Reload
+                        </a>
+                        <div style="margin-top: 12rem;"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    <script src="/assets/scripts/animationvisible.js"></script>
+                             <script src="/assets/scripts/scrollice.js"></script>
+                        <script src="/assets/scripts/dropdown.js"></script>
+                        <script>
+                            document.getElementById("reloadBtn").addEventListener("click", (e) => {
+                              e.preventDefault();
+                              location.reload();
+                            });
+                          </script>
+</body>
+</html>
