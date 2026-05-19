@@ -2402,7 +2402,7 @@ class NotesApp {
             if (statusbar) statusbar.style.display = '';
             document.body.classList.remove('no-active-note');
             if (ribbon) { ribbon.classList.remove('entering'); void ribbon.offsetWidth; ribbon.classList.add('entering'); }
-            if (sidebar) { sidebar.classList.remove('appearing'); void sidebar.offsetWidth; sidebar.classList.add('appearing'); }
+            if (sidebar) sidebar.classList.remove('appearing');
             if (editorArea) { editorArea.classList.remove('appearing'); void editorArea.offsetWidth; editorArea.classList.add('appearing'); }
         } else {
             welcomeScreen.classList.remove('hidden');
