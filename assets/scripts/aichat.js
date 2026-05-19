@@ -647,7 +647,7 @@ function renderMarkdown(text) {
 }
 
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function unescHtml(s) { return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"'); }
+function unescHtml(s) { const ta = document.createElement('textarea'); ta.innerHTML = s; return ta.value; }
 function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function highlightCode(code, lang) {

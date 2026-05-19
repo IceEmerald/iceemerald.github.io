@@ -343,7 +343,7 @@ class NotesApp {
         const randomName = names[Math.floor(Math.random() * names.length)];
         const randomNumber = Math.floor(Math.random() * 90 + 10);
         const collaborator = {
-            id: this.generateId(10),
+            id: this.generateSecureId(16),
             name: `${randomName} ${randomNumber}`,
             color: colors[Math.floor(Math.random() * colors.length)]
         };
@@ -531,7 +531,7 @@ class NotesApp {
             return;
         }
         if (!this.collabSessionId || !this.collabMode) {
-            this.collabSessionId = this.collabSessionId || this.generateId(10);
+            this.collabSessionId = this.collabSessionId || this.generateSecureId(16);
             this.collabNoteId = note ? note.id : null;
             this.collabIsOwner = true;
             this.collabMode = true;
@@ -3263,6 +3263,11 @@ class NotesApp {
     generateId() {
         return 'note_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
+    generateSecureId(length = 16) {
+        const arr = new Uint8Array(Math.ceil(length / 2));
+        crypto.getRandomValues(arr);
+        return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('').slice(0, length);
+    }
     formatDate(date) {
         const now = new Date();
         const diff = now - date;
@@ -3661,7 +3666,11 @@ class NotesApp {
         const meaningfulElements = content.match(/<(img|table|audio|video|iframe|embed|object|canvas|svg)[^>]*>/gi);
         if (meaningfulElements && meaningfulElements.length > 0) return false;
         const listMatches = content.match(/<(ul|ol)[^>]*>[\s\S]*?<\/(ul|ol)>/gi);
-        if (listMatches && listMatches.some(list => list.replace(/<[^>]*>/g, '').trim() !== '')) return false;
+        if (listMatches && listMatches.some(list => {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = list;
+            return tmp.textContent.trim() !== '';
+        })) return false;
         if (textContent === '' || textContent === '\u00A0') return true;
         const emptyPatterns = ['', '<br>', '<div></div>', '<p></p>', '<div><br></div>', '<p><br></p>', '<div>\u00A0</div>', '<p>\u00A0</p>', '<p>Start typing your note here...</p>', '<ul></ul>', '<ol></ol>', '<ul><li></li></ul>', '<ol><li></li></ol>'];
         return emptyPatterns.includes(content);

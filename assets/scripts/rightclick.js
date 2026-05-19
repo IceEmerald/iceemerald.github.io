@@ -26,7 +26,10 @@ window.addEventListener("contextmenu", function (e) {
 window.addEventListener("click", () => {
   contextMenu.style.display = "none";
 });
-let toastTimer; 
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+let toastTimer;
 function showToast(message) {
   const toast = document.getElementById("custom-toast");
   toast.innerHTML = message;
@@ -46,7 +49,7 @@ function truncate(str, maxLength = 100) {
 function copyTextContent() {
   if (selectedText) {
     navigator.clipboard.writeText(selectedText);
-    const preview = truncate(selectedText.trim(), 100);
+    const preview = escHtml(truncate(selectedText.trim(), 100));
     showToast(`📋 Copied: "${preview}"`);
   } else {
     showToast("⚠️ No text selected.");
@@ -57,43 +60,44 @@ function showElementInfo() {
     showToast("⚠️ No element selected.");
     return;
   }
-  const tag = clickedElement.tagName;
-  const id = clickedElement.id ? `#${truncate(clickedElement.id, 100)}` : null;
+  const tag = escHtml(clickedElement.tagName);
+  const id = clickedElement.id ? `#${escHtml(truncate(clickedElement.id, 100))}` : null;
   const classList = clickedElement.className
     ? clickedElement.className
         .split(" ")
         .filter(cls => cls)
-        .map(cls => `.${truncate(cls, 100)}`)
+        .map(cls => `.${escHtml(truncate(cls, 100))}`)
         .join(" ")
     : null;
   const rawText = clickedElement.textContent || "";
   const cleanText = rawText.trim().replace(/\s+/g, " ");
-  const text = cleanText ? `“${truncate(cleanText, 100)}”` : null;
+  const text = cleanText ? `"${escHtml(truncate(cleanText, 100))}"` : null;
+  const attr = (name) => escHtml(truncate(clickedElement.getAttribute(name) || "", 100));
   const attributes = {
-    href: truncate(clickedElement.getAttribute("href") || "", 100),
-    src: truncate(clickedElement.getAttribute("src") || "", 100),
-    alt: truncate(clickedElement.getAttribute("alt") || "", 100),
-    title: truncate(clickedElement.getAttribute("title") || "", 100),
-    placeholder: truncate(clickedElement.getAttribute("placeholder") || "", 100),
-    value: truncate(clickedElement.getAttribute("value") || "", 100),
-    role: truncate(clickedElement.getAttribute("role") || "", 100),
-    name: truncate(clickedElement.getAttribute("name") || "", 100),
-    for: truncate(clickedElement.getAttribute("for") || "", 100),
+    href: attr("href"),
+    src: attr("src"),
+    alt: attr("alt"),
+    title: attr("title"),
+    placeholder: attr("placeholder"),
+    value: attr("value"),
+    role: attr("role"),
+    name: attr("name"),
+    for: attr("for"),
     label: clickedElement.labels
-      ? truncate(Array.from(clickedElement.labels).map(label => label.textContent.trim()).join(", "), 100)
+      ? escHtml(truncate(Array.from(clickedElement.labels).map(label => label.textContent.trim()).join(", "), 100))
       : null,
-    ariaLabel: truncate(clickedElement.getAttribute("aria-label") || "", 100)
+    ariaLabel: attr("aria-label")
   };
   const dataset = Object.entries(clickedElement.dataset || {})
-    .map(([k, v]) => `data-${k}="${truncate(v, 100)}"`)
+    .map(([k, v]) => `data-${escHtml(k)}="${escHtml(truncate(v, 100))}"`)
     .join(", ");
-  const truncatedDataset = dataset ? truncate(dataset, 100) : null;
+  const truncatedDataset = dataset ? escHtml(truncate(dataset, 100)) : null;
   const rect = clickedElement.getBoundingClientRect();
   const width = Math.round(rect.width);
   const height = Math.round(rect.height);
   const size = (width && height) ? `${width}×${height}px` : null;
   const childIndex = Array.from(clickedElement.parentNode?.children || []).indexOf(clickedElement);
-  const inlineStyle = truncate(clickedElement.getAttribute("style") || "", 100);
+  const inlineStyle = escHtml(truncate(clickedElement.getAttribute("style") || "", 100));
   const infoLines = [
     `🔖 <strong>Tag:</strong> ${tag}`,
     id ? `🆔 <strong>ID:</strong> ${id}` : null,
@@ -114,6 +118,6 @@ function showElementInfo() {
     size ? `📏 <strong>Size:</strong> ${size}` : null,
     `🧭 <strong>Child Index:</strong> ${childIndex}`,
     inlineStyle ? `🎨 <strong>Inline Style:</strong> ${inlineStyle}` : null
-  ].filter(Boolean); 
+  ].filter(Boolean);
   showToast(infoLines.join("<br>"));
 }
