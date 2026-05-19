@@ -27,7 +27,7 @@
         flex-direction: column;
         background: #F5F5F5;
         overflow: hidden;
-        cursor: url('/assets/images/maincursor.png'), auto;
+        cursor: auto;
     }
     .notes-header {
         background: rgba(255, 255, 255, 0.9);
@@ -128,7 +128,7 @@
         background: none;
         border: none;
         padding: 12px 20px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         font-size: 13px;
         color: rgba(44, 62, 80, 0.7);
         border-bottom: 2px solid transparent;
@@ -219,7 +219,7 @@
         border: 1px solid rgba(0, 0, 0, 0.08);
         padding: 8px 12px;
         border-radius: 6px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -286,7 +286,7 @@
         height: 28px;
         border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 50%;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         padding: 0;
         margin: 0 4px;
         transition: all 0.2s ease;
@@ -381,7 +381,7 @@
         border-radius: 8px;
         width: 40px;
         height: 40px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -414,7 +414,7 @@
         padding: 0;
         width: 40px;
         height: 40px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -438,7 +438,7 @@
         border-radius: 8px;
         padding: 16px 20px;
         margin-bottom: 8px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         backdrop-filter: blur(3px);
@@ -581,7 +581,7 @@
         border: 1px solid rgba(0, 0, 0, 0.1);
         border-radius: 8px;
         padding: 12px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         color: rgba(44, 62, 80, 0.7);
         transition: all 0.2s ease;
         backdrop-filter: blur(3px);
@@ -601,7 +601,7 @@
         border: 1px solid rgba(0, 0, 0, 0.1);
         border-radius: 8px;
         padding: 12px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         color: rgba(44, 62, 80, 0.7);
         transition: all 0.2s ease;
         backdrop-filter: blur(3px);
@@ -621,7 +621,7 @@
         border: 1px solid rgba(0, 0, 0, 0.1);
         border-radius: 8px;
         padding: 12px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         color: rgba(44, 62, 80, 0.7);
         transition: all 0.2s ease;
         backdrop-filter: blur(3px);
@@ -1048,7 +1048,7 @@
         border-radius: 8px;
         padding: 10px 20px;
         font-size: 14px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -1096,7 +1096,7 @@
         border: 1px solid rgba(0, 0, 0, 0.08);
         border-radius: 12px;
         padding: 24px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
         flex-direction: column;
@@ -1684,7 +1684,7 @@
         background: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(0, 0, 0, 0.08);
         padding: 6px 24px 6px 12px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         border-radius: 6px;
         font-size: 13px;
         color: rgba(44, 62, 80, 0.8);
@@ -1785,7 +1785,7 @@
     }
     .ms-dropdown-item {
         padding: 10px 16px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         transition: all 0.15s ease;
         color: rgba(44, 62, 80, 0.8);
         font-size: 13px;
@@ -1834,7 +1834,7 @@
     }
     .context-menu-item {
         padding: 8px 16px;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         transition: all 0.15s ease;
         color: rgba(44, 62, 80, 0.8);
         display: flex;
@@ -1950,7 +1950,7 @@
         border-radius: 8px;
         font-size: 14px;
         font-weight: 500;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         transition: all 0.2s ease;
         font-family: 'DM Sans', sans-serif;
         min-width: 100px;
@@ -2058,7 +2058,7 @@
         border-radius: 8px;
         font-size: 14px;
         font-weight: 500;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         transition: all 0.2s ease;
         font-family: 'DM Sans', sans-serif;
         min-width: 100px;
@@ -2175,7 +2175,7 @@
         border-radius: 8px;
         font-size: 14px;
         font-weight: 500;
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
         transition: all 0.2s ease;
         font-family: 'DM Sans', sans-serif;
         min-width: 100px;
@@ -2271,7 +2271,7 @@
         cursor: pointer;
         margin-top: 2px;
         accent-color: var(--primary-color, #2ecc71);
-        cursor: url('/assets/images/clickcursor.png') 0 0, pointer;
+        cursor: pointer;
     }
     .todo-label {
         flex: 1;
@@ -2497,10 +2497,10 @@
         left: 0;
         pointer-events: none;
         z-index: 10;
-        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z' fill='%23374151'/%3E%3C/svg%3E") 0 24, crosshair;
+        cursor: crosshair;
     }
     #drawingCanvas.eraser-active {
-        cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M20 20H7L3 16l11-11 6 6-3.5 3.5' stroke='%23374151' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M6 11L13 18' stroke='%23374151' stroke-width='2' fill='none'/%3E%3C/svg%3E") 12 12, crosshair;
+        cursor: crosshair;
     }
     #tableToolbar {
         display: none;
