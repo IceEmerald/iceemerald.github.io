@@ -1052,16 +1052,19 @@ p.animate-on-scroll {
     background: rgb(158 158 158 / 16%);
 }
 .footer-bottom {
-    width: 100%;
-    padding-top: 0.75rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    color: var(--muted-foreground);
-    font-size: 0.9rem;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto; /* ini yang bikin kontainer di tengah */
+  padding-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
 }
+
 .footer-bottom p {
   margin: 0;
 }
