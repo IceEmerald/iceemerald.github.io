@@ -1063,10 +1063,7 @@ p.animate-on-scroll {
     font-size: 0.9rem;
 }
 .footer-bottom p {
-    margin-right: 29rem;
-}
-.footer-bottom p {
-    margin-right: 29rem;
+  margin: 0;
 }
 .footer.footer--dark {
     border-top: 1px solid rgba(255,255,255,0.08);
@@ -1115,6 +1112,9 @@ p.animate-on-scroll {
     .footer-bottom {
         justify-content: center;
     }
+  .footer-bottom .footer-links {
+    margin-left: auto;
+  }
 }
 :root {
     --background-values: 214, 43%, 95%;
