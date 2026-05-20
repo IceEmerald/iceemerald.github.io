@@ -408,9 +408,11 @@ body {
   display: flex;
   gap: 1.25rem;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: center;
   flex-wrap: wrap;
   padding: 0 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
 }
 .footer-brand {
   display: flex;
@@ -436,7 +438,7 @@ body {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  margin-left: auto;
+  margin-left: 0;
 }
 .social-icon-button-footer {
   display: inline-flex;
@@ -456,7 +458,7 @@ body {
 }
 .footer-bottom {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
@@ -965,6 +967,8 @@ p.animate-on-scroll {
     justify-content: space-between;
     gap: 1rem;
     padding: 2rem 1rem 1rem;
+    max-width: 1100px;
+    margin: 0 auto;
 }
 .footer p {
     margin: 0;
@@ -1103,18 +1107,20 @@ p.animate-on-scroll {
     .footer-container {
         flex-direction: row;
         align-items: center;
-        justify-content: space-between;
+        justify-content: center;
         margin-bottom: 1.2rem;
+        gap: 2rem;
     }
     .footer-brand {
-        text-align: left;
+        text-align: center;
+    }
+    .footer-social-links {
+        justify-content: center;
+        margin-left: 0;
     }
     .footer-bottom {
         justify-content: center;
     }
-  .footer-bottom .footer-links {
-    margin-left: auto;
-  }
 }
 :root {
     --background-values: 214, 43%, 95%;
