@@ -2738,6 +2738,7 @@
         flex-shrink: 1 !important;
         overflow: hidden !important;
         padding: 0 !important;
+        display: none;
     }
     .sidebar.collapsed .sidebar-header h3,
     .sidebar.collapsed .new-note-btn,
