@@ -1,0 +1,15 @@
+# #######################################################
+# ############## EmeraldNetwork robots.txt ##############
+# #######################################################
+
+User-agent: *
+Allow: /
+
+Disallow: /offline.html
+Disallow: /404.html
+Disallow: /sw.js
+Disallow: /CNAME
+Disallow: /README.md
+Disallow: /SECURITY.md
+
+Sitemap: https://emeraldnetwork.groups.id/sitemap.xml
