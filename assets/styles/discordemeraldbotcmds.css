@@ -1,0 +1,196 @@
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #313131;
+  border-radius: 5px;
+}
+
+.cmd-tabs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.cmd-tab {
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 10px 22px;
+  border-radius: 0;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: color 0.2s;
+  list-style: none;
+  position: relative;
+}
+
+.cmd-tab:hover {
+  color: #e0e0e0;
+}
+
+.cmd-tab.active {
+  background: transparent;
+  color: #f0f0f0;
+  font-weight: 600;
+}
+
+.cmd-tab-indicator {
+  position: absolute;
+  bottom: 0;
+  height: 2px;
+  width: 28px;
+  background: #00ff99;
+  border-radius: 2px;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+  pointer-events: none;
+}
+
+.cmd-search-wrapper {
+  position: relative;
+  margin-bottom: 1.75rem;
+}
+
+.cmd-search-wrapper .cmd-search-icon {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.cmd-search-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 20px 12px 46px;
+  border-radius: 999px;
+  border: 1px solid #313131;
+  background: #202020;
+  color: #f0f0f0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cmd-search-input::placeholder {
+  color: #555;
+}
+
+.cmd-search-input:focus {
+  border-color: rgba(0, 255, 153, 0.5);
+  box-shadow: 0 0 0 3px rgba(0, 255, 153, 0.07);
+}
+
+.cmd-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 768px) {
+  .cmd-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .cmd-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(1);
+    filter: blur(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.cmd-card-grid.is-exiting .cmd-card {
+  animation: cardExit 0.15s ease forwards;
+}
+
+.cmd-card {
+  background: #202020;
+  border: 1px solid #2c2c2c;
+  border-radius: 12px;
+  padding: 18px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  opacity: 0;
+  animation: cardEnter 0.45s ease-out forwards;
+  will-change: opacity, transform, filter;
+}
+
+.cmd-card:hover {
+  border-color: rgba(0, 255, 153, 0.25);
+  box-shadow: 0 0 0 1px rgba(0, 255, 153, 0.08), 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.cmd-card-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.975rem;
+  font-weight: 600;
+  color: #00ff99;
+}
+
+.cmd-card-desc {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  color: #aaa;
+  line-height: 1.45;
+}
+
+.cmd-card-usage {
+  font-family: 'DM Sans', monospace;
+  font-size: 0.78rem;
+  color: #888;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  padding: 5px 10px;
+  border-radius: 8px;
+  margin-top: 6px;
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-all;
+}
+
+.cmd-no-results {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #888;
+  padding: 2rem;
+  font-family: 'DM Sans', sans-serif;
+  animation: cardEnter 0.22s ease forwards;
+}
+
+.command-docs {
+  padding: 2rem 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}

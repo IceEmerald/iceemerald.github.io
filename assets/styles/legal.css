@@ -1,0 +1,29 @@
+.legal-page { max-width: 800px; margin: 0 auto; padding: 4rem 1.5rem 5rem; }
+.legal-meta { margin-bottom: 2.5rem; font-style: italic; }
+.legal-toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 2.5rem; }
+.legal-toc ol { padding-left: 1.25rem; margin: 0.5rem 0 0; }
+.legal-toc ol li { margin-bottom: 0.3rem; }
+.legal-toc ol li a { color: #10b981; text-decoration: none; }
+.legal-toc ol li a:hover { text-decoration: underline; }
+.legal-section { margin-bottom: 2.25rem; scroll-margin-top: 80px; }
+.legal-page h1 {
+    background: linear-gradient(90deg, rgb(26, 26, 26), rgb(90, 90, 90), rgb(26, 26, 26));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+.legal-section h2 {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(90deg, rgb(26, 26, 26), rgb(90, 90, 90), rgb(26, 26, 26));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.legal-page p, .legal-section p, .legal-meta { font-size: 1.125rem; margin-bottom: 1.25rem; }
+.legal-section ul, .legal-section ol { padding-left: 1.4rem; margin-bottom: 0.85rem; }
+.legal-section ul li, .legal-section ol li { margin-bottom: 0.4rem; font-size: 1.125rem; }
+.legal-section a { color: #10b981; text-decoration: none; }
+.legal-section a:hover { text-decoration: underline; }

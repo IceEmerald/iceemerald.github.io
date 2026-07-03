@@ -1,0 +1,4410 @@
+const CHAT_WORKER_URL = "https://emeraldnetwork-aichatserver.iceemerald.workers.dev";
+const EMERALDBOT_API = "managed-by-worker";
+const DISPLAY_MODEL = "EmeraldCore.AI";
+(function _installConsoleNoiseFilter() {
+  if (window._esbConsoleFilterInstalled) return;
+  window._esbConsoleFilterInstalled = true;
+  const _origError = console.error.bind(console);
+  const NOISY_RE = /\b(40[04]|429|5\d{2})\b|API error \d|quota|rate.?limit|RESOURCE_EXHAUSTED|Too Many Requests|temporarily unavailable|please retry in|model not found|not_found|NOT_FOUND/i;
+  const _isNoisy = (...args) => {
+    const txt = args.slice(0, 3).map((a) => {
+      if (a instanceof Error) return a.message || "";
+      if (typeof a === "string") return a;
+      try {
+        return JSON.stringify(a);
+      } catch {
+        return String(a);
+      }
+    }).join(" ");
+    return NOISY_RE.test(txt);
+  };
+  console.error = function(...args) {
+    if (_isNoisy(...args)) return;
+    return _origError(...args);
+  };
+  window.addEventListener("unhandledrejection", (ev) => {
+    const r = ev && ev.reason;
+    const msg = r && (r.message || r) || "";
+    if (typeof msg === "string" && NOISY_RE.test(msg)) {
+      ev.preventDefault();
+    }
+  });
+})();
+const MODELS = [
+  { id: "gamma", name: "EmeraldCore Gamma", short: "Gamma", tier: "v4", desc: "V4 | Advanced technical reasoning." },
+  { id: "diamond", name: "EmeraldCore Diamond", short: "Diamond", tier: "v4", desc: "V4 | Highest creativity and strategic thinking." },
+  { id: "gold", name: "EmeraldCore Gold", short: "Gold", tier: "v4", desc: "V4 | Accurate research and deeper analysis." },
+  { id: "kappa", name: "EmeraldCore Kappa", short: "Kappa", tier: "v3", desc: "V3 | Enhanced reasoning and versatility." },
+  { id: "cream", name: "EmeraldCore Cream", short: "Cream", tier: "v2", desc: "V2 | Reliable general-purpose responses." }
+];
+const MODEL_DEFAULT_ID = "auto";
+function getModelById(id) {
+  return MODELS.find((m) => m.id === id) || null;
+}
+function getSelectedModelId() {
+  const s = loadSettings();
+  return s.modelId || MODEL_DEFAULT_ID;
+}
+function setSelectedModelId(id) {
+  const s = loadSettings();
+  saveSettingsObj({ ...s, modelId: id });
+}
+const SEARCH_PROXY_URL = "https://emeraldnetwork-aichatsearch.iceemerald.workers.dev";
+const IMAGE_WORKER_URL = "https://emeraldnetwork-aichatimagegen.iceemerald.workers.dev";
+const memoryStorageFallback = /* @__PURE__ */ new Map();
+const S = {
+  get: (k) => {
+    if (window.EmeraldIDBStorage) {
+      return window.EmeraldIDBStorage.getJSONSync(k);
+    }
+    return memoryStorageFallback.has(k) ? memoryStorageFallback.get(k) : null;
+  },
+  set: (k, v) => {
+    if (window.EmeraldIDBStorage) {
+      window.EmeraldIDBStorage.setJSONSync(k, v);
+      return;
+    }
+    memoryStorageFallback.set(k, v);
+  },
+  del: (k) => {
+    if (window.EmeraldIDBStorage) {
+      window.EmeraldIDBStorage.delete(k).catch(() => {
+      });
+    }
+    memoryStorageFallback.delete(k);
+  }
+};
+const CONV_KEY = "en_chat_convs";
+const LIB_KEY = "en_chat_lib";
+const SETTINGS_KEY = "en_chat_settings";
+const MEMORY_KEY = "en_chat_memory";
+const OB_KEY = "en_onboarded";
+async function migrateChatStorageToIndexedDB() {
+  if (!window.EmeraldIDBStorage) return;
+  await window.EmeraldIDBStorage.ready();
+  await Promise.all([
+    window.EmeraldIDBStorage.migrateLocalJSON(CONV_KEY),
+    window.EmeraldIDBStorage.migrateLocalJSON(LIB_KEY),
+    window.EmeraldIDBStorage.migrateLocalJSON(SETTINGS_KEY),
+    window.EmeraldIDBStorage.migrateLocalJSON(MEMORY_KEY),
+    window.EmeraldIDBStorage.migrateLocalJSON(OB_KEY)
+  ]);
+}
+let state = {
+  convId: null,
+  isTemp: false,
+  isStreaming: false,
+  abortCtrl: null,
+  attachments: [],
+  tempHistory: []
+};
+function loadConvs() {
+  return S.get(CONV_KEY) || [];
+}
+function saveConvs(arr) {
+  S.set(CONV_KEY, arr);
+}
+function loadLib() {
+  return S.get(LIB_KEY) || [];
+}
+function saveLib(arr) {
+  S.set(LIB_KEY, arr);
+}
+function loadSettings() {
+  return S.get(SETTINGS_KEY) || {};
+}
+async function initTheme() {
+  await migrateChatStorageToIndexedDB();
+  applyTheme(loadSettings().theme || "system");
+}
+function saveSettingsObj(o) {
+  S.set(SETTINGS_KEY, o);
+}
+function loadMemories() {
+  return S.get(MEMORY_KEY) || [];
+}
+function saveMemories(arr) {
+  S.set(MEMORY_KEY, arr);
+}
+function addMemory(text) {
+  const arr = loadMemories();
+  const norm = text.trim().toLowerCase();
+  const idx = arr.findIndex((m) => m.text.toLowerCase() === norm);
+  if (idx >= 0) {
+    arr[idx].text = text.trim();
+    arr[idx].updatedAt = Date.now();
+  } else {
+    arr.unshift({ id: genId(), text: text.trim(), createdAt: Date.now() });
+  }
+  saveMemories(arr.slice(0, 100));
+}
+function deleteMemory(id) {
+  saveMemories(loadMemories().filter((m) => m.id !== id));
+  renderMemoriesModal();
+}
+let chatStorageSyncReady = false;
+function setupChatStorageSync() {
+  if (chatStorageSyncReady || !window.EmeraldIDBStorage?.subscribe) return;
+  chatStorageSyncReady = true;
+  const watchedKeys = /* @__PURE__ */ new Set([CONV_KEY, LIB_KEY, SETTINGS_KEY, MEMORY_KEY, OB_KEY]);
+  window.EmeraldIDBStorage.subscribe(({ key }) => {
+    if (!watchedKeys.has(key)) return;
+    if (key === SETTINGS_KEY) {
+      applyTheme(loadSettings().theme || "system");
+    }
+    if (key === CONV_KEY) {
+      const activeId = state.convId;
+      const activeConv = activeId ? getConv(activeId) : null;
+      renderSidebar();
+      if (activeId && activeConv && !state.isStreaming) {
+        loadConversation(activeId);
+      } else if (activeId && !activeConv) {
+        state.convId = null;
+        showWelcome();
+        renderSidebar();
+      }
+    }
+    if (key === LIB_KEY) {
+      renderLibraryModal();
+    }
+    if (key === MEMORY_KEY) {
+      renderMemoriesModal();
+    }
+    if (key === OB_KEY) {
+      if (S.get(OB_KEY)) {
+        const overlay = $("obOverlay");
+        if (overlay) {
+          overlay.classList.remove("ob-visible");
+          overlay.style.display = "none";
+        }
+      } else {
+        checkOnboarding();
+      }
+    }
+  });
+}
+function buildFileParts(files) {
+  const parts = [];
+  const unreadable = [];
+  const INLINE_PREFIXES = ["image/", "audio/", "video/", "text/"];
+  const INLINE_EXACT = /* @__PURE__ */ new Set(["application/pdf", "application/json", "application/xml", "application/x-yaml", "application/x-sh"]);
+  const TEXT_EXTS = /* @__PURE__ */ new Set([
+    "txt",
+    "md",
+    "markdown",
+    "csv",
+    "json",
+    "xml",
+    "yaml",
+    "yml",
+    "toml",
+    "ini",
+    "log",
+    "html",
+    "htm",
+    "css",
+    "js",
+    "mjs",
+    "ts",
+    "jsx",
+    "tsx",
+    "py",
+    "rb",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "go",
+    "rs",
+    "sh",
+    "bash",
+    "sql",
+    "graphql",
+    "gql",
+    "tf",
+    "vue",
+    "svelte",
+    "r",
+    "swift",
+    "kt",
+    "dart",
+    "php",
+    "env"
+  ]);
+  for (const f of files) {
+    const type = (f.type || "application/octet-stream").toLowerCase();
+    const ext = (f.name || "").split(".").pop().toLowerCase();
+    const isOffice = ["pptx", "ppt", "docx", "doc", "xlsx", "xls"].includes(ext);
+    if (isOffice && f.extractedText) {
+      try {
+        const txt = `[File: ${f.name}]
+${f.extractedText}`;
+        const b642 = btoa(unescape(encodeURIComponent(txt)));
+        parts.push({ inlineData: { mimeType: "text/plain", data: b642 } });
+      } catch (e) {
+        unreadable.push(f.name);
+      }
+      continue;
+    }
+    if (!f.data) continue;
+    const b64 = f.data.includes(",") ? f.data.split(",")[1] : f.data;
+    const isInline = INLINE_PREFIXES.some((p) => type.startsWith(p)) || INLINE_EXACT.has(type);
+    const isTextExt = TEXT_EXTS.has(ext);
+    if (isInline) {
+      parts.push({ inlineData: { mimeType: type, data: b64 } });
+    } else if (isTextExt) {
+      parts.push({ inlineData: { mimeType: "text/plain", data: b64 } });
+    } else {
+      unreadable.push(f.name);
+    }
+  }
+  if (unreadable.length) {
+    parts.push({ text: `[The following file(s) were attached but cannot be read directly in this format: ${unreadable.join(", ")}. Ask the user to copy and paste the content, or describe what they need help with.]` });
+  }
+  return parts;
+}
+function getConv(id) {
+  return loadConvs().find((c) => c.id === id) || null;
+}
+function upsertConv(conv) {
+  const arr = loadConvs();
+  const idx = arr.findIndex((c) => c.id === conv.id);
+  if (idx >= 0) arr[idx] = conv;
+  else arr.unshift(conv);
+  saveConvs(arr);
+}
+function deleteConv(id) {
+  saveConvs(loadConvs().filter((c) => c.id !== id));
+  saveLib(loadLib().filter((f) => f.convId !== id));
+}
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+async function safeCopy(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+function getApiKey() {
+  return EMERALDBOT_API;
+}
+function getUserName() {
+  return loadSettings().userName || "You";
+}
+function getUserInitials() {
+  const n = loadSettings().userName || "You";
+  return n.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "U";
+}
+let _toastTimer;
+function showToast(msg, type = "default") {
+  const el = document.getElementById("custom-toast") || document.getElementById("aiToast");
+  if (!el) return;
+  el.innerHTML = msg;
+  const base = el.id === "custom-toast" ? "custom-toast" : "ai-toast";
+  el.className = base + " show" + (type !== "default" ? " " + base + "--" + type : "");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove("show"), 5e3);
+}
+let _ctxTarget = null;
+let selectedText = "";
+function setupContextMenu() {
+  const menu = document.getElementById("aiContextMenu");
+  if (!menu) return;
+  document.addEventListener("contextmenu", (e) => {
+    const histItem = e.target.closest(".history-item");
+    const msgBody = e.target.closest('.message[data-ai="1"]');
+    const userMsg = e.target.closest(".message--user");
+    const sel = window.getSelection();
+    selectedText = sel ? sel.toString().trim() : "";
+    e.preventDefault();
+    if (histItem) {
+      _ctxTarget = histItem;
+      buildContextMenu("history");
+    } else if (msgBody) {
+      _ctxTarget = msgBody;
+      buildContextMenu("message");
+    } else if (userMsg) {
+      _ctxTarget = userMsg;
+      buildContextMenu("user-message");
+    } else {
+      _ctxTarget = e.target;
+      buildContextMenu("tools");
+    }
+    positionMenu(menu, e.clientX, e.clientY);
+  });
+  document.addEventListener("click", () => menu.style.display = "none");
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") menu.style.display = "none";
+  });
+}
+function positionMenu(menu, x, y) {
+  menu.style.top = "-9999px";
+  menu.style.left = "-9999px";
+  menu.style.display = "block";
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  const mw = menu.offsetWidth || 260;
+  const mh = menu.offsetHeight || 160;
+  let left = x;
+  let top = y;
+  if (left + mw > vw) left = vw - mw - 8;
+  if (left < 8) left = 8;
+  if (top + mh > vh) top = vh - mh - 8;
+  if (top < 8) top = 8;
+  menu.style.left = left + "px";
+  menu.style.top = top + "px";
+}
+function buildContextMenu(type) {
+  const menu = document.getElementById("aiContextMenu");
+  if (!menu) return;
+  if (type === "history") {
+    const id = _ctxTarget?.dataset.convId;
+    menu.innerHTML = `
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        CHATS
+      </div>
+      <a onclick="renameConvPrompt('${id}')">Rename</a>
+      <a onclick="deleteConvConfirm('${id}')" class="ctx-danger">Delete</a>`;
+  } else if (type === "message") {
+    const regen = isLatestAIMessage(_ctxTarget) ? '<a onclick="regenFromCtx()">Regenerate</a>' : "";
+    menu.innerHTML = `
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        MESSAGE
+      </div>
+      <a onclick="copyMsgText()">Copy text</a>
+      <a onclick="showUsedModel()">Show Used Model</a>
+      ${regen}`;
+  } else if (type === "user-message") {
+    const msgId = _ctxTarget?.dataset?.msgId || "";
+    const canEdit = !!msgId && !!state.convId;
+    menu.innerHTML = `
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+        YOUR MESSAGE
+      </div>
+      <a onclick="copyUserMsgText()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:7px"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        Copy Text
+      </a>
+      ${canEdit ? `<a onclick="editUserMsg('${msgId}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:7px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit
+      </a>` : ""}`;
+  } else {
+    menu.innerHTML = `
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        TOOLS
+      </div>
+      <a onclick="ctxCopyText()">Copy Text</a>
+      <a onclick="ctxCopyPageLink()">Copy Page Link</a>
+      <a onclick="ctxShowElementInfo()">Show Element Info</a>`;
+  }
+}
+function isLatestAIMessage(msgEl) {
+  const aiMsgs = Array.from(document.querySelectorAll('.message[data-ai="1"]'));
+  return aiMsgs.length > 0 && aiMsgs[aiMsgs.length - 1] === msgEl;
+}
+const _aiSvgCopy = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`;
+const _aiSvgLink = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+const _aiSvgWarn = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+const _aiSvgTrash = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+const _aiSvgTag = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
+const _aiSvgCheck = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><path d="M20 6L9 17l-5-5"/></svg>`;
+const _aiSvgThumbUp = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+const _aiSvgThumbDown = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>`;
+const _aiSvgFile = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
+const _aiSvgError = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+const _aiSvgInfo = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`;
+const _aiSvgPlay = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;opacity:0.7"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+async function ctxCopyText() {
+  if (!selectedText) {
+    showToast(`${_aiSvgWarn} No text selected.`);
+    return;
+  }
+  const ok = await safeCopy(selectedText);
+  if (ok) {
+    const preview = escHtml(truncate(selectedText, 100));
+    showToast(`${_aiSvgCopy} Copied: "${preview}"`);
+  } else {
+    showToast(`${_aiSvgWarn} Failed to copy.`);
+  }
+}
+async function ctxCopyPageLink() {
+  const ok = await safeCopy(location.href);
+  showToast(ok ? `${_aiSvgLink} Page link copied!` : `${_aiSvgWarn} Failed to copy page link.`);
+}
+function ctxShowElementInfo() {
+  const el = _ctxTarget;
+  if (!el || !el.tagName) {
+    showToast(`${_aiSvgWarn} No element selected.`);
+    return;
+  }
+  const eh = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const tr = (s, n = 100) => String(s).length > n ? String(s).slice(0, n) + "..." : String(s);
+  const attr = (name) => eh(tr(el.getAttribute(name) || "", 100));
+  const tag = eh(el.tagName);
+  const id = el.id ? `#${eh(tr(el.id, 100))}` : null;
+  const classList = el.className && typeof el.className === "string" ? el.className.split(" ").filter(Boolean).map((cls) => `.${eh(tr(cls, 100))}`).join(" ") : null;
+  const cleanText = (el.textContent || "").trim().replace(/\s+/g, " ");
+  const text = cleanText ? `"${eh(tr(cleanText, 100))}"` : null;
+  const label = el.labels ? eh(tr(Array.from(el.labels).map((labelEl) => labelEl.textContent.trim()).join(", "), 100)) : null;
+  const dataset = Object.entries(el.dataset || {}).map(([k, v]) => `data-${eh(k)}="${eh(tr(v, 100))}"`).join(", ");
+  const rect = el.getBoundingClientRect();
+  const size = rect.width && rect.height ? `${Math.round(rect.width)}x${Math.round(rect.height)}px` : null;
+  const childIndex = Array.from(el.parentNode?.children || []).indexOf(el);
+  const inlineStyle = eh(tr(el.getAttribute("style") || "", 100));
+  const I = (body) => `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px;opacity:0.7">${body}</svg>`;
+  const iconTag = I('<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>');
+  const iconId = I('<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>');
+  const iconClass = I('<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>');
+  const iconText = I('<line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/>');
+  const iconLink = I('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>');
+  const iconImg = I('<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>');
+  const iconInfo = I('<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>');
+  const iconFile = I('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>');
+  const iconName = I('<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>');
+  const iconFor = I('<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>');
+  const iconRole = I('<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>');
+  const iconData = I('<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>');
+  const iconSize = I('<path d="M21 3H3v18h18V3zM12 3v4m0 14v-4M3 12h4m14 0h-4m-8-4l2 2m4 4l2 2m-8 0l2-2m4-4l2-2"/>');
+  const iconChild = I('<polygon points="3 11 22 2 13 21 11 13 3 11"/>');
+  const infoLines = [
+    `${iconTag} <strong>Tag:</strong> ${tag}`,
+    id ? `${iconId} <strong>ID:</strong> ${id}` : null,
+    classList ? `${iconClass} <strong>Class:</strong> ${classList}` : null,
+    text ? `${iconText} <strong>Text:</strong> ${text}` : null,
+    attr("href") ? `${iconLink} <strong>Href:</strong> ${attr("href")}` : null,
+    attr("src") ? `${iconImg} <strong>Src:</strong> ${attr("src")}` : null,
+    attr("alt") ? `${iconImg} <strong>Alt:</strong> ${attr("alt")}` : null,
+    attr("title") ? `${iconInfo} <strong>Title:</strong> ${attr("title")}` : null,
+    attr("placeholder") ? `${iconInfo} <strong>Placeholder:</strong> ${attr("placeholder")}` : null,
+    attr("value") ? `${iconFile} <strong>Value:</strong> ${attr("value")}` : null,
+    attr("name") ? `${iconName} <strong>Name:</strong> ${attr("name")}` : null,
+    attr("for") ? `${iconFor} <strong>For:</strong> ${attr("for")}` : null,
+    label ? `${iconTag} <strong>Labels:</strong> ${label}` : null,
+    attr("aria-label") ? `${iconInfo} <strong>ARIA Label:</strong> ${attr("aria-label")}` : null,
+    attr("role") ? `${iconRole} <strong>Role:</strong> ${attr("role")}` : null,
+    dataset ? `${iconData} <strong>Data Attributes:</strong> ${eh(tr(dataset, 100))}` : null,
+    size ? `${iconSize} <strong>Size:</strong> ${size}` : null,
+    `${iconChild} <strong>Child Index:</strong> ${childIndex}`,
+    inlineStyle ? `${iconClass} <strong>Inline Style:</strong> ${inlineStyle}` : null
+  ].filter(Boolean);
+  showToast(infoLines.join("<br>"));
+}
+async function copyMsgText() {
+  if (!_ctxTarget) return;
+  const textEl = _ctxTarget.querySelector(".message-text");
+  const ok = await safeCopy(textEl?.innerText || "");
+  showToast(
+    ok ? `${_aiSvgCopy} Copied to clipboard` : `${_aiSvgError} Failed to copy`,
+    ok ? "success" : "error"
+  );
+}
+function regenFromCtx() {
+  if (!_ctxTarget) return;
+  regenerateMessage(_ctxTarget);
+}
+function showUsedModel() {
+  if (!_ctxTarget) return;
+  const imgModelName = _ctxTarget.dataset?.imageModelName || "";
+  const imgModelId = _ctxTarget.dataset?.imageModelId || "";
+  if (imgModelName) {
+    showToast(`${_aiSvgInfo} Image generated by ${escapeHtml(imgModelName)}`);
+    return;
+  }
+  if (imgModelId) {
+    const friendly = imgModelId.split("/").pop();
+    showToast(`${_aiSvgInfo} Image generated by ${escapeHtml(friendly)}`);
+    return;
+  }
+  const modelName = _ctxTarget.dataset?.modelName || "";
+  const modelId = _ctxTarget.dataset?.modelId || "";
+  if (modelName) {
+    showToast(`${_aiSvgInfo} This response was generated by ${escapeHtml(modelName)}`);
+  } else if (modelId) {
+    const m = getModelById(modelId);
+    const name = m ? m.name : modelId;
+    showToast(`${_aiSvgInfo} This response was generated by ${escapeHtml(name)}`);
+  } else {
+    showToast(`${_aiSvgWarn} Model info not recorded for this message.`);
+  }
+}
+function renameConvPrompt(id) {
+  const conv = getConv(id);
+  if (!conv) return;
+  openModal("renameModal");
+  document.getElementById("renameInput").value = conv.title;
+  document.getElementById("renameSaveBtn").onclick = () => {
+    const title = document.getElementById("renameInput").value.trim();
+    if (title) {
+      conv.title = title;
+      upsertConv(conv);
+      renderSidebar();
+      closeModal("renameModal");
+    }
+  };
+}
+function deleteConvConfirm(id) {
+  openModal("deleteModal");
+  const conv = getConv(id);
+  document.getElementById("deleteModalTitle").textContent = conv ? `Delete "${conv.title}"?` : "Delete conversation?";
+  document.getElementById("deleteConfirmBtn").onclick = () => {
+    deleteConv(id);
+    if (state.convId === id) {
+      state.convId = null;
+      if (state.isTemp) {
+        state.isTemp = false;
+        state.tempHistory = [];
+        const btn = $("tempChatBtn");
+        if (btn) btn.classList.remove("active");
+        const badge = $("tempBadge");
+        if (badge) badge.style.display = "none";
+      }
+      showWelcome();
+    }
+    renderSidebar();
+    closeModal("deleteModal");
+    showToast(`${_aiSvgTrash} Conversation deleted`);
+    const _fp = $("filePreviewPanel");
+    if (_fp) {
+      _fp.classList.remove("open", "closing");
+      const _fb = $("fpPanelBody");
+      if (_fb) _fb.innerHTML = "";
+    }
+    const _sb = $("mobileSidebar");
+    if (_sb) _sb.classList.remove("open");
+    const _bk = $("sidebarBackdrop");
+    if (_bk) _bk.classList.remove("open");
+  };
+}
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove("closing");
+  el.classList.add("open");
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el || !el.classList.contains("open")) return;
+  el.classList.add("closing");
+  setTimeout(() => {
+    el.classList.remove("open");
+    el.classList.remove("closing");
+  }, 230);
+}
+function setupMarked() {
+  if (typeof marked === "undefined") return;
+  function _codeRenderer(token) {
+    const code = token && typeof token === "object" ? String(token.text ?? "") : String(token ?? "");
+    const lang = token && typeof token === "object" ? String(token.lang ?? "") : "";
+    const language = lang || "plaintext";
+    let highlighted = code;
+    try {
+      if (typeof hljs !== "undefined") {
+        highlighted = hljs.getLanguage(language) ? hljs.highlight(code, { language }).value : hljs.highlightAuto(code).value;
+      }
+    } catch {
+    }
+    const escapedLang = escapeHtml(language);
+    window._codeStore = window._codeStore || {};
+    window._codeMeta = window._codeMeta || {};
+    const cid = "cs_" + Math.random().toString(36).slice(2, 10);
+    window._codeStore[cid] = code;
+    window._codeMeta[cid] = { code, language };
+    return `<div class="md-code-block" data-cid="${cid}" data-lang="${escapeHtmlAttr(language)}">
+      <div class="md-code-header">
+        <span class="md-code-lang">${escapedLang}</span>
+        <div class="md-code-actions">
+          <button class="md-run-btn" data-cid="${cid}" onclick="runCode(this)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Run
+          </button>
+          <button class="md-copy-btn" data-cid="${cid}" onclick="copyCode(this)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            Copy
+          </button>
+        </div>
+      </div>
+      <pre><code class="hljs language-${escapedLang}">${highlighted}</code></pre>
+    </div>`;
+  }
+  function _tableRenderer(token) {
+    if (token && typeof token === "object" && Array.isArray(token.header)) {
+      const al = (i) => token.align?.[i] ? ` style="text-align:${token.align[i]}"` : "";
+      const pi = (c) => {
+        const raw = typeof c === "object" ? c.text ?? "" : String(c ?? "");
+        try {
+          return marked.parseInline(raw);
+        } catch {
+          return escapeHtml(raw);
+        }
+      };
+      const hdr = "<tr>" + token.header.map((c, i) => `<th${al(i)}>${pi(c)}</th>`).join("") + "</tr>";
+      const bdy = (token.rows ?? []).map(
+        (row) => "<tr>" + row.map((c, i) => `<td${al(i)}>${pi(c)}</td>`).join("") + "</tr>"
+      ).join("");
+      return `<div class="md-table-wrap"><table class="md-table"><thead>${hdr}</thead><tbody>${bdy}</tbody></table></div>`;
+    }
+    return false;
+  }
+  function _blockquoteRenderer(token) {
+    const body = token && typeof token === "object" ? token.body ?? token.text ?? "" : String(token ?? "");
+    return `<blockquote class="md-blockquote">${body}</blockquote>`;
+  }
+  function _linkRenderer(token) {
+    const href = token && typeof token === "object" ? String(token.href ?? "") : String(token ?? "");
+    const title = token && typeof token === "object" && token.title ? ` title="${escapeHtmlAttr(token.title)}"` : "";
+    const text = token && typeof token === "object" ? token.text || escapeHtml(href) : escapeHtml(href);
+    return `<a href="${escapeHtmlAttr(href)}" target="_blank" rel="noopener noreferrer"${title}>${text}</a>`;
+  }
+  try {
+    marked.use({
+      renderer: { code: _codeRenderer, table: _tableRenderer, blockquote: _blockquoteRenderer, link: _linkRenderer },
+      breaks: true,
+      gfm: true
+    });
+  } catch {
+    const renderer = new marked.Renderer();
+    renderer.code = _codeRenderer;
+    renderer.table = _tableRenderer;
+    renderer.blockquote = _blockquoteRenderer;
+    renderer.link = _linkRenderer;
+    marked.setOptions({ renderer, breaks: true, gfm: true });
+  }
+}
+function renderMarkdown(raw) {
+  if (typeof marked === "undefined") return escapeHtml(raw);
+  let text = raw;
+  const codeBlocks = [];
+  text = text.replace(/(```[\s\S]*?```|`[^`\n]+`)/g, (m) => {
+    const i = codeBlocks.push(m) - 1;
+    return `CODEBLOCK${i}`;
+  });
+  const mathBlocks = [];
+  text = text.replace(/\$\$([^$]+?)\$\$/gs, (_, m) => {
+    const i = mathBlocks.push({ type: "block", src: m }) - 1;
+    return `MATHBLOCK${i}MATHBLOCK`;
+  });
+  text = text.replace(/\$([^$\n]+?)\$/g, (_, m) => {
+    const i = mathBlocks.push({ type: "inline", src: m }) - 1;
+    return `MATHINLINE${i}MATHINLINE`;
+  });
+  text = text.replace(/\x02CODEBLOCK(\d+)\x02/g, (_, i) => codeBlocks[+i]);
+  let html = marked.parse(text);
+  html = html.replace(/MATHBLOCK(\d+)MATHBLOCK/g, (_, i) => {
+    try {
+      return typeof katex !== "undefined" ? `<div class="md-math-block">${katex.renderToString(mathBlocks[i].src, { throwOnError: false, displayMode: true })}</div>` : `<pre>$$${mathBlocks[i].src}$$</pre>`;
+    } catch {
+      return `<pre>$$${mathBlocks[i].src}$$</pre>`;
+    }
+  });
+  html = html.replace(/MATHINLINE(\d+)MATHINLINE/g, (_, i) => {
+    try {
+      return typeof katex !== "undefined" ? katex.renderToString(mathBlocks[i].src, { throwOnError: false }) : `$${mathBlocks[i].src}$`;
+    } catch {
+      return `$${mathBlocks[i].src}$`;
+    }
+  });
+  return html;
+}
+function setMessageTextMarkdown(el, raw) {
+  if (!el) return;
+  const text = String(raw || "").trim();
+  el.classList.toggle("message-text--empty", !text);
+  el.innerHTML = text ? renderMarkdown(text) : "";
+}
+function _streamDisplayText(raw) {
+  let t = String(raw || "");
+  t = t.replace(/\[MEMORY:[^\]]*\]?/g, "");
+  t = t.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "");
+  t = _stripThinkingPreamble(t);
+  const quizIdx = t.indexOf("<quiz>");
+  if (quizIdx >= 0) {
+    return { text: t.slice(0, quizIdx), quizStarted: true };
+  }
+  const tag = "<quiz";
+  for (let i = tag.length; i >= 1; i--) {
+    if (t.endsWith(tag.slice(0, i))) {
+      t = t.slice(0, -i);
+      break;
+    }
+  }
+  return { text: t, quizStarted: false };
+}
+function _stripThinkingPreamble(text) {
+  let t = text;
+  let changed = true;
+  let guard = 0;
+  while (changed && guard < 100) {
+    changed = false;
+    guard++;
+    if (/^\s*\[[A-Z][A-Z\s—-]*(STRICT|ABSOLUTE|NEVER VIOLATE|CRITICAL)[^\]]*\]\s*/i.test(t)) {
+      t = t.replace(/^\s*\[[A-Z][A-Z\s—-]*(?:STRICT|ABSOLUTE|NEVER VIOLATE|CRITICAL)[^\]]*\]\s*\n?/i, "");
+      changed = true;
+      continue;
+    }
+    if (/^\s*\d+\.\s+(NEVER|ALWAYS|Volunteering|When|Output|Do not|Don't|Asking|If)\b/i.test(t)) {
+      t = t.replace(/^\s*\d+\.\s+[^\n]*\n?/i, "");
+      changed = true;
+      continue;
+    }
+    if (/^\s*The user \b/i.test(t)) {
+      t = t.replace(/^\s*The user [^\n]*\n?/i, "");
+      changed = true;
+      continue;
+    }
+    if (/^\s*(User is|The question is|This is a|I need to|Let me|I'll|I will|Now I|Okay,? so|According to the rules|Following the rules|Based on the rules|Plan:|Step \d+:|First,|Next,|Then,|Finally,)\b/i.test(t)) {
+      t = t.replace(/^\s*(?:User is|The question is|This is a|I need to|Let me|I'll|I will|Now I|Okay,? so|According to the rules|Following the rules|Based on the rules|Plan:|Step \d+:|First,|Next,|Then,|Finally,)[^\n]*\n?/i, "");
+      changed = true;
+      continue;
+    }
+    if (/^\s*```[a-zA-Z]*\n[\s\S]*?```\s*/i.test(t)) {
+      t = t.replace(/^\s*```[a-zA-Z]*\n[\s\S]*?```\s*/i, "");
+      changed = true;
+      continue;
+    }
+    if (/^\s*```[a-zA-Z]*\n/i.test(t)) {
+      const afterFence = t.replace(/^\s*```[a-zA-Z]*\n/i, "");
+      if (/\b(Identity|Backend|Coding|Output|Quiz|Image|Date|Time|Disclosure|Secrecy|Format|Suggest|Keep|Plan|Step|Rule|Never|Always|The user)\b/i.test(afterFence)) {
+        t = afterFence;
+        changed = true;
+        continue;
+      }
+    }
+    if (/^\s*[*\-]\s+.*(Identity|Backend|Coding|Output Format|Quiz|Image|Date|Time|Disclosure|Secrecy|Suggest|Keep|Plan|Step|Rule|Never|Always|No identity|No technical|No coding|No reasoning|No quiz|Not asked|Provide|State|Respond|Answer|Tone|Friendly|Helpful)\b/i.test(t)) {
+      const lineMatch = t.match(/^\s*[*\-]\s+[^\n]*\n?/);
+      if (lineMatch) {
+        const line = lineMatch[0];
+        const splitMatch = line.match(/[.!?]([A-Z][a-z]+ (?:can|am|'ll|would|'d|have|don't|Here|Sure|course|Yes|No|Absolutely|Great|Let's|That's|It sounds|It looks|Depending|Sounds|Looks|I ))/);
+        if (splitMatch) {
+          const splitIdx = line.indexOf(splitMatch[0]);
+          const answerPart = line.slice(splitIdx + 1);
+          t = answerPart + t.slice(line.length);
+          changed = true;
+          continue;
+        }
+        const concatMatch = line.match(/\.I (can|am|'ll|would|'d|have|don't)/i);
+        if (concatMatch) {
+          const splitIdx = line.indexOf(concatMatch[0]);
+          const answerPart = line.slice(splitIdx + 1);
+          t = answerPart + t.slice(line.length);
+          changed = true;
+          continue;
+        }
+        t = t.replace(/^\s*[*\-]\s+[^\n]*\n?/i, "");
+        changed = true;
+        continue;
+      }
+    }
+    if (/^\s*[*\-]\s+(Suggest|Keep|Provide|State|Respond|Answer|Plan|Step|First|Next|Then|Finally|Avoid|Do not|Don't|Never|Always|Use|Make|Ensure|Keep|Set|Follow|Check|Verify|Determine|Identify|Analyze|Consider)\b/i.test(t)) {
+      const lineMatch = t.match(/^\s*[*\-]\s+[^\n]*\n?/);
+      if (lineMatch) {
+        const line = lineMatch[0];
+        const concatMatch = line.match(/\.I (can|am|'ll|would|'d|have|don't)/i);
+        if (concatMatch) {
+          const splitIdx = line.indexOf(concatMatch[0]);
+          const answerPart = line.slice(splitIdx + 1);
+          t = answerPart + t.slice(line.length);
+          changed = true;
+          continue;
+        }
+        t = t.replace(/^\s*[*\-]\s+[^\n]*\n?/i, "");
+        changed = true;
+        continue;
+      }
+    }
+    if (/^\s*(plaintext|Run|Copy)\s*\n/i.test(t)) {
+      t = t.replace(/^\s*(?:plaintext|Run|Copy)\s*\n/i, "");
+      changed = true;
+      continue;
+    }
+    if (/^\s*\[[A-Z][A-Z\s-]{2,}\]\s*[^\n]*\n?/.test(t)) {
+      const labelMatch = t.match(/^\s*\[([A-Z][A-Z\s-]{2,})\]/);
+      if (labelMatch && /^[A-Z\s-]+$/.test(labelMatch[1])) {
+        t = t.replace(/^\s*\[[A-Z][A-Z\s-]{2,}\]\s*[^\n]*\n?/, "");
+        changed = true;
+        continue;
+      }
+    }
+    if (/^\s*\n/.test(t) && t.trim()) {
+      t = t.replace(/^\s*\n/, "");
+      changed = true;
+      continue;
+    }
+  }
+  return t;
+}
+function insertBeforeMessageActions(body, el) {
+  const anchor = body?.querySelector(".message-actions, .branch-nav");
+  if (anchor) body.insertBefore(el, anchor);
+  else body?.appendChild(el);
+}
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+function getLatestUserImageInput() {
+  if (!state.convId) return null;
+  const conv = getConv(state.convId);
+  if (!conv || !conv.messages) return null;
+  for (let i = conv.messages.length - 1; i >= 0; i--) {
+    const m = conv.messages[i];
+    if (m.role !== "user") continue;
+    const files = m.files || [];
+    const imgFile = files.find((f) => f.type && f.type.startsWith("image/") && f.data);
+    if (imgFile) return imgFile.data;
+    return null;
+  }
+  return null;
+}
+async function copyCode(btn) {
+  try {
+    let text = "";
+    if (btn.dataset.cid) {
+      text = (window._codeStore || {})[btn.dataset.cid] || "";
+    } else {
+      text = decodeURIComponent(btn.dataset.code || "");
+    }
+    const ok = await safeCopy(text);
+    if (ok) {
+      showToast(`${_aiSvgCopy} Code copied to clipboard`);
+    } else {
+      showToast(`${_aiSvgWarn} Failed to copy`);
+    }
+  } catch (err) {
+    console.error(err);
+    showToast(`${_aiSvgWarn} Failed to copy`);
+  }
+}
+function normalizeCodeLang(lang) {
+  const l = String(lang || "").toLowerCase().trim();
+  if (["html", "htm", "xml"].includes(l)) return "html";
+  if (["css", "scss", "sass"].includes(l)) return "css";
+  if (["js", "javascript", "mjs", "jsx", "ts", "typescript", "tsx"].includes(l)) return "js";
+  return l || "plaintext";
+}
+function looksLikeHtml(code) {
+  return /<!doctype\s+html|<html[\s>]|<body[\s>]|<script[\s>]|<style[\s>]|<[a-z][\s\S]*>/i.test(code || "");
+}
+function escapeClosingScript(code) {
+  return String(code || "").replace(/<\/script/gi, "<\\/script");
+}
+function codeBlockMeta(block) {
+  const cid = block?.dataset?.cid;
+  const stored = cid ? (window._codeMeta || {})[cid] : null;
+  return stored || { code: (window._codeStore || {})[cid] || "", language: block?.dataset?.lang || "" };
+}
+function buildRunnablePreview(btn) {
+  const block = btn.closest(".md-code-block");
+  if (!block) return { ok: false, reason: "No code block found." };
+  const selected = codeBlockMeta(block);
+  const selectedLang = normalizeCodeLang(selected.language);
+  const message = btn.closest(".message");
+  const blocks = Array.from(message?.querySelectorAll(".md-code-block") || [block]).map(codeBlockMeta);
+  const browserBlocks = blocks.filter((b) => {
+    const lang = normalizeCodeLang(b.language);
+    return ["html", "css", "js"].includes(lang) || lang === "plaintext" && looksLikeHtml(b.code);
+  });
+  if (!browserBlocks.length && !["html", "css", "js"].includes(selectedLang) && !looksLikeHtml(selected.code)) {
+    return { ok: false, reason: `Cannot run ${selected.language || "this"} code in the browser preview.` };
+  }
+  let html = "";
+  let css = "";
+  let js = "";
+  const source = browserBlocks.length ? browserBlocks : [selected];
+  source.forEach((item) => {
+    const lang = normalizeCodeLang(item.language);
+    if (lang === "html" || lang === "plaintext" && looksLikeHtml(item.code)) html += "\n" + item.code;
+    else if (lang === "css") css += "\n" + item.code;
+    else if (lang === "js") js += "\n" + item.code;
+  });
+  if (!html && selectedLang === "css") css = selected.code;
+  if (!html && selectedLang === "js") js = selected.code;
+  if (!html) {
+    html = '<main class="emerald-preview-root"><h1>Preview</h1><p>Your code is running in a browser sandbox.</p><div id="app"></div><button id="btn">Button</button><p id="count">0</p></main>';
+  }
+  return {
+    ok: true,
+    title: selected.language ? `${selected.language.toUpperCase()} Preview` : "Code Preview",
+    srcdoc: createPreviewSrcdoc(html, css, js)
+  };
+}
+function createPreviewSrcdoc(html, css, js) {
+  const sandboxSupport = `<script>
+(function() {
+  function makeStorage() {
+    var data = Object.create(null);
+    return {
+      get length() { return Object.keys(data).length; },
+      key: function(index) { return Object.keys(data)[index] || null; },
+      getItem: function(key) {
+        key = String(key);
+        return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
+      },
+      setItem: function(key, value) { data[String(key)] = String(value); },
+      removeItem: function(key) { delete data[String(key)]; },
+      clear: function() { data = Object.create(null); }
+    };
+  }
+  try {
+    Object.defineProperty(window, 'localStorage', { value: makeStorage(), configurable: true });
+    Object.defineProperty(window, 'sessionStorage', { value: makeStorage(), configurable: true });
+  } catch (err) {}
+})();
+<\/script>`;
+  const virtualDialogHTML = '<div id="_esbOv" style="position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:2147483647;opacity:0;transition:opacity .18s ease;pointer-events:none;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"><div id="_esbDlg" style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:18px;padding:28px 24px 20px;min-width:270px;max-width:min(380px,88vw);box-shadow:0 28px 70px rgba(0,0,0,.75);transform:translateY(12px) scale(.96);transition:transform .22s cubic-bezier(.34,1.56,.64,1),opacity .18s ease;opacity:0"><div id="_esbIcon" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px"></div><div id="_esbKind" style="font-size:.68rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#505050;text-align:center;margin-bottom:8px"></div><div id="_esbMsg" style="font-size:.92rem;color:#c8c8c8;line-height:1.65;text-align:center;margin-bottom:20px;word-break:break-word;white-space:pre-wrap;max-height:160px;overflow-y:auto"></div><input id="_esbInp" type="text" style="display:none;width:100%;box-sizing:border-box;background:#111;border:1px solid #2e2e2e;border-radius:9px;color:#e0e0e0;font:inherit;font-size:.9rem;padding:9px 12px;margin-bottom:16px;outline:none"><div id="_esbBtns" style="display:flex;gap:8px;justify-content:flex-end"></div></div></div><div id="_esbCon" style="position:fixed;bottom:0;left:0;right:0;z-index:2147483640;background:#131313;border-top:1px solid #2a2a2a;font-family:ui-monospace,monospace;font-size:.76rem;display:flex;flex-direction:column;max-height:200px;transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1)"><div id="_esbConBar" style="display:flex;align-items:center;padding:5px 10px;gap:8px;user-select:none;border-bottom:1px solid #1d1d1d;flex-shrink:0;min-height:28px"><span style="font-size:.68rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#909090;flex:1">Console</span><span id="_esbBadge" style="background:#50c878;color:#000;font-size:.62rem;font-weight:700;border-radius:20px;padding:0 7px;line-height:18px;display:none">0</span><button id="_esbClr" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:.7rem;font-weight:600;font-family:inherit;padding:2px 8px;border-radius:4px;letter-spacing:.04em">Clear</button></div><div id="_esbConBody" style="overflow-y:auto;flex:1;padding:2px 0"></div></div>';
+  const virtualDialogJS = `<script>
+(function(){
+  var _cb = null;
+  var ICONS = {
+    a: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>',
+    c: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>',
+    p: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
+  };
+  var ICON_STYLES = {
+    a: 'background:rgba(80,200,120,.13);color:#50c878',
+    c: 'background:rgba(255,196,0,.11);color:#ffc400',
+    p: 'background:rgba(100,160,255,.11);color:#64a0ff'
+  };
+  var KIND_LABELS = { a: 'Alert', c: 'Confirm', p: 'Input' };
+
+  function _btn(label, primary, cb){
+    var b = document.createElement('button');
+    b.textContent = label;
+    b.style.cssText = 'border:none;border-radius:9px;padding:8px 18px;font:inherit;font-size:.87rem;font-weight:600;cursor:pointer;outline:none;' +
+      (primary ? 'background:#019100;color:#fff' : 'background:#252525;color:#aaa;border:1px solid #333');
+    b.onmouseenter = function(){ b.style.background = primary ? '#01a800' : '#2e2e2e'; };
+    b.onmouseleave = function(){ b.style.background = primary ? '#019100' : '#252525'; };
+    b.onclick = cb;
+    return b;
+  }
+
+  function _open(kind, msg, def, cb){
+    _cb = cb;
+    var ov   = document.getElementById('_esbOv');
+    var dlg  = document.getElementById('_esbDlg');
+    var icon = document.getElementById('_esbIcon');
+    var lbl  = document.getElementById('_esbKind');
+    var msgEl= document.getElementById('_esbMsg');
+    var inp  = document.getElementById('_esbInp');
+    var btns = document.getElementById('_esbBtns');
+    if (!ov) { cb && cb(kind==='c'?false:null); return; }
+    icon.style.cssText = 'width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;' + ICON_STYLES[kind];
+    icon.innerHTML = ICONS[kind];
+    lbl.textContent = KIND_LABELS[kind] || 'Alert';
+    msgEl.textContent = (msg==null)?'':String(msg);
+    inp.style.display = kind==='p' ? 'block' : 'none';
+    if (kind==='p') inp.value = (def!=null)?String(def):'';
+    btns.innerHTML = '';
+    function done(val){ ov.style.opacity='0'; ov.style.pointerEvents='none'; dlg.style.opacity='0'; dlg.style.transform='translateY(12px) scale(.96)'; if(_cb){_cb(val);_cb=null;} }
+    if (kind!=='a') btns.appendChild(_btn('Cancel', false, function(){ done(kind==='c'?false:null); }));
+    var ok = _btn('OK', true, function(){ done(kind==='p'?inp.value:(kind==='c'?true:undefined)); });
+    btns.appendChild(ok);
+    ov.style.opacity='1'; ov.style.pointerEvents='all';
+    dlg.style.opacity='1'; dlg.style.transform='translateY(0) scale(1)';
+    ov.onclick = function(e){ if(e.target===ov) done(kind==='c'?false:(kind==='p'?null:undefined)); };
+    if(kind==='p'){ inp.onkeydown=function(e){ if(e.key==='Enter') done(inp.value); if(e.key==='Escape') done(null); }; }
+    setTimeout(function(){ (kind==='p'?inp:ok).focus(); if(kind==='p') inp.select(); }, 60);
+  }
+
+  window.alert   = function(m)    { return new Promise(function(r){ _open('a',m,null,r); }); };
+  window.confirm = function(m)    { return new Promise(function(r){ _open('c',m,null,r); }); };
+  window.prompt  = function(m,d)  { return new Promise(function(r){ _open('p',m,d,r);   }); };
+
+  var _n = 0;
+  var LEVEL_STYLE = {
+    log:  'background:#1e1e1e;color:#606060',
+    info: 'background:rgba(100,160,255,.1);color:#64a0ff',
+    warn: 'background:rgba(255,196,0,.09);color:#c4970a',
+    error:'background:rgba(220,50,50,.1);color:#cc4444'
+  };
+  var MSG_STYLE = {
+    log:'color:#bababa', info:'color:#bababa',
+    warn:'color:#b8910e', error:'color:#c05050'
+  };
+  function _addLog(lvl, args){
+    var body  = document.getElementById('_esbConBody');
+    var badge = document.getElementById('_esbBadge');
+    var con   = document.getElementById('_esbCon');
+    if (!body) return;
+    _n++;
+    var text = Array.prototype.slice.call(args).map(function(a){
+      if(a===null) return 'null'; if(a===undefined) return 'undefined';
+      try{ return typeof a==='object'?JSON.stringify(a,null,2):String(a); }catch(e){ return String(a); }
+    }).join(' ');
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;padding:3px 10px;border-bottom:1px solid #191919;align-items:baseline;line-height:1.55';
+    var tag = document.createElement('span');
+    tag.style.cssText = 'font-size:.62rem;font-weight:700;text-transform:uppercase;padding:0 5px;border-radius:4px;flex-shrink:0;line-height:16px;' + (LEVEL_STYLE[lvl]||LEVEL_STYLE.log);
+    tag.textContent = lvl;
+    var m = document.createElement('span');
+    m.style.cssText = 'word-break:break-all;white-space:pre-wrap;flex:1;min-width:0;' + (MSG_STYLE[lvl]||MSG_STYLE.log);
+    m.textContent = text;
+    row.appendChild(tag); row.appendChild(m);
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+    if(badge){ badge.textContent=_n; badge.style.display='inline-block'; }
+    if(con && !con._open){ con.style.transform='translateY(0)'; con._open=true; }
+  }
+  ['log','info','warn','error'].forEach(function(m){
+    var orig = console[m]?console[m].bind(console):function(){};
+    console[m] = function(){ orig.apply(console,arguments); _addLog(m,arguments); };
+  });
+
+  function _wire(){
+    var clr = document.getElementById('_esbClr');
+    if(clr) clr.onclick = function(e){
+      e.stopPropagation();
+      var b=document.getElementById('_esbConBody'), badge=document.getElementById('_esbBadge');
+      if(b) b.innerHTML='';
+      if(badge){ badge.textContent='0'; badge.style.display='none'; }
+      _n=0;
+    };
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_wire); else _wire();
+
+  window.addEventListener('message', function(e){
+    if(!e.data || typeof e.data !== 'object') return;
+    var con = document.getElementById('_esbCon');
+    if(!con) return;
+    if(e.data.type === 'esb-console-toggle'){
+      con._open = !con._open;
+      con.style.transform = con._open ? 'translateY(0)' : 'translateY(100%)';
+    }
+  });
+})();
+<\/script>`;
+  const relay = `<script>
+window.addEventListener('error', function(event) {
+  parent.postMessage({ type: 'emerald-code-error', message: event.message || 'Preview runtime error.' }, '*');
+});
+window.addEventListener('unhandledrejection', function(event) {
+  var reason = event.reason && (event.reason.message || String(event.reason));
+  parent.postMessage({ type: 'emerald-code-error', message: reason || 'Preview promise error.' }, '*');
+});
+<\/script>`;
+  const baseStyle = `<style>
+html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171717;background:#fff}
+body{padding:24px;padding-bottom:52px}
+.emerald-preview-root{display:grid;gap:12px;max-width:760px;margin:0 auto}
+button{font:inherit;border:1px solid #d0d7de;background:#f6f8fa;border-radius:8px;padding:8px 12px;cursor:pointer}
+${css || ""}
+</style>`;
+  const consoleScrollCSS = `<style>
+#_esbConBody::-webkit-scrollbar{width:6px;height:6px}
+#_esbConBody::-webkit-scrollbar-track{background:#131313}
+#_esbConBody::-webkit-scrollbar-thumb{background:#2e2e2e;border-radius:10px}
+#_esbConBody::-webkit-scrollbar-thumb:hover{background:#555}
+#_esbConBody{scrollbar-width:thin;scrollbar-color:#2e2e2e #131313}
+</style>`;
+  const headInject = `${baseStyle}${consoleScrollCSS}${sandboxSupport}${virtualDialogJS}`;
+  const script = js ? `<script>${escapeClosingScript(js)}<\/script>` : "";
+  let doc = String(html || "");
+  if (!/<!doctype\s+html|<html[\s>]/i.test(doc)) {
+    doc = `<!doctype html><html><head><meta charset="utf-8">${headInject}</head><body>${virtualDialogHTML}${doc}${script}${relay}</body></html>`;
+  } else {
+    doc = doc.replace(/<\/head>/i, `${headInject}</head>`);
+    doc = doc.replace(/<body(\s[^>]*)?>/, (m) => `${m}${virtualDialogHTML}`);
+    doc = doc.replace(/<\/body>/i, `${script}${relay}</body>`);
+    if (!/<\/body>/i.test(doc)) doc += script + relay;
+    if (!/<\/head>/i.test(doc)) doc = doc.replace(/<html[^>]*>/i, (match) => `${match}<head><meta charset="utf-8">${headInject}</head>`);
+  }
+  return doc;
+}
+function runCode(btn) {
+  try {
+    const preview = buildRunnablePreview(btn);
+    if (!preview.ok) {
+      showToast(`${_aiSvgWarn} ${escapeHtml(preview.reason || "This code cannot run in the browser preview.")}`);
+      return;
+    }
+    openCodePreviewPanel(preview.title, preview.srcdoc);
+  } catch (err) {
+    console.error(err);
+    showToast(`${_aiSvgError} Failed to open code preview.`);
+  }
+}
+function openCodePreviewPanel(titleText, srcdoc) {
+  const panel = $("codePreviewPanel");
+  const body = $("codePreviewBody");
+  const title = $("codePreviewTitle");
+  if (!panel || !body) {
+    showToast(`${_aiSvgError} Code preview panel is not available.`);
+    return;
+  }
+  closeFilePreviewPanel();
+  closeQuizPanel();
+  if (title) title.textContent = titleText || "Code Preview";
+  body.innerHTML = `<iframe class="code-preview-frame" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer"></iframe>`;
+  const frame = body.querySelector("iframe");
+  frame.srcdoc = srcdoc;
+  panel.classList.add("open");
+  showToast(`${_aiSvgPlay} Preview opened`);
+}
+function closeCodePreviewPanel() {
+  const panel = $("codePreviewPanel");
+  if (!panel || !panel.classList.contains("open")) return;
+  panel.classList.add("closing");
+  setTimeout(() => {
+    panel.classList.remove("open", "closing");
+    const body = $("codePreviewBody");
+    if (body) body.innerHTML = "";
+  }, 320);
+}
+window.addEventListener("message", (event) => {
+  if (event.data?.type === "emerald-code-error") {
+    showToast(`${_aiSvgError} Preview error: ${escapeHtml(event.data.message || "The code could not run.")}`);
+  }
+});
+const $ = (id) => document.getElementById(id);
+let _libFilter = "all";
+function setLibFilter(value, tabEl) {
+  _libFilter = value;
+  document.querySelectorAll(".lib-tab").forEach((t) => t.classList.remove("active"));
+  if (tabEl) tabEl.classList.add("active");
+  moveLibTabIndicator(tabEl);
+  renderLibraryModal();
+}
+function moveLibTabIndicator(tabEl) {
+  const indicator = $("libTabIndicator");
+  if (!indicator || !tabEl) return;
+  const tabsEl = tabEl.closest(".lib-tabs");
+  if (!tabsEl) return;
+  const rect = tabEl.getBoundingClientRect();
+  const tabsRect = tabsEl.getBoundingClientRect();
+  const center = rect.left - tabsRect.left + rect.width / 2;
+  const indW = Math.max(rect.width * 0.55, 22);
+  indicator.style.width = indW + "px";
+  indicator.style.left = center - indW / 2 + "px";
+}
+function appendStreamWords(textEl, chunk) {
+  const parts = chunk.split(/(\s+)/);
+  parts.forEach((part, idx) => {
+    if (part === "") return;
+    const span = document.createElement("span");
+    span.className = "stream-word";
+    span.style.animationDelay = `${idx * 12}ms`;
+    span.textContent = part;
+    textEl.appendChild(span);
+  });
+}
+function _updateWelcomeSpacer(active) {
+}
+function showWelcome() {
+  const GREETINGS = [
+    (n) => `How can I help, ${n}?`,
+    (n) => `What's on your agenda today, ${n}?`,
+    (n) => `Ready when you are, ${n}. What do you need?`,
+    (n) => `What's on your mind today, ${n}?`,
+    (n) => `Hi ${n}! What would you like to explore?`
+  ];
+  const name = (loadSettings().userName || "").trim();
+  const displayName = name && name !== "You" ? name : "User";
+  const pick = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+  const heading = $("welcomeHeading");
+  if (heading) heading.textContent = pick(displayName);
+  $("welcomeScreen").style.display = "flex";
+  $("messagesArea").style.display = "none";
+  $("messagesArea").innerHTML = typingIndicatorHTML();
+  updateTopbarTitle("");
+  if ($("tempChatBtn")) $("tempChatBtn").style.display = "";
+  requestAnimationFrame(() => _updateWelcomeSpacer(true));
+}
+function showMessages() {
+  $("welcomeScreen").style.display = "none";
+  $("messagesArea").style.display = "flex";
+  if ($("tempChatBtn")) $("tempChatBtn").style.display = "none";
+  _updateWelcomeSpacer(false);
+}
+function typingIndicatorHTML() {
+  return `<div class="message" id="typingIndicator" style="display:none;">
+    <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
+    <div class="message-body">
+      <div class="message-sender">EmeraldBot</div>
+      <div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>
+    </div>
+  </div>`;
+}
+function updateTopbarTitle(title) {
+  const el = $("topbarTitle");
+  if (el) el.textContent = title || "";
+}
+function renderSidebar() {
+  renderRecents();
+}
+function renderRecents() {
+  const container = $("sidebarHistory");
+  if (!container) return;
+  const convs = loadConvs().filter((c) => !c.isTemp);
+  const recent = convs.slice(0, 30);
+  if (recent.length === 0) {
+    container.innerHTML = `<div class="sidebar-section-title">Recents</div><div class="sidebar-empty">No conversations yet</div>`;
+    return;
+  }
+  container.innerHTML = `<div class="sidebar-section-title">Recents</div>` + recent.map((c) => `
+    <div class="history-item${state.convId === c.id ? " active" : ""}" 
+         data-conv-id="${c.id}" 
+         onclick="loadConversation('${c.id}')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      <span class="history-item-text">${escapeHtml(c.title || "Untitled")}</span>
+    </div>`).join("");
+}
+function loadConversation(id) {
+  const conv = getConv(id);
+  if (!conv) return;
+  state.convId = id;
+  state.isTemp = false;
+  showMessages();
+  $("messagesArea").innerHTML = typingIndicatorHTML();
+  conv.messages.forEach((m) => {
+    if (m.role === "user") appendUserMessageDOM(m.text, m.files || [], m.id || null, m._editBranchRef || null);
+    else appendStoredAIMessage(m);
+  });
+  if (conv._editBranches) {
+    Object.keys(conv._editBranches).forEach((origId) => updateBranchNavDOM(origId));
+  }
+  if (conv._regenBranches) {
+    Object.keys(conv._regenBranches).forEach((branchId) => updateRegenNavDOM(branchId));
+  }
+  updateLastMsgActions();
+  updateTopbarTitle(conv.title);
+  renderSidebar();
+  scrollToBottom();
+}
+function appendUserMessageDOM(text, files = [], msgId = null, branchRef = null) {
+  const typingEl = $("typingIndicator");
+  const initials = getUserInitials();
+  const userName = getUserName();
+  const avatarImg = loadSettings().avatar;
+  const fileCards = files.map((f) => fileCardHTML(f)).join("");
+  const div = document.createElement("div");
+  div.className = "message message--user";
+  if (msgId) div.dataset.msgId = msgId;
+  if (branchRef) div.dataset.branchRef = branchRef;
+  const avatarHTML = avatarImg ? `<div class="message-avatar-user user message-avatar--img"><img src="${avatarImg}" alt="${escapeHtml(initials)}"></div>` : `<div class="message-avatar-user user">${escapeHtml(initials)}</div>`;
+  div.innerHTML = `
+    ${avatarHTML}
+    <div class="message-body">
+      <div class="message-sender">${escapeHtml(userName)}</div>
+      ${fileCards ? `<div class="msg-files">${fileCards}</div>` : ""}
+      <div class="message-text user-text">${escapeHtml(text).replace(/\n/g, "<br>")}</div>
+    </div>`;
+  $("messagesArea").insertBefore(div, typingEl);
+}
+const _fileRegistry = {};
+function _regFile(f) {
+  const fid = genId();
+  _fileRegistry[fid] = f;
+  return fid;
+}
+function fileCardHTML(f) {
+  const fid = _regFile(f);
+  const isImg = f.type && f.type.startsWith("image/");
+  const name = escapeHtml(f.name || "");
+  const inner = isImg && f.data ? `<img class="msg-file-thumb" src="${f.data}" alt="">` : fileIcon(f.type || "");
+  return `<div class="msg-file-card${isImg ? " msg-file-card--img" : ""}" data-fid="${fid}" onclick="openFilePreview('${fid}')" title="${name}">${inner}<span class="msg-file-name">${name}</span></div>`;
+}
+const _TEXT_PREVIEW_EXTS = /* @__PURE__ */ new Set([
+  "txt",
+  "md",
+  "markdown",
+  "csv",
+  "json",
+  "xml",
+  "yaml",
+  "yml",
+  "toml",
+  "ini",
+  "log",
+  "html",
+  "htm",
+  "css",
+  "js",
+  "mjs",
+  "ts",
+  "jsx",
+  "tsx",
+  "py",
+  "rb",
+  "java",
+  "c",
+  "cpp",
+  "h",
+  "hpp",
+  "go",
+  "rs",
+  "sh",
+  "bash",
+  "sql",
+  "graphql",
+  "gql",
+  "tf",
+  "vue",
+  "svelte",
+  "r",
+  "swift",
+  "kt",
+  "dart",
+  "php",
+  "env",
+  "config",
+  "conf",
+  "properties"
+]);
+function openFilePreview(fid) {
+  const f = _fileRegistry[fid];
+  if (!f) return;
+  closeCodePreviewPanel();
+  closeQuizPanel();
+  const panel = $("filePreviewPanel");
+  const body = $("fpPanelBody");
+  const title = $("fpPanelTitle");
+  if (!panel || !body) return;
+  if (title) title.textContent = f.name || "Preview";
+  _fpZoom = 1;
+  _fpCurrentFid = fid;
+  _fpUpdateZoomLabel();
+  const isImg = f.type && f.type.startsWith("image/");
+  const isPDF = f.type === "application/pdf" || (f.name || "").toLowerCase().endsWith(".pdf");
+  const ext_fp = (f.name || "").split(".").pop().toLowerCase();
+  const isDocx = f.type?.includes("word") || ext_fp === "docx" || ext_fp === "doc";
+  const isPptx = f.type?.includes("presentation") || ext_fp === "pptx" || ext_fp === "ppt";
+  const isText = _TEXT_PREVIEW_EXTS.has(ext_fp);
+  if (isImg && f.data) {
+    body.innerHTML = `<div class="fp-img-wrap"><img src="${f.data}" alt="${escapeHtml(f.name || "")}" id="fpImgEl" style="transform-origin:top center;"></div>`;
+    panel.classList.add("open");
+    _fpApplyZoom();
+    return;
+  }
+  if (isPDF && f.data) {
+    renderPdfCustom(f.data, body);
+    panel.classList.add("open");
+    return;
+  }
+  if (isPptx && f.data && typeof JSZip !== "undefined") {
+    renderPptxSlides(f.data, body);
+    panel.classList.add("open");
+    return;
+  }
+  if (isDocx && f.data && typeof JSZip !== "undefined") {
+    renderDocxCustom(f.data, body);
+    panel.classList.add("open");
+    return;
+  }
+  if (isText && f.data) {
+    try {
+      const b64 = f.data.includes(",") ? f.data.split(",")[1] : f.data;
+      const binStr = atob(b64);
+      const bytes = new Uint8Array(binStr.length);
+      for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+      const text = new TextDecoder("utf-8").decode(bytes);
+      let highlighted = escapeHtml(text);
+      if (typeof hljs !== "undefined") {
+        try {
+          const res = hljs.getLanguage(ext_fp) ? hljs.highlight(text, { language: ext_fp }) : hljs.highlightAuto(text);
+          highlighted = res.value;
+        } catch (e) {
+        }
+      }
+      body.innerHTML = `<div class="fp-text-viewer"><pre class="fp-text-code hljs"><code>${highlighted}</code></pre></div>`;
+    } catch (e) {
+      body.innerHTML = `<pre class="fp-text">${escapeHtml(f.extractedText || "")}</pre>`;
+    }
+    panel.classList.add("open");
+    _fpApplyZoom();
+    return;
+  }
+  if (f.extractedText) {
+    body.innerHTML = `<pre class="fp-text">${escapeHtml(f.extractedText)}</pre>`;
+    panel.classList.add("open");
+    _fpApplyZoom();
+    return;
+  }
+  body.innerHTML = `<div class="fp-nopreview"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>${escapeHtml(f.name || "File")}</p><small>No preview available</small></div>`;
+  panel.classList.add("open");
+}
+function closeFilePreviewPanel() {
+  const panel = $("filePreviewPanel");
+  if (!panel || !panel.classList.contains("open")) return;
+  panel.classList.add("closing");
+  setTimeout(() => {
+    panel.classList.remove("open", "closing");
+  }, 320);
+}
+async function renderPptxSlides(fileData, body) {
+  body.innerHTML = '<div class="fp-loading"><svg class="fp-spin" viewBox="0 0 50 50" width="36" height="36"><circle cx="25" cy="25" r="20" fill="none" stroke="#4caf7d" stroke-width="4" stroke-dasharray="80 20"/></svg><p>Rendering slides\u2026</p></div>';
+  try {
+    const b64 = fileData.includes(",") ? fileData.split(",")[1] : fileData;
+    const raw = atob(b64);
+    const u8 = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+    const zip = await JSZip.loadAsync(u8.buffer);
+    let slideW = 9144e3, slideH = 6858e3;
+    try {
+      const px = await zip.file("ppt/presentation.xml")?.async("text") || "";
+      const m = px.match(/sldSz[^/]*?cx="(\d+)"[^/]*?cy="(\d+)"/);
+      if (m) {
+        slideW = +m[1];
+        slideH = +m[2];
+      }
+    } catch (e) {
+    }
+    const RW = 960;
+    const RH = Math.round(RW * slideH / slideW);
+    const ex = (v) => Math.round(v / slideW * RW);
+    const ey = (v) => Math.round(v / slideH * RH);
+    const fs = (sz) => Math.max(8, Math.round(sz / 100 * 12700 / slideW * RW));
+    const slideFiles = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => +a.match(/\d+/)[0] - +b.match(/\d+/)[0]);
+    if (!slideFiles.length) {
+      body.innerHTML = '<div class="fp-nopreview"><p>No slides found</p></div>';
+      return;
+    }
+    const slideHtmls = [];
+    for (const path of slideFiles) {
+      const num = path.match(/\d+/)[0];
+      const xml = await zip.file(path)?.async("text") || "";
+      const imgMap = {};
+      try {
+        const rxml = await zip.file(`ppt/slides/_rels/slide${num}.xml.rels`)?.async("text") || "";
+        for (const m of rxml.matchAll(/Id="(rId\w+)"[^>]*Target="([^"]+)"/g)) {
+          const [, rId, tgt] = m;
+          if (!/\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(tgt)) continue;
+          const ip = tgt.startsWith("../") ? "ppt/" + tgt.slice(3) : !tgt.startsWith("ppt/") ? "ppt/slides/" + tgt : tgt;
+          const ext = ip.split(".").pop().toLowerCase();
+          const mime = /jpe?g/.test(ext) ? "image/jpeg" : `image/${ext}`;
+          const b = await zip.file(ip)?.async("base64").catch(() => null);
+          if (b) imgMap[rId] = `data:${mime};base64,${b}`;
+        }
+      } catch (e) {
+      }
+      const clean = xml.replace(/<(\/?)[a-zA-Z][\w]*:/g, "<$1").replace(/\w+:embed=/g, "embed=");
+      const doc = new DOMParser().parseFromString(clean, "text/xml");
+      let bg = "#FFFFFF";
+      const bgEl = doc.querySelector("bg solidFill srgbClr") || doc.querySelector("bg solidFill sysClr");
+      if (bgEl) bg = "#" + (bgEl.getAttribute("val") || bgEl.getAttribute("lastClr") || "FFFFFF");
+      let html = `<div class="pptx-slide" style="background:${bg};width:${RW}px;height:${RH}px;position:relative;font-family:Calibri,Arial,sans-serif;">`;
+      doc.querySelectorAll("sp, pic").forEach((el) => {
+        const xfrm = el.querySelector("spPr > xfrm") || el.querySelector("xfrm");
+        if (!xfrm) return;
+        const off = xfrm.querySelector("off"), ext = xfrm.querySelector("ext");
+        if (!off || !ext) return;
+        const x = ex(+off.getAttribute("x") || 0), y = ey(+off.getAttribute("y") || 0);
+        const w = ex(+ext.getAttribute("cx") || 0), h = ey(+ext.getAttribute("cy") || 0);
+        if (w < 1 || h < 1) return;
+        const pos = `position:absolute;left:${x}px;top:${y}px;width:${w}px;height:${h}px;overflow:hidden;`;
+        if (el.tagName === "pic") {
+          const blip = el.querySelector("blip");
+          const src = imgMap[blip?.getAttribute("embed")];
+          if (src) html += `<img src="${src}" style="${pos}object-fit:fill;width:${w}px;height:${h}px;" alt="">`;
+        } else {
+          const fillEl = el.querySelector("spPr > solidFill > srgbClr");
+          const noFill = el.querySelector("spPr > noFill, spPr noFill");
+          const fillBg = !noFill && fillEl ? `background:#${fillEl.getAttribute("val")};` : "";
+          const pad = `padding:${Math.max(2, Math.round(h * 0.02))}px ${Math.max(3, Math.round(w * 0.02))}px;`;
+          html += `<div style="${pos}${fillBg}${pad}box-sizing:border-box;">`;
+          el.querySelectorAll("txBody > p").forEach((p) => {
+            const pPr = p.querySelector("pPr");
+            const algn = pPr?.getAttribute("algn");
+            const ta = algn === "ctr" ? "center" : algn === "r" ? "right" : algn === "just" ? "justify" : "left";
+            html += `<p style="margin:0;padding:0;line-height:1.25;text-align:${ta};">`;
+            p.querySelectorAll("r").forEach((r) => {
+              const t = r.querySelector("t");
+              if (!t || !t.textContent) return;
+              const rPr = r.querySelector("rPr");
+              const sz = rPr?.getAttribute("sz") ? fs(+rPr.getAttribute("sz")) : fs(1800);
+              const fw = rPr?.getAttribute("b") === "1" ? "bold" : "normal";
+              const fi = rPr?.getAttribute("i") === "1" ? "italic" : "normal";
+              const td = rPr?.getAttribute("u") === "sng" ? "underline" : "none";
+              const ce = rPr?.querySelector("solidFill srgbClr");
+              const cl = ce ? "#" + ce.getAttribute("val") : "#000";
+              html += `<span style="font-size:${sz}px;font-weight:${fw};font-style:${fi};text-decoration:${td};color:${cl};">${escapeHtml(t.textContent)}</span>`;
+            });
+            html += "</p>";
+          });
+          html += "</div>";
+        }
+      });
+      html += "</div>";
+      slideHtmls.push(html);
+    }
+    const vid = "pptx" + Date.now();
+    body.innerHTML = `<div class="pptx-viewer" id="${vid}"><div class="pptx-wrap" style="overflow:hidden;"><div id="${vid}-sc" style="display:block;">${slideHtmls[0]}</div></div><div class="pptx-nav"><button class="pptx-btn" onclick="_pptxGo('${vid}',-1)">&#8592; Prev</button><span class="pptx-ctr" id="${vid}-ctr">1 / ${slideHtmls.length}</span><button class="pptx-btn" onclick="_pptxGo('${vid}',1)">Next &#8594;</button></div></div>`;
+    const doScale = () => {
+      const wrap = document.querySelector(`#${vid} .pptx-wrap`);
+      const sc = document.getElementById(`${vid}-sc`);
+      if (!wrap || !sc) return;
+      const scale = wrap.clientWidth / RW;
+      sc.style.zoom = scale;
+      wrap.style.height = Math.round(RH * scale) + "px";
+    };
+    window[`__pp_${vid}`] = { s: slideHtmls, i: 0, rw: RW, rh: RH, doScale };
+    setTimeout(doScale, 0);
+    if (window.ResizeObserver) new ResizeObserver(() => {
+      if (_fpZoom === 1) doScale();
+    }).observe(body);
+  } catch (e) {
+    console.error("PPTX render:", e);
+    body.innerHTML = '<div class="fp-nopreview"><p>Could not render slides</p><small>' + escapeHtml(String(e)) + "</small></div>";
+  }
+}
+window._pptxGo = function(vid, dir) {
+  const d = window[`__pp_${vid}`];
+  if (!d) return;
+  d.i = Math.max(0, Math.min(d.s.length - 1, d.i + dir));
+  const sc = document.getElementById(`${vid}-sc`);
+  const ctr = document.getElementById(`${vid}-ctr`);
+  if (sc) sc.innerHTML = d.s[d.i];
+  if (ctr) ctr.textContent = `${d.i + 1} / ${d.s.length}`;
+  if (d.doScale) d.doScale();
+};
+let _fpZoom = 1;
+let _fpCurrentFid = null;
+function _fpUpdateZoomLabel() {
+  const lbl = $("fpZoomLabel");
+  if (lbl) lbl.textContent = Math.round(_fpZoom * 100) + "%";
+}
+function _fpZoomIn() {
+  _fpZoom = Math.min(4, +(_fpZoom + 0.25).toFixed(2));
+  _fpApplyZoom();
+}
+function _fpZoomOut() {
+  _fpZoom = Math.max(0.25, +(_fpZoom - 0.25).toFixed(2));
+  _fpApplyZoom();
+}
+function _fpZoomReset() {
+  _fpZoom = 1;
+  _fpApplyZoom();
+}
+function _fpApplyZoom() {
+  _fpUpdateZoomLabel();
+  const body = $("fpPanelBody");
+  if (!body) return;
+  const el = body.firstElementChild;
+  if (!el) return;
+  const pptxData = window[`__pp_${el.id}`];
+  if (pptxData && pptxData.doScale) {
+    const wrap = el.querySelector(".pptx-wrap");
+    if (wrap) wrap.style.width = _fpZoom * 100 + "%";
+    pptxData.doScale();
+    return;
+  }
+  const pdfData = window[`__pf_${el.id}`];
+  if (pdfData) {
+    _pdfRenderPage(el.id, pdfData.cur);
+    return;
+  }
+  const imgEl = document.getElementById("fpImgEl");
+  if (imgEl) {
+    imgEl.style.width = _fpZoom * 100 + "%";
+    imgEl.style.maxWidth = "none";
+    imgEl.style.height = "auto";
+    const wrap = imgEl.parentElement;
+    if (wrap) wrap.style.overflow = _fpZoom > 1 ? "auto" : "visible";
+    return;
+  }
+  el.style.zoom = _fpZoom;
+}
+async function renderPdfCustom(fileData, body) {
+  body.innerHTML = '<div class="fp-loading"><svg class="fp-spin" viewBox="0 0 50 50" width="36" height="36"><circle cx="25" cy="25" r="20" fill="none" stroke="#4caf7d" stroke-width="4" stroke-dasharray="80 20"/></svg><p>Loading PDF\u2026</p></div>';
+  try {
+    if (!window.pdfjsLib) {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        s.onload = res;
+        s.onerror = rej;
+        document.head.appendChild(s);
+      });
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+    const b64 = fileData.includes(",") ? fileData.split(",")[1] : fileData;
+    const raw = atob(b64);
+    const u8 = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+    const pdf = await window.pdfjsLib.getDocument({ data: u8 }).promise;
+    const vid = "pdf" + Date.now();
+    body.innerHTML = `<div class="doc-viewer" id="${vid}"><div class="doc-canvas-wrap"><canvas id="${vid}-cv"></canvas></div><div class="pptx-nav"><button class="pptx-btn" onclick="_pdfGo('${vid}',-1)">&#8592; Prev</button><span class="pptx-ctr" id="${vid}-ctr">1 / ${pdf.numPages}</span><button class="pptx-btn" onclick="_pdfGo('${vid}',1)">Next &#8594;</button></div></div>`;
+    window[`__pf_${vid}`] = { pdf, cur: 1, total: pdf.numPages };
+    await _pdfRenderPage(vid, 1);
+    _fpApplyZoom();
+  } catch (e) {
+    console.error("PDF render:", e);
+    body.innerHTML = '<div class="fp-nopreview"><p>Could not render PDF</p></div>';
+  }
+}
+async function _pdfRenderPage(vid, n) {
+  const d = window[`__pf_${vid}`];
+  if (!d) return;
+  const cv = document.getElementById(`${vid}-cv`);
+  if (!cv) return;
+  const wrap = cv.parentElement;
+  const oldTL = wrap.querySelector(".pdfTextLayer");
+  if (oldTL) oldTL.remove();
+  const page = await d.pdf.getPage(n);
+  const baseVp = page.getViewport({ scale: 1 });
+  const baseScale = Math.min(1.5, (wrap.clientWidth || 572) / baseVp.width);
+  const renderScale = baseScale * _fpZoom;
+  const vp = page.getViewport({ scale: renderScale });
+  cv.width = vp.width;
+  cv.height = vp.height;
+  cv.style.width = "";
+  cv.style.height = "";
+  cv.style.maxWidth = _fpZoom > 1 ? "none" : "";
+  cv.style.maxHeight = _fpZoom > 1 ? "none" : "";
+  wrap.style.overflow = _fpZoom > 1 ? "auto" : "hidden";
+  wrap.style.alignItems = _fpZoom > 1 ? "flex-start" : "center";
+  wrap.style.justifyContent = _fpZoom > 1 ? "flex-start" : "center";
+  await page.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+  try {
+    const textContent = await page.getTextContent();
+    setTimeout(() => {
+      try {
+        const dispW = cv.offsetWidth;
+        const dispH = cv.offsetHeight;
+        const dispScale = dispW / cv.width;
+        const tl = document.createElement("div");
+        tl.className = "pdfTextLayer";
+        tl.style.cssText = `left:${cv.offsetLeft}px;top:${cv.offsetTop}px;width:${dispW}px;height:${dispH}px;`;
+        textContent.items.forEach((item) => {
+          if (!item.str) return;
+          const span = document.createElement("span");
+          span.textContent = item.str;
+          const tx = window.pdfjsLib.Util.transform(vp.transform, item.transform);
+          const angle = Math.atan2(tx[1], tx[0]);
+          const fontH = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]);
+          const x = tx[4] * dispScale;
+          const y = (vp.height - tx[5]) * dispScale - fontH * dispScale;
+          span.style.cssText = `left:${x}px;top:${y}px;font-size:${fontH * dispScale}px;transform:rotate(${angle}rad);transform-origin:0% 100%;`;
+          tl.appendChild(span);
+        });
+        wrap.appendChild(tl);
+      } catch (e) {
+      }
+    }, 0);
+  } catch (e) {
+  }
+  const ctr = document.getElementById(`${vid}-ctr`);
+  if (ctr) ctr.textContent = `${n} / ${d.total}`;
+}
+window._pdfGo = async function(vid, dir) {
+  const d = window[`__pf_${vid}`];
+  if (!d) return;
+  d.cur = Math.max(1, Math.min(d.total, d.cur + dir));
+  await _pdfRenderPage(vid, d.cur);
+};
+async function renderDocxCustom(fileData, body) {
+  body.innerHTML = '<div class="fp-loading"><svg class="fp-spin" viewBox="0 0 50 50" width="36" height="36"><circle cx="25" cy="25" r="20" fill="none" stroke="#4caf7d" stroke-width="4" stroke-dasharray="80 20"/></svg><p>Loading document\u2026</p></div>';
+  try {
+    const b64 = fileData.includes(",") ? fileData.split(",")[1] : fileData;
+    const raw = atob(b64);
+    const u8 = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+    const zip = await JSZip.loadAsync(u8.buffer);
+    const imgMap = {};
+    for (const [path, file] of Object.entries(zip.files)) {
+      if (/word\/media\/.+\.(png|jpe?g|gif|bmp|webp)$/i.test(path)) {
+        const ext = path.split(".").pop().toLowerCase();
+        const mime = /jpe?g/.test(ext) ? "image/jpeg" : `image/${ext}`;
+        const b = await file.async("base64").catch(() => null);
+        if (b) imgMap[path.split("/").pop()] = `data:${mime};base64,${b}`;
+      }
+    }
+    const relMap = {};
+    try {
+      const rx = await zip.file("word/_rels/document.xml.rels")?.async("text") || "";
+      for (const m of rx.matchAll(/Id="(rId\w+)"[^>]*Target="media\/([^"]+)"/g))
+        relMap[m[1]] = m[2];
+    } catch (e) {
+    }
+    const xml = await zip.file("word/document.xml")?.async("text") || "";
+    const clean = xml.replace(/<(\/?)[a-zA-Z][\w]*:/g, "<$1").replace(/\w+:val=/g, "val=").replace(/\w+:id=/g, "id=").replace(/\w+:embed=/g, "embed=");
+    const doc = new DOMParser().parseFromString(clean, "text/xml");
+    let html = '<div class="docx-body">';
+    doc.querySelectorAll("body > *").forEach((el) => {
+      html += _docxEl(el, relMap, imgMap);
+    });
+    html += "</div>";
+    body.innerHTML = html;
+    _fpApplyZoom();
+  } catch (e) {
+    console.error("DOCX render:", e);
+    body.innerHTML = '<div class="fp-nopreview"><p>Could not render document</p></div>';
+  }
+}
+function _docxEl(el, relMap, imgMap) {
+  const tag = el.tagName;
+  if (tag === "p") {
+    const pStyle = el.querySelector("pStyle")?.getAttribute("val") || "";
+    const isH = /heading(\d)/i.test(pStyle);
+    const hLevel = isH ? pStyle.match(/\d/)[0] : null;
+    const jc = el.querySelector("jc")?.getAttribute("val") || "left";
+    const align = jc === "center" ? "center" : jc === "right" ? "right" : jc === "both" ? "justify" : "left";
+    let inner = "";
+    el.querySelectorAll("r, hyperlink").forEach((r) => {
+      if (r.tagName === "hyperlink") {
+        inner += `<span style="color:#4caf7d;text-decoration:underline;">${_docxRuns(r, relMap, imgMap)}</span>`;
+      } else {
+        inner += _docxRun(r, relMap, imgMap);
+      }
+    });
+    el.querySelectorAll("drawing blip").forEach((blip) => {
+      const rId = blip.getAttribute("embed");
+      const fn = relMap[rId];
+      const src = fn ? imgMap[fn] : null;
+      if (src) inner += `<img src="${src}" style="max-width:100%;height:auto;display:block;margin:4px 0;border-radius:4px;">`;
+    });
+    if (!inner.trim()) return '<div class="docx-spacer"></div>';
+    if (hLevel) return `<h${hLevel} class="docx-h" style="text-align:${align};">${inner}</h${hLevel}>`;
+    return `<p class="docx-p" style="text-align:${align};">${inner}</p>`;
+  }
+  if (tag === "tbl") {
+    let t = '<table class="docx-tbl"><tbody>';
+    el.querySelectorAll("tr").forEach((tr) => {
+      t += "<tr>";
+      tr.querySelectorAll("tc").forEach((tc) => {
+        let c = "";
+        tc.querySelectorAll("p").forEach((p) => {
+          c += _docxEl(p, relMap, imgMap);
+        });
+        t += `<td class="docx-td">${c}</td>`;
+      });
+      t += "</tr>";
+    });
+    return t + "</tbody></table>";
+  }
+  return "";
+}
+function _docxRuns(el, relMap, imgMap) {
+  let s = "";
+  el.querySelectorAll("r").forEach((r) => {
+    s += _docxRun(r, relMap, imgMap);
+  });
+  return s;
+}
+function _docxRun(r, relMap, imgMap) {
+  const t = r.querySelector("t");
+  if (!t) return "";
+  const rPr = r.querySelector("rPr");
+  const b = rPr?.querySelector("b") ? "font-weight:bold;" : "";
+  const i = rPr?.querySelector("i") ? "font-style:italic;" : "";
+  const u = rPr?.querySelector('u[val]:not([val="none"])') ? "text-decoration:underline;" : "";
+  const szEl = rPr?.querySelector("sz");
+  const sz = szEl ? `font-size:${+szEl.getAttribute("val") / 2}pt;` : "";
+  const clEl = rPr?.querySelector("color[val]");
+  const cl = clEl && clEl.getAttribute("val") !== "auto" ? `color:#${clEl.getAttribute("val")};` : "";
+  const st = b + i + u + sz + cl;
+  return st ? `<span style="${st}">${escapeHtml(t.textContent)}</span>` : escapeHtml(t.textContent);
+}
+function fileIconHTML(name, mimeType) {
+  const type = (mimeType || "").toLowerCase();
+  const ext = (name || "").split(".").pop().toLowerCase();
+  const isImg = type.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "ico", "tiff", "avif"].includes(ext);
+  const isDoc = type.includes("pdf") || type.includes("word") || type.includes("docx") || ["pdf", "docx", "doc", "txt", "rtf", "odt"].includes(ext);
+  const isSheet = type.includes("sheet") || type.includes("xlsx") || type.includes("csv") || ["xlsx", "xls", "csv", "ods"].includes(ext);
+  const isPres = type.includes("presentation") || type.includes("pptx") || ["pptx", "ppt", "odp"].includes(ext);
+  if (isImg) return `<div class="lib-icon lib-icon--img"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
+  if (isDoc) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/docsicon.webp" alt="doc"></div>`;
+  if (isSheet) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/sheeticon.webp" alt="sheet"></div>`;
+  if (isPres) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/presentationicon.webp" alt="presentation"></div>`;
+  return `<div class="lib-icon lib-icon--other"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></div>`;
+}
+function fileIcon(mimeType) {
+  const type = (mimeType || "").toLowerCase();
+  if (type.includes("pdf") || type.includes("word") || type.includes("docx")) return "\u{1F4C4}";
+  if (type.includes("sheet") || type.includes("xlsx")) return "\u{1F4CA}";
+  if (type.includes("presentation") || type.includes("pptx")) return "\u{1F4CA}";
+  if (type.includes("zip") || type.includes("archive")) return "\u{1F5DC}\uFE0F";
+  return "\u{1F4C4}";
+}
+function appendAIMessageDOM(text, msgId, streaming = false) {
+  const typingEl = $("typingIndicator");
+  const div = document.createElement("div");
+  div.className = "message";
+  div.dataset.ai = "1";
+  div.dataset.msgId = msgId;
+  div.innerHTML = `
+    <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
+    <div class="message-body">
+      <div class="message-sender">EmeraldBot</div>
+      <div class="message-text md-content">${streaming ? "" : renderMarkdown(text)}</div>
+      ${streaming ? "" : messageActionsHTML(msgId, text)}
+    </div>`;
+  $("messagesArea").insertBefore(div, typingEl);
+  return div;
+}
+function messageActionsHTML(msgId, rawText) {
+  return `<div class="message-actions" data-msg-actions="${msgId}">
+    <button class="msg-action-btn" title="Like" onclick="rateMsg(this,'like')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+    </button>
+    <button class="msg-action-btn" title="Dislike" onclick="rateMsg(this,'dislike')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>
+    </button>
+  </div>`;
+}
+function updateLastMsgActions() {
+  const aiMsgs = document.querySelectorAll('[data-ai="1"]');
+  aiMsgs.forEach((msg, i) => {
+    const actions = msg.querySelector(".message-actions");
+    if (i < aiMsgs.length - 1) {
+      if (actions) actions.remove();
+    }
+  });
+}
+async function copyMsgById(msgId) {
+  const el = document.querySelector(`[data-msg-id="${msgId}"] .message-text`);
+  const text = el?.innerText || "";
+  const ok = await safeCopy(text);
+  showToast(
+    ok ? `${_aiSvgCopy} Copied to clipboard` : `${_aiSvgError} Failed to copy`,
+    ok ? "success" : "error"
+  );
+}
+function rateMsg(btn, type) {
+  const already = btn.classList.contains("rated");
+  document.querySelectorAll(".msg-action-btn.rated").forEach((b) => b.classList.remove("rated"));
+  if (!already) {
+    btn.classList.add("rated");
+    showToast(type === "like" ? `${_aiSvgThumbUp} You liked this response` : `${_aiSvgThumbDown} You disliked this response`);
+  }
+}
+async function handleSend() {
+  if (state.isStreaming) return;
+  const textarea = $("chatInput");
+  const text = textarea.value.trim();
+  const files = [...state.attachments];
+  if (!text && files.length === 0) return;
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showToast(`${_aiSvgError} Service unavailable \u2014 API key not configured.`, "error");
+    return;
+  }
+  if (!state.isTemp && !state.convId) {
+    state.convId = genId();
+  }
+  textarea.value = "";
+  textarea.style.height = "auto";
+  clearAttachments();
+  showMessages();
+  const userMsgId = genId();
+  appendUserMessageDOM(text, files, userMsgId);
+  scrollToBottom();
+  const typingEl = $("typingIndicator");
+  typingEl.style.display = "flex";
+  scrollToBottom();
+  const conv = !state.isTemp && state.convId ? getConv(state.convId) || {
+    id: state.convId,
+    title: text.slice(0, 55) || "New Chat",
+    messages: [],
+    isTemp: false,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  } : null;
+  if (conv) {
+    const isNewConv = !getConv(conv.id);
+    conv.messages.push({ role: "user", text, files: files.map((f) => ({ name: f.name, type: f.type, size: f.size, data: f.data || void 0, extractedText: f.extractedText })), id: userMsgId });
+    upsertConv(conv);
+    if (isNewConv) updateTopbarTitle(conv.title);
+    renderSidebar();
+    addFilesToLibrary(files, conv.id);
+  } else {
+    state.tempHistory.push({ role: "user", parts: [{ text }] });
+  }
+  const history = buildHistory(conv);
+  const fileParts = buildFileParts(files);
+  if (fileParts.length) history[history.length - 1].parts.push(...fileParts);
+  const urlsInMsg = extractUrls(text);
+  const _wsNeeded = detectWebSearchIntent(text) || urlsInMsg.length > 0;
+  let _webSources = [];
+  const _typingLabel = document.getElementById("typingLabel");
+  const _setLabel = (msg) => {
+    if (!_typingLabel) return;
+    if (msg) {
+      _typingLabel.textContent = msg;
+      _typingLabel.style.display = "block";
+    } else {
+      _typingLabel.textContent = "";
+      _typingLabel.style.display = "none";
+    }
+  };
+  if (_wsNeeded) {
+    if (urlsInMsg.length) {
+      for (const url of urlsInMsg.slice(0, 3)) {
+        _webSources.push({ title: url, uri: url });
+      }
+      for (const url of urlsInMsg.slice(0, 3)) {
+        const ghMatch = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+)/);
+        if (ghMatch) {
+          const [, owner, repo] = ghMatch;
+          const ac = new AbortController();
+          const t = setTimeout(() => ac.abort(), 8e3);
+          try {
+            const [infoRes, readmeRes] = await Promise.all([
+              fetch("https://api.github.com/repos/" + owner + "/" + repo, { signal: ac.signal, headers: { Accept: "application/vnd.github+json" } }),
+              fetch("https://api.github.com/repos/" + owner + "/" + repo + "/readme", { signal: ac.signal, headers: { Accept: "application/vnd.github+json" } })
+            ]);
+            clearTimeout(t);
+            let parts = ["[GitHub repo: " + owner + "/" + repo + "]"];
+            if (infoRes.ok) {
+              const info = await infoRes.json();
+              parts.push("Description: " + (info.description || "none"));
+              parts.push("Stars: " + info.stargazers_count + "  Forks: " + info.forks_count);
+              parts.push("Language: " + (info.language || "unknown"));
+              if (info.topics?.length) parts.push("Topics: " + info.topics.join(", "));
+            }
+            if (readmeRes.ok) {
+              const rm = await readmeRes.json();
+              const decoded = atob(rm.content.replace(/\n/g, ""));
+              parts.push("\n[README.md]\n" + decoded.slice(0, 6e3));
+            }
+            const pageContent = parts.join("\n");
+            const last = history[history.length - 1];
+            if (last?.parts?.length) {
+              const existing = last.parts[0]?.text || "";
+              last.parts[0] = { text: pageContent + "\n\n" + existing };
+            }
+          } catch (e) {
+            clearTimeout(t);
+          }
+        }
+      }
+    } else {
+      _setLabel("Searching the web\u2026");
+      try {
+        const _results = await performAdvancedSearch(text);
+        if (_results.contextText) {
+          _webSources.push(..._results.sources);
+          const ctx = _results.contextText + "\n";
+          const last = history[history.length - 1];
+          if (last?.parts?.length) last.parts[0] = { text: ctx + (last.parts[0]?.text || "") };
+        }
+      } catch (e) {
+      }
+    }
+    _setLabel(null);
+  }
+  state.isStreaming = true;
+  state.abortCtrl = new AbortController();
+  setSendState(true);
+  const msgId = genId();
+  let aiDiv = null;
+  let textEl = null;
+  let fullText = "";
+  let _usedModelId = "";
+  let _usedModelName = "";
+  const _streamOpts = {
+    useUrlContext: urlsInMsg.length > 0,
+    userText: text,
+    files
+  };
+  const MAX_CONTINUATIONS = 4;
+  let continueCount = 0;
+  let continueEl = null;
+  let _groundingMetadata = null;
+  const _doStream = async (h) => streamEmeraldBot(h, apiKey, (chunk) => {
+    fullText += chunk;
+    if (!aiDiv) {
+      typingEl.style.display = "none";
+      aiDiv = appendAIMessageDOM("", msgId, true);
+      textEl = aiDiv.querySelector(".message-text");
+      textEl.classList.add("stream-reveal");
+    }
+    const _sd = _streamDisplayText(fullText);
+    textEl.innerHTML = (_sd.text ? renderMarkdown(_sd.text) : "") + (_sd.quizStarted ? quizLoadingCardHTML() : '<span class="stream-cursor" aria-hidden="true"></span>');
+    scrollToBottom();
+  }, _streamOpts);
+  try {
+    let _streamResult = await _doStream(history);
+    let finishReason = _streamResult.finishReason;
+    if (_streamResult.groundingMetadata) _groundingMetadata = _streamResult.groundingMetadata;
+    if (_streamResult.modelId) {
+      _usedModelId = _streamResult.modelId;
+      const _m = getModelById(_usedModelId);
+      _usedModelName = _m ? _m.name : _usedModelId;
+    }
+    while (finishReason === "MAX_TOKENS" && continueCount < MAX_CONTINUATIONS && !state.abortCtrl?.signal?.aborted) {
+      continueCount++;
+      if (!continueEl && aiDiv) {
+        continueEl = document.createElement("span");
+        continueEl.className = "continue-indicator";
+        continueEl.textContent = "\u2193 Continuing\u2026";
+        aiDiv.querySelector(".message-body").appendChild(continueEl);
+      }
+      const contHistory = [
+        ...history,
+        { role: "model", parts: [{ text: fullText }] },
+        { role: "user", parts: [{ text: "continue" }] }
+      ];
+      _streamResult = await _doStream(contHistory);
+      finishReason = _streamResult.finishReason;
+      if (_streamResult.groundingMetadata) _groundingMetadata = _streamResult.groundingMetadata;
+    }
+    if (continueEl) continueEl.remove();
+  } catch (err) {
+    if (continueEl) continueEl.remove();
+    typingEl.style.display = "none";
+    if (!aiDiv) {
+      aiDiv = appendAIMessageDOM("", msgId, true);
+      textEl = aiDiv.querySelector(".message-text");
+    }
+    if (err.name === "AbortError") {
+      if (!fullText) {
+        textEl.innerHTML = `<span class="md-error">Request was cancelled.</span>`;
+      }
+    } else {
+      textEl.innerHTML = `<span class="md-error">Something went wrong: ${escapeHtml(err.message || "Unknown error")}. Please try again.</span>`;
+    }
+  }
+  typingEl.style.display = "none";
+  if (!fullText && !aiDiv) {
+    aiDiv = appendAIMessageDOM("", msgId, true);
+    textEl = aiDiv.querySelector(".message-text");
+  }
+  if (!fullText && aiDiv && textEl && !textEl.querySelector(".md-error")) {
+    textEl.innerHTML = `<span class="md-error">No response received. The service may be temporarily unavailable. Please try again.</span>`;
+  }
+  if (fullText && aiDiv) {
+    let displayText = fullText;
+    const memMatches = [...fullText.matchAll(/\[MEMORY:\s*([^\]]+)\]/g)];
+    const memoriesAdded = memMatches.map((m) => m[1].trim()).filter(Boolean);
+    memoriesAdded.forEach((text2) => addMemory(text2));
+    displayText = displayText.replace(/\[MEMORY:[^\]]*\]?/g, "").replace(/\n{3,}/g, "\n\n").trim();
+    displayText = _stripThinkingPreamble(displayText).replace(/^\s+/, "");
+    const memoryAdded = memoriesAdded.length > 0;
+    const _imgGenMatch = displayText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
+    const _imgPrompt = _imgGenMatch ? _imgGenMatch[1].trim() : null;
+    displayText = displayText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
+    let quizData = null;
+    let beforeQuizText = displayText;
+    let afterQuizText = "";
+    const quizMatch = displayText.match(/<quiz>([\s\S]+?)<\/quiz>/) || displayText.match(/<quiz>([\s\S]+)$/);
+    if (quizMatch) {
+      try {
+        quizData = JSON.parse(quizMatch[1]);
+      } catch (e) {
+      }
+      const qStart = displayText.indexOf("<quiz>");
+      beforeQuizText = displayText.slice(0, qStart).trim();
+      afterQuizText = displayText.slice(qStart + quizMatch[0].length).trim();
+      displayText = displayText.slice(0, qStart).trim();
+    }
+    textEl.classList.remove("stream-reveal");
+    const _textToShow = quizData ? beforeQuizText : displayText;
+    const _hasOtherContent = !!(quizData || _imgPrompt || memoryAdded);
+    if (_textToShow) {
+      textEl.innerHTML = renderMarkdown(_textToShow);
+    } else if (_hasOtherContent) {
+      textEl.innerHTML = "";
+      textEl.classList.add("message-text--empty");
+    } else {
+      textEl.innerHTML = '<span class="md-error">An error occurred while processing your request. Please try again later.</span>';
+    }
+    if (memoryAdded) {
+      const badge = document.createElement("div");
+      badge.className = "memory-badge";
+      const cnt = memoriesAdded.length > 1 ? `Updated ${memoriesAdded.length} memories` : "Updated memory";
+      badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg> ${cnt}`;
+      aiDiv.querySelector(".message-sender").insertAdjacentElement("afterend", badge);
+    }
+    if (quizData) {
+      const qid = "quiz_" + genId();
+      quizData._id = qid;
+      window._quizzes = window._quizzes || {};
+      window._quizzes[qid] = { data: quizData, answers: {}, submitted: false };
+      const cardEl = document.createElement("div");
+      cardEl.innerHTML = quizCardHTML(qid, quizData);
+      textEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
+      if (afterQuizText) {
+        const afterEl = document.createElement("div");
+        afterEl.className = "message-text md-content";
+        afterEl.style.marginTop = "8px";
+        afterEl.innerHTML = renderMarkdown(afterQuizText);
+        textEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
+      }
+    }
+    const _groundingSources = extractGroundingSources(_groundingMetadata);
+    const _allSources = [..._groundingSources, ..._webSources];
+    if (_allSources.length) renderCitations(aiDiv, _allSources);
+    aiDiv.querySelector(".message-body").insertAdjacentHTML("beforeend", messageActionsHTML(msgId, displayText));
+    if (aiDiv) {
+      aiDiv.dataset.modelId = _usedModelId || "";
+      aiDiv.dataset.modelName = _usedModelName || "";
+    }
+    const savedText = memoryAdded ? memMatches.map((m) => m[0]).join(" ") + " " + displayText : displayText;
+    if (conv) {
+      conv.messages.push({
+        role: "assistant",
+        text: savedText,
+        id: msgId,
+        modelId: _usedModelId || void 0,
+        modelName: _usedModelName || void 0,
+        hasMemory: !!memoryAdded,
+        hasQuiz: !!quizData,
+        quizData: quizData || void 0,
+        quizTextBefore: quizData ? beforeQuizText : void 0,
+        quizTextAfter: quizData ? afterQuizText : void 0,
+        imagePrompt: _imgPrompt || void 0
+      });
+      conv.updatedAt = Date.now();
+      upsertConv(conv);
+    } else {
+      state.tempHistory.push({ role: "model", parts: [{ text: savedText }] });
+      if (quizData) state.tempHistory.push({ role: "user", parts: [{ text: "" }] });
+    }
+    if (_imgPrompt) {
+      const _imgInput = getLatestUserImageInput();
+      processImageGenTag(aiDiv, _imgPrompt, state.convId, msgId, _imgInput);
+    }
+  }
+  updateLastMsgActions();
+  state.isStreaming = false;
+  state.abortCtrl = null;
+  setSendState(false);
+  scrollToBottom();
+}
+const HISTORY_MAX_MSGS = 30;
+const HISTORY_FULL_TAIL = 6;
+const HISTORY_MAX_CHARS = 1200;
+function buildHistory(conv) {
+  if (conv) {
+    const allMsgs = conv.messages;
+    const msgs = allMsgs.slice(-HISTORY_MAX_MSGS).map((m, idx, arr) => {
+      let text = m.text || "";
+      text = text.replace(/<quiz>[\s\S]*?<\/quiz>/g, "[A quiz was provided here]");
+      text = text.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").trim();
+      if (m.imagePrompt) {
+        text += `
+[An image was generated and shown to the user for this prompt: "${m.imagePrompt}"]`;
+      }
+      const isRecent = idx >= arr.length - HISTORY_FULL_TAIL;
+      if (!isRecent && text.length > HISTORY_MAX_CHARS) {
+        text = text.slice(0, HISTORY_MAX_CHARS) + "\n[...content truncated...]";
+      }
+      return {
+        role: m.role === "user" ? "user" : "model",
+        parts: [{ text }]
+      };
+    });
+    if (window._quizzes) {
+      const branchQuizIds = new Set(
+        conv.messages.filter((m) => m.hasQuiz && m.quizData && m.quizData._id).map((m) => m.quizData._id)
+      );
+      const submitted = Object.values(window._quizzes).filter(function(q) {
+        return q.submitted && branchQuizIds.has(q.data && q.data._id);
+      });
+      if (submitted.length > 0 && msgs.length > 0) {
+        const quizLines = submitted.map(function(q) {
+          const answerDetails = q.data.questions.map(function(qq, i) {
+            const chosen = qq.options[q.answers[i]] || "skipped";
+            const correct = qq.options[qq.answer];
+            const result = q.answers[i] === qq.answer ? "CORRECT" : "WRONG";
+            return "Q" + (i + 1) + ': "' + qq.q + '" - User chose: "' + chosen + '", Correct: "' + correct + '", ' + result;
+          }).join("; ");
+          return '[QUIZ RESULT: "' + q.data.title + '" - Score ' + q.score + "/" + q.data.questions.length + ". Answers: " + answerDetails + "]";
+        });
+        msgs[msgs.length - 1].parts[0].text += "\n\n" + quizLines.join("\n");
+      }
+    }
+    return msgs;
+  }
+  return [...state.tempHistory];
+}
+function setSendState(sending) {
+  const btn = $("sendBtn");
+  if (!btn) return;
+  if (sending) {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+    btn.title = "Stop";
+    btn.onclick = stopStreaming;
+  } else {
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+    btn.title = "Send";
+    btn.onclick = handleSend;
+  }
+}
+function stopStreaming() {
+  state.abortCtrl?.abort();
+  state.isStreaming = false;
+  setSendState(false);
+  $("typingIndicator").style.display = "none";
+}
+async function regenerateMessage(msgEl) {
+  if (state.isStreaming || !state.convId) return;
+  const conv = getConv(state.convId);
+  if (!conv) return;
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showToast(`${_aiSvgError} No API key set`, "error");
+    return;
+  }
+  const msgId = msgEl?.dataset?.msgId;
+  const idx = conv.messages.findIndex((m) => m.id === msgId);
+  if (idx < 0) return;
+  const currentMsg = conv.messages[idx];
+  const regenBranchId = currentMsg._regenBranchRef || msgId;
+  conv._regenBranches = conv._regenBranches || {};
+  if (!conv._regenBranches[regenBranchId]) {
+    conv._regenBranches[regenBranchId] = { variants: [], current: -1 };
+  }
+  const regenBranch = conv._regenBranches[regenBranchId];
+  if (regenBranch.variants.length >= MAX_CHAT_BRANCH_VARIANTS) {
+    showChatBranchLimitToast("ai");
+    return;
+  }
+  const currentVariant = { ...currentMsg, _regenBranchRef: regenBranchId };
+  if (regenBranch.variants.length === 0) {
+    regenBranch.variants.push(currentVariant);
+  } else if (regenBranch.current >= 0) {
+    regenBranch.variants[regenBranch.current] = currentVariant;
+  }
+  conv.messages = conv.messages.slice(0, idx);
+  conv._regenBranches[regenBranchId] = regenBranch;
+  upsertConv(conv);
+  msgEl.remove();
+  const history = buildHistory(conv);
+  state.isStreaming = true;
+  state.abortCtrl = new AbortController();
+  setSendState(true);
+  const _lastUserText = history.length ? history[history.length - 1]?.parts?.[0]?.text || "" : "";
+  const _wsNeeded = detectWebSearchIntent(_lastUserText);
+  const _urlsInMsg = extractUrls(_lastUserText);
+  let _webSources = [];
+  if (_wsNeeded && !_urlsInMsg.length) {
+    try {
+      const _results = await performAdvancedSearch(_lastUserText);
+      if (_results.contextText) {
+        _webSources.push(..._results.sources);
+        const ctx = _results.contextText + "\n";
+        const last = history[history.length - 1];
+        if (last?.parts?.length) last.parts[0] = { text: ctx + (last.parts[0]?.text || "") };
+      }
+    } catch (e) {
+    }
+  }
+  let _groundingMetadata = null;
+  const newId = genId();
+  const rTypingEl = $("typingIndicator");
+  rTypingEl.style.display = "flex";
+  scrollToBottom();
+  let aiDiv = null;
+  let textEl = null;
+  let fullText = "";
+  let _usedModelId = "";
+  let _usedModelName = "";
+  try {
+    const _streamResult = await streamEmeraldBot(history, apiKey, (chunk) => {
+      fullText += chunk;
+      if (!aiDiv) {
+        rTypingEl.style.display = "none";
+        aiDiv = appendAIMessageDOM("", newId, true);
+        textEl = aiDiv.querySelector(".message-text");
+        textEl.classList.add("stream-reveal");
+      }
+      const _sd = _streamDisplayText(fullText);
+      textEl.innerHTML = (_sd.text ? renderMarkdown(_sd.text) : "") + (_sd.quizStarted ? quizLoadingCardHTML() : '<span class="stream-cursor" aria-hidden="true"></span>');
+      scrollToBottom();
+    }, { useUrlContext: _urlsInMsg.length > 0, userText: _lastUserText });
+    _groundingMetadata = _streamResult.groundingMetadata;
+    if (_streamResult.modelId) {
+      _usedModelId = _streamResult.modelId;
+      const _m = getModelById(_usedModelId);
+      _usedModelName = _m ? _m.name : _usedModelId;
+    }
+  } catch (err) {
+    rTypingEl.style.display = "none";
+    if (err.name !== "AbortError") {
+      if (!aiDiv) {
+        aiDiv = appendAIMessageDOM("", newId, true);
+        textEl = aiDiv.querySelector(".message-text");
+      }
+      const _msg = err?.message || "An error occurred while processing your request. Please try again later.";
+      textEl.innerHTML = `<span class="md-error">${escapeHtml(_msg)}</span>`;
+    }
+  }
+  rTypingEl.style.display = "none";
+  if (!fullText && !aiDiv) {
+    aiDiv = appendAIMessageDOM("", newId, true);
+    textEl = aiDiv.querySelector(".message-text");
+  }
+  if (!fullText && aiDiv && textEl && !textEl.querySelector(".md-error")) {
+    textEl.innerHTML = `<span class="md-error">No response received. The service may be temporarily unavailable. Please try again.</span>`;
+  }
+  if (fullText && aiDiv) {
+    let displayText = fullText;
+    const memMatches = [...fullText.matchAll(/\[MEMORY:\s*([^\]]+)\]/g)];
+    const memoriesAdded = memMatches.map((m) => m[1].trim()).filter(Boolean);
+    memoriesAdded.forEach((text) => addMemory(text));
+    displayText = displayText.replace(/\[MEMORY:[^\]]*\]?/g, "").replace(/\n{3,}/g, "\n\n").trim();
+    displayText = _stripThinkingPreamble(displayText).replace(/^\s+/, "");
+    const memoryAdded = memoriesAdded.length > 0;
+    const imgGenMatch = displayText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
+    const imgPrompt = imgGenMatch ? imgGenMatch[1].trim() : null;
+    displayText = displayText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
+    let quizData = null;
+    let beforeQuizText = displayText;
+    let afterQuizText = "";
+    const quizMatch = displayText.match(/<quiz>([\s\S]+?)<\/quiz>/) || displayText.match(/<quiz>([\s\S]+)$/);
+    if (quizMatch) {
+      try {
+        quizData = JSON.parse(quizMatch[1]);
+      } catch (e) {
+      }
+      const qStart = displayText.indexOf("<quiz>");
+      beforeQuizText = displayText.slice(0, qStart).trim();
+      afterQuizText = displayText.slice(qStart + quizMatch[0].length).trim();
+      displayText = displayText.slice(0, qStart).trim();
+    }
+    textEl.classList.remove("stream-reveal");
+    const _regenTextToShow = quizData ? beforeQuizText : displayText;
+    const _hasOtherContent = !!(quizData || imgPrompt || memoryAdded);
+    if (_regenTextToShow) {
+      textEl.innerHTML = renderMarkdown(_regenTextToShow);
+    } else if (_hasOtherContent) {
+      textEl.innerHTML = "";
+      textEl.classList.add("message-text--empty");
+    } else {
+      textEl.innerHTML = '<span class="md-error">An error occurred while processing your request. Please try again later.</span>';
+    }
+    if (memoryAdded) {
+      const badge = document.createElement("div");
+      badge.className = "memory-badge";
+      const cnt = memoriesAdded.length > 1 ? `Updated ${memoriesAdded.length} memories` : "Updated memory";
+      badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg> ${cnt}`;
+      aiDiv.querySelector(".message-sender").insertAdjacentElement("afterend", badge);
+    }
+    if (quizData) {
+      const qid = "quiz_" + genId();
+      quizData._id = qid;
+      window._quizzes = window._quizzes || {};
+      window._quizzes[qid] = { data: quizData, answers: {}, submitted: false };
+      const cardEl = document.createElement("div");
+      cardEl.innerHTML = quizCardHTML(qid, quizData);
+      textEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
+      if (afterQuizText) {
+        const afterEl = document.createElement("div");
+        afterEl.className = "message-text md-content";
+        afterEl.style.marginTop = "8px";
+        afterEl.innerHTML = renderMarkdown(afterQuizText);
+        textEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
+      }
+    }
+    const _groundingSources = extractGroundingSources(_groundingMetadata);
+    const _allSources = [..._groundingSources, ..._webSources];
+    if (_allSources.length) renderCitations(aiDiv, _allSources);
+    aiDiv.querySelector(".message-body").insertAdjacentHTML("beforeend", messageActionsHTML(newId, displayText));
+    if (aiDiv) {
+      aiDiv.dataset.modelId = _usedModelId || "";
+      aiDiv.dataset.modelName = _usedModelName || "";
+    }
+    const savedText = memoryAdded ? memMatches.map((m) => m[0]).join(" ") + " " + displayText : displayText;
+    const savedMsg = {
+      role: "assistant",
+      text: savedText,
+      id: newId,
+      modelId: _usedModelId || void 0,
+      modelName: _usedModelName || void 0,
+      _regenBranchRef: regenBranchId,
+      hasMemory: !!memoryAdded,
+      hasQuiz: !!quizData,
+      quizData: quizData || void 0,
+      quizTextBefore: quizData ? beforeQuizText : void 0,
+      quizTextAfter: quizData ? afterQuizText : void 0,
+      imagePrompt: imgPrompt || void 0
+    };
+    aiDiv.dataset.regenBranchRef = regenBranchId;
+    conv.messages.push(savedMsg);
+    regenBranch.variants.push({ ...savedMsg });
+    regenBranch.current = regenBranch.variants.length - 1;
+    conv._regenBranches[regenBranchId] = regenBranch;
+    upsertConv(conv);
+    updateRegenNavDOM(regenBranchId);
+    if (imgPrompt) {
+      const _imgInput = getLatestUserImageInput();
+      processImageGenTag(aiDiv, imgPrompt, state.convId, newId, _imgInput);
+    }
+  }
+  updateLastMsgActions();
+  state.isStreaming = false;
+  state.abortCtrl = null;
+  setSendState(false);
+  scrollToBottom();
+}
+function _switchToAutoDueToUnavailableModel(failedModelId, reason) {
+  void reason;
+  setSelectedModelId("auto");
+  try {
+    refreshModelSelectorUI();
+  } catch {
+  }
+  try {
+    const sel = $("modelSelector");
+    if (sel && sel.classList.contains("open")) renderModelDropdown();
+  } catch {
+  }
+  showToast(`${_aiSvgCheck} Switched to Auto \u2014 selected model isn't available.`);
+}
+async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
+  const requestedId = options.model || getSelectedModelId();
+  const reqBody = {
+    contents: history,
+    memories: loadMemories(),
+    userDisplayName: (loadSettings().userName || "").trim() || null,
+    useUrlContext: !!options.useUrlContext,
+    tools: options.tools || []
+  };
+  const url = `${CHAT_WORKER_URL}/chat?model=${encodeURIComponent(requestedId)}`;
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reqBody),
+      signal: state.abortCtrl?.signal
+    });
+  } catch (err) {
+    if (err.name === "AbortError") throw err;
+    const e = new Error("Network error: " + (err?.message || err));
+    e._modelError = true;
+    e._httpStatus = 0;
+    throw e;
+  }
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    let errMsg = `API error ${res.status}`;
+    try {
+      const j = JSON.parse(errText);
+      errMsg = j.error?.message || errMsg;
+    } catch {
+    }
+    const e = new Error(errMsg);
+    e._modelError = true;
+    e._httpStatus = res.status;
+    throw e;
+  }
+  const usedModelId = res.headers.get("X-Model-Used") || requestedId;
+  const usedModel = getModelById(usedModelId);
+  const autoSwitched = res.headers.get("X-Auto-Switched") === "1";
+  if (autoSwitched && requestedId !== "auto") {
+    try {
+      _switchToAutoDueToUnavailableModel(requestedId, "");
+    } catch {
+    }
+  }
+  if (typeof onModelUsed === "function" && usedModel) {
+    try {
+      onModelUsed(usedModel);
+    } catch {
+    }
+  }
+  if (requestedId === "auto" || autoSwitched) {
+    try {
+      refreshModelSelectorUI();
+    } catch {
+    }
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finishReason = null;
+  let groundingMetadata = null;
+  const STREAM_IDLE_TIMEOUT = 3e4;
+  let timedOut = false;
+  let idleTimer = setTimeout(() => {
+    timedOut = true;
+    try {
+      reader.cancel("Stream idle timeout");
+    } catch {
+    }
+  }, STREAM_IDLE_TIMEOUT);
+  try {
+    let streamDone = false;
+    while (!streamDone) {
+      const { done, value } = await reader.read();
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        timedOut = true;
+        try {
+          reader.cancel("Stream idle timeout");
+        } catch {
+        }
+      }, STREAM_IDLE_TIMEOUT);
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") {
+          streamDone = true;
+          break;
+        }
+        try {
+          const json = JSON.parse(data);
+          const candidate = json.candidates?.[0];
+          if (candidate?.content?.parts) {
+            for (const part of candidate.content.parts) {
+              if (part.text) onChunk(part.text);
+            }
+          }
+          if (candidate?.finishReason) {
+            finishReason = candidate.finishReason;
+            streamDone = true;
+          }
+          if (candidate?.groundingMetadata) groundingMetadata = candidate.groundingMetadata;
+        } catch {
+        }
+      }
+    }
+  } finally {
+    clearTimeout(idleTimer);
+  }
+  if (timedOut && !finishReason) {
+    const e = new Error("Response timed out \u2014 the server did not send any data for 30 seconds.");
+    e._modelError = true;
+    throw e;
+  }
+  if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
+    const reasonMap = { SAFETY: "Content blocked by safety filters", RECITATION: "Content blocked by recitation policy", OTHER: "Response blocked for an unknown reason" };
+    throw new Error(reasonMap[finishReason] || `Response blocked: ${finishReason}`);
+  }
+  return { finishReason, groundingMetadata, modelId: usedModelId };
+}
+function extractGroundingSources(groundingMetadata) {
+  if (!groundingMetadata) return [];
+  const sources = [];
+  const seen = /* @__PURE__ */ new Set();
+  const chunks = groundingMetadata.groundingChunks || [];
+  for (const chunk of chunks) {
+    const uri = chunk?.web?.uri;
+    const title = chunk?.web?.title || "";
+    if (uri && !seen.has(uri)) {
+      seen.add(uri);
+      sources.push({ title: title || uri, uri });
+    }
+  }
+  return sources;
+}
+async function processFileForAttachment(f) {
+  const ext = (f.name.split(".").pop() || "").toLowerCase();
+  const isImage = f.type.startsWith("image/");
+  const MAX = isImage ? 25 * 1024 * 1024 : 100 * 1024 * 1024;
+  if (f.size > MAX) {
+    const maxMb = Math.round(MAX / 1024 / 1024);
+    showToast(`${_aiSvgFile} ${f.name} is too large. Please use files under ${maxMb} MB.`, "error");
+    return;
+  }
+  if (["docx", "pptx", "doc", "ppt"].includes(ext) && typeof JSZip !== "undefined") {
+    try {
+      const buf = await f.arrayBuffer();
+      const zip = await JSZip.loadAsync(buf);
+      let text = "";
+      if (ext === "docx" || ext === "doc") {
+        const xml = await zip.file("word/document.xml")?.async("text");
+        if (xml) text = xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      } else {
+        const slides = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => {
+          const na = parseInt(a.match(/\d+/)?.[0] || 0);
+          const nb = parseInt(b.match(/\d+/)?.[0] || 0);
+          return na - nb;
+        });
+        for (const s of slides) {
+          const xml = await zip.file(s)?.async("text");
+          if (xml) text += xml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() + "\n\n";
+        }
+      }
+      if ((ext === "pptx" || ext === "docx") && f.size <= 25 * 1024 * 1024) {
+        const dataUrl = await new Promise((r) => {
+          const fr = new FileReader();
+          fr.onload = (e) => r(e.target.result);
+          fr.readAsDataURL(f);
+        });
+        state.attachments.push({ name: f.name, type: f.type, size: f.size, data: dataUrl, extractedText: text.slice(0, 12e4) });
+      } else {
+        state.attachments.push({ name: f.name, type: f.type, size: f.size, extractedText: text.slice(0, 12e4) });
+      }
+      renderAttachmentPreviews();
+      return;
+    } catch (e) {
+      console.warn("Office extract failed:", e);
+    }
+  }
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      state.attachments.push({ name: f.name, type: f.type, size: f.size, data: e.target.result });
+      renderAttachmentPreviews();
+      resolve();
+    };
+    reader.readAsDataURL(f);
+  });
+}
+async function handleFileSelect(input) {
+  await Promise.all(Array.from(input.files).map((f) => processFileForAttachment(f)));
+  input.value = "";
+}
+function renderAttachmentPreviews() {
+  const wrap = $("attachPreview");
+  if (!wrap) return;
+  if (state.attachments.length === 0) {
+    wrap.style.display = "none";
+    wrap.innerHTML = "";
+    return;
+  }
+  wrap.style.display = "flex";
+  wrap.innerHTML = state.attachments.map((f, i) => {
+    if (f.type?.startsWith("image/")) {
+      return `<div class="attach-thumb">
+        <img src="${f.data}" alt="${escapeHtml(f.name)}">
+        <button class="attach-rm" onclick="removeAttachment(${i})">\xD7</button>
+      </div>`;
+    }
+    return `<div class="attach-file">
+      <span class="attach-icon">${fileIcon(f.type)}</span>
+      <span class="attach-name">${escapeHtml(f.name)}</span>
+      <button class="attach-rm" onclick="removeAttachment(${i})">\xD7</button>
+    </div>`;
+  }).join("");
+}
+function removeAttachment(idx) {
+  state.attachments.splice(idx, 1);
+  renderAttachmentPreviews();
+}
+function clearAttachments() {
+  state.attachments = [];
+  renderAttachmentPreviews();
+}
+function addFilesToLibrary(files, convId) {
+  if (!files || !files.length || !convId) return;
+  if (!getConv(convId)) return;
+  const lib = loadLib();
+  files.forEach((f) => {
+    lib.unshift({ id: genId(), name: f.name, type: f.type, size: f.size, convId, createdAt: Date.now() });
+  });
+  saveLib(lib.slice(0, 200));
+}
+function openLibrary() {
+  openModal("libraryModal");
+  renderLibraryModal();
+  requestAnimationFrame(() => {
+    const active = document.querySelector(".lib-tab.active");
+    if (active) moveLibTabIndicator(active);
+  });
+}
+function renderLibraryModal() {
+  const lib = loadLib();
+  const filter = _libFilter || "all";
+  const convs = loadConvs();
+  const filtered = lib.filter((f) => {
+    if (filter === "images") return f.type?.startsWith("image/");
+    if (filter === "documents") return f.type?.includes("pdf") || f.type?.includes("word") || f.type?.includes("docx") || f.type?.includes("text");
+    if (filter === "archives") return f.type?.includes("zip") || f.type?.includes("pptx") || f.type?.includes("presentation");
+    return true;
+  });
+  const validLib = filtered.filter((f) => convs.find((c) => c.id === f.convId));
+  if (validLib.length !== (S.get(LIB_KEY) || []).length) {
+    const allLib = loadLib().filter((f) => convs.find((c) => c.id === f.convId));
+    saveLib(allLib);
+  }
+  const list = $("libList");
+  if (!list) return;
+  if (validLib.length === 0) {
+    list.innerHTML = `<div class="lib-empty">No files found</div>`;
+    return;
+  }
+  list.innerHTML = validLib.map((f) => {
+    const conv = convs.find((c) => c.id === f.convId);
+    const date = new Date(f.createdAt).toLocaleDateString();
+    return `<div class="lib-item">
+      ${fileIconHTML(f.name, f.type)}
+      <div class="lib-item-info">
+        <div class="lib-item-name">${escapeHtml(f.name)}</div>
+        <div class="lib-item-meta">${date} \xB7 ${escapeHtml(conv.title)}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+let _pendingTheme = null;
+let _pendingAvatar = null;
+function openSettings() {
+  const s = loadSettings();
+  const el = $("settingsModal");
+  if (!el) return;
+  $("settName").value = s.userName || "";
+  _pendingTheme = s.theme || "system";
+  _pendingAvatar = s.avatar || null;
+  _refreshSettThemeUI(_pendingTheme);
+  _refreshSettAvatarUI(s.userName || "", _pendingAvatar);
+  el.classList.add("open");
+}
+function saveSettings() {
+  const name = $("settName")?.value.trim() || "You";
+  const s = loadSettings();
+  const newS = { ...s, userName: name, theme: _pendingTheme || "system", avatar: _pendingAvatar !== void 0 ? _pendingAvatar : s.avatar || null };
+  saveSettingsObj(newS);
+  applyTheme(newS.theme);
+  closeModal("settingsModal");
+  showToast(`${_aiSvgCheck} Settings saved`);
+  const nh = $("welcomeHeading");
+  if (nh) {
+    const greets = [
+      `What's on your <span style="color:#50c878">agenda</span> today, ${escapeHtml(name)}?`,
+      `Hello, ${escapeHtml(name)}! What can I help you with?`,
+      `Hey ${escapeHtml(name)}, what are we working on?`,
+      `Good to see you, ${escapeHtml(name)}. Ask me anything.`,
+      `Hi ${escapeHtml(name)}! Ready when you are.`
+    ];
+    nh.innerHTML = greets[Math.floor(Math.random() * greets.length)];
+  }
+}
+function selectSettTheme(t) {
+  _pendingTheme = t;
+  _refreshSettThemeUI(t);
+}
+function _refreshSettThemeUI(t) {
+  document.querySelectorAll(".sett-theme-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.theme === t);
+  });
+}
+function _refreshSettAvatarUI(name, avatarData) {
+  const circle = $("settAvatarCircle");
+  const initEl = $("settAvatarInitials");
+  const imgEl = $("settAvatarImg");
+  const removeBtn = $("settAvatarRemoveBtn");
+  const nameEl = $("settAvatarDisplayName");
+  if (nameEl) nameEl.textContent = name || "Your Name";
+  if (avatarData) {
+    if (imgEl) {
+      imgEl.src = avatarData;
+      imgEl.style.display = "block";
+    }
+    if (initEl) initEl.style.display = "none";
+    if (removeBtn) removeBtn.style.display = "inline-block";
+  } else {
+    if (imgEl) {
+      imgEl.src = "";
+      imgEl.style.display = "none";
+    }
+    if (initEl) {
+      initEl.textContent = getUserInitials();
+      initEl.style.display = "block";
+    }
+    if (removeBtn) removeBtn.style.display = "none";
+  }
+}
+async function handleAvatarUpload(input) {
+  const f = input.files[0];
+  if (!f) return;
+  try {
+    const img = new Image();
+    img.src = URL.createObjectURL(f);
+    await new Promise((resolve) => {
+      img.onload = resolve;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d");
+    const size = Math.min(img.width, img.height);
+    const sx = (img.width - size) / 2;
+    const sy = (img.height - size) / 2;
+    ctx.drawImage(
+      img,
+      sx,
+      sy,
+      size,
+      size,
+      0,
+      0,
+      64,
+      64
+    );
+    _pendingAvatar = canvas.toDataURL("image/webp", 0.85);
+    URL.revokeObjectURL(img.src);
+    const name = $("settName")?.value || loadSettings().userName || "";
+    _refreshSettAvatarUI(name, _pendingAvatar);
+  } catch (err) {
+    console.error(err);
+    showToast("Failed to process avatar", "error");
+  }
+  input.value = "";
+}
+function removeAvatar() {
+  _pendingAvatar = null;
+  const name = $("settName")?.value || loadSettings().userName || "";
+  _refreshSettAvatarUI(name, null);
+}
+function applyTheme(theme) {
+  const isDark = theme === "dark" || theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  document.body.classList.toggle("light-mode", !isDark);
+}
+function toggleTempChat() {
+  state.isTemp = !state.isTemp;
+  state.convId = null;
+  state.tempHistory = [];
+  const btn = $("tempChatBtn");
+  const badge = $("tempBadge");
+  if (state.isTemp) {
+    btn?.classList.add("active");
+    if (badge) badge.style.display = "inline";
+    showToast(`${_aiSvgInfo} Temporary chat \u2014 this conversation won't be saved`);
+  } else {
+    btn?.classList.remove("active");
+    if (badge) badge.style.display = "none";
+  }
+  showWelcome();
+}
+function openSearch() {
+  openModal("searchModal");
+  $("searchInput")?.focus();
+}
+function doSearch() {
+  const q = $("searchInput")?.value.toLowerCase().trim();
+  const list = $("searchResults");
+  if (!list) return;
+  if (!q) {
+    list.innerHTML = "";
+    return;
+  }
+  const convs = loadConvs();
+  const hits = convs.filter(
+    (c) => c.title.toLowerCase().includes(q) || c.messages.some((m) => m.text?.toLowerCase().includes(q))
+  );
+  if (!hits.length) {
+    list.innerHTML = `<div class="lib-empty">No results</div>`;
+    return;
+  }
+  list.innerHTML = hits.slice(0, 20).map((c) => `
+    <div class="search-result" onclick="loadConversation('${c.id}');closeModal('searchModal')">
+      <div class="search-title">${escapeHtml(c.title)}</div>
+      <div class="search-snippet">${escapeHtml(c.messages.find((m) => m.text?.toLowerCase().includes(q))?.text?.slice(0, 80) || "")}</div>
+    </div>`).join("");
+}
+function newChat() {
+  state.convId = null;
+  showWelcome();
+  updateTopbarTitle("");
+  renderSidebar();
+}
+function scrollToBottom() {
+  const cc = $("chatContent");
+  if (cc) cc.scrollTop = cc.scrollHeight;
+}
+function sendQuickPrompt(text) {
+  $("chatInput").value = text;
+  handleSend();
+}
+const AUTO_OPTION = {
+  id: "auto",
+  name: "EmeraldCore Auto",
+  short: "Auto",
+  tier: "auto",
+  desc: "Picks the best model automatically."
+};
+const LOCKED_MODELS = [
+  {
+    id: "emeraldcore-alpha-locked",
+    name: "EmeraldCore Alpha",
+    short: "Alpha",
+    tier: "v1",
+    desc: "V1 | Essential conversations.",
+    lockedReason: "Restricted for security reasons."
+  }
+];
+function _escapeAttr(s) {
+  return String(s || "").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function renderModelDropdown() {
+  const dd = $("modelDropdown");
+  if (!dd) return;
+  const selectedId = getSelectedModelId();
+  const items = [AUTO_OPTION, ...MODELS].map((opt) => {
+    const isActive = opt.id === selectedId;
+    return `
+      <div class="model-dropdown-item ${isActive ? "active" : ""}" role="menuitem"
+           data-model-id="${_escapeAttr(opt.id)}"
+           onclick="selectModel('${_escapeAttr(opt.id)}')">
+        <div class="model-dropdown-text">
+          <div class="model-dropdown-title">${escapeHtml(opt.name)}</div>
+          <div class="model-dropdown-desc">${escapeHtml(opt.desc)}</div>
+        </div>
+      </div>`;
+  }).join("");
+  const lockedItems = LOCKED_MODELS.map((opt) => {
+    const tooltip = (opt.lockedReason || "Restricted") + " \u2014 " + opt.name;
+    return `
+      <div class="model-dropdown-item disabled"
+           data-model-id="${_escapeAttr(opt.id)}"
+           aria-disabled="true"
+           tabindex="-1"
+           title="${_escapeAttr(tooltip)}"
+           onclick="return false;">
+        <div class="model-dropdown-text">
+          <div class="model-dropdown-title">
+            <span class="model-dropdown-lock" aria-hidden="true">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>${escapeHtml(opt.name)}
+          </div>
+          <div class="model-dropdown-desc">${escapeHtml(opt.desc)}</div>
+        </div>
+      </div>`;
+  }).join("");
+  dd.innerHTML = items + lockedItems;
+}
+function toggleModelDropdown(e) {
+  if (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  const sel = $("modelSelector");
+  if (!sel) return;
+  const willOpen = !sel.classList.contains("open");
+  if (willOpen) renderModelDropdown();
+  sel.classList.toggle("open", willOpen);
+}
+function closeModelDropdown() {
+  const sel = $("modelSelector");
+  if (sel) sel.classList.remove("open");
+}
+function selectModel(id) {
+  if (LOCKED_MODELS.some((m) => m.id === id)) {
+    const opt2 = LOCKED_MODELS.find((m) => m.id === id);
+    showToast(`${_aiSvgWarn || "\u26A0"} ${opt2 ? opt2.name : "This model"} is restricted for security reasons.`);
+    return;
+  }
+  const valid = id === "auto" || MODELS.some((m) => m.id === id);
+  if (!valid) return;
+  setSelectedModelId(id);
+  closeModelDropdown();
+  refreshModelSelectorUI();
+  const opt = id === "auto" ? AUTO_OPTION : getModelById(id);
+  if (opt) {
+    showToast(`${_aiSvgCheck} Model: ${opt.name}`);
+  }
+}
+function refreshModelSelectorUI() {
+  const nameEl = $("modelSelectorName");
+  if (!nameEl) return;
+  const id = getSelectedModelId();
+  const opt = id === "auto" ? AUTO_OPTION : getModelById(id);
+  if (opt) {
+    nameEl.textContent = opt.name;
+    nameEl.title = opt.name + (opt.desc ? " \u2014 " + opt.desc : "");
+  }
+  const sel = $("modelSelector");
+  if (sel && sel.classList.contains("open")) renderModelDropdown();
+}
+function onModelUsed(model) {
+  const sel = $("modelSelector");
+  if (!sel) return;
+  sel.classList.add("is-active");
+  if (window._modelPulseTimer) clearTimeout(window._modelPulseTimer);
+  window._modelPulseTimer = setTimeout(() => {
+    sel.classList.remove("is-active");
+  }, 1200);
+}
+function setActiveModelBadge(modelId, opts = {}) {
+  if (getSelectedModelId() === "auto") return;
+  const model = getModelById(modelId);
+  if (!model) return;
+  const nameEl = $("modelSelectorName");
+  if (nameEl) nameEl.textContent = model.name;
+  if (!opts.silent) {
+  }
+}
+document.addEventListener("click", (e) => {
+  const sel = $("modelSelector");
+  if (!sel || !sel.classList.contains("open")) return;
+  if (!sel.contains(e.target)) closeModelDropdown();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeModelDropdown();
+});
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = String(s ?? "");
+  return d.innerHTML;
+}
+function escapeHtmlAttr(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+let _obCurStep = 0;
+let _obSelTheme = "system";
+let _obPendingAvatar = null;
+let _obParsedMemories = [];
+const OB_STEPS = 4;
+function checkOnboarding() {
+  if (S.get(OB_KEY)) return;
+  const overlay = $("obOverlay");
+  if (!overlay) return;
+  const saved = loadSettings();
+  const inp = $("obNameInput");
+  if (inp && saved.userName && saved.userName !== "You") {
+    inp.value = saved.userName;
+    _obUpdateInitials(saved.userName);
+  }
+  if (saved.avatar) {
+    _obShowAvatarImg(saved.avatar);
+    _obPendingAvatar = saved.avatar;
+  }
+  requestAnimationFrame(() => overlay.classList.add("ob-visible"));
+}
+function _obUpdateInitials(name) {
+  const initEl = $("obAvatarInitials");
+  if (!initEl) return;
+  const n = (name || "").trim();
+  if (!n) {
+    initEl.textContent = "?";
+    return;
+  }
+  const parts = n.split(/\s+/);
+  initEl.textContent = parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : n[0].toUpperCase();
+}
+function _obShowAvatarImg(src) {
+  const img = $("obAvatarImg");
+  const init2 = $("obAvatarInitials");
+  if (!img || !init2) return;
+  img.src = src;
+  img.style.display = "block";
+  init2.style.display = "none";
+}
+async function _obAvatarUpload(input) {
+  const f = input.files[0];
+  if (!f) return;
+  try {
+    const imgEl = new Image();
+    imgEl.src = URL.createObjectURL(f);
+    await new Promise((r) => {
+      imgEl.onload = r;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 96;
+    const ctx = canvas.getContext("2d");
+    const size = Math.min(imgEl.width, imgEl.height);
+    ctx.drawImage(imgEl, (imgEl.width - size) / 2, (imgEl.height - size) / 2, size, size, 0, 0, 96, 96);
+    _obPendingAvatar = canvas.toDataURL("image/webp", 0.88);
+    URL.revokeObjectURL(imgEl.src);
+    _obShowAvatarImg(_obPendingAvatar);
+  } catch (e) {
+    showToast("Could not load image", "error");
+  }
+  input.value = "";
+}
+function _obParseMemoryText(raw) {
+  if (!raw.trim()) return [];
+  const cleanedText = raw.trim();
+  if (cleanedText.length > 4 && cleanedText.length < 1e4) {
+    return [cleanedText];
+  }
+  return [];
+}
+function _obMemoryPreview() {
+  const raw = $("obMemoryInput")?.value || "";
+  _obParsedMemories = _obParseMemoryText(raw);
+  const preview = $("obMemoryPreview");
+  const titleEl = $("obMemoryPreviewTitle");
+  const itemsEl = $("obMemoryItems");
+  const importBtn = $("obImportBtn");
+  if (_obParsedMemories.length === 0) {
+    if (preview) preview.style.display = "none";
+    if (importBtn) importBtn.style.display = "none";
+    return;
+  }
+  if (preview) preview.style.display = "";
+  if (titleEl) titleEl.textContent = `Found ${_obParsedMemories.length} memor${_obParsedMemories.length === 1 ? "y" : "ies"} to import`;
+  if (itemsEl) itemsEl.innerHTML = _obParsedMemories.slice(0, 10).map(
+    (m) => `<div class="ob-import-item"><span class="ob-import-item-dot"></span>${escapeHtml(m)}</div>`
+  ).join("") + (_obParsedMemories.length > 10 ? `<div class="ob-import-item" style="color:rgba(255,255,255,0.3)">\u2026and ${_obParsedMemories.length - 10} more</div>` : "");
+  if (importBtn) {
+    importBtn.style.display = "";
+  }
+  if (countEl) {
+    countEl.textContent = ` (${_obParsedMemories.length})`;
+  }
+}
+function _obImportMemory() {
+  const rawInput = $("obMemoryInput")?.value || "";
+  if (!rawInput.trim()) {
+    _obNext();
+    return;
+  }
+  const existing = loadMemories();
+  const newMem = {
+    id: genId(),
+    text: rawInput.trim(),
+    createdAt: Date.now()
+  };
+  saveMemories([...existing, newMem].slice(0, 100));
+  _obParsedMemories = [];
+  _obNext();
+}
+function _obSetStep(n, fromBack) {
+  const old = document.getElementById("obStep" + _obCurStep);
+  const next = document.getElementById("obStep" + n);
+  const dots = document.querySelectorAll(".ob-dot");
+  if (old) {
+    old.classList.remove("ob-step--active", "ob-step--from-back");
+  }
+  if (next) {
+    next.classList.remove("ob-step--from-back");
+    void next.offsetWidth;
+    if (fromBack) next.classList.add("ob-step--from-back");
+    next.classList.add("ob-step--active");
+  }
+  dots.forEach((d, i) => d.classList.toggle("ob-dot--active", i === n));
+  _obCurStep = n;
+}
+function _obNext() {
+  if (_obCurStep === 0) {
+    const inp = $("obNameInput");
+    const name = (inp?.value || "").trim();
+    const s = loadSettings();
+    saveSettingsObj({ ...s, userName: name || s.userName || "You", avatar: _obPendingAvatar !== null ? _obPendingAvatar : s.avatar || null });
+  }
+  if (_obCurStep < OB_STEPS - 1) _obSetStep(_obCurStep + 1, false);
+}
+function _obBack() {
+  if (_obCurStep > 0) _obSetStep(_obCurStep - 1, true);
+}
+function _obSelectTheme(t) {
+  _obSelTheme = t;
+  ["system", "dark", "light"].forEach((k) => {
+    const el = document.getElementById("obTheme_" + k);
+    if (el) el.classList.toggle("ob-theme--active", k === t);
+  });
+}
+function _obFinish() {
+  const s = loadSettings();
+  saveSettingsObj({ ...s, theme: _obSelTheme });
+  applyTheme(_obSelTheme);
+  S.set(OB_KEY, true);
+  const name = (loadSettings().userName || "User").trim();
+  const nh = $("welcomeHeading");
+  if (nh) nh.textContent = `Hi ${name}! What would you like to explore?`;
+  const overlay = $("obOverlay");
+  if (overlay) {
+    overlay.classList.remove("ob-visible");
+    setTimeout(() => {
+      overlay.style.display = "none";
+    }, 400);
+  }
+}
+async function init() {
+  try {
+    refreshModelSelectorUI();
+  } catch {
+  }
+  requestAnimationFrame(() => {
+    try {
+      refreshModelSelectorUI();
+    } catch {
+    }
+  });
+  await migrateChatStorageToIndexedDB();
+  setupChatStorageSync();
+  setupMarked();
+  setupContextMenu();
+  renderSidebar();
+  showWelcome();
+  checkOnboarding();
+  try {
+    refreshModelSelectorUI();
+  } catch {
+  }
+  const textarea = $("chatInput");
+  textarea?.addEventListener("input", function() {
+    this.style.height = "auto";
+    this.style.height = Math.min(this.scrollHeight, 200) + "px";
+  });
+  textarea?.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  });
+  textarea?.addEventListener("paste", function(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    let hasImage = false;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          processFileForAttachment(file);
+          hasImage = true;
+        }
+      }
+    }
+  });
+  const inputBox = document.querySelector(".chat-input-box");
+  inputBox?.addEventListener("dragover", function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    inputBox.classList.add("drag-over");
+  });
+  inputBox?.addEventListener("dragleave", function() {
+    inputBox.classList.remove("drag-over");
+  });
+  inputBox?.addEventListener("drop", function(e) {
+    e.preventDefault();
+    inputBox.classList.remove("drag-over");
+    Array.from(e.dataTransfer.files).forEach(processFileForAttachment);
+  });
+  $("searchInput")?.addEventListener("input", doSearch);
+}
+document.addEventListener("DOMContentLoaded", function() {
+  initTheme();
+}, { once: true });
+document.addEventListener("DOMContentLoaded", init);
+function openMobileSidebar() {
+  $("sidebar")?.classList.add("mobile-open");
+  $("sidebarBackdrop")?.classList.add("visible");
+}
+function closeMobileSidebar() {
+  $("sidebar")?.classList.remove("mobile-open");
+  $("sidebarBackdrop")?.classList.remove("visible");
+}
+function _quizUpdateProgress(qid) {
+  const qz = (window._quizzes || {})[qid];
+  if (!qz) return;
+  const answered = Object.keys(qz.answers).length;
+  const total = qz.data.questions.length;
+  const prog = document.getElementById(`${qid}_prog`);
+  if (prog) prog.textContent = `${answered} / ${total} answered`;
+  const submit = document.getElementById(`${qid}_submit`);
+  if (submit) submit.disabled = answered < total;
+}
+function renderQuizWidget(qid, data) {
+  const qs = data.questions || [];
+  const title = data.title || "Quiz";
+  const infoSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>`;
+  const qHtml = qs.map((q, qi) => {
+    const type = q.type || "mcq";
+    let typeBadge = "";
+    let inputHtml = "";
+    if (type === "fill") {
+      inputHtml = "";
+    } else if (type === "essay") {
+      inputHtml = `<div class="quiz-essay-wrap">
+        <textarea class="quiz-essay-input" id="${qid}_q${qi}_essay"
+          oninput="_quizEssayInput('${qid}',${qi},this.value)"
+          placeholder="Write your answer here\u2026" rows="4"></textarea>
+      </div>`;
+    } else {
+      inputHtml = `<div class="quiz-options">
+        ${(q.options || []).map((opt, oi) => `
+          <button class="quiz-opt" id="${qid}_q${qi}_o${oi}" onclick="_quizSelect('${qid}',${qi},${oi})">
+            <span class="quiz-opt-letter">${String.fromCharCode(65 + oi)}</span>
+            <span>${escapeHtml(opt)}</span>
+          </button>`).join("")}
+      </div>`;
+    }
+    let qTextHtml;
+    if (type === "fill") {
+      const raw = q.q || "";
+      const parts = raw.split(/___+/);
+      const inlineInput = `<input type="text" class="quiz-fill-inline" id="${qid}_q${qi}_fill"
+        oninput="_quizFillInput('${qid}',${qi},this.value)"
+        placeholder="\u2026" autocomplete="off" spellcheck="false" size="14">`;
+      const joined = parts.map((p, i) => escapeHtml(p) + (i < parts.length - 1 ? inlineInput : "")).join("");
+      qTextHtml = `<div class="quiz-q-text quiz-q-fill-text">${qi + 1}. ${joined}</div>`;
+    } else {
+      qTextHtml = `<div class="quiz-q-text">${qi + 1}. ${escapeHtml(q.q)}${typeBadge}</div>`;
+    }
+    return `<div class="quiz-question" id="${qid}_q${qi}">
+      ${qTextHtml}
+      ${inputHtml}
+      <div class="quiz-explanation" id="${qid}_exp${qi}" style="display:none"></div>
+    </div>`;
+  }).join("");
+  return `<div class="quiz-widget" id="${qid}">
+    <div class="quiz-header">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+      <span>${escapeHtml(title)}</span>
+      <span class="quiz-count">${qs.length} question${qs.length !== 1 ? "s" : ""}</span>
+    </div>
+    <div class="quiz-body">${qHtml}</div>
+    <div class="quiz-footer">
+      <span class="quiz-progress" id="${qid}_prog">0 / ${qs.length} answered</span>
+      <button class="quiz-submit-btn" id="${qid}_submit" onclick="_quizSubmit('${qid}')" disabled>Submit</button>
+    </div>
+    <div class="quiz-result" id="${qid}_result" style="display:none"></div>
+  </div>`;
+}
+window._quizSelect = function(qid, qi, oi) {
+  const qz = (window._quizzes || {})[qid];
+  if (!qz || qz.submitted) return;
+  qz.answers[qi] = oi;
+  const questionEl = document.getElementById(`${qid}_q${qi}`);
+  questionEl?.querySelectorAll(".quiz-opt").forEach((btn, i) => {
+    btn.classList.toggle("selected", i === oi);
+  });
+  _quizUpdateProgress(qid);
+};
+window._quizFillInput = function(qid, qi, value) {
+  const qz = (window._quizzes || {})[qid];
+  if (!qz || qz.submitted) return;
+  if (value.trim()) qz.answers[qi] = value;
+  else delete qz.answers[qi];
+  _quizUpdateProgress(qid);
+};
+window._quizEssayInput = function(qid, qi, value) {
+  const qz = (window._quizzes || {})[qid];
+  if (!qz || qz.submitted) return;
+  if (value.trim()) qz.answers[qi] = value;
+  else delete qz.answers[qi];
+  _quizUpdateProgress(qid);
+};
+window._quizSubmit = function(qid) {
+  const qz = (window._quizzes || {})[qid];
+  if (!qz || qz.submitted) return;
+  qz.submitted = true;
+  const infoSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>`;
+  let score = 0, autoTotal = 0, essayCount = 0;
+  qz.data.questions.forEach((q, qi) => {
+    const type = q.type || "mcq";
+    const chosen = qz.answers[qi];
+    const expEl = document.getElementById(`${qid}_exp${qi}`);
+    if (type === "mcq") {
+      autoTotal++;
+      const correct = q.answer;
+      const isCorrect = chosen === correct;
+      if (isCorrect) score++;
+      const questionEl = document.getElementById(`${qid}_q${qi}`);
+      questionEl?.querySelectorAll(".quiz-opt").forEach((btn, oi) => {
+        if (oi === correct) btn.classList.add("correct");
+        else if (oi === chosen && !isCorrect) btn.classList.add("wrong");
+        btn.disabled = true;
+      });
+      if (expEl && q.explanation) {
+        expEl.style.display = "block";
+        expEl.innerHTML = `${infoSvg} ${escapeHtml(q.explanation)}`;
+      }
+    } else if (type === "fill") {
+      autoTotal++;
+      const userAns = (chosen || "").toString().trim().toLowerCase();
+      const correctAns = (q.answer || "").trim().toLowerCase();
+      const isCorrect = userAns === correctAns || correctAns.split("|").map((s) => s.trim()).includes(userAns);
+      if (isCorrect) score++;
+      const inputEl = document.getElementById(`${qid}_q${qi}_fill`);
+      if (inputEl) {
+        inputEl.disabled = true;
+        inputEl.classList.add(isCorrect ? "quiz-fill-inline-correct" : "quiz-fill-inline-wrong");
+      }
+      if (expEl) {
+        expEl.style.display = "block";
+        const correctNote = !isCorrect ? `<span class="quiz-fill-correct-ans">\u2713 Correct answer: <strong>${escapeHtml(q.answer)}</strong></span>` : `<span class="quiz-fill-correct-ans quiz-fill-correct-ans-ok">\u2713 Correct!</span>`;
+        expEl.innerHTML = `${correctNote}${q.explanation ? `<br>${infoSvg} ${escapeHtml(q.explanation)}` : ""}`;
+      }
+    } else if (type === "essay") {
+      essayCount++;
+      const textareaEl = document.getElementById(`${qid}_q${qi}_essay`);
+      if (textareaEl) {
+        textareaEl.disabled = true;
+        textareaEl.classList.add("quiz-essay-submitted");
+      }
+      if (expEl) {
+        expEl.style.display = "block";
+        expEl.innerHTML = `${infoSvg} Your answer has been recorded. Click "Ask AI" for personalized feedback.`;
+      }
+    }
+  });
+  qz.score = score;
+  qz.autoTotal = autoTotal;
+  qz.essayCount = essayCount;
+  const pct = autoTotal > 0 ? Math.round(score / autoTotal * 100) : 0;
+  const grade = essayCount > 0 && autoTotal === 0 ? "\u270D\uFE0F Responses recorded!" : pct >= 80 ? "\u{1F3C6} Excellent!" : pct >= 60 ? "\u{1F44D} Good job!" : pct >= 40 ? "\u{1F4D6} Keep studying!" : "\u{1F4AA} Keep practicing!";
+  const scoreText = autoTotal > 0 ? `${score}/${autoTotal}` : `${essayCount} response${essayCount !== 1 ? "s" : ""}`;
+  const resultEl = document.getElementById(`${qid}_result`);
+  if (resultEl) {
+    resultEl.style.display = "block";
+    resultEl.innerHTML = `<div class="quiz-score"><span class="quiz-score-num">${scoreText}</span><span class="quiz-score-msg">${grade}</span></div>
+      <button class="quiz-ask-btn" onclick="_quizAskAI('${qid}')">Ask AI about my results</button>`;
+  }
+  const footer = document.getElementById(`${qid}_submit`);
+  if (footer) footer.style.display = "none";
+};
+window._quizAskAI = function(qid) {
+  const qz = (window._quizzes || {})[qid];
+  if (!qz) return;
+  const mcqFillWrong = qz.data.questions.filter((q, i) => {
+    const type = q.type || "mcq";
+    if (type === "mcq") return qz.answers[i] !== q.answer;
+    if (type === "fill") {
+      const ua = (qz.answers[i] || "").toString().trim().toLowerCase();
+      const ca = (q.answer || "").trim().toLowerCase();
+      return ua !== ca && !ca.split("|").map((s) => s.trim()).includes(ua);
+    }
+    return false;
+  });
+  const essays = qz.data.questions.map((q, i) => q.type === "essay" ? { q: q.q, a: qz.answers[i] || "", rubric: q.rubric } : null).filter(Boolean);
+  let prompt = `I just completed the quiz "${qz.data.title}".`;
+  if (qz.autoTotal > 0) prompt += ` I scored ${qz.score}/${qz.autoTotal} on auto-graded questions.`;
+  if (mcqFillWrong.length > 0) prompt += ` I got these wrong: ${mcqFillWrong.map((q) => `"${q.q}"`).join(", ")}. Can you explain them?`;
+  else if (qz.autoTotal > 0) prompt += " I got all auto-graded questions right!";
+  if (essays.length > 0) {
+    prompt += "\n\nPlease review my essay answers:\n";
+    essays.forEach((e) => {
+      prompt += `
+Q: "${e.q}"
+My answer: "${e.a}"${e.rubric ? `
+(Rubric: ${e.rubric})` : ""}`;
+    });
+    prompt += "\nPlease give me feedback.";
+  }
+  prompt += "\n\n[IMPORTANT: Only provide explanations and essay feedback for the above. Do NOT generate a new quiz. Do NOT generate an image. No <quiz> tags. No [GENERATE_IMAGE:...] tags. Just a plain helpful response.]";
+  const input = document.getElementById("chatInput");
+  if (input) {
+    input.value = prompt;
+    input.focus();
+    handleSend();
+  }
+};
+function openMemoriesModal() {
+  renderMemoriesModal();
+  openModal("memoriesModal");
+}
+function renderMemoriesModal() {
+  const list = document.getElementById("memoriesList");
+  if (!list) return;
+  const mems = loadMemories();
+  if (mems.length === 0) {
+    list.innerHTML = '<div class="memories-empty"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg><p>No memories saved yet</p><small>Ask EmeraldBot to remember something about you.</small></div>';
+    return;
+  }
+  list.innerHTML = mems.map((m) => `
+    <div class="memory-item" id="mem_${m.id}">
+      <div class="memory-item-content">
+        <div class="memory-item-text" style="white-space: pre-wrap;">${escapeHtml(m.text)}</div>
+        <div class="memory-item-meta">${new Date(m.createdAt).toLocaleDateString()}</div>
+      </div>
+      <div class="memory-item-btns">
+        <button class="memory-item-btn memory-item-edit" onclick="editMemory('${m.id}')" title="Edit memory">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+        </button>
+        <button class="memory-item-btn memory-item-del" onclick="deleteMemory('${m.id}')" title="Delete memory">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+    </div>`).join("");
+}
+function clearAllMemories() {
+  saveMemories([]);
+  renderMemoriesModal();
+  showToast("\u2713 All memories cleared");
+}
+function confirmClearAllChats() {
+  openModal("clearChatsModal");
+}
+function clearAllChats() {
+  saveConvs([]);
+  saveLib([]);
+  window._quizzes = {};
+  state.convId = null;
+  state.isTemp = false;
+  state.tempHistory = [];
+  state.attachments = [];
+  const btn = $("tempChatBtn");
+  if (btn) btn.classList.remove("active");
+  const badge = $("tempBadge");
+  if (badge) badge.style.display = "none";
+  renderSidebar();
+  showWelcome();
+  closeModal("clearChatsModal");
+  closeModal("settingsModal");
+  showToast("\u2713 All chats & memories cleared");
+}
+function appendStoredAIMessage(m) {
+  const rawText = m.text || "";
+  const displayText = rawText.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  const hasMemory = m.hasMemory || /\[MEMORY:/.test(rawText);
+  const beforeQuiz = m.quizTextBefore !== void 0 ? m.quizTextBefore : m.hasQuiz ? "" : displayText;
+  const afterQuiz = m.quizTextAfter || "";
+  const _initText = m.hasQuiz ? beforeQuiz || "" : displayText || "";
+  const div = document.createElement("div");
+  div.className = "message";
+  div.dataset.ai = "1";
+  div.dataset.msgId = m.id || genId();
+  if (m.modelId) div.dataset.modelId = m.modelId;
+  if (m.modelName) div.dataset.modelName = m.modelName;
+  if (m.imageModelId) div.dataset.imageModelId = m.imageModelId;
+  if (m.imageModelName) div.dataset.imageModelName = m.imageModelName;
+  if (m._regenBranchRef) div.dataset.regenBranchRef = m._regenBranchRef;
+  if (m._editBranchRef) div.dataset.branchRef = m._editBranchRef;
+  div.innerHTML = `
+    <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
+    <div class="message-body">
+      <div class="message-sender">EmeraldBot</div>
+      <div class="message-text md-content"${_initText ? "" : ' style="display:none"'}>${_initText ? renderMarkdown(_initText) : ""}</div>
+    </div>`;
+  if (hasMemory) {
+    const badge = document.createElement("div");
+    badge.className = "memory-badge";
+    badge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg> Updated memory';
+    div.querySelector(".message-sender").insertAdjacentElement("afterend", badge);
+  }
+  if (m.hasQuiz && m.quizData) {
+    const qid = m.quizData._id || "quiz_" + (m.id || genId());
+    m.quizData._id = qid;
+    window._quizzes = window._quizzes || {};
+    if (!window._quizzes[qid]) {
+      window._quizzes[qid] = { data: m.quizData, answers: {}, submitted: false };
+    }
+    const cardEl = document.createElement("div");
+    cardEl.innerHTML = quizCardHTML(qid, m.quizData);
+    const textEl = div.querySelector(".message-text");
+    textEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
+    if (afterQuiz) {
+      const afterEl = document.createElement("div");
+      afterEl.className = "message-text md-content";
+      afterEl.style.marginTop = "8px";
+      afterEl.innerHTML = renderMarkdown(afterQuiz);
+      textEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
+    }
+  }
+  div.querySelector(".message-body").insertAdjacentHTML("beforeend", messageActionsHTML(m.id || genId(), displayText));
+  if (m.imageData) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "img-gen-result";
+    const img = document.createElement("img");
+    img.src = m.imageData;
+    img.alt = m.imagePrompt ? escapeHtmlAttr(m.imagePrompt.slice(0, 80)) : "";
+    img.className = "img-gen-image";
+    const dlLink = document.createElement("a");
+    dlLink.className = "img-gen-download";
+    dlLink.href = m.imageData;
+    dlLink.download = "emeraldbot-image.png";
+    dlLink.title = "Download image";
+    dlLink.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+    wrapper.appendChild(img);
+    wrapper.appendChild(dlLink);
+    insertBeforeMessageActions(div.querySelector(".message-body"), wrapper);
+  }
+  const typingEl = $("typingIndicator");
+  $("messagesArea").insertBefore(div, typingEl);
+  return div;
+}
+function quizLoadingCardHTML() {
+  return `<div class="quiz-loading-card">
+    <div class="quiz-loading-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4caf7d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+    </div>
+    <div>
+      <div style="font-size:13.5px;font-weight:600;color:var(--text);margin-bottom:4px">Generating quiz\u2026</div>
+      <div class="quiz-loading-dots">
+        <div class="quiz-loading-dot"></div>
+        <div class="quiz-loading-dot"></div>
+        <div class="quiz-loading-dot"></div>
+      </div>
+    </div>
+  </div>`;
+}
+function quizCardHTML(qid, data) {
+  const n = (data.questions || []).length;
+  return `<div class="quiz-card" onclick="openQuizPanel('${qid}')">
+    <div class="quiz-card-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+    </div>
+    <div class="quiz-card-info">
+      <div class="quiz-card-title">${escapeHtml(data.title || "Quiz")}</div>
+      <div class="quiz-card-meta">${n} question${n !== 1 ? "s" : ""} \xB7 Click to start</div>
+    </div>
+    <svg class="quiz-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </div>`;
+}
+function openQuizPanel(qid) {
+  const qz = (window._quizzes || {})[qid];
+  if (!qz) return;
+  closeCodePreviewPanel();
+  closeFilePreviewPanel();
+  const panel = $("quizPanel");
+  const body = $("quizPanelBody");
+  const title = $("quizPanelTitle");
+  const count = $("quizPanelCount");
+  if (!panel || !body) return;
+  const n = qz.data.questions ? qz.data.questions.length : 0;
+  if (title) title.textContent = qz.data.title || "Quiz";
+  if (count) count.textContent = n + " question" + (n !== 1 ? "s" : "");
+  body.innerHTML = renderQuizWidget(qid, qz.data);
+  const widgetHeader = body.querySelector(".quiz-header");
+  if (widgetHeader) widgetHeader.style.display = "none";
+  panel.classList.add("open");
+}
+function closeQuizPanel() {
+  const p = $("quizPanel");
+  if (!p || !p.classList.contains("open")) return;
+  p.classList.add("closing");
+  setTimeout(() => {
+    p.classList.remove("open", "closing");
+  }, 320);
+}
+function editMemory(id) {
+  const mems = loadMemories();
+  const m = mems.find((x) => x.id === id);
+  if (!m) return;
+  const item = document.getElementById("mem_" + id);
+  if (!item) return;
+  item.innerHTML = `
+    <textarea class="memory-edit-input" id="medit_${id}" rows="5">${escapeHtml(m.text)}</textarea>
+    <div class="memory-edit-actions">
+      <button class="memory-edit-save" onclick="saveEditMemory('${id}')" title="Save">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+      <button class="memory-edit-cancel" onclick="renderMemoriesModal()" title="Cancel">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`;
+  const ta = document.getElementById("medit_" + id);
+  if (ta) {
+    ta.focus();
+    ta.selectionStart = ta.value.length;
+  }
+}
+function saveEditMemory(id) {
+  const ta = document.getElementById("medit_" + id);
+  if (!ta) return;
+  const newText = ta.value.trim();
+  if (!newText) return;
+  const mems = loadMemories();
+  const idx = mems.findIndex((m) => m.id === id);
+  if (idx >= 0) {
+    mems[idx].text = newText;
+    mems[idx].updatedAt = Date.now();
+    saveMemories(mems);
+  }
+  renderMemoriesModal();
+}
+async function copyUserMsgText() {
+  if (!_ctxTarget) return;
+  const textEl = _ctxTarget.querySelector(".message-text.user-text");
+  const ok = await safeCopy(textEl?.innerText || "");
+  showToast(
+    ok ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px;margin-right:5px"><polyline points="20 6 9 17 4 12"/></svg> Copied` : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Failed to copy`,
+    ok ? "success" : "error"
+  );
+}
+const _editOriginals = /* @__PURE__ */ new Map();
+const MAX_CHAT_BRANCH_VARIANTS = 10;
+function showChatBranchLimitToast(kind) {
+  const label = kind === "ai" ? "regenerate this AI answer" : "edit this message";
+  showToast(`${_aiSvgWarn} You cannot ${label} more than ${MAX_CHAT_BRANCH_VARIANTS} times because the history limit is ${MAX_CHAT_BRANCH_VARIANTS}.`, "warning");
+}
+function editUserMsg(msgId) {
+  if (state.isStreaming) {
+    showToast('<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Wait for response to finish.', "warning");
+    return;
+  }
+  const msgEl = document.querySelector(`.message--user[data-msg-id="${msgId}"]`);
+  if (!msgEl) return;
+  const textEl = msgEl.querySelector(".message-text.user-text");
+  if (!textEl) return;
+  const conv = state.convId ? getConv(state.convId) : null;
+  const msgRecord = conv?.messages?.find((m) => m.id === msgId);
+  const originalText = msgRecord?.text || textEl.innerText.trim();
+  _editOriginals.set(msgId, originalText);
+  textEl.innerHTML = "";
+  const ta = document.createElement("textarea");
+  ta.className = "user-msg-edit-input";
+  ta.value = originalText;
+  ta.oninput = () => {
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+  };
+  textEl.appendChild(ta);
+  ta.style.height = "auto";
+  ta.style.height = ta.scrollHeight + "px";
+  const actions = document.createElement("div");
+  actions.className = "user-msg-edit-actions";
+  actions.innerHTML = `
+    <button class="user-edit-btn user-edit-btn--submit" onclick="submitUserMsgEdit('${msgId}')">Submit</button>
+    <button class="user-edit-btn user-edit-btn--cancel" onclick="cancelUserMsgEdit('${msgId}')">Cancel</button>`;
+  textEl.insertAdjacentElement("afterend", actions);
+  ta.focus();
+  ta.selectionStart = ta.value.length;
+}
+function cancelUserMsgEdit(msgId) {
+  const originalText = _editOriginals.get(msgId) || "";
+  _editOriginals.delete(msgId);
+  const msgEl = document.querySelector(`.message--user[data-msg-id="${msgId}"]`);
+  if (!msgEl) return;
+  const textEl = msgEl.querySelector(".message-text.user-text");
+  if (textEl) textEl.innerHTML = escapeHtml(originalText).replace(/\n/g, "<br>");
+  const actions = msgEl.querySelector(".user-msg-edit-actions");
+  if (actions) actions.remove();
+}
+async function submitUserMsgEdit(msgId) {
+  if (state.isStreaming) return;
+  const msgEl = document.querySelector(`.message--user[data-msg-id="${msgId}"]`);
+  if (!msgEl) return;
+  const ta = msgEl.querySelector(".user-msg-edit-input");
+  if (!ta) return;
+  const newText = ta.value.trim();
+  if (!newText) return;
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showToast("Service unavailable.", "error");
+    return;
+  }
+  const origText = _editOriginals.get(msgId) || "";
+  const branchRootId = msgEl.dataset.branchRef || msgId;
+  const conv = state.convId ? getConv(state.convId) : null;
+  const existingEditBranch = conv?._editBranches?.[branchRootId];
+  if (existingEditBranch && existingEditBranch.variants.length >= MAX_CHAT_BRANCH_VARIANTS) {
+    showChatBranchLimitToast("user");
+    return;
+  }
+  cancelUserMsgEdit(msgId);
+  if (conv) {
+    const msgIdx = conv.messages.findIndex((m) => m.id === msgId);
+    if (msgIdx >= 0) {
+      conv._editBranches = conv._editBranches || {};
+      if (!conv._editBranches[branchRootId]) conv._editBranches[branchRootId] = { variants: [], current: -1 };
+      const b = conv._editBranches[branchRootId];
+      if (b.variants.length === 0) {
+        b.variants.push({ text: conv.messages[msgIdx].text, tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })) });
+      } else {
+        const ci = b.current >= 0 ? b.current : b.variants.length - 1;
+        b.variants[ci] = { ...b.variants[ci], text: conv.messages[msgIdx].text, tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })) };
+      }
+      b.variants.push({ text: newText, tail: null });
+      b.current = b.variants.length - 1;
+      conv.messages = conv.messages.slice(0, msgIdx);
+      upsertConv(conv);
+    }
+  } else {
+    const tempIdx = state.tempHistory.findIndex((m) => m.role === "user" && m.parts?.[0]?.text === origText);
+    if (tempIdx >= 0) state.tempHistory = state.tempHistory.slice(0, tempIdx);
+  }
+  const area = $("messagesArea");
+  const allMsgs = Array.from(area.querySelectorAll(".message:not(#typingIndicator)"));
+  const domIdx = allMsgs.indexOf(msgEl);
+  if (domIdx >= 0) allMsgs.slice(domIdx).forEach((el) => el.remove());
+  if (!$("typingIndicator")) {
+    area.insertAdjacentHTML("beforeend", typingIndicatorHTML());
+  }
+  const newMsgId = genId();
+  if (conv) {
+    conv.messages.push({ role: "user", text: newText, id: newMsgId, _editBranchRef: branchRootId, files: [] });
+    upsertConv(conv);
+  } else {
+    state.tempHistory.push({ role: "user", parts: [{ text: newText }] });
+  }
+  appendUserMessageDOM(newText, [], newMsgId, branchRootId);
+  if (conv) updateBranchNavDOM(branchRootId);
+  scrollToBottom();
+  const typingEl = $("typingIndicator");
+  typingEl.style.display = "flex";
+  scrollToBottom();
+  const history = conv ? buildHistory(conv) : [...state.tempHistory];
+  state.isStreaming = true;
+  state.abortCtrl = new AbortController();
+  setSendState(true);
+  const _wsNeeded = detectWebSearchIntent(newText);
+  const _urlsInMsg = extractUrls(newText);
+  let _webSources = [];
+  if (_wsNeeded && !_urlsInMsg.length) {
+    try {
+      const _results = await performAdvancedSearch(newText);
+      if (_results.contextText) {
+        _webSources.push(..._results.sources);
+        const ctx = _results.contextText + "\n";
+        const last = history[history.length - 1];
+        if (last?.parts?.length) last.parts[0] = { text: ctx + (last.parts[0]?.text || "") };
+      }
+    } catch (e) {
+    }
+  }
+  let _groundingMetadata = null;
+  const aiMsgId = genId();
+  let aiDiv = null, aiTextEl = null, aiFullText = "";
+  let _usedModelId = "", _usedModelName = "";
+  try {
+    const _streamResult = await streamEmeraldBot(history, apiKey, (chunk) => {
+      aiFullText += chunk;
+      if (!aiDiv) {
+        typingEl.style.display = "none";
+        aiDiv = appendAIMessageDOM("", aiMsgId, true);
+        aiTextEl = aiDiv.querySelector(".message-text");
+        aiTextEl.classList.add("stream-reveal");
+      }
+      const _sd = _streamDisplayText(aiFullText);
+      aiTextEl.innerHTML = (_sd.text ? renderMarkdown(_sd.text) : "") + (_sd.quizStarted ? quizLoadingCardHTML() : '<span class="stream-cursor" aria-hidden="true"></span>');
+      scrollToBottom();
+    }, { useUrlContext: _urlsInMsg.length > 0, userText: newText });
+    _groundingMetadata = _streamResult.groundingMetadata;
+    if (_streamResult.modelId) {
+      _usedModelId = _streamResult.modelId;
+      const _m = getModelById(_usedModelId);
+      _usedModelName = _m ? _m.name : _usedModelId;
+    }
+  } catch (err) {
+    typingEl.style.display = "none";
+    if (err.name !== "AbortError") {
+      if (!aiDiv) {
+        aiDiv = appendAIMessageDOM("", aiMsgId, true);
+        aiTextEl = aiDiv.querySelector(".message-text");
+      }
+      const _msg = err?.message || "An error occurred while processing your request. Please try again later.";
+      aiTextEl.innerHTML = `<span class="md-error">${escapeHtml(_msg)}</span>`;
+    }
+  }
+  typingEl.style.display = "none";
+  if (!aiFullText && !aiDiv) {
+    aiDiv = appendAIMessageDOM("", aiMsgId, true);
+    aiTextEl = aiDiv.querySelector(".message-text");
+  }
+  if (!aiFullText && aiDiv && aiTextEl && !aiTextEl.querySelector(".md-error")) {
+    aiTextEl.innerHTML = `<span class="md-error">No response received. The service may be temporarily unavailable. Please try again.</span>`;
+  }
+  if (aiFullText && aiDiv) {
+    let dispText = aiFullText;
+    const memM = [...aiFullText.matchAll(/\[MEMORY:\s*([^\]]+)\]/g)];
+    const memoriesAdded = memM.map((m) => m[1].trim()).filter(Boolean);
+    memoriesAdded.forEach((t) => addMemory(t));
+    dispText = dispText.replace(/\[MEMORY:[^\]]*\]?/g, "").replace(/\n{3,}/g, "\n\n").trim();
+    const memoryAdded = memoriesAdded.length > 0;
+    const imgM = dispText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
+    const imgPrompt = imgM ? imgM[1].trim() : null;
+    dispText = dispText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
+    let quizData = null;
+    let beforeQuizText = dispText;
+    let afterQuizText = "";
+    const quizMatch = dispText.match(/<quiz>([\s\S]+?)<\/quiz>/) || dispText.match(/<quiz>([\s\S]+)$/);
+    if (quizMatch) {
+      try {
+        quizData = JSON.parse(quizMatch[1]);
+      } catch (e) {
+      }
+      const qStart = dispText.indexOf("<quiz>");
+      beforeQuizText = dispText.slice(0, qStart).trim();
+      afterQuizText = dispText.slice(qStart + quizMatch[0].length).trim();
+      dispText = dispText.slice(0, qStart).trim();
+    }
+    aiTextEl.classList.remove("stream-reveal");
+    const _editTextToShow = quizData ? beforeQuizText : dispText;
+    const _hasOtherContent = !!(quizData || imgPrompt || memoryAdded);
+    if (_editTextToShow) {
+      aiTextEl.innerHTML = renderMarkdown(_editTextToShow);
+    } else if (_hasOtherContent) {
+      aiTextEl.innerHTML = "";
+      aiTextEl.classList.add("message-text--empty");
+    } else {
+      aiTextEl.innerHTML = '<span class="md-error">An error occurred while processing your request. Please try again later.</span>';
+    }
+    if (memoryAdded) {
+      const badge = document.createElement("div");
+      badge.className = "memory-badge";
+      const cnt = memoriesAdded.length > 1 ? `Updated ${memoriesAdded.length} memories` : "Updated memory";
+      badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg> ${cnt}`;
+      aiDiv.querySelector(".message-sender").insertAdjacentElement("afterend", badge);
+    }
+    if (quizData) {
+      const qid = "quiz_" + genId();
+      quizData._id = qid;
+      window._quizzes = window._quizzes || {};
+      window._quizzes[qid] = { data: quizData, answers: {}, submitted: false };
+      const cardEl = document.createElement("div");
+      cardEl.innerHTML = quizCardHTML(qid, quizData);
+      aiTextEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
+      if (afterQuizText) {
+        const afterEl = document.createElement("div");
+        afterEl.className = "message-text md-content";
+        afterEl.style.marginTop = "8px";
+        afterEl.innerHTML = renderMarkdown(afterQuizText);
+        aiTextEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
+      }
+    }
+    const _groundingSources = extractGroundingSources(_groundingMetadata);
+    const _allSources = [..._groundingSources, ..._webSources];
+    if (_allSources.length) renderCitations(aiDiv, _allSources);
+    aiDiv.querySelector(".message-body").insertAdjacentHTML("beforeend", messageActionsHTML(aiMsgId, dispText));
+    if (aiDiv) {
+      aiDiv.dataset.modelId = _usedModelId || "";
+      aiDiv.dataset.modelName = _usedModelName || "";
+    }
+    if (conv) {
+      conv.messages.push({
+        role: "assistant",
+        text: aiFullText,
+        id: aiMsgId,
+        _editBranchRef: branchRootId,
+        modelId: _usedModelId || void 0,
+        modelName: _usedModelName || void 0,
+        hasMemory: !!memoryAdded,
+        hasQuiz: !!quizData,
+        quizData: quizData || void 0,
+        quizTextBefore: quizData ? beforeQuizText : void 0,
+        quizTextAfter: quizData ? afterQuizText : void 0,
+        imagePrompt: imgPrompt || void 0
+      });
+      conv.updatedAt = Date.now();
+      upsertConv(conv);
+      updateBranchNavDOM(branchRootId);
+    } else {
+      state.tempHistory.push({ role: "model", parts: [{ text: aiFullText }] });
+    }
+    if (imgPrompt) {
+      const _imgInput = getLatestUserImageInput();
+      processImageGenTag(aiDiv, imgPrompt, state.convId, aiMsgId, _imgInput);
+    }
+  }
+  updateLastMsgActions();
+  state.isStreaming = false;
+  state.abortCtrl = null;
+  setSendState(false);
+  scrollToBottom();
+}
+function navigateBranch(originalMsgId, dir) {
+  if (state.isStreaming) return;
+  if (!state.convId) return;
+  const conv = getConv(state.convId);
+  if (!conv?._editBranches?.[originalMsgId]) return;
+  const branchInfo = conv._editBranches[originalMsgId];
+  const newIdx = branchInfo.current + dir;
+  if (newIdx < 0 || newIdx >= branchInfo.variants.length) return;
+  let startIdx = conv.messages.findIndex((m) => m.id === originalMsgId);
+  if (startIdx < 0) startIdx = conv.messages.findIndex((m) => m._editBranchRef === originalMsgId);
+  if (startIdx < 0) return;
+  if (branchInfo.variants[branchInfo.current]) {
+    branchInfo.variants[branchInfo.current].text = conv.messages[startIdx].text;
+    branchInfo.variants[branchInfo.current].tail = conv.messages.slice(startIdx + 1).map((m) => ({ ...m }));
+  }
+  branchInfo.current = newIdx;
+  const target = branchInfo.variants[newIdx];
+  const newUserMsg = { role: "user", text: target.text, id: genId(), _editBranchRef: originalMsgId, files: [] };
+  conv.messages = [
+    ...conv.messages.slice(0, startIdx),
+    newUserMsg,
+    ...(target.tail || []).map((m) => ({ ...m }))
+  ];
+  conv._editBranches[originalMsgId] = branchInfo;
+  upsertConv(conv);
+  loadConversation(conv.id);
+}
+function updateBranchNavDOM(originalMsgId) {
+  if (!state.convId) return;
+  const conv = getConv(state.convId);
+  if (!conv?._editBranches?.[originalMsgId]) return;
+  const branchInfo = conv._editBranches[originalMsgId];
+  if (branchInfo.variants.length < 2) return;
+  const branchUserEl = document.querySelector(`.message--user[data-branch-ref="${originalMsgId}"]`) || document.querySelector(`.message--user[data-msg-id="${originalMsgId}"]`);
+  const msgEl = branchUserEl;
+  if (!msgEl) return;
+  document.querySelectorAll(`.branch-nav[data-branch-for="${originalMsgId}"]`).forEach((navEl) => navEl.remove());
+  let nav = msgEl.querySelector(`.branch-nav[data-branch-for="${originalMsgId}"]`);
+  if (!nav) {
+    nav = document.createElement("div");
+    nav.className = "branch-nav branch-nav--edit";
+    nav.dataset.branchFor = originalMsgId;
+    const body = msgEl.querySelector(".message-body");
+    if (body) body.appendChild(nav);
+  }
+  const cur = branchInfo.current + 1;
+  const tot = branchInfo.variants.length;
+  nav.innerHTML = `
+    <button class="branch-nav-btn" onclick="navigateBranch('${originalMsgId}', -1)"${branchInfo.current === 0 ? " disabled" : ""}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="branch-nav-count">${cur} / ${tot}</span>
+    <button class="branch-nav-btn" onclick="navigateBranch('${originalMsgId}', 1)"${branchInfo.current === tot - 1 ? " disabled" : ""}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>`;
+}
+function navigateRegenBranch(branchId, dir) {
+  if (state.isStreaming || !state.convId) return;
+  const conv = getConv(state.convId);
+  const branch = conv?._regenBranches?.[branchId];
+  if (!conv || !branch) return;
+  const newIdx = branch.current + dir;
+  if (newIdx < 0 || newIdx >= branch.variants.length) return;
+  let msgIdx = conv.messages.findIndex((m) => m._regenBranchRef === branchId);
+  if (msgIdx < 0) msgIdx = conv.messages.findIndex((m) => m.id === branchId);
+  if (msgIdx < 0) return;
+  branch.variants[branch.current] = { ...conv.messages[msgIdx], _regenBranchRef: branchId };
+  branch.current = newIdx;
+  conv.messages[msgIdx] = { ...branch.variants[newIdx], id: genId(), _regenBranchRef: branchId };
+  conv._regenBranches[branchId] = branch;
+  upsertConv(conv);
+  loadConversation(conv.id);
+}
+function updateRegenNavDOM(branchId) {
+  if (!state.convId) return;
+  const conv = getConv(state.convId);
+  const branch = conv?._regenBranches?.[branchId];
+  if (!branch || branch.variants.length < 2) return;
+  let msgEl = document.querySelector(`[data-ai="1"][data-regen-branch-ref="${branchId}"]`);
+  if (!msgEl) msgEl = document.querySelector(`[data-ai="1"][data-msg-id="${branchId}"]`);
+  if (!msgEl) return;
+  document.querySelectorAll(`.branch-nav[data-regen-for="${branchId}"]`).forEach((navEl) => navEl.remove());
+  let nav = msgEl.querySelector(`.branch-nav[data-regen-for="${branchId}"]`);
+  if (!nav) {
+    nav = document.createElement("div");
+    nav.className = "branch-nav branch-nav--regen";
+    nav.dataset.regenFor = branchId;
+    const body = msgEl.querySelector(".message-body");
+    if (body) body.appendChild(nav);
+  }
+  const cur = branch.current + 1;
+  const tot = branch.variants.length;
+  nav.innerHTML = `
+    <button class="branch-nav-btn" onclick="navigateRegenBranch('${branchId}', -1)"${branch.current === 0 ? " disabled" : ""}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="branch-nav-count">${cur} / ${tot}</span>
+    <button class="branch-nav-btn" onclick="navigateRegenBranch('${branchId}', 1)"${branch.current === tot - 1 ? " disabled" : ""}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>`;
+}
+function detectWebSearchIntent(text) {
+  if (!text) return false;
+  return /\b(search|look up|look it up|look for|look on|find|find out|google|browse|open|visit|go to|check out|navigate to|load|show me|latest|current|today'?s|today is|right now|live|breaking news|what'?s happening|real.?time|stock price|weather|recent|this week|this year|news|update|happened|who is|who are|what is|what are|when did|where is|how much|how many|check|tell me about|give me info|any info)\b/i.test(text);
+}
+function extractUrls(text) {
+  if (!text) return [];
+  const re = /https?:\/\/[^\s<>"']+/g;
+  const raw = [...new Set(text.match(re) || [])].map((u) => u.replace(/[.,;!?)]+$/, ""));
+  const full = raw.filter((u) => {
+    try {
+      const host = new URL(u).hostname;
+      return host.includes(".") && host.split(".").every((p) => p.length > 0);
+    } catch {
+      return false;
+    }
+  });
+  const bareRe = /(?:open|visit|go to|check out|navigate to|load|browse|read)\s+([a-zA-Z0-9][-a-zA-Z0-9]*(?:\.[a-zA-Z0-9][-a-zA-Z0-9]*)+(?:\/[^\s]*)?)/gi;
+  let m;
+  const bare = [];
+  while ((m = bareRe.exec(text)) !== null) {
+    const candidate = "https://" + m[1].replace(/[.,;!?)]+$/, "");
+    try {
+      const host = new URL(candidate).hostname;
+      if (host.includes(".") && host.split(".").pop().length >= 2) bare.push(candidate);
+    } catch {
+    }
+  }
+  return [.../* @__PURE__ */ new Set([...full, ...bare])];
+}
+function toggleWebSearch() {
+}
+function togglePreviewConsole() {
+  const body = document.getElementById("codePreviewBody");
+  const iframe = body?.querySelector("iframe");
+  if (iframe) iframe.contentWindow.postMessage({ type: "esb-console-toggle" }, "*");
+}
+async function proxySearch(endpoint, params) {
+  if (!SEARCH_PROXY_URL) return null;
+  try {
+    const url = new URL(endpoint, SEARCH_PROXY_URL + "/");
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12e3);
+    const r = await fetch(url.toString(), { signal: ctrl.signal });
+    clearTimeout(t);
+    if (r.ok) return await r.json();
+  } catch (e) {
+    console.warn("[proxySearch] " + endpoint + " failed:", e?.message || e);
+  }
+  return null;
+}
+async function performAdvancedSearch(text) {
+  const sources = [];
+  let contextText = "";
+  const platforms = [
+    { regex: /\b(on\s+yt\b|on\s+youtube\b|youtube\b|yt\b)\b/i, endpoint: "/api/youtube", label: "YouTube" },
+    { regex: /\b(on\s+github\b|on\s+gh\b|github\b|gh\b)\b/i, endpoint: "/api/github", label: "GitHub" },
+    { regex: /\b(on\s+reddit\b|reddit\b)\b/i, endpoint: "/api/reddit", label: "Reddit" },
+    { regex: /\b(on\s+quora\b|quora\b)\b/i, site: "quora.com", label: "Quora" },
+    { regex: /\b(on\s+stack\s*overflow\b|on\s+so\b|stack\s*overflow\b)\b/i, site: "stackoverflow.com", label: "Stack Overflow" },
+    { regex: /\b(on\s+twitter\b|on\s+x\b|twitter\b|\bx\.com\b)\b/i, site: "twitter.com OR x.com", label: "Twitter/X" },
+    { regex: /\b(on\s+medium\b|medium\b)\b/i, site: "medium.com", label: "Medium" },
+    { regex: /\b(on\s+dev\.?to\b|devto\b)\b/i, site: "dev.to", label: "Dev.to" },
+    { regex: /\b(on\s+hacker\s*news\b|hn\b|news\.ycombinator\.com)\b/i, site: "news.ycombinator.com", label: "Hacker News" },
+    { regex: /\b(on\s+wikipedia\b|wikipedia\b|wiki\b)\b/i, endpoint: "/api/wikipedia", label: "Wikipedia" },
+    { regex: /\b(on\s+linkedin\b|linkedin\b)\b/i, site: "linkedin.com", label: "LinkedIn" },
+    { regex: /\b(on\s+instagram\b|instagram\b|insta\b)\b/i, site: "instagram.com", label: "Instagram" },
+    { regex: /\b(on\s+facebook\b|facebook\b|fb\b)\b/i, site: "facebook.com", label: "Facebook" },
+    { regex: /\b(on\s+tiktok\b|tiktok\b)\b/i, site: "tiktok.com", label: "TikTok" }
+  ];
+  let platformMatch = null;
+  for (const p of platforms) {
+    if (p.regex.test(text)) {
+      platformMatch = p;
+      break;
+    }
+  }
+  const deepIntent = /\b(read|about|open|tell me about|look at|deep|detailed|full info|full information)\b/i.test(text);
+  let subject = text.replace(/\b(what'?s the latest on|tell me about|find out about|info about|information about|look up|look it up|search for|look for|google|can you|could you|would you)\b/gi, " ").replace(/\b(search|find|read|about|open|check|the|a|an|its|his|her|their|and|then|page|info|information|me|please|thanks|thank you|thx)\b/gi, " ").replace(/\b(on\s+yt\b|on\s+youtube\b|youtube\b|yt\b|on\s+github\b|on\s+gh\b|github\b|gh\b|on\s+reddit\b|reddit\b|on\s+quora\b|quora\b|on\s+stack\s*overflow\b|on\s+so\b|stack\s*overflow\b|on\s+twitter\b|on\s+x\b|twitter\b|on\s+medium\b|medium\b|on\s+dev\.?to\b|devto\b|on\s+hacker\s*news\b|hn\b|on\s+wikipedia\b|wikipedia\b|wiki\b|on\s+linkedin\b|linkedin\b|on\s+instagram\b|instagram\b|insta\b|on\s+facebook\b|facebook\b|fb\b|on\s+tiktok\b|tiktok\b)\b/gi, " ").replace(/[?!.]+$/g, " ").replace(/\s+/g, " ").trim();
+  if (!subject) {
+    subject = text.replace(/^\s*(search|find|look\s+(?:up|for))\s+/i, "").trim() || text;
+  }
+  if (platformMatch) {
+    if (platformMatch.endpoint) {
+      const data = await proxySearch(platformMatch.endpoint, { q: subject });
+      if (data?.results?.length) {
+        contextText = `${platformMatch.label} search results for "${subject}":
+
+`;
+        data.results.slice(0, 8).forEach((res, i) => {
+          contextText += `${i + 1}. ${res.title}
+   ${res.url}
+   ${res.snippet || ""}
+`;
+          sources.push({ title: res.title, uri: res.url });
+        });
+        if (platformMatch.label === "YouTube" && deepIntent && data.results[0]?.channelUrl) {
+          const aboutUrl = data.results[0].channelUrl + "/about";
+          const aboutData = await proxySearch("/api/read", { url: aboutUrl });
+          if (aboutData?.content) {
+            contextText += `
+Channel about page (${data.results[0].channel}):
+${aboutData.content.slice(0, 3e3)}
+`;
+          }
+        }
+      }
+    } else if (platformMatch.site) {
+      const data = await proxySearch("/api/sitesearch", { q: subject, site: platformMatch.site });
+      if (data?.results?.length) {
+        contextText = `${platformMatch.label} search results for "${subject}":
+
+`;
+        data.results.slice(0, 8).forEach((res, i) => {
+          contextText += `${i + 1}. ${res.title}
+   ${res.url}
+   ${res.snippet || ""}
+`;
+          sources.push({ title: res.title, uri: res.url });
+        });
+      }
+    }
+  }
+  if (!contextText) {
+    const endpoint = deepIntent ? "/api/deepsearch" : "/api/search";
+    const searchData = await proxySearch(endpoint, { q: subject });
+    if (searchData?.results?.length) {
+      contextText = `Web search results for "${subject}":
+
+`;
+      searchData.results.slice(0, 8).forEach((res) => {
+        contextText += `From [${res.title}](${res.url}): ${res.snippet || ""}
+
+`;
+        sources.push({ title: res.title, uri: res.url });
+      });
+      if (searchData.deepResults?.length) {
+        contextText += "\nDetailed page content:\n\n";
+        searchData.deepResults.forEach((dp) => {
+          contextText += `From ${dp.url}:
+${dp.content.slice(0, 3e3)}
+
+`;
+        });
+      }
+    }
+  }
+  if (!contextText) {
+    if (platformMatch) {
+      const generalData = await proxySearch("/api/search", { q: subject });
+      if (generalData?.results?.length) {
+        contextText = `Web search results for "${subject}":
+
+`;
+        generalData.results.slice(0, 8).forEach((res) => {
+          contextText += `From [${res.title}](${res.url}): ${(res.snippet || "").slice(0, 300)}
+
+`;
+          sources.push({ title: res.title, uri: res.url });
+        });
+      }
+    }
+  }
+  if (!contextText) {
+    const deepData = await proxySearch("/api/deepsearch", { q: subject });
+    if (deepData?.results?.length) {
+      contextText = `Web search results for "${subject}":
+
+`;
+      deepData.results.slice(0, 8).forEach((res) => {
+        contextText += `From [${res.title}](${res.url}): ${(res.snippet || "").slice(0, 300)}
+
+`;
+        sources.push({ title: res.title, uri: res.url });
+      });
+      if (deepData.deepResults?.length) {
+        contextText += "\nDetailed page content:\n\n";
+        deepData.deepResults.forEach((dp) => {
+          contextText += `From ${dp.url}:
+${(dp.content || "").slice(0, 3e3)}
+
+`;
+        });
+      }
+    }
+  }
+  return { contextText, sources };
+}
+function renderCitations(aiDiv, sources) {
+  if (!sources?.length) return;
+  const body = aiDiv?.querySelector(".message-body");
+  if (!body) return;
+  const wrap = document.createElement("div");
+  wrap.className = "esb-citations";
+  const seen = /* @__PURE__ */ new Set();
+  sources.forEach((s) => {
+    if (!s?.uri || seen.has(s.uri)) return;
+    seen.add(s.uri);
+    const a = document.createElement("a");
+    a.className = "esb-citation-chip";
+    a.href = s.uri;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    let host = "";
+    try {
+      host = new URL(s.uri).hostname.replace(/^www\./, "");
+    } catch {
+    }
+    a.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>${escapeHtml(s.title || host || "Source")}`;
+    wrap.appendChild(a);
+  });
+  if (wrap.children.length) body.insertAdjacentElement("beforeend", wrap);
+}
+function detectAspectRatio(prompt) {
+  const p = (prompt || "").toLowerCase();
+  const explicit = p.match(/\b(21:9|16:9|9:16|4:5|5:4|4:3|3:4|3:2|2:3|1:1)\b/);
+  if (explicit) return explicit[1];
+  if (/\b(wide|landscape|panoramic|cinematic|banner|desktop wallpaper|youtube thumbnail|cover photo|header image|ultrawide)\b/.test(p)) return "16:9";
+  if (/\b(tall|portrait|vertical|phone|mobile screen|story|instagram story|tiktok|reel|shorts)\b/.test(p)) return "9:16";
+  if (/\b(square|profile|avatar|icon|album cover|logo|sticker)\b/.test(p)) return "1:1";
+  if (/\b(a4|letter|document|page|poster vertical)\b/.test(p)) return "3:4";
+  if (/\b(presentation slide|slide deck|16x10)\b/.test(p)) return "16:9";
+  return "1:1";
+}
+async function processImageGenTag(aiDiv, prompt, convId, msgId, inputImage) {
+  const body = aiDiv?.querySelector(".message-body");
+  if (!body) return;
+  const isImg2Img = !!inputImage;
+  const loadEl = document.createElement("div");
+  loadEl.className = "img-gen-loading";
+  loadEl.innerHTML = `
+    <div class="img-gen-loading-inner">
+      <span class="img-gen-spinner"></span>
+      <div class="img-gen-loading-text">
+        <span class="img-gen-loading-title">${isImg2Img ? "Editing image" : "Generating image"}</span>
+        <span class="img-gen-loading-sub">This may take a few seconds\u2026</span>
+      </div>
+    </div>`;
+  insertBeforeMessageActions(body, loadEl);
+  scrollToBottom();
+  try {
+    const reqBody = {
+      prompt,
+      aspect_ratio: isImg2Img ? "match_input_image" : detectAspectRatio(prompt),
+      output_format: "png"
+    };
+    if (isImg2Img) reqBody.image = inputImage;
+    const res = await fetch(IMAGE_WORKER_URL + "/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(reqBody)
+    });
+    loadEl.remove();
+    if (!res.ok) {
+      let errDetail = "";
+      try {
+        const errJson = await res.json();
+        errDetail = errJson?.error || errJson?.details || "";
+      } catch {
+      }
+      const _errMsg = errDetail ? `Image generation failed.` : `Image generation failed.`;
+      const textEl = body?.querySelector(".message-text");
+      if (textEl) {
+        textEl.classList.remove("message-text--empty");
+        const _existing = (textEl.innerHTML || "").trim();
+        textEl.innerHTML = _existing ? `${_existing}<br><span class="md-error">${escapeHtml(_errMsg)}</span>` : `<span class="md-error">${escapeHtml(_errMsg)}</span>`;
+      }
+      scrollToBottom();
+      return;
+    }
+    const imageModelId = res.headers.get("X-Model-Used") || "";
+    const imageModelName = imageModelId ? imageModelId.split("/").pop() : "";
+    if (imageModelId) {
+      aiDiv.dataset.imageModelId = imageModelId;
+      aiDiv.dataset.imageModelName = imageModelName;
+    }
+    const blob = await res.blob();
+    const dataUrl = await blobToDataURL(blob);
+    const ct = blob.type || "";
+    const ext = ct.includes("jpeg") || ct.includes("jpg") ? "jpg" : ct.includes("png") ? "png" : "png";
+    const wrapper = document.createElement("div");
+    wrapper.className = "img-gen-result";
+    const img = document.createElement("img");
+    img.src = dataUrl;
+    img.alt = escapeHtmlAttr(prompt.slice(0, 80));
+    img.className = "img-gen-image";
+    const dlLink = document.createElement("a");
+    dlLink.className = "img-gen-download";
+    dlLink.href = dataUrl;
+    dlLink.download = "emeraldbot-image." + ext;
+    dlLink.title = "Download image";
+    dlLink.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+    wrapper.appendChild(img);
+    wrapper.appendChild(dlLink);
+    insertBeforeMessageActions(body, wrapper);
+    if (convId && msgId) {
+      const convArr = loadConvs();
+      const convObj = convArr.find((c) => c.id === convId);
+      if (convObj) {
+        const savedMsg = convObj.messages.find((m) => m.id === msgId);
+        if (savedMsg) {
+          savedMsg.imageData = dataUrl;
+          savedMsg.imagePrompt = prompt;
+          if (isImg2Img) savedMsg.imageInput = inputImage;
+          if (imageModelId) {
+            savedMsg.imageModelId = imageModelId;
+            savedMsg.imageModelName = imageModelName;
+          }
+          upsertConv(convObj);
+        }
+      }
+    }
+  } catch (e) {
+    if (loadEl.parentNode) loadEl.remove();
+    const textEl = body?.querySelector(".message-text");
+    if (textEl) {
+      textEl.classList.remove("message-text--empty");
+      const _existing = (textEl.innerHTML || "").trim();
+      textEl.innerHTML = _existing ? `${_existing}<br><span class="md-error">Image generation error. Please try again.</span>` : `<span class="md-error">Image generation error. Please try again.</span>`;
+    }
+  }
+  scrollToBottom();
+}

@@ -1,0 +1,829 @@
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork | About Us</title>
+    <meta name="description" content="Explore EmeraldNetwork products including EmeraldEssentials, EmeraldBot, EmeraldCreative, and more.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link rel="stylesheet" href="/assets/styles/style.css">
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+    <link rel="icon" href="/assets/images/favicon.ico" sizes="any">
+</head>
+<body>
+    <style>
+        .abt-hero {
+            min-height: 45vh;
+            display: flex;
+            align-items: flex-end;
+            background: #fff;
+        }
+        .abt-hero-inner {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: flex-end;
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+        .abt-hero-h1 {
+            background: linear-gradient(0deg, rgb(26, 26, 26), rgb(90, 90, 90), rgb(26, 26, 26));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            font-size: clamp(2.6rem, 5.5vw, 5.2rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1.03;
+            margin: 0;
+        }
+        .abt-hero-right { padding-bottom: 0.4rem; }
+        .abt-hero-right p {
+            color: var(--muted-foreground);
+            max-width: 380px;
+            margin-bottom: 2rem;
+            font-size: 1.125rem;
+            line-height: 1.7;
+        }
+        @media (min-width: 768px) {
+            .abt-hero-right p { font-size: 1.25rem; }
+        }
+        .abt-hero-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-decoration: none;
+            letter-spacing: 0.01em;
+            transition: gap 0.2s ease;
+        }
+        .abt-hero-link:hover { gap: 0.85rem; }
+        .abt-hero-link svg { width: 16px; height: 16px; }
+        @media (max-width: 760px) {
+            .abt-hero { min-height: 60vh; padding-bottom: 4rem; align-items: flex-start; padding-top: 4rem; }
+            .abt-hero-inner { grid-template-columns: 1fr; gap: 2rem; }
+            .abt-hero-right p { max-width: 100%; }
+        }
+        .abt-globe-section { position: relative; height: 225vh; background: #fff; }
+        .abt-globe-sticky {
+            position: sticky; top: 0; height: 100vh;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .abt-globe-box {
+            position: relative;
+            width: min(760px, calc(100vw - 3rem));
+            height: 520px;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #f4f9f5;
+            will-change: width, height, border-radius;
+        }
+        .abt-globe-canvas {
+            position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+            cursor: grab;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+        .abt-globe-canvas:active { cursor: grabbing; }
+        .abt-globe-overlay {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 2; pointer-events: none;
+        }
+        .abt-globe-est {
+            font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em;
+            text-transform: uppercase; color: var(--accent); margin-bottom: 0.9rem; opacity: 0.85;
+        }
+        .abt-globe-title {
+            font-size: clamp(2rem, 4.5vw, 3.6rem); font-weight: 800;
+            letter-spacing: -0.03em; color: #1a1a1a; text-align: center;
+            line-height: 1.1; -webkit-text-fill-color: initial; margin: 0;
+            max-width: 520px; padding: 0 1.5rem;
+        }
+        .abt-globe-sub {
+            color: #555; margin-top: 1rem; text-align: center; padding: 0 1.5rem;
+            font-size: 1.125rem; line-height: 1.7;
+        }
+        @media (min-width: 768px) { .abt-globe-sub { font-size: 1.25rem; } }
+        @media (max-width: 760px) {
+            .abt-globe-section { height: auto; }
+            .abt-globe-sticky { position: relative; height: auto; padding: 3rem 0; }
+            .abt-globe-box { width: calc(100vw - 2rem); height: 360px; }
+        }
+        .navbar.nav-at-top {
+            background-color: transparent !important; background-image: none !important;
+            border-bottom: 0 !important; border-bottom-color: transparent !important;
+            box-shadow: none !important; backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important; height: 6rem !important;
+        }
+        .navbar {
+            transition: background-color .25s ease, border-bottom .25s ease,
+                box-shadow .25s ease, backdrop-filter .25s ease, height .25s ease;
+        }
+        /* ── 3. STORY / TIMELINE ───────────────────────── */
+        .abt-story-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+        .abt-entry {
+            display: grid;
+            grid-template-columns: 80px 1fr;
+            gap: 3rem;
+            padding: 3rem 0;
+            border-top: 1px solid rgba(0,0,0,0.07);
+        }
+        .abt-entry:last-child { border-bottom: 1px solid rgba(0,0,0,0.07); }
+        .abt-entry-year {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--accent);
+            padding-top: 0.3rem;
+        }
+        .abt-entry-body h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.6rem;
+            -webkit-text-fill-color: initial;
+        }
+        .abt-entry-body p {
+            font-size: 1rem;
+            color: #555;
+            line-height: 1.75;
+            max-width: 520px;
+            text-align: left;
+        }
+
+        @media (max-width: 560px) {
+            .abt-entry {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+    <header class="navbar sticky-top apps">
+        <div class="navcontainer nav-container">
+            <a href="/" class="logo">
+                <img href="/" src="/assets/images/favicon.webp" width="30" height="30" viewbox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-primary"><rect width="25" height="19" x="2" y="7" rx="2" ry="2"><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16">
+                <span href="/" class="logo-text">EmeraldNetwork</span>
+            </path></rect></a>
+            <nav class="nav-links">
+                <a href="#story">Story</a>
+                <a href="#mission">Mission</a>
+                <a href="#founder">Founder</a>
+            </nav>
+        </div>
+    </header>
+    <div id="custom-context-menu" class="rightclick-menu" style="display: none;">
+        <div class="context-section">
+            <span class="context-title">🔧 Tools</span>
+            <a onclick="copyTextContent()">Copy Text</a>
+            <a onclick="copyPageLink()">Copy Page Link</a>
+            <a onclick="showElementInfo()">Show Element Info</a>
+        </div>
+    </div>
+    <div id="custom-toast" class="custom-toast"></div>
+    <main>
+        <section class="abt-hero" id="hero">
+            <div class="abt-hero-inner">
+                <h1 class="abt-hero-h1 animate-on-scroll" style="-webkit-text-fill-color: transparent; opacity: 0; transform: translateY(20px); filter: blur(5px); transition: opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out, background-color 0.2s, color 0.2s, border-color 0.2s; will-change: opacity, transform, filter;">
+                    Building digital infrastructure for&nbsp;everyone.
+                </h1>
+                <div class="abt-hero-right animate-on-scroll">
+                    <p>EmeraldNetwork is a technology ecosystem built on the belief that great software should be accessible, reliable, and human.</p>
+                    <a href="#story" rel="noopener noreferrer" class="aboutice-link button button-outline" style="opacity: 0; transform: translateY(20px); filter: blur(5px); transition: opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out, background-color 0.2s, color 0.2s, border-color 0.2s; will-change: opacity, transform, filter;">
+                        Our Story
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section class="abt-globe-section" id="globe-section">
+            <div class="abt-globe-sticky">
+                <div class="abt-globe-box" id="globe-box" style="width: 404px; height: 935px; border-radius: 0px;">
+                    <canvas class="abt-globe-canvas" id="globe-canvas" width="364" height="841" style="cursor: grab;"></canvas>
+                    <div class="abt-globe-overlay">
+                        <span class="abt-globe-est">Est. 2020</span>
+                        <h2 class="abt-globe-title">A network built to last.</h2>
+                        <p class="abt-globe-sub">Started by one person. Growing every day.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3 · STORY ────────────────────────────────────── -->
+
+        <section id="story" class="section" style="padding-bottom: 2px !important; padding-top: 10rem !important;">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="animate-on-scroll" style="background: linear-gradient(90deg, rgb(26, 26, 26), rgb(90, 90, 90), rgb(26, 26, 26)) text; -webkit-text-fill-color: transparent; opacity: 0; transform: translateY(20px); filter: blur(5px); transition: opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out, background-color 0.2s, color 0.2s, border-color 0.2s; will-change: opacity, transform, filter;">Who we are</h2>
+                </div>
+            </div>
+        </section>
+        <section class="abt-story" id="story">
+            <div class="abt-story-inner">
+                <div class="abt-entry animate-on-scroll">
+                    <span class="abt-entry-year">2020</span>
+                    <div class="abt-entry-body">
+                        <h3>Where it all began</h3>
+                        <p>What started as curiosity became a passion. IceEmerald began experimenting with programming, creating small projects, and learning by building. Every line of code was a step toward something bigger.</p>
+                    </div>
+                </div>
+
+                <div class="abt-entry animate-on-scroll">
+                    <span class="abt-entry-year">2021</span>
+                    <div class="abt-entry-body">
+                        <h3>Learning through creation</h3>
+                        <p>More ideas turned into real applications. I explored automation, Discord bots, Minecraft development, and web technologies while refining our skills through continuous experimentation.</p>
+                    </div>
+                </div>
+
+                <div class="abt-entry animate-on-scroll">
+                    <span class="abt-entry-year">2022</span>
+                    <div class="abt-entry-body">
+                        <h3>Building with purpose</h3>
+                        <p>Projects became more ambitious and polished. Instead of simply creating software, I focused on solving real problems and delivering experiences people could genuinely enjoy.</p>
+                    </div>
+                </div>
+
+                <div class="abt-entry animate-on-scroll">
+                    <span class="abt-entry-year">2023</span>
+                    <div class="abt-entry-body">
+                        <h3>The birth of EmeraldNetwork</h3>
+                        <p>EmeraldNetwork took shape as a unified identity. Individual projects came together under one vision: creating thoughtful, reliable, and innovative digital products for communities around the world.</p>
+                    </div>
+                </div>
+
+                <div class="abt-entry animate-on-scroll">
+                    <span class="abt-entry-year">2024</span>
+                    <div class="abt-entry-body">
+                        <h3>Growing the ecosystem</h3>
+                        <p>New products, services, and technologies expanded the network. Each release reflected our commitment to quality, usability, and continuous improvement.</p>
+                    </div>
+                </div>
+
+                <div class="abt-entry animate-on-scroll">
+                    <span class="abt-entry-year">2025</span>
+                    <div class="abt-entry-body">
+                        <h3>Reaching further</h3>
+                        <p>EmeraldNetwork continued to evolve, embracing AI, creative tools, developer solutions, and modern web experiences while staying focused on building products that make a meaningful impact.</p>
+                    </div>
+                </div>
+
+                <div class="abt-entry animate-on-scroll">
+                    <span class="abt-entry-year">Today</span>
+                    <div class="abt-entry-body">
+                        <h3>Just getting started</h3>
+                        <p>We're still building, still learning, and still exploring new possibilities. Every project is another step toward our vision of empowering people through technology.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <div style="margin-bottom: 10rem;"></div>
+
+        <section id="mission" class="section animate-on-scroll" style="background-color: #f8f8f8;">
+            <div class="container">
+                <div class="section-header" style="margin-top: 3rem;">
+                    <h2 class="animate-on-scroll" style="background: linear-gradient(90deg, rgb(26, 26, 26), rgb(90, 90, 90), rgb(26, 26, 26)) text; -webkit-text-fill-color: transparent; opacity: 1; transform: translateY(0px); filter: blur(0px); transition: opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out, background-color 0.2s, color 0.2s, border-color 0.2s; will-change: opacity, transform, filter;">What we want?</h2>
+                    <p><span class="anim-word visible" style="transition-delay: 0.025s;">Simple...</span> <span class="anim-word visible" style="transition-delay: 0.05s;">We</span> <span class="anim-word visible" style="transition-delay: 0.075s;">want</span> <span class="anim-word visible" style="transition-delay: 0.1s;">to</span> <span class="anim-word visible" style="transition-delay: 0.125s;">empower</span> <span class="anim-word visible" style="transition-delay: 0.15s;">people</span> <span class="anim-word visible" style="transition-delay: 0.175s;">through</span> <span class="anim-word visible" style="transition-delay: 0.2s;">technology.</span> <span class="anim-word visible" style="transition-delay: 0.225s;">Every</span> <span class="anim-word visible" style="transition-delay: 0.25s;">product</span> <span class="anim-word visible" style="transition-delay: 0.275s;">we</span> <span class="anim-word visible" style="transition-delay: 0.3s;">build</span> <span class="anim-word visible" style="transition-delay: 0.325s;">is</span> <span class="anim-word visible" style="transition-delay: 0.35s;">created</span> <span class="anim-word visible" style="transition-delay: 0.375s;">with</span> <span class="anim-word visible" style="transition-delay: 0.4s;">the</span> <span class="anim-word visible" style="transition-delay: 0.425s;">goal</span> <span class="anim-word visible" style="transition-delay: 0.45s;">of</span> <span class="anim-word visible" style="transition-delay: 0.475s;">making</span> <span class="anim-word visible" style="transition-delay: 0.5s;">life</span> <span class="anim-word visible" style="transition-delay: 0.525s;">a</span> <span class="anim-word visible" style="transition-delay: 0.55s;">little</span> <span class="anim-word visible" style="transition-delay: 0.575s;">easier,</span> <span class="anim-word visible" style="transition-delay: 0.6s;">creativity</span> <span class="anim-word visible" style="transition-delay: 0.625s;">a</span> <span class="anim-word visible" style="transition-delay: 0.65s;">little</span> <span class="anim-word visible" style="transition-delay: 0.675s;">bigger,</span> <span class="anim-word visible" style="transition-delay: 0.7s;">and</span> <span class="anim-word visible" style="transition-delay: 0.725s;">possibilities</span> <span class="anim-word visible" style="transition-delay: 0.75s;">a</span> <span class="anim-word visible" style="transition-delay: 0.775s;">little</span> <span class="anim-word visible" style="transition-delay: 0.8s;">wider.</span></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="founder" class="section animate-on-scroll" style="opacity: 1; transform: translateY(0px); filter: blur(0px); transition: opacity 0.5s ease-out 0.025s, transform 0.5s ease-out, filter 0.5s ease-out; will-change: opacity, transform, filter;">
+            <div class="container about-container" style="display: flex; align-items: center; justify-content: space-between; gap: 2rem; flex-direction: row-reverse;">
+                <div class="animate-on-scroll about-content" style="flex: 1;">
+                    <h2 style="background: linear-gradient(90deg, rgb(26, 26, 26), rgb(90, 90, 90), rgb(26, 26, 26)) text; -webkit-text-fill-color: transparent; opacity: 1; transform: translateY(0px); filter: blur(0px); transition: opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out, background-color 0.2s, color 0.2s, border-color 0.2s; will-change: opacity, transform, filter;">About IceEmerald</h2>
+                    <p><span class="anim-word visible" style="transition-delay: 0.025s;">IceEmerald</span> <span class="anim-word visible" style="transition-delay: 0.05s;">is</span> <span class="anim-word visible" style="transition-delay: 0.075s;">a</span> <span class="anim-word visible" style="transition-delay: 0.1s;">curious</span> <span class="anim-word visible" style="transition-delay: 0.125s;">catboy,</span> <span class="anim-word visible" style="transition-delay: 0.15s;">programmer,</span> <span class="anim-word visible" style="transition-delay: 0.175s;">and</span> <span class="anim-word visible" style="transition-delay: 0.2s;">the</span> <span class="anim-word visible" style="transition-delay: 0.225s;">founder</span> <span class="anim-word visible" style="transition-delay: 0.25s;">of</span> <span class="anim-word visible" style="transition-delay: 0.275s;">EmeraldNetwork.</span> <span class="anim-word visible" style="transition-delay: 0.3s;">Whether</span> <span class="anim-word visible" style="transition-delay: 0.325s;">it's</span> <span class="anim-word visible" style="transition-delay: 0.35s;">writing</span> <span class="anim-word visible" style="transition-delay: 0.375s;">code</span> <span class="anim-word visible" style="transition-delay: 0.4s;">late</span> <span class="anim-word visible" style="transition-delay: 0.425s;">at</span> <span class="anim-word visible" style="transition-delay: 0.45s;">night,</span> <span class="anim-word visible" style="transition-delay: 0.475s;">designing</span> <span class="anim-word visible" style="transition-delay: 0.5s;">new</span> <span class="anim-word visible" style="transition-delay: 0.525s;">experiences,</span> <span class="anim-word visible" style="transition-delay: 0.55s;">or</span> <span class="anim-word visible" style="transition-delay: 0.575s;">exploring</span> <span class="anim-word visible" style="transition-delay: 0.6s;">emerging</span> <span class="anim-word visible" style="transition-delay: 0.625s;">technologies,</span> <span class="anim-word visible" style="transition-delay: 0.65s;">he's</span> <span class="anim-word visible" style="transition-delay: 0.675s;">always</span> <span class="anim-word visible" style="transition-delay: 0.7s;">chasing</span> <span class="anim-word visible" style="transition-delay: 0.725s;">the</span> <span class="anim-word visible" style="transition-delay: 0.75s;">next</span> <span class="anim-word visible" style="transition-delay: 0.775s;">idea</span> <span class="anim-word visible" style="transition-delay: 0.8s;">worth</span> <span class="anim-word visible" style="transition-delay: 0.825s;">building.</span></p>
+                </div>
+                <div class="animate-on-scroll show-desktop-only about-image-container">
+                    <img class="show-desktop-only hover-zoom" src="/assets/images/ice.webp" style="max-width: 400px; height: auto; opacity: 0; transform: translateY(20px); filter: blur(5px); transition: opacity 0.45s ease-out, transform 0.45s ease-out, filter 0.45s ease-out, background-color 0.2s, color 0.2s, border-color 0.2s; will-change: opacity, transform, filter;">
+                </div>
+            </div>
+        </section>
+        <div style="margin-bottom: 3rem;"></div>
+        
+    </main>
+    <footer class="footer">
+        <div class="container footer-container">
+            <div class="footer-brand">
+                <img src="/assets/images/favicon.webp" alt="EmeraldNetwork logo" class="footer-logo">
+                <div>
+                    <p class="footer-brand-name">EmeraldNetwork</p>
+                    <p class="footer-brand-tagline">Shaping the future of connection, intelligence, and digital possibility.</p>
+                </div>
+            </div>
+            <div class="footer-social-links">
+                <a href="https://youtube.com/iceemerald" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="YouTube">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-2C18.88 4 12 4 12 4s-6.88 0-8.59.42a2.78 2.78 0 0 0-1.95 2A29.94 29.94 0 0 0 1 12a29.94 29.94 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 2C5.12 20 12 20 12 20s6.88 0 8.59-.42a2.78 2.78 0 0 0 1.95-2A29.94 29.94 0 0 0 23 12a29.94 29.94 0 0 0-.46-5.58z"></path><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"></polygon></svg>
+                </a>
+                <a href="https://instagram.com/iceemerald23" target="_blank" rel="noopener noreferrer" class="social-icon-button-footer" aria-label="Instagram">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.5" y2="6.5"></line></svg>
+                </a>
+                <a href="mailto:hello@emeraldnetwork.groups.id" class="social-icon-button-footer" aria-label="Email">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+                </a>
+            </div>
+        </div>
+        <div class="footer-splitter"></div>
+        <div class="footer-bottom">
+            <p>© <span id="current-year">2026</span> EmeraldNetwork · IceEmerald</p>
+            <div class="footer-links">
+                <a href="terms">Terms of Use</a>
+                <a href="privacy">Privacy Policy</a>
+                <a href="status">System status</a>
+            </div>
+        </div>
+    </footer>
+    <script src="/assets/scripts/animationvisible.js"></script>
+    <script src="/assets/scripts/scrollice.js"></script>
+    <script src="/assets/scripts/dropdown.js"></script>
+    <script src="/assets/scripts/rightclick.js"></script>
+    <script src="/assets/scripts/footer-year.js"></script>
+                    <script>
+                        /* ── Globe canvas — interactive high-quality vector earth ── */
+                        (function () {
+                            var canvas = document.getElementById('globe-canvas');
+                            if (!canvas) return;
+                            var ctx = canvas.getContext('2d');
+                            var dpr = window.devicePixelRatio || 1;
+
+                            /* ── Rotation state ──────────────────────────────── */
+                            var angle = -80;          // longitude rotation (degrees)
+                            var tilt  = 18;           // latitude tilt (degrees)
+                            var cx, cy, r;
+
+                            /* ── Drag / interaction state ────────────────────── */
+                            var isDragging    = false;
+                            var lastPointerX  = 0;
+                            var lastPointerY  = 0;
+                            var velX          = 0;     // momentum velocity (deg/frame)
+                            var velY          = 0;
+                            var lastMoveTime  = 0;
+                            var autoRotate    = true;
+                            var resumeTimer   = null;
+
+                            var SENS_X     = 0.18;    // deg per px horizontal
+                            var SENS_Y     = 0.12;    // deg per px vertical
+                            var MAX_TILT   = 75;
+                            var FRICTION   = 0.955;
+                            var AUTO_SPEED = 0.05;
+                            var RESUME_MS  = 1000;
+                            var VEL_STOP   = 0.003;
+
+                            /* ── Detailed continent outlines ─────────────────── */
+                            var continents = [
+                                [[71,-157],[72,-152],[72,-146],[72,-140],[71,-134],[70,-128],[70,-122],[69,-115],[68,-108],[67,-102],[66,-96],[65,-90],[64,-85],[62,-79],[60,-74],[58,-68],[56,-63],[54,-58],[52,-56],[50,-57],[48,-59],[46,-62],[44,-65],[43,-68],[42,-70],[41,-72],[40,-74],[38,-76],[37,-76],[35,-77],[34,-78],[32,-80],[31,-81],[30,-81],[29,-82],[28,-83],[27,-82],[26,-82],[25,-81],[25,-83],[26,-85],[27,-86],[28,-88],[29,-90],[29,-92],[28,-94],[27,-95],[26,-97],[24,-98],[22,-98],[20,-97],[19,-96],[18,-95],[17,-93],[16,-91],[15,-89],[15,-87],[16,-88],[16,-91],[17,-95],[18,-98],[19,-101],[20,-104],[22,-107],[24,-110],[26,-112],[28,-114],[30,-116],[32,-117],[34,-119],[36,-121],[38,-123],[40,-124],[42,-124],[44,-125],[47,-125],[49,-127],[51,-130],[53,-133],[55,-136],[57,-139],[59,-143],[60,-147],[62,-150],[63,-154],[64,-158],[65,-162],[66,-165],[68,-166],[70,-164],[71,-160],[71,-157]],
+                                [[12,-72],[11,-69],[10,-66],[9,-63],[8,-60],[7,-57],[6,-54],[5,-52],[4,-50],[2,-48],[0,-46],[-1,-44],[-3,-41],[-5,-38],[-7,-35],[-9,-35],[-11,-37],[-13,-39],[-15,-40],[-17,-41],[-19,-42],[-21,-43],[-23,-45],[-25,-47],[-27,-49],[-29,-51],[-31,-53],[-33,-55],[-35,-57],[-37,-59],[-39,-61],[-41,-63],[-43,-64],[-45,-66],[-47,-67],[-49,-68],[-51,-69],[-53,-69],[-54,-68],[-55,-66],[-54,-64],[-53,-66],[-52,-69],[-50,-72],[-48,-74],[-46,-75],[-44,-74],[-42,-73],[-40,-72],[-38,-71],[-36,-70],[-34,-70],[-32,-70],[-30,-70],[-28,-69],[-26,-69],[-24,-70],[-22,-71],[-20,-72],[-18,-73],[-16,-75],[-14,-76],[-12,-77],[-10,-78],[-8,-79],[-6,-80],[-4,-80],[-2,-79],[0,-78],[2,-78],[4,-77],[6,-76],[8,-75],[10,-74],[12,-72]],
+                                [[71,28],[71,30],[70,33],[70,36],[70,40],[69,42],[68,44],[67,44],[65,43],[63,42],[61,41],[59,41],[57,40],[55,40],[53,40],[51,40],[49,41],[47,41],[45,40],[44,40],[43,42],[42,43],[41,40],[40,37],[39,33],[38,28],[37,24],[37,20],[38,16],[38,14],[39,12],[40,14],[41,12],[42,10],[43,8],[44,7],[45,5],[46,4],[47,3],[48,2],[49,2],[50,4],[51,5],[52,6],[53,8],[54,9],[55,10],[56,12],[57,11],[58,10],[59,8],[60,6],[61,5],[62,6],[63,8],[64,10],[65,13],[66,16],[67,18],[68,20],[69,22],[70,25],[71,28]],
+                                [[37,10],[36,6],[35,2],[34,-2],[33,-5],[32,-8],[31,-10],[29,-12],[27,-14],[25,-16],[23,-17],[21,-17],[19,-17],[17,-17],[15,-17],[13,-16],[11,-15],[9,-14],[7,-12],[6,-10],[5,-8],[4,-5],[4,-2],[4,0],[4,3],[3,6],[2,9],[0,10],[-2,10],[-4,11],[-6,12],[-8,13],[-10,14],[-12,15],[-14,16],[-16,17],[-18,18],[-20,20],[-22,22],[-24,24],[-26,26],[-28,28],[-30,28],[-32,27],[-34,25],[-35,22],[-34,20],[-33,22],[-32,25],[-30,28],[-28,31],[-26,33],[-24,35],[-22,36],[-20,37],[-18,38],[-16,39],[-14,40],[-12,41],[-10,42],[-8,43],[-6,44],[-4,44],[-2,44],[0,44],[2,45],[4,46],[6,47],[8,48],[10,50],[12,51],[14,49],[16,46],[18,44],[19,42],[20,40],[22,38],[24,36],[26,34],[28,33],[30,32],[32,30],[34,28],[36,25],[37,20],[37,15],[37,10]],
+                                [[70,42],[71,48],[72,55],[73,62],[73,70],[74,78],[74,85],[75,92],[75,100],[74,108],[73,115],[72,120],[72,128],[71,135],[70,140],[68,148],[67,155],[66,160],[64,165],[62,168],[60,165],[58,160],[56,158],[54,155],[52,148],[50,143],[48,143],[46,143],[44,142],[42,140],[40,136],[38,132],[36,128],[34,125],[32,122],[30,120],[28,118],[26,116],[24,114],[22,112],[20,110],[18,108],[16,106],[14,105],[12,105],[10,104],[8,104],[6,104],[4,104],[2,103],[1,104],[3,100],[5,98],[7,97],[9,96],[12,95],[15,94],[17,93],[19,91],[20,89],[19,86],[18,83],[16,80],[14,78],[12,76],[10,76],[8,76],[6,76],[5,75],[8,74],[12,73],[16,72],[20,72],[24,70],[27,68],[30,66],[32,64],[34,62],[36,58],[38,54],[40,50],[42,46],[44,42],[46,40],[48,40],[50,40],[52,40],[54,40],[56,40],[58,42],[60,42],[62,42],[64,42],[66,42],[68,42],[70,42]],
+                                [[-12,131],[-13,128],[-15,125],[-17,122],[-19,119],[-21,116],[-23,115],[-25,114],[-27,114],[-29,115],[-31,116],[-33,117],[-34,119],[-35,121],[-36,124],[-37,128],[-37,132],[-38,136],[-38,140],[-38,144],[-37,148],[-36,150],[-34,151],[-32,152],[-30,153],[-28,153],[-26,152],[-24,151],[-22,149],[-20,147],[-18,145],[-16,143],[-14,140],[-13,137],[-12,134],[-12,131]],
+                                [[76,-72],[77,-66],[78,-60],[79,-53],[80,-46],[81,-38],[82,-30],[82,-24],[81,-20],[80,-18],[78,-20],[76,-24],[74,-28],[72,-32],[70,-36],[68,-40],[66,-44],[65,-48],[64,-52],[64,-56],[65,-58],[67,-60],[69,-62],[71,-64],[73,-66],[75,-68],[76,-72]],
+                                [[66,-24],[66,-20],[65,-18],[64,-16],[64,-18],[64,-22],[65,-24],[66,-24]],
+                                [[58,-6],[59,-4],[59,-2],[58,0],[57,0],[56,-1],[55,-2],[54,-3],[53,-4],[52,-5],[51,-5],[50,-5],[51,-4],[52,-3],[53,-2],[54,-1],[55,0],[56,0],[57,-1],[58,-3],[58,-6]],
+                                [[45,142],[44,144],[43,145],[42,144],[41,142],[40,140],[39,138],[38,136],[37,134],[36,133],[35,132],[34,131],[33,130],[34,129],[35,130],[36,132],[37,134],[39,137],[41,140],[43,142],[45,142]],
+                                [[-35,174],[-37,175],[-39,177],[-41,176],[-42,174],[-41,173],[-39,175],[-37,176],[-36,175],[-35,174]],
+                                [[-42,171],[-43,172],[-45,170],[-46,167],[-45,168],[-44,170],[-43,171],[-42,171]],
+                                [[5,95],[4,97],[3,99],[1,101],[-1,103],[-2,105],[-3,105],[-3,103],[-2,100],[0,97],[2,95],[4,94],[5,95]],
+                                [[4,109],[3,111],[2,113],[0,115],[-1,116],[-2,116],[-2,114],[-1,112],[0,110],[2,108],[4,109]],
+                                [[-6,106],[-7,108],[-7,110],[-8,112],[-8,114],[-7,115],[-6,114],[-6,112],[-6,108],[-6,106]],
+                                [[-2,140],[-3,141],[-5,142],[-6,144],[-7,146],[-8,148],[-8,150],[-7,151],[-6,150],[-5,148],[-4,146],[-3,144],[-2,142],[-1,141],[-2,140]],
+                                [[1,120],[0,121],[-1,122],[-2,121],[-3,120],[-2,119],[-1,119],[0,119],[1,120]],
+                                [[-12,49],[-14,50],[-16,50],[-18,49],[-20,48],[-22,47],[-24,46],[-25,45],[-24,44],[-22,44],[-20,44],[-18,45],[-16,46],[-14,47],[-12,49]],
+                                [[10,80],[9,80],[8,80],[7,80],[6,80],[6,81],[7,82],[8,82],[9,81],[10,80]],
+                                [[25,121],[24,121],[23,121],[22,121],[22,120],[23,120],[24,120],[25,121]],
+                                [[18,120],[17,121],[16,121],[15,121],[14,121],[15,120],[16,120],[17,120],[18,120]],
+                                [[10,124],[9,125],[8,126],[7,126],[7,125],[8,124],[9,124],[10,124]],
+                                [[38,128],[37,127],[36,127],[35,127],[34,128],[35,129],[36,129],[37,129],[38,128]],
+                                [[71,26],[70,22],[69,18],[68,15],[67,14],[66,13],[65,12],[64,11],[63,9],[62,7],[61,6],[60,5],[59,5],[58,6],[58,8],[59,10],[60,12],[61,14],[62,16],[63,18],[64,20],[65,22],[66,24],[67,26],[68,28],[69,30],[70,32],[71,28]],
+                                [[46,7],[45,8],[44,9],[43,11],[42,12],[41,14],[40,16],[39,17],[38,16],[38,15],[39,13],[40,12],[41,11],[42,10],[43,9],[44,8],[45,7],[46,7]],
+                                [[30,35],[28,36],[26,37],[24,38],[22,39],[20,40],[18,42],[16,43],[14,44],[13,45],[12,44],[13,43],[15,42],[17,41],[19,40],[21,39],[23,38],[25,37],[27,36],[29,35],[30,35]],
+                                [[30,68],[28,70],[26,72],[24,73],[22,73],[20,73],[18,73],[16,74],[14,75],[12,76],[10,77],[8,77],[8,76],[10,76],[12,75],[14,74],[16,73],[18,72],[20,72],[22,72],[24,72],[26,72],[28,70],[30,68]],
+                                [[55,160],[56,162],[57,163],[58,163],[59,162],[60,163],[61,164],[62,163],[63,162],[62,161],[61,160],[60,159],[59,158],[58,159],[57,160],[56,160],[55,160]],
+                                [[22,-84],[21,-82],[20,-78],[20,-76],[21,-75],[22,-77],[23,-80],[23,-82],[22,-84]],
+                                [[20,-72],[19,-71],[18,-70],[18,-72],[19,-73],[20,-73],[20,-72]],
+                                [[73,-80],[72,-75],[71,-70],[70,-65],[69,-62],[68,-63],[68,-67],[69,-72],[70,-76],[71,-79],[73,-80]]
+                            ];
+
+                            var cities = [
+                                [40.7,-74],[51.5,-0.1],[48.9,2.3],[55.8,37.6],[35.7,139.7],
+                                [39.9,116.4],[28.6,77.2],[-23.5,-46.6],[-33.9,151.2],[19.4,-99.1],
+                                [30,31.2],[1.3,103.8],[-6.2,106.8],[37.6,127],[34.1,-118.2],
+                                [41.9,-87.6],[52.5,13.4],[59.3,18.1],[45.5,-73.6],[22.3,114.2]
+                            ];
+
+                            var connections = [
+                                [0,1],[0,14],[0,15],[1,2],[1,16],[1,17],[2,3],[2,16],
+                                [3,4],[3,5],[4,5],[4,13],[5,19],[5,11],[6,10],[6,11],
+                                [7,8],[8,19],[9,14],[10,3],[12,11],[13,4],[15,0],[16,17],
+                                [18,0],[19,12]
+                            ];
+
+                            /* ── 3D projection with tilt ─────────────────────── */
+                            function project(lat, lon) {
+                                var latR  = lat  * Math.PI / 180;
+                                var lonR  = (lon - angle) * Math.PI / 180;
+                                var tiltR = tilt * Math.PI / 180;
+
+                                var x3 = Math.cos(latR) * Math.sin(lonR);
+                                var y3 = Math.sin(latR);
+                                var z3 = Math.cos(latR) * Math.cos(lonR);
+
+                                /* Rotate around X-axis by tilt */
+                                var yT = y3 * Math.cos(tiltR) - z3 * Math.sin(tiltR);
+                                var zT = y3 * Math.sin(tiltR) + z3 * Math.cos(tiltR);
+
+                                return {
+                                    x: cx + r * x3,
+                                    y: cy - r * yT,
+                                    z: zT,
+                                    lat: lat, lon: lon
+                                };
+                            }
+
+                            function edgePoint(p1, p2) {
+                                var dz = p1.z - p2.z;
+                                if (Math.abs(dz) < 1e-6) return null;
+                                var t   = p1.z / dz;
+                                var lat = p1.lat + t * (p2.lat - p1.lat);
+                                var lon = p1.lon + t * (p2.lon - p1.lon);
+                                return project(lat, lon);
+                            }
+
+                            /* ── Smooth Catmull-Rom path ─────────────────────── */
+                            function traceSmoothPath(pts) {
+                                if (pts.length < 2) return;
+                                if (pts.length === 2) {
+                                    ctx.moveTo(pts[0].x, pts[0].y);
+                                    ctx.lineTo(pts[1].x, pts[1].y);
+                                    return;
+                                }
+                                ctx.moveTo(pts[0].x, pts[0].y);
+                                var T = 5;
+                                for (var i = 0; i < pts.length - 1; i++) {
+                                    var p0 = pts[i === 0 ? 0 : i - 1];
+                                    var p1 = pts[i];
+                                    var p2 = pts[i + 1];
+                                    var p3 = pts[i + 2 >= pts.length ? pts.length - 1 : i + 2];
+                                    ctx.bezierCurveTo(
+                                        p1.x + (p2.x - p0.x) / T, p1.y + (p2.y - p0.y) / T,
+                                        p2.x - (p3.x - p1.x) / T, p2.y - (p3.y - p1.y) / T,
+                                        p2.x, p2.y
+                                    );
+                                }
+                            }
+
+                            /* ── Grid / graticule ────────────────────────────── */
+                            function drawGrid() {
+                                ctx.strokeStyle = 'rgba(35,154,77,0.055)';
+                                ctx.lineWidth   = 0.5;
+                                for (var lat = -60; lat <= 60; lat += 30) {
+                                    ctx.beginPath();
+                                    var started = false;
+                                    for (var lon = -180; lon <= 180; lon += 3) {
+                                        var p = project(lat, lon);
+                                        if (p.z > 0) { if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y); }
+                                        else started = false;
+                                    }
+                                    ctx.stroke();
+                                }
+                                for (var lon2 = -180; lon2 < 180; lon2 += 30) {
+                                    ctx.beginPath();
+                                    var started2 = false;
+                                    for (var lat2 = -90; lat2 <= 90; lat2 += 3) {
+                                        var p2 = project(lat2, lon2);
+                                        if (p2.z > 0) { if (!started2) { ctx.moveTo(p2.x, p2.y); started2 = true; } else ctx.lineTo(p2.x, p2.y); }
+                                        else started2 = false;
+                                    }
+                                    ctx.stroke();
+                                }
+                            }
+
+                            function drawEquator() {
+                                ctx.beginPath();
+                                var started = false;
+                                for (var lon = -180; lon <= 180; lon += 2) {
+                                    var p = project(0, lon);
+                                    if (p.z > 0) { if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y); }
+                                    else started = false;
+                                }
+                                ctx.strokeStyle = 'rgba(35,154,77,0.11)';
+                                ctx.lineWidth   = 0.7;
+                                ctx.stroke();
+                            }
+
+                            /* ── Connection arcs ─────────────────────────────── */
+                            function drawArcs() {
+                                for (var ci = 0; ci < connections.length; ci++) {
+                                    var pair = connections[ci];
+                                    var c1 = cities[pair[0]], c2 = cities[pair[1]];
+                                    var p1 = project(c1[0], c1[1]);
+                                    var p2 = project(c2[0], c2[1]);
+                                    if (p1.z < 0.1 || p2.z < 0.1) continue;
+
+                                    var midLat = (c1[0] + c2[0]) / 2;
+                                    var midLon = (c1[1] + c2[1]) / 2;
+                                    var dist   = Math.sqrt(Math.pow(c1[0]-c2[0],2) + Math.pow(c1[1]-c2[1],2));
+                                    var elev   = Math.min(dist * 0.35, 28);
+                                    var pM     = project(midLat + elev, midLon);
+
+                                    var avgZ = (p1.z + p2.z) / 2;
+                                    ctx.beginPath();
+                                    ctx.moveTo(p1.x, p1.y);
+                                    if (pM.z > 0) ctx.quadraticCurveTo(pM.x, pM.y, p2.x, p2.y);
+                                    else ctx.lineTo(p2.x, p2.y);
+                                    ctx.strokeStyle = 'rgba(35,154,77,' + (0.04 + 0.06 * avgZ).toFixed(3) + ')';
+                                    ctx.lineWidth = 0.6;
+                                    ctx.stroke();
+                                }
+                            }
+
+                            /* ── Continents ──────────────────────────────────── */
+                            function drawContinents() {
+                                for (var ci = 0; ci < continents.length; ci++) {
+                                    var continent = continents[ci];
+                                    var n = continent.length;
+                                    var pts = [];
+                                    for (var pi = 0; pi < n; pi++) {
+                                        pts.push(project(continent[pi][0], continent[pi][1]));
+                                    }
+
+                                    var segs = [], cur = [];
+                                    for (var i = 0; i < n; i++) {
+                                        var p  = pts[i];
+                                        var pn = pts[(i + 1) % n];
+                                        if (p.z > 0.01) cur.push({ x: p.x, y: p.y });
+                                        if (p.z > 0.01 && pn.z <= 0.01) {
+                                            var ep = edgePoint(p, pn);
+                                            if (ep) cur.push(ep);
+                                            if (cur.length > 1) segs.push(cur);
+                                            cur = [];
+                                        }
+                                        if (p.z <= 0.01 && pn.z > 0.01) {
+                                            var ep2 = edgePoint(p, pn);
+                                            cur = ep2 ? [ep2] : [];
+                                        }
+                                    }
+                                    if (cur.length > 0 && segs.length > 0) segs[0] = cur.concat(segs[0]);
+                                    else if (cur.length > 1) segs.push(cur);
+
+                                    for (var si = 0; si < segs.length; si++) {
+                                        var seg = segs[si];
+                                        if (seg.length < 2) continue;
+                                        ctx.beginPath(); traceSmoothPath(seg); ctx.closePath();
+                                        ctx.fillStyle = 'rgba(35,154,77,0.11)'; ctx.fill();
+
+                                        ctx.beginPath(); traceSmoothPath(seg);
+                                        ctx.strokeStyle = 'rgba(35,154,77,0.34)';
+                                        ctx.lineWidth = 0.9; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                                        ctx.stroke();
+                                    }
+                                }
+                            }
+
+                            /* ── City dots ───────────────────────────────────── */
+                            function drawCities() {
+                                for (var i = 0; i < cities.length; i++) {
+                                    var p = project(cities[i][0], cities[i][1]);
+                                    if (p.z < 0.12) continue;
+                                    var glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 6);
+                                    glow.addColorStop(0, 'rgba(35,154,77,' + (0.18 * p.z).toFixed(3) + ')');
+                                    glow.addColorStop(1, 'rgba(35,154,77,0)');
+                                    ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+                                    ctx.fillStyle = glow; ctx.fill();
+
+                                    ctx.beginPath();
+                                    ctx.arc(p.x, p.y, Math.max(0.8, 1.5 * p.z), 0, Math.PI * 2);
+                                    ctx.fillStyle = 'rgba(35,154,77,' + (0.3 + 0.45 * p.z).toFixed(3) + ')';
+                                    ctx.fill();
+                                }
+                            }
+
+                            /* ── Pointer helpers ─────────────────────────────── */
+                            function getPointerPos(e) {
+                                if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                                return { x: e.clientX, y: e.clientY };
+                            }
+
+                            function onPointerDown(e) {
+                                isDragging = true;
+                                var pos = getPointerPos(e);
+                                lastPointerX = pos.x;
+                                lastPointerY = pos.y;
+                                velX = 0; velY = 0;
+                                lastMoveTime = performance.now();
+                                canvas.style.cursor = 'grabbing';
+                                autoRotate = false;
+                                if (resumeTimer) { clearTimeout(resumeTimer); resumeTimer = null; }
+                            }
+
+                            function onPointerMove(e) {
+                                if (!isDragging) return;
+                                e.preventDefault();
+                                var pos = getPointerPos(e);
+                                var dx  = pos.x - lastPointerX;
+                                var dy  = pos.y - lastPointerY;
+                                var now = performance.now();
+                                var dt  = Math.max(1, now - lastMoveTime);
+
+                                angle -= dx * SENS_X;
+                                tilt  += dy * SENS_Y;
+                                tilt   = Math.max(-MAX_TILT, Math.min(MAX_TILT, tilt));
+
+                                velX = -dx * SENS_X / dt * 16;
+                                velY =  dy * SENS_Y / dt * 16;
+
+                                lastPointerX = pos.x;
+                                lastPointerY = pos.y;
+                                lastMoveTime = now;
+                            }
+
+                            function onPointerUp() {
+                                if (!isDragging) return;
+                                isDragging = false;
+                                canvas.style.cursor = 'grab';
+                                resumeTimer = setTimeout(function () { autoRotate = true; }, RESUME_MS);
+                            }
+
+                            canvas.addEventListener('mousedown', onPointerDown);
+                            window.addEventListener('mousemove', onPointerMove);
+                            window.addEventListener('mouseup', onPointerUp);
+                            canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+                            window.addEventListener('touchmove', onPointerMove, { passive: false });
+                            window.addEventListener('touchend', onPointerUp);
+
+                            /* Prevent context menu on long-press (mobile) */
+                            canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+                            /* ── Main render loop ────────────────────────────── */
+                            function draw() {
+                                var w = canvas.offsetWidth;
+                                var h = canvas.offsetHeight;
+                                var needW = Math.round(w * dpr);
+                                var needH = Math.round(h * dpr);
+                                if (canvas.width !== needW || canvas.height !== needH) {
+                                    canvas.width  = needW;
+                                    canvas.height = needH;
+                                }
+
+                                /* Apply momentum when not dragging and not auto-rotating */
+                                if (!isDragging && !autoRotate) {
+                                    angle += velX;
+                                    tilt  += velY;
+                                    tilt   = Math.max(-MAX_TILT, Math.min(MAX_TILT, tilt));
+                                    velX  *= FRICTION;
+                                    velY  *= FRICTION;
+                                    if (Math.abs(velX) < VEL_STOP) velX = 0;
+                                    if (Math.abs(velY) < VEL_STOP) velY = 0;
+                                }
+
+                                /* Auto-rotate */
+                                if (autoRotate) {
+                                    angle += AUTO_SPEED;
+                                }
+
+                                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                                ctx.clearRect(0, 0, w, h);
+
+                                cx = w / 2;
+                                cy = h / 2;
+                                r  = Math.min(cx, cy) * 0.78;
+
+                                /* Drop shadow */
+                                var sGrd = ctx.createRadialGradient(cx + 2, cy + 4, r * 0.7, cx + 2, cy + 4, r * 1.25);
+                                sGrd.addColorStop(0, 'rgba(35,154,77,0.035)');
+                                sGrd.addColorStop(1, 'rgba(35,154,77,0)');
+                                ctx.beginPath(); ctx.arc(cx + 2, cy + 4, r * 1.25, 0, Math.PI * 2);
+                                ctx.fillStyle = sGrd; ctx.fill();
+
+                                /* Atmospheric glow (3 layers) */
+                                for (var gi = 3; gi >= 1; gi--) {
+                                    var gR = r + gi * 10;
+                                    var aG = ctx.createRadialGradient(cx, cy, r - 2, cx, cy, gR);
+                                    aG.addColorStop(0, 'rgba(35,154,77,0)');
+                                    aG.addColorStop(0.4, 'rgba(35,154,77,' + (0.025 * gi).toFixed(3) + ')');
+                                    aG.addColorStop(1, 'rgba(35,154,77,0)');
+                                    ctx.beginPath(); ctx.arc(cx, cy, gR, 0, Math.PI * 2);
+                                    ctx.fillStyle = aG; ctx.fill();
+                                }
+
+                                /* Clip to sphere */
+                                ctx.save();
+                                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
+
+                                ctx.fillStyle = 'rgba(35,154,77,0.015)';
+                                ctx.fillRect(0, 0, w, h);
+
+                                drawGrid();
+                                drawEquator();
+                                drawArcs();
+                                drawContinents();
+                                drawCities();
+
+                                ctx.restore();
+
+                                /* 3D shading */
+                                var shG = ctx.createRadialGradient(
+                                    cx - r * 0.35, cy - r * 0.35, r * 0.05,
+                                    cx + r * 0.1,  cy + r * 0.1,  r * 1.1
+                                );
+                                shG.addColorStop(0, 'rgba(255,255,255,0.055)');
+                                shG.addColorStop(0.35, 'rgba(255,255,255,0.01)');
+                                shG.addColorStop(0.7, 'rgba(0,0,0,0.02)');
+                                shG.addColorStop(1, 'rgba(0,0,0,0.07)');
+                                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                                ctx.fillStyle = shG; ctx.fill();
+
+                                /* Outer ring */
+                                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                                ctx.strokeStyle = 'rgba(35,154,77,0.2)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+                                /* Inner rim highlight */
+                                ctx.beginPath(); ctx.arc(cx, cy, r - 0.8, 0, Math.PI * 2);
+                                ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5; ctx.stroke();
+
+                                /* Edge atmosphere fade */
+                                var eG = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
+                                eG.addColorStop(0, 'rgba(244,249,245,0)');
+                                eG.addColorStop(1, 'rgba(244,249,245,0.4)');
+                                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                                ctx.fillStyle = eG; ctx.fill();
+
+                                requestAnimationFrame(draw);
+                            }
+
+                            requestAnimationFrame(draw);
+                        })();
+
+                        /* ── Globe box — scroll-driven expand ─────────────────── */
+                        (function () {
+                            var section = document.getElementById('globe-section');
+                            var box     = document.getElementById('globe-box');
+                            if (!section || !box) return;
+                            if (window.matchMedia('(max-width: 760px)').matches) return;
+
+                            function update() {
+                                var rect     = section.getBoundingClientRect();
+                                var viewH    = window.innerHeight;
+                                var scroll   = -rect.top;
+                                var progress = Math.max(0, Math.min(1, scroll / viewH));
+                                var ease     = progress < 0.5
+                                    ? 2 * progress * progress
+                                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                                var minW = Math.min(760, window.innerWidth - 48);
+                                var maxW = window.innerWidth;
+                                var minH = 520;
+                                var maxH = viewH;
+
+                                box.style.width        = (minW + (maxW - minW) * ease) + 'px';
+                                box.style.height       = (minH + (maxH - minH) * ease) + 'px';
+                                box.style.borderRadius = (20 * (1 - ease)) + 'px';
+                            }
+
+                            window.addEventListener('scroll', update, { passive: true });
+                            window.addEventListener('resize', update, { passive: true });
+                            update();
+                        })();
+
+                        /* ── NAVBAR: transparent at top, solid when scrolled ──── */
+                        (function () {
+                            var navbar = document.querySelector('.navbar');
+                            if (!navbar) return;
+                            var ENTER_THRESHOLD = 20;
+                            var EXIT_THRESHOLD  = 120;
+
+                            function syncNavState() {
+                                var y = window.scrollY;
+                                var isAtTop = navbar.classList.contains('nav-at-top');
+                                if (isAtTop && y > EXIT_THRESHOLD) navbar.classList.remove('nav-at-top');
+                                else if (!isAtTop && y <= ENTER_THRESHOLD) navbar.classList.add('nav-at-top');
+                            }
+
+                            var ticking = false;
+                            function onScroll() {
+                                if (ticking) return;
+                                ticking = true;
+                                requestAnimationFrame(function () { syncNavState(); ticking = false; });
+                            }
+
+                            window.addEventListener('scroll', onScroll, { passive: true });
+                            syncNavState();
+                        })();
+                    </script>
+
+</body></html>

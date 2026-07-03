@@ -1,0 +1,113 @@
+// ====================================================
+//                  status.emeraldcore
+// ====================================================
+//
+//
+//  ┌─ SERVICES ─────────────────────────────────────┐
+//  │                                                │
+//  │  id     → internal key, no spaces              │
+//  │  name   → display name on the card             │
+//  │  items  → sub-services shown inside the card   │
+//  │    name → label                                │
+//  │                                                │
+//  │  - Status badge is AUTO from uptimeDays        │
+//  │  - Uptime % is AUTO from uptimeDays            │
+//  │    Nothing to set manually here!               │
+//  │                                                │
+//  └────────────────────────────────────────────────┘
+//
+//  ┌─ UPTIME DAYS ──────────────────────────────────┐
+//  │                                                │
+//  │  Key = service id (must match above).          │
+//  │  Leave the array empty [] = always Operational │
+//  │                                                │
+//  │  date  → "DD-MM-YYYY"   ← your local date      │
+//  │  type  → "degraded"     ← yellow bar           │
+//  │          "outage"       ← red bar              │
+//  │                                                │
+//  │  - Today's entry auto-sets the service badge.  │
+//  │  - No entry for today = Operational (auto)     │
+//  │                                                │
+//  └────────────────────────────────────────────────┘
+//
+//  ┌─ INCIDENTS ────────────────────────────────────┐
+//  │                                                │
+//  │  title           → short title                 │
+//  │  desc            → what happened               │
+//  │  date            → "DD-MM-YYYY"                │
+//  │                                                │
+//  │  currentIncident → true   goes to Current      │
+//  │                    false  goes to Previous     │
+//  │                                                │
+//  │  duration        → ""             if ongoing   │
+//  │                    "~15 min"                   │
+//  │                    "~2 hrs"       if resolved  │
+//  │                                                │
+//  │  - Banner auto-detected:                       │
+//  │    any currentIncident true  → Partial Outage  │
+//  │    all false                 → All Systems OK  │
+//  │  - Previous incidents auto-grouped by month    │
+//  │  - Both sections auto-sorted newest → oldest   │
+//  │                                                │
+//  └────────────────────────────────────────────────┘
+
+
+{
+  "services": [
+    {
+      "id": "core",
+      "name": "EmeraldCore",
+      "items": [
+        { "name": "EmeraldCore System" }
+      ]
+    },
+    {
+      "id": "website",
+      "name": "Website",
+      "items": [
+        { "name": "EmeraldNetwork Website" }
+      ]
+    },
+    {
+      "id": "bot",
+      "name": "EmeraldBot",
+      "items": [
+        { "name": "Discord EmeraldBot" }
+      ]
+    }
+  ],
+
+  "uptimeDays": {
+    "core": [],
+    "website": [],
+    "bot": [
+      { "date": "02-06-2026", "type": "outage" },
+      { "date": "13-05-2026", "type": "outage" },
+      { "date": "14-03-2026", "type": "degraded" }
+    ]
+  },
+
+  "incidents": [
+    {
+      "title": "EmeraldBot Down",
+      "desc": "EmeraldBot outage lasted approximately 1 hour and services have been restored.",
+      "date": "02-06-2026",
+      "currentIncident": false,
+      "duration": "~1 hour"
+    },
+    {
+      "title": "EmeraldBot Slash Commands Update",
+      "desc": "EmeraldBot is offline due to a full restart. No data was affected and the issue was fully resolved.",
+      "date": "12-05-2026",
+      "currentIncident": false,
+      "duration": "~15 minutes"
+    },
+    {
+      "title": "EmeraldBot AI Response Delays",
+      "desc": "EmeraldBot responses were delayed by 5–8 seconds due to incorrect settings. Normal performance was restored after configuration adjustments.",
+      "date": "13-03-2026",
+      "currentIncident": false,
+      "duration": "~2 hours"
+    }
+  ]
+}

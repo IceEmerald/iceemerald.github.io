@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EmeraldNetwork | AI Chat</title>
+    <meta name="description" content="EmeraldBot — Your intelligent assistant powered by EmeraldNetwork.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="/assets/images/favicon.webp">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+    <link rel="stylesheet" href="/assets/styles/aichat.css">
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+</head>
+<body>
+
+
+    <!-- Mobile sidebar backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+
+    <div id="custom-toast" class="custom-toast"></div>
+
+    <!-- ─── Sidebar ─────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+
+        <div class="sidebar-top">
+            <a href="/" class="sidebar-logo" id="sidebarLogo">
+                <img src="/assets/images/favicon.webp" alt="EmeraldNetwork">
+            </a>
+            <button class="sidebar-toggle" id="sidebarToggle" title="Toggle sidebar" onclick="var sb=document.getElementById('sidebar'); if(sb.classList.contains('mobile-open')){closeMobileSidebar();}else{sb.classList.toggle('collapsed');}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                    <path d="M9 3v18"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="sidebar-nav">
+            <button class="sidebar-btn new-chat" onclick="newChat()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 5v14M5 12h14"></path>
+                </svg>
+                <span class="sidebar-btn-label">New Chat</span>
+            </button>
+            <button class="sidebar-btn" onclick="openSearch()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
+                </svg>
+                <span class="sidebar-btn-label">Search Chats</span>
+            </button>
+            <button class="sidebar-btn" onclick="openLibrary()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
+                </svg>
+                <span class="sidebar-btn-label">Library</span>
+            </button>
+        </div>
+
+        <div class="sidebar-history" id="sidebarHistory"><div class="sidebar-section-title">Recents</div>
+    <div class="history-item">
+    </div></div>
+
+        <div class="sidebar-footer">
+            <button class="settings-btn" onclick="openSettings()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span class="settings-btn-label">Settings</span>
+            </button>
+        </div>
+
+    </aside>
+
+    <!-- ─── Main ──────────────────────────────── -->
+    <main class="chat-main" id="chatMain">
+
+        <!-- Topbar -->
+        <div class="chat-topbar">
+            <button class="mobile-hamburger" id="mobileMenuBtn" onclick="openMobileSidebar()" title="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+
+            <!-- Model Selector (top-left, ChatGPT-style) -->
+            <div class="model-selector" id="modelSelector">
+                <button class="model-selector-btn" id="modelSelectorBtn" type="button" onclick="toggleModelDropdown(event)" title="Switch model">
+                    <span class="model-selector-name" id="modelSelectorName">EmeraldCore</span>
+                    <svg class="model-selector-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div class="model-dropdown" id="modelDropdown" role="menu" aria-label="Model selector">
+                    <!-- Populated by JS: renderModelDropdown() -->
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+                <span class="temp-badge" id="tempBadge" style="display: none;">Temporary</span>
+                <button class="icon-btn" id="tempChatBtn" title="Temporary chat" onclick="toggleTempChat()" style="display: none;">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a10 10 0 1 0 10 10"></path>
+                        <path d="M12 6v6l3 3"></path>
+                        <path d="M18 2v4M20 4h-4"></path>
+                    </svg>
+                    <span class="btn-tooltip">Temporary Chat</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Content -->
+        <div class="chat-content" id="chatContent">
+
+            <!-- Welcome Screen -->
+            <div class="welcome-screen" id="welcomeScreen" style="display: flex;">
+                <img src="/assets/images/favicon.webp" alt="EmeraldNetwork" style="max-width: 80px; max-height: 80px;">
+                <div class="welcome-text-group">
+                    <h1 class="welcome-heading" id="welcomeHeading">How can I help?</h1>
+                </div>
+                <div class="quick-actions">
+                    <div class="quick-card" onclick="sendQuickPrompt('What can you help me with?')">
+                        <div class="quick-card-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 8v4l3 3"></path>
+                            </svg>
+                        </div>
+                        <div class="quick-card-text">
+                            <div class="quick-card-title">Quick Setup</div>
+                        </div>
+                    </div>
+                    <div class="quick-card" onclick="sendQuickPrompt('Help me write or edit something')">
+                        <div class="quick-card-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                        </div>
+                        <div class="quick-card-text">
+                            <div class="quick-card-title">Write or Edit</div>
+                        </div>
+                    </div>
+                    <div class="quick-card" onclick="sendQuickPrompt('Help me look something up or research a topic')">
+                        <div class="quick-card-icon">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
+                            </svg>
+                        </div>
+                        <div class="quick-card-text">
+                            <div class="quick-card-title">Look Something Up</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages area (populated by JS) -->
+            <div class="messages-area" id="messagesArea" style="display: none;">
+              <div class="message" id="typingIndicator" style="display:none;">
+                <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
+                <div class="message-body">
+                  <div class="message-sender">EmeraldBot</div>
+                  <div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>
+                  <span id="typingLabel" style="display:none;font-size:0.77rem;color:#6ecf8e;margin-top:3px;letter-spacing:0.01em;"></span>
+                </div>
+              </div>
+            </div>
+
+        </div>
+
+        <!-- ─── Input ─────────────────────────── -->
+        <div class="chat-input-wrap">
+            <div class="chat-input-box">
+                <!-- File attachment preview -->
+                <div class="attach-preview" id="attachPreview" style="display:none;"></div>
+                <div class="input-container">
+                    <button class="input-attach-btn" title="Attach file" onclick="document.getElementById('fileInput').click()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 5v14M5 12h14"></path>
+                        </svg>
+                    </button>
+                    <input type="file" id="fileInput" multiple="" accept="image/*,.pdf,.doc,.docx,.txt,.zip,.pptx,.xlsx,.csv" style="display:none" onchange="handleFileSelect(this)">
+                    <textarea class="chat-textarea" id="chatInput" placeholder="Ask anything..." rows="1" style="height: auto;"></textarea>
+                    <button class="send-btn" id="sendBtn" title="Send" onclick="handleSend()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></button>
+                </div>
+                <p class="input-footer-note">EmeraldBot may produce inaccurate information. Verify important details.</p>
+            </div>
+        </div>
+        <!-- Spacer for centering input on welcome screen (height set by JS) -->
+        <div class="chat-input-spacer" id="chatInputSpacer"></div>
+
+    </main>
+
+    <!-- ─── Toast ──────────────────────────────── -->
+    <div id="aiToast" class="ai-toast">Settings saved</div>
+
+    <!-- ─── Context Menu ───────────────────────── -->
+    <div id="aiContextMenu" class="rightclick-menu ai-context-menu" style="display: none; left: 214px; top: 252px;">
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        CHATS
+      </div>
+      <a onclick="renameConvPrompt('mqa9naj44juff')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"></path></svg>
+        Rename
+      </a>
+      <a onclick="deleteConvConfirm('mqa9naj44juff')" class="ctx-danger">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+        Delete
+      </a></div>
+
+    <!-- ─── Settings Modal ─────────────────────── -->
+    <div class="ai-modal-overlay" id="settingsModal" onclick="if(event.target===this)closeModal('settingsModal')">
+        <div class="ai-modal ai-modal--settings">
+            <div class="sett-header">
+                <span class="sett-title">Settings</span>
+            </div>
+            <div class="sett-scroll">
+                <!-- Avatar -->
+                <div class="sett-section">
+                    <div class="sett-section-label">Profile</div>
+                    <div class="sett-avatar-row">
+                        <div class="sett-avatar-circle" id="settAvatarCircle" onclick="document.getElementById('settAvatarInput').click()" title="Click to change avatar">
+                            <span id="settAvatarInitials">?</span>
+                            <img id="settAvatarImg" alt="Avatar">
+                        </div>
+                        <input type="file" id="settAvatarInput" accept="image/*" style="display:none" onchange="handleAvatarUpload(this)">
+                        <div class="sett-avatar-info">
+                            <div class="sett-avatar-name" id="settAvatarDisplayName">Your Name</div>
+                            <div class="sett-avatar-actions">
+                                <label for="settAvatarInput" class="sett-avatar-action-btn">Upload photo</label>
+                                <button class="sett-avatar-action-btn sett-avatar-action-btn--remove" id="settAvatarRemoveBtn" onclick="removeAvatar()">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sett-group sett-group--inline">
+                        <label class="sett-label">Name</label>
+                        <input type="text" id="settName" class="sett-input" placeholder="e.g. IceEmerald" maxlength="32">
+                    </div>
+                </div>
+                <!-- Appearance -->
+                <div class="sett-section">
+                    <div class="sett-section-label">Appearance</div>
+                    <div class="sett-theme-row" id="settThemeRow">
+                        <button class="sett-theme-btn" data-theme="system" onclick="selectSettTheme('system')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>
+                            System
+                        </button>
+                        <button class="sett-theme-btn" data-theme="dark" onclick="selectSettTheme('dark')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                            Dark
+                        </button>
+                        <button class="sett-theme-btn" data-theme="light" onclick="selectSettTheme('light')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+                            Light
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Data section -->
+            <div class="sett-scroll-extra">
+                <div class="sett-section">
+                    <div class="sett-section-label">Data &amp; Memory</div>
+                    <div class="sett-data-btns">
+                        <button class="sett-data-btn" onclick="openMemoriesModal()">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg>
+                            Memories
+                        </button>
+                        <button class="sett-data-btn sett-data-btn--danger" onclick="confirmClearAllChats()">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+                            Clear All Chats
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="sett-footer">
+                <button class="ai-modal-btn secondary" onclick="closeModal('settingsModal')">Cancel</button>
+                <button class="ai-modal-btn primary" onclick="saveSettings()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Rename Modal ────────────────────────── -->
+    <div class="ai-modal-overlay" id="renameModal" onclick="if(event.target===this)closeModal('renameModal')">
+        <div class="ai-modal ai-modal--sm ai-modal--centered">
+            <div class="ai-modal-body ai-modal-body--centered">
+                <div class="modal-icon modal-icon--info">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"></path></svg>
+                </div>
+                <div class="modal-centered-title">Rename conversation</div>
+                <div class="modal-form-body">
+                    <input type="text" id="renameInput" class="sett-input" placeholder="Conversation title…" maxlength="80">
+                </div>
+                <div class="modal-centered-actions">
+                    <button class="ai-modal-btn secondary" onclick="closeModal('renameModal')">Cancel</button>
+                    <button class="ai-modal-btn primary" id="renameSaveBtn">Rename</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Delete Confirm Modal ────────────────── -->
+    <div class="ai-modal-overlay" id="deleteModal" onclick="if(event.target===this)closeModal('deleteModal')">
+        <div class="ai-modal ai-modal--sm ai-modal--centered">
+            <div class="ai-modal-body ai-modal-body--centered">
+                <div class="modal-icon modal-icon--danger">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+                </div>
+                <div class="modal-centered-title" id="deleteModalTitle">Delete ""?</div>
+                <p class="modal-centered-text">This action cannot be undone.</p>
+                <div class="modal-centered-actions">
+                    <button class="ai-modal-btn secondary" onclick="closeModal('deleteModal')">Cancel</button>
+                    <button class="ai-modal-btn danger" id="deleteConfirmBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Library Modal ──────────────────────── -->
+    <div class="ai-modal-overlay" id="libraryModal" onclick="if(event.target===this)closeModal('libraryModal')">
+        <div class="ai-modal ai-modal--lg ai-modal--centered">
+            <button class="ai-modal-close ai-modal-close--abs" onclick="closeModal('libraryModal')">×</button>
+            <div class="ai-modal-body ai-modal-body--centered">
+                <div class="modal-icon modal-icon--info">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                </div>
+                <div class="modal-centered-title">Library</div>
+                <div class="lib-tabs" id="libTabs">
+                    <button class="lib-tab active" onclick="setLibFilter('all',this)">All files</button>
+                    <button class="lib-tab" onclick="setLibFilter('images',this)">Images</button>
+                    <button class="lib-tab" onclick="setLibFilter('documents',this)">Documents</button>
+                    <button class="lib-tab" onclick="setLibFilter('archives',this)">Archives</button>
+                    <div class="lib-tab-indicator" id="libTabIndicator"></div>
+                </div>
+                <div id="libList" class="lib-scroll-area"><div class="lib-empty">No files found</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Search Modal ───────────────────────── -->
+    <div class="ai-modal-overlay" id="searchModal" onclick="if(event.target===this)closeModal('searchModal')">
+        <div class="ai-modal ai-modal--lg ai-modal--centered">
+            <button class="ai-modal-close ai-modal-close--abs" onclick="closeModal('searchModal')">×</button>
+            <div class="ai-modal-body ai-modal-body--centered">
+                <div class="modal-icon modal-icon--info">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                </div>
+                <div class="modal-centered-title">Search chats</div>
+                <div class="modal-form-body">
+                    <input type="text" id="searchInput" class="sett-input" placeholder="Search conversations…" autofocus="">
+                    <div id="searchResults" class="search-results-scroll" style="margin-top:12px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Scripts ────────────────────────────── -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@18.0.5/lib/marked.umd.js" integrity="sha384-ZD0fTOwPMHi7zM6WTVIWJR21I07lq0ccnqz3J6WMvQKG9thh4y7TA1QE6PJu0Af8" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" integrity="sha384-hIoBPJpTUs74ddyc4bFZSM1TVlQDA60VBbJS0oA934VSz82sBx1X7kSx2ATBDIyd" crossorigin="anonymous"></script>
+    <script src="/assets/scripts/idb-storage.js"></script>
+    <script src="/assets/scripts/aichat.js"></script>
+
+
+    <!-- ─── File Preview Modal ──────────────────── -->
+    <!-- File Preview Side Panel -->
+    <div class="file-preview-panel" id="filePreviewPanel">
+        <div class="fp-panel-header">
+            <span id="fpPanelTitle" class="fp-panel-title">Preview</span>
+            <div class="fp-zoom-bar">
+                <button class="fp-zoom-btn" onclick="_fpZoomOut()" title="Zoom out">−</button>
+                <span class="fp-zoom-label" id="fpZoomLabel">100%</span>
+                <button class="fp-zoom-btn" onclick="_fpZoomIn()" title="Zoom in">+</button>
+            </div>
+            <button class="fp-panel-close" onclick="closeFilePreviewPanel()" title="Close preview">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div id="fpPanelBody" class="fp-panel-body"></div>
+    </div>
+
+    <!-- Code Preview Side Panel -->
+    <div class="code-preview-panel" id="codePreviewPanel">
+        <div class="fp-panel-header">
+            <span id="codePreviewTitle" class="fp-panel-title">Code Preview</span>
+            <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+                <button class="fp-panel-close" id="consoleToggleBtn" onclick="togglePreviewConsole()" title="Toggle console output">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                </button>
+                <button class="fp-panel-close" onclick="closeCodePreviewPanel()" title="Close preview">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+        </div>
+        <div id="codePreviewBody" class="code-preview-body"></div>
+    </div>
+
+    <!-- ─── Memories Modal ──────────────────────── -->
+    <div class="ai-modal-overlay" id="memoriesModal" onclick="if(event.target===this)closeModal('memoriesModal')">
+        <div class="ai-modal ai-modal--memories">
+            <div class="ai-modal-header">
+                <div class="ai-modal-header-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"></path><path d="M12 6v6l4 2"></path></svg>
+                </div>
+                <span class="ai-modal-header-title">Memories</span>
+            </div>
+            <div class="ai-modal-body ai-modal-body--scroll">
+                <p class="memories-desc">EmeraldBot remembers facts about you to give better responses.</p>
+                <div id="memoriesList"></div>
+            </div>
+            <div class="ai-modal-footer">
+                <button class="ai-modal-btn secondary" onclick="closeModal('memoriesModal')">Close</button>
+                <button class="ai-modal-btn danger" onclick="clearAllMemories()">Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Clear All Chats Confirm ─────────────── -->
+    <div class="ai-modal-overlay" id="clearChatsModal" onclick="if(event.target===this)closeModal('clearChatsModal')">
+        <div class="ai-modal ai-modal--sm ai-modal--centered">
+            <div class="ai-modal-body ai-modal-body--centered">
+                <div class="modal-icon modal-icon--danger">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6M14 11v6"></path><path d="M9 6V4h6v2"></path></svg>
+                </div>
+                <div class="modal-centered-title">Clear all chats?</div>
+                <div class="modal-centered-body">This will permanently delete all your conversations, files, and memories. Your name and appearance settings won't be affected.</div>
+            </div>
+            <div class="ai-modal-actions">
+                <button class="ai-modal-btn secondary" onclick="closeModal('clearChatsModal')">Cancel</button>
+                <button class="ai-modal-btn danger" onclick="clearAllChats()">Clear All Chats</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ─── Quiz Side Panel ──────────────────────── -->
+    <div class="quiz-panel" id="quizPanel">
+        <div class="fp-panel-header">
+            <span id="quizPanelTitle" class="fp-panel-title">Quiz</span>
+            <span id="quizPanelCount" class="quiz-panel-count"></span>
+            <button class="fp-panel-close" onclick="closeQuizPanel()" title="Close">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div class="quiz-panel-body" id="quizPanelBody"></div>
+    </div>
+
+
+    <!-- ─── Onboarding (Full-Screen) ─────────────────── -->
+    <div class="ob-overlay" id="obOverlay">
+
+      <!-- Right step panel -->
+      <div class="ob-right">
+
+        <!-- Progress dots -->
+        <div class="ob-dots">
+          <div class="ob-dot ob-dot--active" id="obDot0"></div>
+          <div class="ob-dot" id="obDot1"></div>
+          <div class="ob-dot" id="obDot2"></div>
+          <div class="ob-dot" id="obDot3"></div>
+        </div>
+
+        <!-- ── Step 0: Welcome, Name, Avatar ── -->
+        <div class="ob-step ob-step--active" id="obStep0">
+          <div class="ob-step-head">
+            <h2 class="ob-heading">Welcome to EmeraldBot!</h2>
+            <p class="ob-sub">Tell us a bit about yourself to personalize your experience.</p>
+          </div>
+
+          <!-- Avatar picker -->
+          <div class="ob-avatar-wrap" onclick="document.getElementById('obAvatarInput').click()" title="Click to upload photo">
+            <div class="ob-avatar-circle" id="obAvatarCircle">
+              <img class="ob-avatar-img" id="obAvatarImg" src="" alt="" style="display:none;">
+              <span class="ob-avatar-initials" id="obAvatarInitials">?</span>
+              <div class="ob-avatar-overlay">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Upload
+              </div>
+            </div>
+            <input type="file" id="obAvatarInput" accept="image/*" style="display:none;" onchange="_obAvatarUpload(this)">
+          </div>
+          <p class="ob-avatar-hint">Click the circle to upload a photo</p>
+
+          <div class="ob-field">
+            <label class="ob-label">Your name</label>
+            <input class="ob-input" id="obNameInput" type="text" placeholder="e.g. IceEmerald" maxlength="32" autocomplete="off" oninput="_obUpdateInitials(this.value)" onkeydown="if(event.key==='Enter') _obNext()">
+          </div>
+
+          <button class="ob-btn-primary" onclick="_obNext()">
+            Continue
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+          </button>
+        </div>
+
+          <!-- ── Step 1: Features ── -->
+          <div class="ob-step" id="obStep1">
+            <div class="ob-step-head">
+              <h2 class="ob-heading">Capabilities</h2>
+              <p class="ob-sub">EmeraldBot provides the following core functions:</p>
+            </div>
+            <div class="ob-features">
+              <!-- Chat & Answers -->
+              <div class="ob-feat">
+                <div class="ob-feat-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                </div>
+                <div class="ob-feat-text">
+                  <div class="ob-feat-title">Chat &amp; Answers</div>
+                  <div class="ob-feat-desc">Ask questions, brainstorm ideas, and get instant answers.</div>
+                </div>
+              </div>
+              <!-- Attach Files -->
+              <div class="ob-feat">
+                <div class="ob-feat-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                </div>
+                <div class="ob-feat-text">
+                  <div class="ob-feat-title">File Attachments</div>
+                  <div class="ob-feat-desc">Upload documents, images, or data for analysis.</div>
+                </div>
+              </div>
+              <!-- Code Things -->
+              <div class="ob-feat">
+                <div class="ob-feat-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                </div>
+                <div class="ob-feat-text">
+                  <div class="ob-feat-title">Coding Support</div>
+                  <div class="ob-feat-desc">Write, debug, and understand code snippets across languages.</div>
+                </div>
+              </div>
+              <!-- Quiz -->
+              <div class="ob-feat">
+                <div class="ob-feat-icon">
+                  <!-- New Help/Quiz Help Circle Icon -->
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                </div>
+                <div class="ob-feat-text">
+                  <div class="ob-feat-title">Interactive Quizzes</div>
+                  <div class="ob-feat-desc">Test your knowledge, study, or play trivia games.</div>
+                </div>
+              </div>
+            </div>
+            <div class="ob-row">
+              <button class="ob-btn-secondary" onclick="_obBack()">← Back</button>
+              <button class="ob-btn-primary" onclick="_obNext()">
+                Continue
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+              </button>
+            </div>
+          </div>
+
+        <!-- ── Step 2: Import Memory ── -->
+        <div class="ob-step" id="obStep2">
+          <div class="ob-step-head">
+            <h2 class="ob-heading">Import your memories</h2>
+            <p class="ob-sub">Paste memories exported from ChatGPT, Claude, Gemini, or write your own.</p>
+          </div>
+          <div class="ob-import-wrap">
+            <textarea class="ob-import-textarea" id="obMemoryInput" placeholder="Paste here — e.g.:
+• I prefer concise answers
+• I work as a software engineer
+• My favorite language is Python
+
+Or paste a JSON export from ChatGPT." rows="6" oninput="_obMemoryPreview()"></textarea>
+          </div>
+          <div class="ob-row">
+            <button class="ob-btn-secondary" onclick="_obBack()">← Back</button>
+            <button class="ob-btn-secondary" onclick="_obNext()">Skip</button>
+            <button class="ob-btn-primary" id="obImportBtn" onclick="_obImportMemory()" style="display:none;">
+              Import
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Step 3: Theme + Go ── -->
+        <div class="ob-step" id="obStep3">
+          <div class="ob-step-head">
+            <h2 class="ob-heading">Pick your look</h2>
+            <p class="ob-sub">You can always change this in Settings later.</p>
+          </div>
+          <div class="ob-themes">
+            <div class="ob-theme ob-theme--active" id="obTheme_system" onclick="_obSelectTheme('system')">
+              <div class="ob-theme-preview">
+                <div class="ob-tp-half ob-tp-dark"></div>
+                <div class="ob-tp-half ob-tp-light"></div>
+              </div>
+              <span class="ob-theme-label">System</span>
+              <div class="ob-theme-check">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+            </div>
+            <div class="ob-theme" id="obTheme_dark" onclick="_obSelectTheme('dark')">
+              <div class="ob-theme-preview ob-theme-preview--dark"></div>
+              <span class="ob-theme-label">Dark</span>
+              <div class="ob-theme-check">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+            </div>
+            <div class="ob-theme" id="obTheme_light" onclick="_obSelectTheme('light')">
+              <div class="ob-theme-preview ob-theme-preview--light"></div>
+              <span class="ob-theme-label">Light</span>
+              <div class="ob-theme-check">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </div>
+            </div>
+          </div>
+          <div class="ob-row">
+            <button class="ob-btn-secondary" onclick="_obBack()">← Back</button>
+            <button class="ob-btn-primary ob-btn-glow" onclick="_obFinish()">
+              Start chatting
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+            </button>
+          </div>
+        </div>
+
+      </div><!-- /ob-right -->
+    </div><!-- /ob-overlay -->
+</body></html>
