@@ -2137,6 +2137,27 @@ async function handleSend() {
     }
     if (continueEl) continueEl.remove();
   } catch (err) {
+    if (err?._jailbreakBlocked) {
+      // Jailbreak attempt detected by the worker. Tear down the current
+      // conversation entirely — delete it from storage, return the user
+      // to the welcome screen, refresh the sidebar so the chat no longer
+      // appears in Recents, and surface a toast explaining what happened.
+      // No assistant message is rendered.
+      if (continueEl) continueEl.remove();
+      typingEl.style.display = "none";
+      if (state.convId && !state.isTemp) {
+        deleteConv(state.convId);
+      }
+      state.convId = null;
+      state.tempHistory = [];
+      state.isStreaming = false;
+      state.abortCtrl = null;
+      setSendState(false);
+      showWelcome();
+      renderSidebar();
+      showToast(`${_aiSvgWarn} You are trying to jailbreak this AI. This conversation has been removed.`, "error");
+      return;
+    }
     if (continueEl) continueEl.remove();
     typingEl.style.display = "none";
     if (!aiDiv) {
@@ -2588,6 +2609,18 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
     e._modelError = true;
     e._httpStatus = res.status;
     throw e;
+  }
+  // Jailbreak detection: when the worker flags a request as blocked
+  // (X-Safety-Status: blocked), it sends an EMPTY SSE stream with no
+  // refusal text. We must NOT stream anything to the user — instead we
+  // throw a tagged error so the caller can remove the conversation,
+  // return the user to the welcome screen, and show a toast.
+  const _safetyStatus = res.headers.get("X-Safety-Status");
+  if (_safetyStatus === "blocked") {
+    try { await res.body?.cancel(); } catch {}
+    const _jbErr = new Error("Jailbreak attempt detected");
+    _jbErr._jailbreakBlocked = true;
+    throw _jbErr;
   }
   const usedModelId = res.headers.get("X-Model-Used") || requestedId;
   const usedModel = getModelById(usedModelId);
@@ -3985,6 +4018,25 @@ async function submitUserMsgEdit(msgId) {
       _usedModelName = _m ? _m.name : _usedModelId;
     }
   } catch (err) {
+    if (err?._jailbreakBlocked) {
+      // Jailbreak attempt detected on a regenerated/edited message.
+      // Same teardown as handleSend: delete the conversation, return
+      // to welcome, refresh sidebar, show toast. No assistant message
+      // is rendered.
+      typingEl.style.display = "none";
+      if (state.convId && !state.isTemp) {
+        deleteConv(state.convId);
+      }
+      state.convId = null;
+      state.tempHistory = [];
+      state.isStreaming = false;
+      state.abortCtrl = null;
+      setSendState(false);
+      showWelcome();
+      renderSidebar();
+      showToast(`${_aiSvgWarn} You are trying to jailbreak this AI. This conversation has been removed.`, "error");
+      return;
+    }
     typingEl.style.display = "none";
     if (err.name !== "AbortError") {
       if (!aiDiv) {
