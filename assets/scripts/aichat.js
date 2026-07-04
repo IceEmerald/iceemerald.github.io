@@ -2155,7 +2155,7 @@ async function handleSend() {
       setSendState(false);
       showWelcome();
       renderSidebar();
-      showToast(`${_aiSvgWarn} You are trying to jailbreak this AI. This conversation has been removed.`, "error");
+      showToast(`${_aiSvgWarn} This request cannot be processed because it violates the EmeraldNetwork usage policies.`, "error");
       return;
     }
     if (continueEl) continueEl.remove();
@@ -4034,7 +4034,7 @@ async function submitUserMsgEdit(msgId) {
       setSendState(false);
       showWelcome();
       renderSidebar();
-      showToast(`${_aiSvgWarn} You are trying to jailbreak this AI. This conversation has been removed.`, "error");
+      showToast(`${_aiSvgWarn} This request cannot be processed because it violates the EmeraldNetwork usage policies.`, "error");
       return;
     }
     typingEl.style.display = "none";
