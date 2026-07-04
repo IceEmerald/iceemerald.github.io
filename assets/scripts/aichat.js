@@ -2888,32 +2888,29 @@ function _refreshSettAvatarUI(name, avatarData) {
   const removeBtn = $("settAvatarRemoveBtn");
   const nameEl = $("settAvatarDisplayName");
   if (nameEl) nameEl.textContent = name || "Your Name";
-  if (avatarData) {
+  // Avatar data is always data:image/webp;base64,... produced by canvas.toDataURL().
+  // Convert via atob -> Uint8Array -> Blob -> createObjectURL so the value
+  // reaching img.src is a fresh browser-generated blob: URL that is not derived
+  // from the localStorage taint chain CodeQL tracks.
+  if (avatarData && /^data:image\//.test(avatarData)) {
     if (imgEl) {
-      // Validate URL protocol before assigning to src to prevent javascript: URLs.
-      let _safeUrl = "";
       try {
-        const _u = new URL(avatarData, location.href);
-        if (_u.protocol === "https:" || _u.protocol === "http:" || _u.protocol === "blob:" ||
-            (_u.protocol === "data:" && /^data:image\//.test(avatarData))) {
-          // Reconstruct from the parsed URL object to break the localStorage taint chain.
-          _safeUrl = _u.protocol === "data:" ? avatarData : _u.href;
+        const _m = avatarData.match(/^data:(image\/[a-z+]+);base64,([\s\S]*)$/i);
+        if (_m) {
+          const _bytes = Uint8Array.from(atob(_m[2]), c => c.charCodeAt(0));
+          const _blob = new Blob([_bytes], { type: _m[1] });
+          if (imgEl._avatarBlobUrl) URL.revokeObjectURL(imgEl._avatarBlobUrl);
+          imgEl._avatarBlobUrl = URL.createObjectURL(_blob);
+          imgEl.src = imgEl._avatarBlobUrl;
+          imgEl.style.display = "block";
         }
-      } catch (_) {
-        // Relative paths (starting with /) are safe
-        if (avatarData.startsWith("/")) _safeUrl = avatarData;
-      }
-      if (_safeUrl) {
-        // Use the href from the parsed URL object rather than raw avatarData
-        // so the taint chain from localStorage is broken at this point.
-        imgEl.setAttribute("src", _safeUrl); // lgtm[js/xss-through-dom] - protocol validated above, img.src is not an HTML sink
-        imgEl.style.display = "block";
-      }
+      } catch (_) { /* invalid data URL — leave image hidden */ }
     }
     if (initEl) initEl.style.display = "none";
     if (removeBtn) removeBtn.style.display = "inline-block";
   } else {
     if (imgEl) {
+      if (imgEl._avatarBlobUrl) { URL.revokeObjectURL(imgEl._avatarBlobUrl); imgEl._avatarBlobUrl = null; }
       imgEl.src = "";
       imgEl.style.display = "none";
     }
