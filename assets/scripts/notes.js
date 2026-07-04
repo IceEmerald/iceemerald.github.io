@@ -2568,8 +2568,7 @@ class NotesApp {
             div.addEventListener('mouseenter', () => { div.style.boxShadow = `0 8px 24px ${hoverShadow}`; });
             div.addEventListener('mouseleave', () => { div.style.boxShadow = `0 4px 16px ${restingShadow}`; });
         }
-        const _parsed1 = new DOMParser().parseFromString(note.content || '', 'text/html');
-        const plainText = _parsed1.body.textContent || '';
+        const plainText = (note.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
         const preview = plainText.substring(0, 150);
         const date = new Date(note.modifiedAt);
         const isLiveNote = note._isCollabNote || this._isCollabNoteId(note.id);
@@ -2607,8 +2606,7 @@ class NotesApp {
                     card.classList.add(colorClasses[colorIndex]);
                 }
             }
-            const _parsed2 = new DOMParser().parseFromString(note.content || '', 'text/html');
-            const plainText = _parsed2.body.textContent || '';
+            const plainText = (note.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
             const preview = plainText.substring(0, 100);
             const date = new Date(note.modifiedAt);
             const formattedDate = this.formatDate(date);
@@ -3576,7 +3574,7 @@ class NotesApp {
                 }
                 if (!allowedTags.includes(tagName)) {
                     const span = document.createElement('span');
-                    span.innerHTML = element.innerHTML;
+                    while (element.firstChild) span.appendChild(element.firstChild);
                     element.parentNode.replaceChild(span, element);
                     return;
                 }

@@ -283,6 +283,12 @@ function deleteConv(id) {
   saveConvs(loadConvs().filter((c) => c.id !== id));
   saveLib(loadLib().filter((f) => f.convId !== id));
 }
+function _cryptoInt(n) {
+  const _max = Math.floor(0x100000000 / n) * n;
+  let _x;
+  do { _x = crypto.getRandomValues(new Uint32Array(1))[0]; } while (_x >= _max);
+  return _x % n;
+}
 function genId() {
   const _b = new Uint8Array(8);
   crypto.getRandomValues(_b);
@@ -1231,8 +1237,7 @@ function showWelcome() {
   ];
   const name = (loadSettings().userName || "").trim();
   const displayName = name && name !== "You" ? name : "User";
-  const _greetIdx = crypto.getRandomValues(new Uint32Array(1))[0] % GREETINGS.length;
-  const pick = GREETINGS[_greetIdx];
+  const pick = GREETINGS[_cryptoInt(GREETINGS.length)];
   const heading = $("welcomeHeading");
   if (heading) heading.textContent = pick(displayName);
   $("welcomeScreen").style.display = "flex";
@@ -1884,6 +1889,22 @@ function fileIcon(mimeType) {
   if (type.includes("zip") || type.includes("archive")) return "\u{1F5DC}\uFE0F";
   return "\u{1F4C4}";
 }
+function buildMessageActionsEl(msgId) {
+  const _actDiv = document.createElement("div");
+  _actDiv.className = "message-actions";
+  _actDiv.dataset.msgActions = msgId;
+  const _likeBtn = document.createElement("button");
+  _likeBtn.className = "msg-action-btn"; _likeBtn.title = "Like";
+  _likeBtn.addEventListener("click", function() { rateMsg(this, "like"); });
+  _likeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>';
+  const _dislikeBtn = document.createElement("button");
+  _dislikeBtn.className = "msg-action-btn"; _dislikeBtn.title = "Dislike";
+  _dislikeBtn.addEventListener("click", function() { rateMsg(this, "dislike"); });
+  _dislikeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>';
+  _actDiv.appendChild(_likeBtn);
+  _actDiv.appendChild(_dislikeBtn);
+  return _actDiv;
+}
 function appendAIMessageDOM(text, msgId, streaming = false) {
   const typingEl = $("typingIndicator");
   const div = document.createElement("div");
@@ -1895,8 +1916,8 @@ function appendAIMessageDOM(text, msgId, streaming = false) {
     <div class="message-body">
       <div class="message-sender">EmeraldBot</div>
       <div class="message-text md-content">${streaming ? "" : renderMarkdown(text)}</div>
-      ${streaming ? "" : messageActionsHTML(msgId, text)}
     </div>`;
+  if (!streaming) div.querySelector(".message-body").appendChild(buildMessageActionsEl(msgId));
   $("messagesArea").insertBefore(div, typingEl);
   return div;
 }
@@ -2842,8 +2863,7 @@ function saveSettings() {
       `Good to see you, ${escapeHtml(name)}. Ask me anything.`,
       `Hi ${escapeHtml(name)}! Ready when you are.`
     ];
-    const _namedIdx = crypto.getRandomValues(new Uint32Array(1))[0] % greets.length;
-    nh.innerHTML = greets[_namedIdx];
+    nh.innerHTML = greets[_cryptoInt(greets.length)];
   }
 }
 function selectSettTheme(t) {
@@ -3107,9 +3127,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeModelDropdown();
 });
 function escapeHtml(s) {
-  const d = document.createElement("div");
-  d.textContent = String(s ?? "");
-  return d.innerHTML;
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 function escapeHtmlAttr(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -3569,28 +3587,30 @@ function renderMemoriesModal() {
   const list = document.getElementById("memoriesList");
   if (!list) return;
   const mems = loadMemories();
+  list.innerHTML = "";
   if (mems.length === 0) {
     list.innerHTML = '<div class="memories-empty"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg><p>No memories saved yet</p><small>Ask EmeraldBot to remember something about you.</small></div>';
     return;
   }
-  list.innerHTML = mems.map((m) => `
-    <div class="memory-item" id="mem_${escapeHtmlAttr(m.id)}">
-      <div class="memory-item-content">
-        <div class="memory-item-text" style="white-space: pre-wrap;">${escapeHtml(m.text)}</div>
-        <div class="memory-item-meta">${new Date(m.createdAt).toLocaleDateString()}</div>
-      </div>
-      <div class="memory-item-btns">
-        <button class="memory-item-btn memory-item-edit" onclick="editMemory('${escapeHtmlAttr(m.id)}')" title="Edit memory">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-          </svg>
-        </button>
-        <button class="memory-item-btn memory-item-del" onclick="deleteMemory('${m.id}')" title="Delete memory">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </button>
-      </div>
-    </div>`).join("");
+  const _frag = document.createDocumentFragment();
+  mems.forEach((m) => {
+    const _item = document.createElement("div");
+    _item.className = "memory-item"; _item.id = "mem_" + m.id;
+    const _content = document.createElement("div"); _content.className = "memory-item-content";
+    const _txt = document.createElement("div"); _txt.className = "memory-item-text"; _txt.style.whiteSpace = "pre-wrap"; _txt.textContent = m.text;
+    const _meta = document.createElement("div"); _meta.className = "memory-item-meta"; _meta.textContent = new Date(m.createdAt).toLocaleDateString();
+    _content.appendChild(_txt); _content.appendChild(_meta); _item.appendChild(_content);
+    const _btns = document.createElement("div"); _btns.className = "memory-item-btns";
+    const _editBtn = document.createElement("button"); _editBtn.className = "memory-item-btn memory-item-edit"; _editBtn.title = "Edit memory";
+    _editBtn.addEventListener("click", () => editMemory(m.id));
+    _editBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+    const _delBtn = document.createElement("button"); _delBtn.className = "memory-item-btn memory-item-del"; _delBtn.title = "Delete memory";
+    _delBtn.addEventListener("click", () => deleteMemory(m.id));
+    _delBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+    _btns.appendChild(_editBtn); _btns.appendChild(_delBtn); _item.appendChild(_btns);
+    _frag.appendChild(_item);
+  });
+  list.appendChild(_frag);
 }
 function clearAllMemories() {
   saveMemories([]);
@@ -3666,7 +3686,7 @@ function appendStoredAIMessage(m) {
       textEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
     }
   }
-  div.querySelector(".message-body").insertAdjacentHTML("beforeend", messageActionsHTML(m.id || genId(), displayText));
+  div.querySelector(".message-body").appendChild(buildMessageActionsEl(m.id || genId()));
   if (m.imageData) {
     const wrapper = document.createElement("div");
     wrapper.className = "img-gen-result";
@@ -4109,15 +4129,17 @@ function updateBranchNavDOM(originalMsgId) {
   }
   const cur = branchInfo.current + 1;
   const tot = branchInfo.variants.length;
-  const _escOrigId = escapeHtmlAttr(originalMsgId);
-  nav.innerHTML = `
-    <button class="branch-nav-btn" onclick="navigateBranch('${_escOrigId}', -1)"${branchInfo.current === 0 ? " disabled" : ""}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <span class="branch-nav-count">${cur} / ${tot}</span>
-    <button class="branch-nav-btn" onclick="navigateBranch('${_escOrigId}', 1)"${branchInfo.current === tot - 1 ? " disabled" : ""}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>`;
+  nav.innerHTML = "";
+  const _bPrev = document.createElement("button"); _bPrev.className = "branch-nav-btn";
+  if (branchInfo.current === 0) _bPrev.disabled = true;
+  _bPrev.addEventListener("click", () => navigateBranch(originalMsgId, -1));
+  _bPrev.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>';
+  const _bCount = document.createElement("span"); _bCount.className = "branch-nav-count"; _bCount.textContent = cur + " / " + tot;
+  const _bNext = document.createElement("button"); _bNext.className = "branch-nav-btn";
+  if (branchInfo.current === tot - 1) _bNext.disabled = true;
+  _bNext.addEventListener("click", () => navigateBranch(originalMsgId, 1));
+  _bNext.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>';
+  nav.appendChild(_bPrev); nav.appendChild(_bCount); nav.appendChild(_bNext);
 }
 function navigateRegenBranch(branchId, dir) {
   if (state.isStreaming || !state.convId) return;
@@ -4155,15 +4177,17 @@ function updateRegenNavDOM(branchId) {
   }
   const cur = branch.current + 1;
   const tot = branch.variants.length;
-  const _escBranchId = escapeHtmlAttr(branchId);
-  nav.innerHTML = `
-    <button class="branch-nav-btn" onclick="navigateRegenBranch('${_escBranchId}', -1)"${branch.current === 0 ? " disabled" : ""}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <span class="branch-nav-count">${cur} / ${tot}</span>
-    <button class="branch-nav-btn" onclick="navigateRegenBranch('${_escBranchId}', 1)"${branch.current === tot - 1 ? " disabled" : ""}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>`;
+  nav.innerHTML = "";
+  const _rPrev = document.createElement("button"); _rPrev.className = "branch-nav-btn";
+  if (branch.current === 0) _rPrev.disabled = true;
+  _rPrev.addEventListener("click", () => navigateRegenBranch(branchId, -1));
+  _rPrev.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>';
+  const _rCount = document.createElement("span"); _rCount.className = "branch-nav-count"; _rCount.textContent = cur + " / " + tot;
+  const _rNext = document.createElement("button"); _rNext.className = "branch-nav-btn";
+  if (branch.current === tot - 1) _rNext.disabled = true;
+  _rNext.addEventListener("click", () => navigateRegenBranch(branchId, 1));
+  _rNext.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>';
+  nav.appendChild(_rPrev); nav.appendChild(_rCount); nav.appendChild(_rNext);
 }
 function detectWebSearchIntent(text) {
   if (!text) return false;
