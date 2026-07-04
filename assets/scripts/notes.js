@@ -206,7 +206,7 @@ class NotesApp {
         const textEditor = document.getElementById('textEditor');
         if (noteTitle) noteTitle.value = note.title;
         if (textEditor) {
-            textEditor.innerHTML = this.sanitizeHtml(note.content);
+            this._applySanitizedHtml(textEditor, note.content);
             textEditor.style.backgroundColor = note.color && note.color !== '#ffffff'
                 ? note.color
                 : 'rgba(255, 255, 255, 0.5)';
@@ -1152,7 +1152,7 @@ class NotesApp {
                     }
                 }
             }
-            textEditor.innerHTML = this.sanitizeHtml(noteData.content || '');
+            this._applySanitizedHtml(textEditor, noteData.content || '');
             this._collabMergeBaseContent = noteData.content || '';
             textEditor.contentEditable = this.collabIsOwner || this.collabPermission === 'edit';
             if (noteData.color && noteData.color !== '#ffffff') {
@@ -2380,7 +2380,7 @@ class NotesApp {
             console.warn('Expected DOM element not found: textEditor');
             return;
         }
-        textEditorInit.innerHTML = this.sanitizeHtml(note.content);
+        this._applySanitizedHtml(textEditorInit, note.content);
         const textEditor = document.getElementById('textEditor');
         if (note.color && note.color !== '#ffffff') {
             textEditor.style.backgroundColor = note.color;
@@ -3602,10 +3602,61 @@ class NotesApp {
             });
             return div.innerHTML;
         } catch (error) {
-            const div = document.createElement('div');
-            div.textContent = html;
-            return div.innerHTML;
+            return String(html || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
+    }
+    _applySanitizedHtml(el, html) {
+        if (!html) { el.innerHTML = ''; return; }
+        const _asTags = [
+            'p', 'br', 'strong', 'em', 'u', 'b', 'i', 'ul', 'ol', 'li',
+            'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a',
+            'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'colgroup', 'col',
+            'font', 'input', 'img', 's', 'strike', 'sub', 'sup'
+        ];
+        const _asAttrs = [
+            'style', 'href', 'target', 'rel',
+            'face', 'color', 'size',
+            'type', 'checked', 'class', 'data-checked',
+            'width', 'height', 'colspan', 'rowspan', 'border',
+            'cellpadding', 'cellspacing', 'align', 'valign',
+            'src', 'alt', 'draggable'
+        ];
+        try {
+            const _asDoc = new DOMParser().parseFromString(html || '', 'text/html');
+            const _asBody = _asDoc.body;
+            _asBody.querySelectorAll('script, iframe, object, embed, form, link, meta').forEach(e => e.remove());
+            _asBody.querySelectorAll('*').forEach(element => {
+                const tn = element.tagName.toLowerCase();
+                if (tn === 'input' && element.getAttribute('type') !== 'checkbox') { element.remove(); return; }
+                if (!_asTags.includes(tn)) {
+                    const sp = document.createElement('span');
+                    while (element.firstChild) sp.appendChild(element.firstChild);
+                    element.parentNode.replaceChild(sp, element);
+                    return;
+                }
+                Array.from(element.attributes).forEach(attr => {
+                    const an = attr.name.toLowerCase(), av = attr.value, avl = av.toLowerCase();
+                    if (an === 'href' && tn === 'a') {
+                        if (avl.startsWith('http://') || avl.startsWith('https://') || avl.startsWith('mailto:')) return;
+                    }
+                    if (an === 'src' && tn === 'img') {
+                        if (avl.startsWith('data:image/') || avl.startsWith('http://') || avl.startsWith('https://') || avl.startsWith('/')) return;
+                    }
+                    if (an.startsWith('on') || avl.includes('javascript:') ||
+                        (an === 'src' && tn !== 'img') || (an === 'href' && tn !== 'a') || !_asAttrs.includes(an)) {
+                        element.removeAttribute(attr.name);
+                    }
+                });
+                if (element.hasAttribute('style')) {
+                    const st = element.getAttribute('style');
+                    if (st && (st.includes('javascript:') || st.includes('expression(') || st.includes('@import'))) {
+                        element.removeAttribute('style');
+                    }
+                }
+            });
+            el.innerHTML = '';
+            while (_asBody.firstChild) el.appendChild(_asBody.firstChild);
+        } catch (_) { el.textContent = html || ''; }
     }
     _closePortal(animate = true) {
         if (!this._portalMenu) return;
@@ -4175,8 +4226,11 @@ class NotesApp {
         if (selection.rangeCount === 0) return;
         const range = selection.getRangeAt(0);
         range.deleteContents();
-        const fragment = document.createRange().createContextualFragment(this.sanitizeHtml(html));
-        range.insertNode(fragment);
+        const _tmpEl = document.createElement('div');
+        this._applySanitizedHtml(_tmpEl, html);
+        const _frag = document.createDocumentFragment();
+        while (_tmpEl.firstChild) _frag.appendChild(_tmpEl.firstChild);
+        range.insertNode(_frag);
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);

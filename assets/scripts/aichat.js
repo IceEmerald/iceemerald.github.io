@@ -331,7 +331,13 @@ let _toastTimer;
 function showToast(msg, type = "default") {
   const el = document.getElementById("custom-toast") || document.getElementById("aiToast");
   if (!el) return;
-  el.innerHTML = msg;
+  el.innerHTML = "";
+  try {
+    const _sd = new DOMParser().parseFromString(String(msg || ""), "text/html");
+    _sd.body.querySelectorAll("script,iframe,object,embed").forEach(e => e.remove());
+    _sd.body.querySelectorAll("*").forEach(e => Array.from(e.attributes).forEach(a => { if (/^on/i.test(a.name)) e.removeAttribute(a.name); }));
+    Array.from(_sd.body.childNodes).forEach(n => el.appendChild(document.importNode(n, true)));
+  } catch (_) { el.textContent = String(msg || ""); }
   const base = el.id === "custom-toast" ? "custom-toast" : "ai-toast";
   el.className = base + " show" + (type !== "default" ? " " + base + "--" + type : "");
   clearTimeout(_toastTimer);
@@ -2222,7 +2228,7 @@ async function handleSend() {
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
     if (_allSources.length) renderCitations(aiDiv, _allSources);
-    aiDiv.querySelector(".message-body").insertAdjacentHTML("beforeend", messageActionsHTML(msgId, displayText));
+    aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(msgId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
       aiDiv.dataset.modelName = _usedModelName || "";
@@ -2494,7 +2500,7 @@ async function regenerateMessage(msgEl) {
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
     if (_allSources.length) renderCitations(aiDiv, _allSources);
-    aiDiv.querySelector(".message-body").insertAdjacentHTML("beforeend", messageActionsHTML(newId, displayText));
+    aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(newId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
       aiDiv.dataset.modelName = _usedModelName || "";
@@ -2884,8 +2890,10 @@ function _refreshSettAvatarUI(name, avatarData) {
   if (nameEl) nameEl.textContent = name || "Your Name";
   if (avatarData) {
     if (imgEl) {
-      imgEl.src = avatarData;
-      imgEl.style.display = "block";
+      if (/^data:image\//.test(avatarData) || /^https?:\/\//.test(avatarData) || avatarData.startsWith("/")) {
+        imgEl.src = avatarData;
+        imgEl.style.display = "block";
+      }
     }
     if (initEl) initEl.style.display = "none";
     if (removeBtn) removeBtn.style.display = "inline-block";
@@ -3768,21 +3776,22 @@ function editMemory(id) {
   if (!m) return;
   const item = document.getElementById("mem_" + id);
   if (!item) return;
-  item.innerHTML = `
-    <textarea class="memory-edit-input" id="medit_${id}" rows="5">${escapeHtml(m.text)}</textarea>
-    <div class="memory-edit-actions">
-      <button class="memory-edit-save" onclick="saveEditMemory('${id}')" title="Save">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      </button>
-      <button class="memory-edit-cancel" onclick="renderMemoriesModal()" title="Cancel">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>`;
-  const ta = document.getElementById("medit_" + id);
-  if (ta) {
-    ta.focus();
-    ta.selectionStart = ta.value.length;
-  }
+  item.innerHTML = "";
+  const ta = document.createElement("textarea");
+  ta.className = "memory-edit-input"; ta.id = "medit_" + id; ta.rows = 5;
+  ta.textContent = m.text;
+  const actions = document.createElement("div"); actions.className = "memory-edit-actions";
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "memory-edit-save"; saveBtn.title = "Save";
+  saveBtn.addEventListener("click", () => saveEditMemory(id));
+  saveBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "memory-edit-cancel"; cancelBtn.title = "Cancel";
+  cancelBtn.addEventListener("click", () => renderMemoriesModal());
+  cancelBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  actions.appendChild(saveBtn); actions.appendChild(cancelBtn);
+  item.appendChild(ta); item.appendChild(actions);
+  ta.focus(); ta.selectionStart = ta.value.length;
 }
 function saveEditMemory(id) {
   const ta = document.getElementById("medit_" + id);
@@ -4046,7 +4055,7 @@ async function submitUserMsgEdit(msgId) {
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
     if (_allSources.length) renderCitations(aiDiv, _allSources);
-    aiDiv.querySelector(".message-body").insertAdjacentHTML("beforeend", messageActionsHTML(aiMsgId, dispText));
+    aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(aiMsgId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
       aiDiv.dataset.modelName = _usedModelName || "";
