@@ -1911,6 +1911,29 @@ function buildMessageActionsEl(msgId) {
   _actDiv.appendChild(_dislikeBtn);
   return _actDiv;
 }
+/* ─── Jailbreak hard-block: delete chat + show warning via existing toast ─── */
+function _handleHardBlockJailbreak(convId, msgId, textEl) {
+  // 1. Delete the conversation from storage + sidebar
+  if (convId) {
+    try {
+      deleteConv(convId);
+      if (state.convId === convId) {
+        state.convId = null;
+      }
+      renderHistorySidebar();
+    } catch (e) {
+      console.warn("Failed to delete conversation after hard-block:", e);
+    }
+  }
+
+  // 2. Show the standard warning toast (uses existing showToast + _aiSvgWarn)
+  showToast(`${_aiSvgWarn} Jailbreak attempt detected — conversation cleared.`, "error");
+
+  // 3. Replace the AI bubble with the standard md-error style
+  if (textEl) {
+    textEl.innerHTML = `<span class="md-error">Jailbreak attempt detected. The conversation has been cleared to protect the integrity of the assistant. Please start a new conversation.</span>`;
+  }
+}
 function appendAIMessageDOM(text, msgId, streaming = false) {
   const typingEl = $("typingIndicator");
   const div = document.createElement("div");
@@ -2117,6 +2140,19 @@ async function handleSend() {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
       _usedModelName = _m ? _m.name : _usedModelId;
+    }
+    // ─── Hard-block handling: jailbreak detected ───
+    // The worker's signature analyzer matched a hard-block pattern (token
+    // injection, "ignore previous instructions", DAN, etc.). Per product
+    // decision: delete the current conversation and show a warning embed.
+    if (_streamResult.safetyAction === "hard-block") {
+      _handleHardBlockJailbreak(state.convId, msgId, textEl);
+      updateLastMsgActions();
+      state.isStreaming = false;
+      state.abortCtrl = null;
+      setSendState(false);
+      scrollToBottom();
+      return;
     }
     while (finishReason === "MAX_TOKENS" && continueCount < MAX_CONTINUATIONS && !state.abortCtrl?.signal?.aborted) {
       continueCount++;
@@ -2592,6 +2628,7 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
   const usedModelId = res.headers.get("X-Model-Used") || requestedId;
   const usedModel = getModelById(usedModelId);
   const autoSwitched = res.headers.get("X-Auto-Switched") === "1";
+  const _safetyAction = res.headers.get("X-Safety-Action") || "";
   if (autoSwitched && requestedId !== "auto") {
     try {
       _switchToAutoDueToUnavailableModel(requestedId, "");
@@ -2676,7 +2713,7 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
     const reasonMap = { SAFETY: "Content blocked by safety filters", RECITATION: "Content blocked by recitation policy", OTHER: "Response blocked for an unknown reason" };
     throw new Error(reasonMap[finishReason] || `Response blocked: ${finishReason}`);
   }
-  return { finishReason, groundingMetadata, modelId: usedModelId };
+  return { finishReason, groundingMetadata, modelId: usedModelId, safetyAction: _safetyAction };
 }
 function extractGroundingSources(groundingMetadata) {
   if (!groundingMetadata) return [];
