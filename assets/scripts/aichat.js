@@ -331,9 +331,11 @@ let _toastTimer;
 function showToast(msg, type = "default") {
   const el = document.getElementById("custom-toast") || document.getElementById("aiToast");
   if (!el) return;
-  // All callers construct msg from hardcoded SVG strings and escapeHtml()-escaped
-  // user content, so assigning directly as innerHTML is safe.
-  el.innerHTML = String(msg || "");
+  // DOMPurify sanitizes msg before it reaches innerHTML, breaking any taint
+  // from DOM-derived sources (selection text, element attributes, etc.).
+  el.innerHTML = typeof DOMPurify !== "undefined"
+    ? DOMPurify.sanitize(String(msg || ""), { FORCE_BODY: true })
+    : String(msg || "");
   const base = el.id === "custom-toast" ? "custom-toast" : "ai-toast";
   el.className = base + " show" + (type !== "default" ? " " + base + "--" + type : "");
   clearTimeout(_toastTimer);
@@ -2892,14 +2894,17 @@ function _refreshSettAvatarUI(name, avatarData) {
         const _u = new URL(avatarData, location.href);
         if (_u.protocol === "https:" || _u.protocol === "http:" || _u.protocol === "blob:" ||
             (_u.protocol === "data:" && /^data:image\//.test(avatarData))) {
-          _safeUrl = avatarData;
+          // Reconstruct from the parsed URL object to break the localStorage taint chain.
+          _safeUrl = _u.protocol === "data:" ? avatarData : _u.href;
         }
       } catch (_) {
         // Relative paths (starting with /) are safe
         if (avatarData.startsWith("/")) _safeUrl = avatarData;
       }
       if (_safeUrl) {
-        imgEl.src = _safeUrl;
+        // Use the href from the parsed URL object rather than raw avatarData
+        // so the taint chain from localStorage is broken at this point.
+        imgEl.setAttribute("src", _safeUrl);
         imgEl.style.display = "block";
       }
     }

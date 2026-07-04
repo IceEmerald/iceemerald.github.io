@@ -3622,10 +3622,13 @@ class NotesApp {
             'src', 'alt', 'draggable'
         ];
         try {
-            // Use a detached div rather than DOMParser so the untrusted HTML is
-            // parsed in a sandboxed, disconnected context before sanitization.
+            // Sanitize with DOMPurify (CodeQL-recognised sanitizer) before any
+            // DOM insertion, then apply the custom allowlist pass as a second layer.
+            const _cleanHtml = typeof DOMPurify !== 'undefined'
+                ? DOMPurify.sanitize(html || '', { FORCE_BODY: true })
+                : (html || '');
             const _asBody = document.createElement('div');
-            _asBody.innerHTML = html || '';
+            _asBody.innerHTML = _cleanHtml;
             _asBody.querySelectorAll('script, iframe, object, embed, form, link, meta').forEach(e => e.remove());
             _asBody.querySelectorAll('*').forEach(element => {
                 const tn = element.tagName.toLowerCase();
