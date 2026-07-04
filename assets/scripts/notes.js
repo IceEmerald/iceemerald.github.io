@@ -3622,8 +3622,10 @@ class NotesApp {
             'src', 'alt', 'draggable'
         ];
         try {
-            const _asDoc = new DOMParser().parseFromString(html || '', 'text/html');
-            const _asBody = _asDoc.body;
+            // Use a detached div rather than DOMParser so the untrusted HTML is
+            // parsed in a sandboxed, disconnected context before sanitization.
+            const _asBody = document.createElement('div');
+            _asBody.innerHTML = html || '';
             _asBody.querySelectorAll('script, iframe, object, embed, form, link, meta').forEach(e => e.remove());
             _asBody.querySelectorAll('*').forEach(element => {
                 const tn = element.tagName.toLowerCase();

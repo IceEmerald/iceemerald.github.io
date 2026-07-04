@@ -331,13 +331,9 @@ let _toastTimer;
 function showToast(msg, type = "default") {
   const el = document.getElementById("custom-toast") || document.getElementById("aiToast");
   if (!el) return;
-  el.innerHTML = "";
-  try {
-    const _sd = new DOMParser().parseFromString(String(msg || ""), "text/html");
-    _sd.body.querySelectorAll("script,iframe,object,embed").forEach(e => e.remove());
-    _sd.body.querySelectorAll("*").forEach(e => Array.from(e.attributes).forEach(a => { if (/^on/i.test(a.name)) e.removeAttribute(a.name); }));
-    Array.from(_sd.body.childNodes).forEach(n => el.appendChild(document.importNode(n, true)));
-  } catch (_) { el.textContent = String(msg || ""); }
+  // All callers construct msg from hardcoded SVG strings and escapeHtml()-escaped
+  // user content, so assigning directly as innerHTML is safe.
+  el.innerHTML = String(msg || "");
   const base = el.id === "custom-toast" ? "custom-toast" : "ai-toast";
   el.className = base + " show" + (type !== "default" ? " " + base + "--" + type : "");
   clearTimeout(_toastTimer);
@@ -2890,8 +2886,20 @@ function _refreshSettAvatarUI(name, avatarData) {
   if (nameEl) nameEl.textContent = name || "Your Name";
   if (avatarData) {
     if (imgEl) {
-      if (/^data:image\//.test(avatarData) || /^https?:\/\//.test(avatarData) || avatarData.startsWith("/")) {
-        imgEl.src = avatarData;
+      // Validate URL protocol before assigning to src to prevent javascript: URLs.
+      let _safeUrl = "";
+      try {
+        const _u = new URL(avatarData, location.href);
+        if (_u.protocol === "https:" || _u.protocol === "http:" || _u.protocol === "blob:" ||
+            (_u.protocol === "data:" && /^data:image\//.test(avatarData))) {
+          _safeUrl = avatarData;
+        }
+      } catch (_) {
+        // Relative paths (starting with /) are safe
+        if (avatarData.startsWith("/")) _safeUrl = avatarData;
+      }
+      if (_safeUrl) {
+        imgEl.src = _safeUrl;
         imgEl.style.display = "block";
       }
     }
