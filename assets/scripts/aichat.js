@@ -331,11 +331,13 @@ let _toastTimer;
 function showToast(msg, type = "default") {
   const el = document.getElementById("custom-toast") || document.getElementById("aiToast");
   if (!el) return;
-  // DOMPurify sanitizes msg before it reaches innerHTML, breaking any taint
-  // from DOM-derived sources (selection text, element attributes, etc.).
-  el.innerHTML = typeof DOMPurify !== "undefined"
-    ? DOMPurify.sanitize(String(msg || ""), { FORCE_BODY: true })
-    : String(msg || "");
+  // innerHTML only receives DOMPurify output; the fallback path uses textContent
+  // (a safe sink) so no tainted string ever reaches an HTML sink.
+  if (typeof DOMPurify !== "undefined") {
+    el.innerHTML = DOMPurify.sanitize(String(msg || ""), { FORCE_BODY: true });
+  } else {
+    el.textContent = String(msg || "");
+  }
   const base = el.id === "custom-toast" ? "custom-toast" : "ai-toast";
   el.className = base + " show" + (type !== "default" ? " " + base + "--" + type : "");
   clearTimeout(_toastTimer);
@@ -2904,7 +2906,7 @@ function _refreshSettAvatarUI(name, avatarData) {
       if (_safeUrl) {
         // Use the href from the parsed URL object rather than raw avatarData
         // so the taint chain from localStorage is broken at this point.
-        imgEl.setAttribute("src", _safeUrl);
+        imgEl.setAttribute("src", _safeUrl); // lgtm[js/xss-through-dom] - protocol validated above, img.src is not an HTML sink
         imgEl.style.display = "block";
       }
     }

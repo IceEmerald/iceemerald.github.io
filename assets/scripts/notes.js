@@ -3622,13 +3622,14 @@ class NotesApp {
             'src', 'alt', 'draggable'
         ];
         try {
-            // Sanitize with DOMPurify (CodeQL-recognised sanitizer) before any
-            // DOM insertion, then apply the custom allowlist pass as a second layer.
-            const _cleanHtml = typeof DOMPurify !== 'undefined'
-                ? DOMPurify.sanitize(html || '', { FORCE_BODY: true })
-                : (html || '');
+            // innerHTML only receives DOMPurify output; the fallback path uses
+            // textContent (a safe sink) so no tainted string reaches an HTML sink.
             const _asBody = document.createElement('div');
-            _asBody.innerHTML = _cleanHtml;
+            if (typeof DOMPurify !== 'undefined') {
+                _asBody.innerHTML = DOMPurify.sanitize(html || '', { FORCE_BODY: true });
+            } else {
+                _asBody.textContent = html || '';
+            }
             _asBody.querySelectorAll('script, iframe, object, embed, form, link, meta').forEach(e => e.remove());
             _asBody.querySelectorAll('*').forEach(element => {
                 const tn = element.tagName.toLowerCase();
