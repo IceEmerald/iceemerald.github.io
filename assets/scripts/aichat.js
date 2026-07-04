@@ -4019,10 +4019,6 @@ async function submitUserMsgEdit(msgId) {
     }
   } catch (err) {
     if (err?._jailbreakBlocked) {
-      // Jailbreak attempt detected on a regenerated/edited message.
-      // Same teardown as handleSend: delete the conversation, return
-      // to welcome, refresh sidebar, show toast. No assistant message
-      // is rendered.
       typingEl.style.display = "none";
       if (state.convId && !state.isTemp) {
         deleteConv(state.convId);
