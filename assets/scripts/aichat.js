@@ -81,14 +81,19 @@ const MEMORY_KEY = "en_chat_memory";
 const OB_KEY = "en_onboarded";
 async function migrateChatStorageToIndexedDB() {
   if (!window.EmeraldIDBStorage) return;
-  await window.EmeraldIDBStorage.ready();
-  await Promise.all([
-    window.EmeraldIDBStorage.migrateLocalJSON(CONV_KEY),
-    window.EmeraldIDBStorage.migrateLocalJSON(LIB_KEY),
-    window.EmeraldIDBStorage.migrateLocalJSON(SETTINGS_KEY),
-    window.EmeraldIDBStorage.migrateLocalJSON(MEMORY_KEY),
-    window.EmeraldIDBStorage.migrateLocalJSON(OB_KEY)
-  ]);
+  try {
+    await window.EmeraldIDBStorage.ready();
+    await Promise.all([
+      window.EmeraldIDBStorage.migrateLocalJSON(CONV_KEY),
+      window.EmeraldIDBStorage.migrateLocalJSON(LIB_KEY),
+      window.EmeraldIDBStorage.migrateLocalJSON(SETTINGS_KEY),
+      window.EmeraldIDBStorage.migrateLocalJSON(MEMORY_KEY),
+      window.EmeraldIDBStorage.migrateLocalJSON(OB_KEY)
+    ]);
+  } catch (err) {
+    // Migration failure shouldn't crash init — log so it's not invisible.
+    console.warn("migrateChatStorageToIndexedDB failed:", err);
+  }
 }
 let state = {
   convId: null,
@@ -310,7 +315,9 @@ function getUserName() {
 }
 function getUserInitials() {
   const n = loadSettings().userName || "You";
-  return n.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "U";
+  // Use regex split so consecutive spaces / leading-trailing whitespace don't
+  // produce "undefined" in the initials (e.g. "Foo  Bar" used to yield "Fu").
+  return (n.match(/\b\w/g) || ["U"]).join("").slice(0, 2).toUpperCase() || "U";
 }
 let _toastTimer;
 function showToast(msg, type = "default") {
@@ -443,7 +450,9 @@ async function ctxCopyText() {
   }
   const ok = await safeCopy(selectedText);
   if (ok) {
-    const preview = escHtml(truncate(selectedText, 100));
+    // `escHtml` / `truncate` were never defined in this codebase — use the
+    // real `escapeHtml` helper and inline the truncation.
+    const preview = escapeHtml(selectedText.length > 100 ? selectedText.slice(0, 100) + "…" : selectedText);
     showToast(`${_aiSvgCopy} Copied: "${preview}"`);
   } else {
     showToast(`${_aiSvgWarn} Failed to copy.`);
@@ -654,7 +663,8 @@ function setupMarked() {
       const pi = (c) => {
         const raw = typeof c === "object" ? c.text ?? "" : String(c ?? "");
         try {
-          return marked.parseInline(raw);
+          const inline = marked.parseInline(raw);
+          return typeof DOMPurify !== "undefined" ? DOMPurify.sanitize(inline, { ADD_ATTR: ["target"] }) : inline;
         } catch {
           return escapeHtml(raw);
         }
@@ -711,6 +721,9 @@ function renderMarkdown(raw) {
   });
   text = text.replace(/\x02CODEBLOCK(\d+)\x02/g, (_, i) => codeBlocks[+i]);
   let html = marked.parse(text);
+  if (typeof DOMPurify !== "undefined") {
+    html = DOMPurify.sanitize(html, { ADD_ATTR: ["target"] });
+  }
   html = html.replace(/MATHBLOCK(\d+)MATHBLOCK/g, (_, i) => {
     try {
       return typeof katex !== "undefined" ? `<div class="md-math-block">${katex.renderToString(mathBlocks[i].src, { throwOnError: false, displayMode: true })}</div>` : `<pre>$$${mathBlocks[i].src}$$</pre>`;
@@ -726,12 +739,6 @@ function renderMarkdown(raw) {
     }
   });
   return html;
-}
-function setMessageTextMarkdown(el, raw) {
-  if (!el) return;
-  const text = String(raw || "").trim();
-  el.classList.toggle("message-text--empty", !text);
-  el.innerHTML = text ? renderMarkdown(text) : "";
 }
 function _streamDisplayText(raw) {
   let t = String(raw || "");
@@ -867,20 +874,6 @@ function blobToDataURL(blob) {
     reader.readAsDataURL(blob);
   });
 }
-function getLatestUserImageInput() {
-  if (!state.convId) return null;
-  const conv = getConv(state.convId);
-  if (!conv || !conv.messages) return null;
-  for (let i = conv.messages.length - 1; i >= 0; i--) {
-    const m = conv.messages[i];
-    if (m.role !== "user") continue;
-    const files = m.files || [];
-    const imgFile = files.find((f) => f.type && f.type.startsWith("image/") && f.data);
-    if (imgFile) return imgFile.data;
-    return null;
-  }
-  return null;
-}
 async function copyCode(btn) {
   try {
     let text = "";
@@ -971,8 +964,26 @@ function createPreviewSrcdoc(html, css, js) {
     };
   }
   try {
-    Object.defineProperty(window, 'localStorage', { value: makeStorage(), configurable: true });
-    Object.defineProperty(window, 'sessionStorage', { value: makeStorage(), configurable: true });
+    // In a sandboxed iframe (no allow-same-origin), accessing the native
+    // localStorage throws SecurityError. The native property is often
+    // non-configurable, so Object.defineProperty alone may silently fail.
+    // Strategy: try delete first, then defineProperty with writable:true,
+    // then verify it took effect, with a final fallback to direct assignment.
+    function installStorage(name, shim) {
+      try {
+        try { delete window[name]; } catch (e) {}
+        Object.defineProperty(window, name, {
+          value: shim, configurable: true, writable: true, enumerable: true
+        });
+        if (window[name] !== shim) throw new Error('defineProperty did not take');
+        return true;
+      } catch (err) {
+        try { window[name] = shim; if (window[name] === shim) return true; } catch (e2) {}
+        return false;
+      }
+    }
+    installStorage('localStorage', makeStorage());
+    installStorage('sessionStorage', makeStorage());
   } catch (err) {}
 })();
 <\/script>`;
@@ -1176,6 +1187,11 @@ function closeCodePreviewPanel() {
   }, 320);
 }
 window.addEventListener("message", (event) => {
+  // Restrict to the code-preview iframe. Without this check, any frame/ad/
+  // widget on the page could spoof "emerald-code-error" toasts. The sandboxed
+  // iframe has a null origin, so we match by contentWindow reference instead.
+  const previewFrame = document.querySelector("#codePreviewBody iframe");
+  if (previewFrame && event.source !== previewFrame.contentWindow) return;
   if (event.data?.type === "emerald-code-error") {
     showToast(`${_aiSvgError} Preview error: ${escapeHtml(event.data.message || "The code could not run.")}`);
   }
@@ -1201,19 +1217,6 @@ function moveLibTabIndicator(tabEl) {
   indicator.style.width = indW + "px";
   indicator.style.left = center - indW / 2 + "px";
 }
-function appendStreamWords(textEl, chunk) {
-  const parts = chunk.split(/(\s+)/);
-  parts.forEach((part, idx) => {
-    if (part === "") return;
-    const span = document.createElement("span");
-    span.className = "stream-word";
-    span.style.animationDelay = `${idx * 12}ms`;
-    span.textContent = part;
-    textEl.appendChild(span);
-  });
-}
-function _updateWelcomeSpacer(active) {
-}
 function showWelcome() {
   const GREETINGS = [
     (n) => `How can I help, ${n}?`,
@@ -1232,13 +1235,11 @@ function showWelcome() {
   $("messagesArea").innerHTML = typingIndicatorHTML();
   updateTopbarTitle("");
   if ($("tempChatBtn")) $("tempChatBtn").style.display = "";
-  requestAnimationFrame(() => _updateWelcomeSpacer(true));
 }
 function showMessages() {
   $("welcomeScreen").style.display = "none";
   $("messagesArea").style.display = "flex";
   if ($("tempChatBtn")) $("tempChatBtn").style.display = "none";
-  _updateWelcomeSpacer(false);
 }
 function typingIndicatorHTML() {
   return `<div class="message" id="typingIndicator" style="display:none;">
@@ -1451,6 +1452,21 @@ function closeFilePreviewPanel() {
   const panel = $("filePreviewPanel");
   if (!panel || !panel.classList.contains("open")) return;
   panel.classList.add("closing");
+  // Release viewer state and pdfjs/PPTX resources retained on window.
+  const body = $("fpPanelBody");
+  if (body) {
+    if (body._pptxRO) { try { body._pptxRO.disconnect(); } catch (e) {} body._pptxRO = null; }
+    // Clean up any __pp_* / __pf_* keys we created.
+    Object.keys(window).forEach((k) => {
+      if (/^__(pp|pf)_(pptx|pdf)\d+$/.test(k)) {
+        const v = window[k];
+        if (v && typeof v.pdf === "object" && typeof v.pdf.destroy === "function") {
+          try { v.pdf.destroy(); } catch (e) {}
+        }
+        try { delete window[k]; } catch (e) {}
+      }
+    });
+  }
   setTimeout(() => {
     panel.classList.remove("open", "closing");
   }, 320);
@@ -1505,7 +1521,17 @@ async function renderPptxSlides(fileData, body) {
       const doc = new DOMParser().parseFromString(clean, "text/xml");
       let bg = "#FFFFFF";
       const bgEl = doc.querySelector("bg solidFill srgbClr") || doc.querySelector("bg solidFill sysClr");
-      if (bgEl) bg = "#" + (bgEl.getAttribute("val") || bgEl.getAttribute("lastClr") || "FFFFFF");
+      if (bgEl) {
+        // srgbClr uses `val` (RGB hex); sysClr uses `val` (system color name
+        // like 'windowText') + `lastClr` (resolved RGB hex). The old code
+        // preferred `val` for both, which produced invalid colors like
+        // '#windowText' for sysClr backgrounds.
+        const tag = bgEl.tagName.toLowerCase();
+        const hex = tag === 'sysclr'
+          ? (bgEl.getAttribute('lastClr') || bgEl.getAttribute('val'))
+          : bgEl.getAttribute('val');
+        bg = '#' + (hex || 'FFFFFF');
+      }
       let html = `<div class="pptx-slide" style="background:${bg};width:${RW}px;height:${RH}px;position:relative;font-family:Calibri,Arial,sans-serif;">`;
       doc.querySelectorAll("sp, pic").forEach((el) => {
         const xfrm = el.querySelector("spPr > xfrm") || el.querySelector("xfrm");
@@ -1563,9 +1589,17 @@ async function renderPptxSlides(fileData, body) {
     };
     window[`__pp_${vid}`] = { s: slideHtmls, i: 0, rw: RW, rh: RH, doScale };
     setTimeout(doScale, 0);
-    if (window.ResizeObserver) new ResizeObserver(() => {
-      if (_fpZoom === 1) doScale();
-    }).observe(body);
+    // Disconnect any previous ResizeObserver on body before installing a new
+    // one — otherwise each PPTX preview stacks a new observer with stale
+    // closures over the old doScale / RW / RH.
+    if (body._pptxRO) { try { body._pptxRO.disconnect(); } catch (e) {} }
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => {
+        if (_fpZoom === 1) doScale();
+      });
+      ro.observe(body);
+      body._pptxRO = ro;
+    }
   } catch (e) {
     console.error("PPTX render:", e);
     body.innerHTML = '<div class="fp-nopreview"><p>Could not render slides</p><small>' + escapeHtml(String(e)) + "</small></div>";
@@ -1593,10 +1627,6 @@ function _fpZoomIn() {
 }
 function _fpZoomOut() {
   _fpZoom = Math.max(0.25, +(_fpZoom - 0.25).toFixed(2));
-  _fpApplyZoom();
-}
-function _fpZoomReset() {
-  _fpZoom = 1;
   _fpApplyZoom();
 }
 function _fpApplyZoom() {
@@ -1703,9 +1733,11 @@ async function _pdfRenderPage(vid, n) {
         });
         wrap.appendChild(tl);
       } catch (e) {
+        console.warn("PDF text layer build failed:", e);
       }
     }, 0);
   } catch (e) {
+    console.warn("PDF text content extraction failed:", e);
   }
   const ctr = document.getElementById(`${vid}-ctr`);
   if (ctr) ctr.textContent = `${n} / ${d.total}`;
@@ -1714,7 +1746,14 @@ window._pdfGo = async function(vid, dir) {
   const d = window[`__pf_${vid}`];
   if (!d) return;
   d.cur = Math.max(1, Math.min(d.total, d.cur + dir));
-  await _pdfRenderPage(vid, d.cur);
+  // _pdfRenderPage can reject (corrupt PDF, page out-of-range). Without a
+  // catch this surfaces as an unhandled rejection since callers ignore the
+  // returned promise. Surface the error to the user instead.
+  try {
+    await _pdfRenderPage(vid, d.cur);
+  } catch (err) {
+    showToast(`${_aiSvgError} Could not render page ${d.cur}: ${escapeHtml(String(err.message || err))}`);
+  }
 };
 async function renderDocxCustom(fileData, body) {
   body.innerHTML = '<div class="fp-loading"><svg class="fp-spin" viewBox="0 0 50 50" width="36" height="36"><circle cx="25" cy="25" r="20" fill="none" stroke="#4caf7d" stroke-width="4" stroke-dasharray="80 20"/></svg><p>Loading document\u2026</p></div>';
@@ -1875,15 +1914,6 @@ function updateLastMsgActions() {
     }
   });
 }
-async function copyMsgById(msgId) {
-  const el = document.querySelector(`[data-msg-id="${msgId}"] .message-text`);
-  const text = el?.innerText || "";
-  const ok = await safeCopy(text);
-  showToast(
-    ok ? `${_aiSvgCopy} Copied to clipboard` : `${_aiSvgError} Failed to copy`,
-    ok ? "success" : "error"
-  );
-}
 function rateMsg(btn, type) {
   const already = btn.classList.contains("rated");
   document.querySelectorAll(".msg-action-btn.rated").forEach((b) => b.classList.remove("rated"));
@@ -1978,8 +2008,16 @@ async function handleSend() {
             }
             if (readmeRes.ok) {
               const rm = await readmeRes.json();
-              const decoded = atob(rm.content.replace(/\n/g, ""));
-              parts.push("\n[README.md]\n" + decoded.slice(0, 6e3));
+              // atob returns a byte-string, not a UTF-8 string — non-ASCII
+              // READMEs (emoji, accents, CJK) became mojibake. Decode via
+              // TextDecoder so multi-byte sequences are interpreted as UTF-8.
+              if (rm?.content) {
+                const bin = atob(rm.content.replace(/\n/g, ""));
+                const u8 = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+                const decoded = new TextDecoder("utf-8").decode(u8);
+                parts.push("\n[README.md]\n" + decoded.slice(0, 6e3));
+              }
             }
             const pageContent = parts.join("\n");
             const last = history[history.length - 1];
@@ -2003,6 +2041,8 @@ async function handleSend() {
           if (last?.parts?.length) last.parts[0] = { text: ctx + (last.parts[0]?.text || "") };
         }
       } catch (e) {
+        console.warn("Web search failed:", e);
+        showToast(`${_aiSvgWarn} Web search unavailable — proceeding without context.`);
       }
     }
     _setLabel(null);
@@ -2106,11 +2146,18 @@ async function handleSend() {
       try {
         quizData = JSON.parse(quizMatch[1]);
       } catch (e) {
+        // Don't silently strip the quiz block when JSON parsing fails —
+        // otherwise the user loses both the quiz AND visibility into what
+        // the model actually returned. Leave displayText untouched.
+        console.warn("Quiz JSON parse failed:", e);
       }
-      const qStart = displayText.indexOf("<quiz>");
-      beforeQuizText = displayText.slice(0, qStart).trim();
-      afterQuizText = displayText.slice(qStart + quizMatch[0].length).trim();
-      displayText = displayText.slice(0, qStart).trim();
+      // Only slice displayText if we successfully parsed the quiz.
+      if (quizData) {
+        const qStart = displayText.indexOf("<quiz>");
+        beforeQuizText = displayText.slice(0, qStart).trim();
+        afterQuizText = displayText.slice(qStart + quizMatch[0].length).trim();
+        displayText = displayText.slice(0, qStart).trim();
+      }
     }
     textEl.classList.remove("stream-reveal");
     const _textToShow = quizData ? beforeQuizText : displayText;
@@ -2173,11 +2220,12 @@ async function handleSend() {
       upsertConv(conv);
     } else {
       state.tempHistory.push({ role: "model", parts: [{ text: savedText }] });
-      if (quizData) state.tempHistory.push({ role: "user", parts: [{ text: "" }] });
+      // Empty-string user parts make the Gemini API reject the next request
+      // with a 400. Use a non-empty placeholder so buildHistory stays valid.
+      if (quizData) state.tempHistory.push({ role: "user", parts: [{ text: "[User started a quiz — no text message]" }] });
     }
     if (_imgPrompt) {
-      const _imgInput = getLatestUserImageInput();
-      processImageGenTag(aiDiv, _imgPrompt, state.convId, msgId, _imgInput);
+      processImageGenTag(aiDiv, _imgPrompt, state.convId, msgId);
     }
   }
   updateLastMsgActions();
@@ -2303,6 +2351,8 @@ async function regenerateMessage(msgEl) {
         if (last?.parts?.length) last.parts[0] = { text: ctx + (last.parts[0]?.text || "") };
       }
     } catch (e) {
+      console.warn("Web search failed:", e);
+      showToast(`${_aiSvgWarn} Web search unavailable — proceeding without context.`);
     }
   }
   let _groundingMetadata = null;
@@ -2372,11 +2422,14 @@ async function regenerateMessage(msgEl) {
       try {
         quizData = JSON.parse(quizMatch[1]);
       } catch (e) {
+        console.warn("Quiz JSON parse failed:", e);
       }
-      const qStart = displayText.indexOf("<quiz>");
-      beforeQuizText = displayText.slice(0, qStart).trim();
-      afterQuizText = displayText.slice(qStart + quizMatch[0].length).trim();
-      displayText = displayText.slice(0, qStart).trim();
+      if (quizData) {
+        const qStart = displayText.indexOf("<quiz>");
+        beforeQuizText = displayText.slice(0, qStart).trim();
+        afterQuizText = displayText.slice(qStart + quizMatch[0].length).trim();
+        displayText = displayText.slice(0, qStart).trim();
+      }
     }
     textEl.classList.remove("stream-reveal");
     const _regenTextToShow = quizData ? beforeQuizText : displayText;
@@ -2443,8 +2496,7 @@ async function regenerateMessage(msgEl) {
     upsertConv(conv);
     updateRegenNavDOM(regenBranchId);
     if (imgPrompt) {
-      const _imgInput = getLatestUserImageInput();
-      processImageGenTag(aiDiv, imgPrompt, state.convId, newId, _imgInput);
+      processImageGenTag(aiDiv, imgPrompt, state.convId, newId);
     }
   }
   updateLastMsgActions();
@@ -2638,9 +2690,11 @@ async function processFileForAttachment(f) {
         }
       }
       if ((ext === "pptx" || ext === "docx") && f.size <= 25 * 1024 * 1024) {
-        const dataUrl = await new Promise((r) => {
+        const dataUrl = await new Promise((resolve, reject) => {
           const fr = new FileReader();
-          fr.onload = (e) => r(e.target.result);
+          fr.onload = (e) => resolve(e.target.result);
+          fr.onerror = () => reject(fr.error || new Error("FileReader failed"));
+          fr.onabort = () => reject(new Error("FileReader aborted"));
           fr.readAsDataURL(f);
         });
         state.attachments.push({ name: f.name, type: f.type, size: f.size, data: dataUrl, extractedText: text.slice(0, 12e4) });
@@ -2653,13 +2707,15 @@ async function processFileForAttachment(f) {
       console.warn("Office extract failed:", e);
     }
   }
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       state.attachments.push({ name: f.name, type: f.type, size: f.size, data: e.target.result });
       renderAttachmentPreviews();
       resolve();
     };
+    reader.onerror = () => reject(reader.error || new Error("FileReader failed"));
+    reader.onabort = () => reject(new Error("FileReader aborted"));
     reader.readAsDataURL(f);
   });
 }
@@ -2725,11 +2781,14 @@ function renderLibraryModal() {
     if (filter === "archives") return f.type?.includes("zip") || f.type?.includes("pptx") || f.type?.includes("presentation");
     return true;
   });
-  const validLib = filtered.filter((f) => convs.find((c) => c.id === f.convId));
-  if (validLib.length !== (S.get(LIB_KEY) || []).length) {
-    const allLib = loadLib().filter((f) => convs.find((c) => c.id === f.convId));
+  // `validLib.length` is the FILTERED count; comparing it against the TOTAL
+  // stored-lib count made this branch fire on every modal open with a filter.
+  // Compare total-valid against total-stored instead.
+  const allLib = loadLib().filter((f) => convs.find((c) => c.id === f.convId));
+  if (allLib.length !== loadLib().length) {
     saveLib(allLib);
   }
+  const validLib = filtered.filter((f) => convs.find((c) => c.id === f.convId));
   const list = $("libList");
   if (!list) return;
   if (validLib.length === 0) {
@@ -2819,11 +2878,14 @@ function _refreshSettAvatarUI(name, avatarData) {
 async function handleAvatarUpload(input) {
   const f = input.files[0];
   if (!f) return;
+  let objUrl = null;
   try {
     const img = new Image();
-    img.src = URL.createObjectURL(f);
-    await new Promise((resolve) => {
+    objUrl = URL.createObjectURL(f);
+    img.src = objUrl;
+    await new Promise((resolve, reject) => {
       img.onload = resolve;
+      img.onerror = () => reject(new Error("Could not decode image. Please choose a valid image file."));
     });
     const canvas = document.createElement("canvas");
     canvas.width = 64;
@@ -2850,6 +2912,9 @@ async function handleAvatarUpload(input) {
   } catch (err) {
     console.error(err);
     showToast("Failed to process avatar", "error");
+  } finally {
+    // Guarantee cleanup even if decoding threw — prevents object-URL leak.
+    if (objUrl) URL.revokeObjectURL(objUrl);
   }
   input.value = "";
 }
@@ -3027,15 +3092,6 @@ function onModelUsed(model) {
     sel.classList.remove("is-active");
   }, 1200);
 }
-function setActiveModelBadge(modelId, opts = {}) {
-  if (getSelectedModelId() === "auto") return;
-  const model = getModelById(modelId);
-  if (!model) return;
-  const nameEl = $("modelSelectorName");
-  if (nameEl) nameEl.textContent = model.name;
-  if (!opts.silent) {
-  }
-}
 document.addEventListener("click", (e) => {
   const sel = $("modelSelector");
   if (!sel || !sel.classList.contains("open")) return;
@@ -3095,11 +3151,14 @@ function _obShowAvatarImg(src) {
 async function _obAvatarUpload(input) {
   const f = input.files[0];
   if (!f) return;
+  let objUrl = null;
   try {
     const imgEl = new Image();
-    imgEl.src = URL.createObjectURL(f);
-    await new Promise((r) => {
-      imgEl.onload = r;
+    objUrl = URL.createObjectURL(f);
+    imgEl.src = objUrl;
+    await new Promise((resolve, reject) => {
+      imgEl.onload = resolve;
+      imgEl.onerror = () => reject(new Error("Could not decode image."));
     });
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 96;
@@ -3111,6 +3170,9 @@ async function _obAvatarUpload(input) {
     _obShowAvatarImg(_obPendingAvatar);
   } catch (e) {
     showToast("Could not load image", "error");
+  } finally {
+    // Guarantee cleanup even if decoding threw — prevents object-URL leak.
+    if (objUrl) URL.revokeObjectURL(objUrl);
   }
   input.value = "";
 }
@@ -3142,9 +3204,9 @@ function _obMemoryPreview() {
   if (importBtn) {
     importBtn.style.display = "";
   }
-  if (countEl) {
-    countEl.textContent = ` (${_obParsedMemories.length})`;
-  }
+  // `countEl` was referenced but never declared — would throw ReferenceError
+  // on every input event after memories are found. The title above already
+  // shows the count, so the orphan block is removed.
 }
 function _obImportMemory() {
   const rawInput = $("obMemoryInput")?.value || "";
@@ -3216,12 +3278,14 @@ function _obFinish() {
 async function init() {
   try {
     refreshModelSelectorUI();
-  } catch {
+  } catch (e) {
+    console.warn("init: refreshModelSelectorUI failed:", e);
   }
   requestAnimationFrame(() => {
     try {
       refreshModelSelectorUI();
-    } catch {
+    } catch (e) {
+      console.warn("init: refreshModelSelectorUI (raf) failed:", e);
     }
   });
   await migrateChatStorageToIndexedDB();
@@ -3233,7 +3297,8 @@ async function init() {
   checkOnboarding();
   try {
     refreshModelSelectorUI();
-  } catch {
+  } catch (e) {
+    console.warn("init: refreshModelSelectorUI (post-onboarding) failed:", e);
   }
   const textarea = $("chatInput");
   textarea?.addEventListener("input", function() {
@@ -3482,6 +3547,11 @@ My answer: "${e.a}"${e.rubric ? `
   if (input) {
     input.value = prompt;
     input.focus();
+    // Don't silently no-op when a stream is in progress — tell the user.
+    if (state.isStreaming) {
+      showToast(`${_aiSvgWarn} Please wait — the AI is still responding. Your question is in the input box.`);
+      return;
+    }
     handleSend();
   }
 };
@@ -3840,6 +3910,8 @@ async function submitUserMsgEdit(msgId) {
         if (last?.parts?.length) last.parts[0] = { text: ctx + (last.parts[0]?.text || "") };
       }
     } catch (e) {
+      console.warn("Web search failed:", e);
+      showToast(`${_aiSvgWarn} Web search unavailable — proceeding without context.`);
     }
   }
   let _groundingMetadata = null;
@@ -3902,11 +3974,14 @@ async function submitUserMsgEdit(msgId) {
       try {
         quizData = JSON.parse(quizMatch[1]);
       } catch (e) {
+        console.warn("Quiz JSON parse failed:", e);
       }
-      const qStart = dispText.indexOf("<quiz>");
-      beforeQuizText = dispText.slice(0, qStart).trim();
-      afterQuizText = dispText.slice(qStart + quizMatch[0].length).trim();
-      dispText = dispText.slice(0, qStart).trim();
+      if (quizData) {
+        const qStart = dispText.indexOf("<quiz>");
+        beforeQuizText = dispText.slice(0, qStart).trim();
+        afterQuizText = dispText.slice(qStart + quizMatch[0].length).trim();
+        dispText = dispText.slice(0, qStart).trim();
+      }
     }
     aiTextEl.classList.remove("stream-reveal");
     const _editTextToShow = quizData ? beforeQuizText : dispText;
@@ -3972,8 +4047,7 @@ async function submitUserMsgEdit(msgId) {
       state.tempHistory.push({ role: "model", parts: [{ text: aiFullText }] });
     }
     if (imgPrompt) {
-      const _imgInput = getLatestUserImageInput();
-      processImageGenTag(aiDiv, imgPrompt, state.convId, aiMsgId, _imgInput);
+      processImageGenTag(aiDiv, imgPrompt, state.convId, aiMsgId);
     }
   }
   updateLastMsgActions();
@@ -4111,8 +4185,6 @@ function extractUrls(text) {
     }
   }
   return [.../* @__PURE__ */ new Set([...full, ...bare])];
-}
-function toggleWebSearch() {
 }
 function togglePreviewConsole() {
   const body = document.getElementById("codePreviewBody");
@@ -4307,17 +4379,16 @@ function detectAspectRatio(prompt) {
   if (/\b(presentation slide|slide deck|16x10)\b/.test(p)) return "16:9";
   return "1:1";
 }
-async function processImageGenTag(aiDiv, prompt, convId, msgId, inputImage) {
+async function processImageGenTag(aiDiv, prompt, convId, msgId) {
   const body = aiDiv?.querySelector(".message-body");
   if (!body) return;
-  const isImg2Img = !!inputImage;
   const loadEl = document.createElement("div");
   loadEl.className = "img-gen-loading";
   loadEl.innerHTML = `
     <div class="img-gen-loading-inner">
       <span class="img-gen-spinner"></span>
       <div class="img-gen-loading-text">
-        <span class="img-gen-loading-title">${isImg2Img ? "Editing image" : "Generating image"}</span>
+        <span class="img-gen-loading-title">Generating image</span>
         <span class="img-gen-loading-sub">This may take a few seconds\u2026</span>
       </div>
     </div>`;
@@ -4326,10 +4397,9 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId, inputImage) {
   try {
     const reqBody = {
       prompt,
-      aspect_ratio: isImg2Img ? "match_input_image" : detectAspectRatio(prompt),
+      aspect_ratio: detectAspectRatio(prompt),
       output_format: "png"
     };
-    if (isImg2Img) reqBody.image = inputImage;
     const res = await fetch(IMAGE_WORKER_URL + "/", {
       method: "POST",
       headers: {
@@ -4345,7 +4415,7 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId, inputImage) {
         errDetail = errJson?.error || errJson?.details || "";
       } catch {
       }
-      const _errMsg = errDetail ? `Image generation failed.` : `Image generation failed.`;
+      const _errMsg = errDetail ? `Image generation failed: ${errDetail}` : `Image generation failed.`;
       const textEl = body?.querySelector(".message-text");
       if (textEl) {
         textEl.classList.remove("message-text--empty");
@@ -4388,7 +4458,6 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId, inputImage) {
         if (savedMsg) {
           savedMsg.imageData = dataUrl;
           savedMsg.imagePrompt = prompt;
-          if (isImg2Img) savedMsg.imageInput = inputImage;
           if (imageModelId) {
             savedMsg.imageModelId = imageModelId;
             savedMsg.imageModelName = imageModelName;
