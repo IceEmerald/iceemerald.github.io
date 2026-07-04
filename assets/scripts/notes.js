@@ -445,7 +445,12 @@ class NotesApp {
         }
         const names = ['Jade', 'Nova', 'Luna', 'Kai', 'Aria', 'Echo', 'Onyx', 'Ariel', 'Zara', 'Orion'];
         const colors = ['#00b894', '#0984e3', '#6c5ce7', '#e17055', '#00cec9', '#fdcb6e', '#ff7675', '#74b9ff', '#55efc4', '#ffeaa7'];
-        const _rnd = (n) => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+        const _rnd = (n) => {
+            const max = Math.floor(0x100000000 / n) * n;
+            let x;
+            do { x = crypto.getRandomValues(new Uint32Array(1))[0]; } while (x >= max);
+            return x % n;
+        };
         const randomName = names[_rnd(names.length)];
         const randomNumber = _rnd(90) + 10;
         const collaborator = {
@@ -2563,9 +2568,8 @@ class NotesApp {
             div.addEventListener('mouseenter', () => { div.style.boxShadow = `0 8px 24px ${hoverShadow}`; });
             div.addEventListener('mouseleave', () => { div.style.boxShadow = `0 4px 16px ${restingShadow}`; });
         }
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = note.content;
-        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        const _parsed1 = new DOMParser().parseFromString(note.content || '', 'text/html');
+        const plainText = _parsed1.body.textContent || '';
         const preview = plainText.substring(0, 150);
         const date = new Date(note.modifiedAt);
         const isLiveNote = note._isCollabNote || this._isCollabNoteId(note.id);
@@ -2603,9 +2607,8 @@ class NotesApp {
                     card.classList.add(colorClasses[colorIndex]);
                 }
             }
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = note.content;
-            const plainText = tempDiv.textContent || tempDiv.innerText || '';
+            const _parsed2 = new DOMParser().parseFromString(note.content || '', 'text/html');
+            const plainText = _parsed2.body.textContent || '';
             const preview = plainText.substring(0, 100);
             const date = new Date(note.modifiedAt);
             const formattedDate = this.formatDate(date);
@@ -3563,8 +3566,8 @@ class NotesApp {
             'src', 'alt', 'draggable'
         ];
         try {
-            const div = document.createElement('div');
-            div.innerHTML = html;
+            const _sanDoc = new DOMParser().parseFromString(html || '', 'text/html');
+            const div = _sanDoc.body;
             div.querySelectorAll('script, iframe, object, embed, form, link, meta').forEach(el => el.remove());
             div.querySelectorAll('*').forEach(element => {
                 const tagName = element.tagName.toLowerCase();

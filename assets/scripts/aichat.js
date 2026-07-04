@@ -284,7 +284,9 @@ function deleteConv(id) {
   saveLib(loadLib().filter((f) => f.convId !== id));
 }
 function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const _b = new Uint8Array(8);
+  crypto.getRandomValues(_b);
+  return Array.from(_b, x => x.toString(16).padStart(2, '0')).join('');
 }
 async function safeCopy(text) {
   try {
@@ -637,7 +639,9 @@ function setupMarked() {
     const escapedLang = escapeHtml(language);
     window._codeStore = window._codeStore || {};
     window._codeMeta = window._codeMeta || {};
-    const cid = "cs_" + Math.random().toString(36).slice(2, 10);
+    const _cidBytes = new Uint8Array(6);
+    crypto.getRandomValues(_cidBytes);
+    const cid = "cs_" + Array.from(_cidBytes, b => b.toString(16).padStart(2, '0')).join('');
     window._codeStore[cid] = code;
     window._codeMeta[cid] = { code, language };
     return `<div class="md-code-block" data-cid="${cid}" data-lang="${escapeHtmlAttr(language)}">
@@ -1227,7 +1231,8 @@ function showWelcome() {
   ];
   const name = (loadSettings().userName || "").trim();
   const displayName = name && name !== "You" ? name : "User";
-  const pick = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+  const _greetIdx = crypto.getRandomValues(new Uint32Array(1))[0] % GREETINGS.length;
+  const pick = GREETINGS[_greetIdx];
   const heading = $("welcomeHeading");
   if (heading) heading.textContent = pick(displayName);
   $("welcomeScreen").style.display = "flex";
@@ -1268,8 +1273,8 @@ function renderRecents() {
   }
   container.innerHTML = `<div class="sidebar-section-title">Recents</div>` + recent.map((c) => `
     <div class="history-item${state.convId === c.id ? " active" : ""}" 
-         data-conv-id="${c.id}" 
-         onclick="loadConversation('${c.id}')">
+         data-conv-id="${escapeHtmlAttr(c.id)}" 
+         onclick="loadConversation('${escapeHtmlAttr(c.id)}')">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
       <span class="history-item-text">${escapeHtml(c.title || "Untitled")}</span>
     </div>`).join("");
@@ -1306,7 +1311,7 @@ function appendUserMessageDOM(text, files = [], msgId = null, branchRef = null) 
   div.className = "message message--user";
   if (msgId) div.dataset.msgId = msgId;
   if (branchRef) div.dataset.branchRef = branchRef;
-  const avatarHTML = avatarImg ? `<div class="message-avatar-user user message-avatar--img"><img src="${avatarImg}" alt="${escapeHtml(initials)}"></div>` : `<div class="message-avatar-user user">${escapeHtml(initials)}</div>`;
+  const avatarHTML = avatarImg ? `<div class="message-avatar-user user message-avatar--img"><img src="${escapeHtmlAttr(avatarImg)}" alt="${escapeHtml(initials)}"></div>` : `<div class="message-avatar-user user">${escapeHtml(initials)}</div>`;
   div.innerHTML = `
     ${avatarHTML}
     <div class="message-body">
@@ -2837,7 +2842,8 @@ function saveSettings() {
       `Good to see you, ${escapeHtml(name)}. Ask me anything.`,
       `Hi ${escapeHtml(name)}! Ready when you are.`
     ];
-    nh.innerHTML = greets[Math.floor(Math.random() * greets.length)];
+    const _namedIdx = crypto.getRandomValues(new Uint32Array(1))[0] % greets.length;
+    nh.innerHTML = greets[_namedIdx];
   }
 }
 function selectSettTheme(t) {
@@ -2964,7 +2970,7 @@ function doSearch() {
     return;
   }
   list.innerHTML = hits.slice(0, 20).map((c) => `
-    <div class="search-result" onclick="loadConversation('${c.id}');closeModal('searchModal')">
+    <div class="search-result" onclick="loadConversation('${escapeHtmlAttr(c.id)}');closeModal('searchModal')">
       <div class="search-title">${escapeHtml(c.title)}</div>
       <div class="search-snippet">${escapeHtml(c.messages.find((m) => m.text?.toLowerCase().includes(q))?.text?.slice(0, 80) || "")}</div>
     </div>`).join("");
@@ -3568,13 +3574,13 @@ function renderMemoriesModal() {
     return;
   }
   list.innerHTML = mems.map((m) => `
-    <div class="memory-item" id="mem_${m.id}">
+    <div class="memory-item" id="mem_${escapeHtmlAttr(m.id)}">
       <div class="memory-item-content">
         <div class="memory-item-text" style="white-space: pre-wrap;">${escapeHtml(m.text)}</div>
         <div class="memory-item-meta">${new Date(m.createdAt).toLocaleDateString()}</div>
       </div>
       <div class="memory-item-btns">
-        <button class="memory-item-btn memory-item-edit" onclick="editMemory('${m.id}')" title="Edit memory">
+        <button class="memory-item-btn memory-item-edit" onclick="editMemory('${escapeHtmlAttr(m.id)}')" title="Edit memory">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -4103,12 +4109,13 @@ function updateBranchNavDOM(originalMsgId) {
   }
   const cur = branchInfo.current + 1;
   const tot = branchInfo.variants.length;
+  const _escOrigId = escapeHtmlAttr(originalMsgId);
   nav.innerHTML = `
-    <button class="branch-nav-btn" onclick="navigateBranch('${originalMsgId}', -1)"${branchInfo.current === 0 ? " disabled" : ""}>
+    <button class="branch-nav-btn" onclick="navigateBranch('${_escOrigId}', -1)"${branchInfo.current === 0 ? " disabled" : ""}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <span class="branch-nav-count">${cur} / ${tot}</span>
-    <button class="branch-nav-btn" onclick="navigateBranch('${originalMsgId}', 1)"${branchInfo.current === tot - 1 ? " disabled" : ""}>
+    <button class="branch-nav-btn" onclick="navigateBranch('${_escOrigId}', 1)"${branchInfo.current === tot - 1 ? " disabled" : ""}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
     </button>`;
 }
@@ -4148,12 +4155,13 @@ function updateRegenNavDOM(branchId) {
   }
   const cur = branch.current + 1;
   const tot = branch.variants.length;
+  const _escBranchId = escapeHtmlAttr(branchId);
   nav.innerHTML = `
-    <button class="branch-nav-btn" onclick="navigateRegenBranch('${branchId}', -1)"${branch.current === 0 ? " disabled" : ""}>
+    <button class="branch-nav-btn" onclick="navigateRegenBranch('${_escBranchId}', -1)"${branch.current === 0 ? " disabled" : ""}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <span class="branch-nav-count">${cur} / ${tot}</span>
-    <button class="branch-nav-btn" onclick="navigateRegenBranch('${branchId}', 1)"${branch.current === tot - 1 ? " disabled" : ""}>
+    <button class="branch-nav-btn" onclick="navigateRegenBranch('${_escBranchId}', 1)"${branch.current === tot - 1 ? " disabled" : ""}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
     </button>`;
 }
