@@ -30,7 +30,7 @@ Empowering the World Through Innovative Networks, Shaping the Future of Connecti
 | [`aichat.html`](aichat.html) | AI chat interface |
 | [`discordemeraldbot.html`](discordemeraldbot.html) | Discord bot overview |
 | [`discordemeraldbotcmds.html`](discordemeraldbotcmds.html) | Discord bot command documentation |
-| [`emeraldcreative.html`](emeraldcreative.html) | Creative projects showcase |
+| [`emeraldsuite.html`](emeraldsuite.html) | Creative projects showcase |
 | [`emeraldessentialsplugin.html`](emeraldessentialsplugin.html) | Plugin documentation |
 | [`offline.html`](offline.html) | Offline fallback page |
 | [`404.html`](404.html) | Custom error page |
@@ -54,7 +54,7 @@ emeraldnetwork.groups.id
 ├── aichat.html
 ├── discordemeraldbot.html
 ├── discordemeraldbotcmds.html
-├── emeraldcreative.html
+├── emeraldsuite.html
 ├── emeraldessentialsplugin.html
 ├── notes.html
 ├── offline.html

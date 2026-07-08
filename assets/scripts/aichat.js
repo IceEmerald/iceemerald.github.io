@@ -1251,11 +1251,16 @@ function showWelcome() {
   $("messagesArea").innerHTML = typingIndicatorHTML();
   updateTopbarTitle("");
   if ($("tempChatBtn")) $("tempChatBtn").style.display = "";
+  // Hide the "Temporary" pill on the new-chat/welcome screen; it should
+  // only appear once the user actually starts chatting (showMessages()).
+  if ($("tempBadge")) $("tempBadge").style.display = "none";
 }
 function showMessages() {
   $("welcomeScreen").style.display = "none";
   $("messagesArea").style.display = "flex";
   if ($("tempChatBtn")) $("tempChatBtn").style.display = "none";
+  // Show the "Temporary" pill only once chatting has actually begun.
+  if ($("tempBadge")) $("tempBadge").style.display = state.isTemp ? "inline" : "none";
 }
 function typingIndicatorHTML() {
   return `<div class="message" id="typingIndicator" style="display:none;">
@@ -2166,10 +2171,10 @@ async function handleSend() {
     }
     if (err.name === "AbortError") {
       if (!fullText) {
-        textEl.innerHTML = `<span class="md-error">Request was cancelled.</span>`;
+        textEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("generating the response"))}</span>`;
       }
     } else {
-      textEl.innerHTML = `<span class="md-error">Something went wrong: ${escapeHtml(err.message || "Unknown error")}. Please try again.</span>`;
+      textEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("generating the response"))}</span>`;
     }
   }
   typingEl.style.display = "none";
@@ -2178,7 +2183,7 @@ async function handleSend() {
     textEl = aiDiv.querySelector(".message-text");
   }
   if (!fullText && aiDiv && textEl && !textEl.querySelector(".md-error")) {
-    textEl.innerHTML = `<span class="md-error">No response received. The service may be temporarily unavailable. Please try again.</span>`;
+    textEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("generating the response"))}</span>`;
   }
   if (fullText && aiDiv) {
     let displayText = fullText;
@@ -2221,7 +2226,7 @@ async function handleSend() {
       textEl.innerHTML = "";
       textEl.classList.add("message-text--empty");
     } else {
-      textEl.innerHTML = '<span class="md-error">An error occurred while processing your request. Please try again later.</span>';
+      textEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("generating the response"))}</span>`;
     }
     if (memoryAdded) {
       const badge = document.createElement("div");
@@ -2279,6 +2284,18 @@ async function handleSend() {
     }
     if (_imgPrompt) {
       processImageGenTag(aiDiv, _imgPrompt, state.convId, msgId);
+    }
+  } else if (aiDiv && textEl) {
+    // No text came back (request error / cancellation / empty response).
+    // Persist the error so it survives a page reload instead of vanishing.
+    const errorText = textEl.querySelector(".md-error")?.textContent || "An error occurred.";
+    aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(msgId));
+    if (conv) {
+      conv.messages.push({ role: "assistant", text: errorText, id: msgId, isError: true });
+      conv.updatedAt = Date.now();
+      upsertConv(conv);
+    } else {
+      state.tempHistory.push({ role: "model", parts: [{ text: errorText }] });
     }
   }
   updateLastMsgActions();
@@ -2444,8 +2461,7 @@ async function regenerateMessage(msgEl) {
         aiDiv = appendAIMessageDOM("", newId, true);
         textEl = aiDiv.querySelector(".message-text");
       }
-      const _msg = err?.message || "An error occurred while processing your request. Please try again later.";
-      textEl.innerHTML = `<span class="md-error">${escapeHtml(_msg)}</span>`;
+      textEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("regenerating the response"))}</span>`;
     }
   }
   rTypingEl.style.display = "none";
@@ -2454,7 +2470,7 @@ async function regenerateMessage(msgEl) {
     textEl = aiDiv.querySelector(".message-text");
   }
   if (!fullText && aiDiv && textEl && !textEl.querySelector(".md-error")) {
-    textEl.innerHTML = `<span class="md-error">No response received. The service may be temporarily unavailable. Please try again.</span>`;
+    textEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("regenerating the response"))}</span>`;
   }
   if (fullText && aiDiv) {
     let displayText = fullText;
@@ -2493,7 +2509,7 @@ async function regenerateMessage(msgEl) {
       textEl.innerHTML = "";
       textEl.classList.add("message-text--empty");
     } else {
-      textEl.innerHTML = '<span class="md-error">An error occurred while processing your request. Please try again later.</span>';
+      textEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("regenerating the response"))}</span>`;
     }
     if (memoryAdded) {
       const badge = document.createElement("div");
@@ -2551,6 +2567,19 @@ async function regenerateMessage(msgEl) {
     if (imgPrompt) {
       processImageGenTag(aiDiv, imgPrompt, state.convId, newId);
     }
+  } else if (aiDiv && textEl) {
+    // No text came back (request error / cancellation / empty response).
+    // Persist the error onto the regen branch so it survives a page reload.
+    const errorText = textEl.querySelector(".md-error")?.textContent || "An error occurred.";
+    aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(newId));
+    const savedMsg = { role: "assistant", text: errorText, id: newId, _regenBranchRef: regenBranchId, isError: true };
+    aiDiv.dataset.regenBranchRef = regenBranchId;
+    conv.messages.push(savedMsg);
+    regenBranch.variants.push({ ...savedMsg });
+    regenBranch.current = regenBranch.variants.length - 1;
+    conv._regenBranches[regenBranchId] = regenBranch;
+    upsertConv(conv);
+    updateRegenNavDOM(regenBranchId);
   }
   updateLastMsgActions();
   state.isStreaming = false;
@@ -3014,7 +3043,9 @@ function toggleTempChat() {
   const badge = $("tempBadge");
   if (state.isTemp) {
     btn?.classList.add("active");
-    if (badge) badge.style.display = "inline";
+    // Badge stays hidden on the new-chat/welcome screen; it only appears
+    // once the conversation actually starts (see showMessages()).
+    if (badge) badge.style.display = "none";
     showToast(`${_aiSvgInfo} Temporary chat \u2014 this conversation won't be saved`);
   } else {
     btn?.classList.remove("active");
@@ -3184,6 +3215,15 @@ function escapeHtml(s) {
 }
 function escapeHtmlAttr(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+// Single source of truth for AI-chat error copy: every user-facing error
+// bubble in the chat (generating, regenerating, editing, image gen, etc.)
+// should read "An error occurred while <doing what>." so the wording stays
+// consistent and user-friendly, regardless of which code path triggered it.
+// Deliberately no raw status codes / backend detail (e.g. "API error 403")
+// are surfaced here -- those are for developer consoles, not end users.
+function aiErrorMessage(action) {
+  return `An error occurred while ${action}. Please try again.`;
 }
 let _obCurStep = 0;
 let _obSelTheme = "system";
@@ -3698,6 +3738,7 @@ function appendStoredAIMessage(m) {
   const beforeQuiz = m.quizTextBefore !== void 0 ? m.quizTextBefore : m.hasQuiz ? "" : displayText;
   const afterQuiz = m.quizTextAfter || "";
   const _initText = m.hasQuiz ? beforeQuiz || "" : displayText || "";
+  const _initHTML = m.isError ? `<span class="md-error">${escapeHtml(_initText)}</span>` : _initText ? renderMarkdown(_initText) : "";
   const div = document.createElement("div");
   div.className = "message";
   div.dataset.ai = "1";
@@ -3712,7 +3753,7 @@ function appendStoredAIMessage(m) {
     <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
     <div class="message-body">
       <div class="message-sender">EmeraldBot</div>
-      <div class="message-text md-content"${_initText ? "" : ' style="display:none"'}>${_initText ? renderMarkdown(_initText) : ""}</div>
+      <div class="message-text md-content"${_initText ? "" : ' style="display:none"'}>${_initHTML}</div>
     </div>`;
   if (hasMemory) {
     const badge = document.createElement("div");
@@ -4039,8 +4080,7 @@ async function submitUserMsgEdit(msgId) {
         aiDiv = appendAIMessageDOM("", aiMsgId, true);
         aiTextEl = aiDiv.querySelector(".message-text");
       }
-      const _msg = err?.message || "An error occurred while processing your request. Please try again later.";
-      aiTextEl.innerHTML = `<span class="md-error">${escapeHtml(_msg)}</span>`;
+      aiTextEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("generating the response"))}</span>`;
     }
   }
   typingEl.style.display = "none";
@@ -4049,7 +4089,7 @@ async function submitUserMsgEdit(msgId) {
     aiTextEl = aiDiv.querySelector(".message-text");
   }
   if (!aiFullText && aiDiv && aiTextEl && !aiTextEl.querySelector(".md-error")) {
-    aiTextEl.innerHTML = `<span class="md-error">No response received. The service may be temporarily unavailable. Please try again.</span>`;
+    aiTextEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("generating the response"))}</span>`;
   }
   if (aiFullText && aiDiv) {
     let dispText = aiFullText;
@@ -4087,7 +4127,7 @@ async function submitUserMsgEdit(msgId) {
       aiTextEl.innerHTML = "";
       aiTextEl.classList.add("message-text--empty");
     } else {
-      aiTextEl.innerHTML = '<span class="md-error">An error occurred while processing your request. Please try again later.</span>';
+      aiTextEl.innerHTML = `<span class="md-error">${escapeHtml(aiErrorMessage("generating the response"))}</span>`;
     }
     if (memoryAdded) {
       const badge = document.createElement("div");
@@ -4143,6 +4183,19 @@ async function submitUserMsgEdit(msgId) {
     }
     if (imgPrompt) {
       processImageGenTag(aiDiv, imgPrompt, state.convId, aiMsgId);
+    }
+  } else if (aiDiv && aiTextEl) {
+    // No text came back (request error / cancellation / empty response).
+    // Persist the error so it survives a page reload instead of vanishing.
+    const errorText = aiTextEl.querySelector(".md-error")?.textContent || "An error occurred.";
+    aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(aiMsgId));
+    if (conv) {
+      conv.messages.push({ role: "assistant", text: errorText, id: aiMsgId, _editBranchRef: branchRootId, isError: true });
+      conv.updatedAt = Date.now();
+      upsertConv(conv);
+      updateBranchNavDOM(branchRootId);
+    } else {
+      state.tempHistory.push({ role: "model", parts: [{ text: errorText }] });
     }
   }
   updateLastMsgActions();
@@ -4510,13 +4563,7 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId) {
     });
     loadEl.remove();
     if (!res.ok) {
-      let errDetail = "";
-      try {
-        const errJson = await res.json();
-        errDetail = errJson?.error || errJson?.details || "";
-      } catch {
-      }
-      const _errMsg = errDetail ? `Image generation failed: ${errDetail}` : `Image generation failed.`;
+      const _errMsg = aiErrorMessage("generating the image");
       const textEl = body?.querySelector(".message-text");
       if (textEl) {
         textEl.classList.remove("message-text--empty");
@@ -4573,7 +4620,8 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId) {
     if (textEl) {
       textEl.classList.remove("message-text--empty");
       const _existing = (textEl.innerHTML || "").trim();
-      textEl.innerHTML = _existing ? `${_existing}<br><span class="md-error">Image generation error. Please try again.</span>` : `<span class="md-error">Image generation error. Please try again.</span>`;
+      const _catchMsg = escapeHtml(aiErrorMessage("generating the image"));
+      textEl.innerHTML = _existing ? `${_existing}<br><span class="md-error">${_catchMsg}</span>` : `<span class="md-error">${_catchMsg}</span>`;
     }
   }
   scrollToBottom();
