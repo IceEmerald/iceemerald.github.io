@@ -1175,6 +1175,33 @@ function runCode(btn) {
     showToast(`${_aiSvgError} Failed to open code preview.`);
   }
 }
+// ============================================================================
+// EVENT DELEGATION FOR CODE BLOCK BUTTONS  (fix: DOMPurify strips onclick)
+// ----------------------------------------------------------------------------
+// DOMPurify.sanitize() in renderMarkdown() strips ALL inline event handler
+// attributes (onclick, oninput, ...) from the HTML. The code-block renderer
+// emits <button class="md-copy-btn" onclick="copyCode(this)"> and
+// <button class="md-run-btn" onclick="runCode(this)">, but after DOMPurify
+// runs the onclick is gone — so clicking Copy / Run does nothing.
+//
+// Rather than weakening DOMPurify by adding "onclick" to ADD_ATTR (which
+// would let AI-generated HTML inject arbitrary handlers), we install a
+// single delegated click listener on the document. When a click lands inside
+// a .md-copy-btn or .md-run-btn, we route it to copyCode() / runCode().
+// The inline onclick attributes remain in the renderer output as a fallback
+// for any code path that does NOT pass through DOMPurify.
+// ============================================================================
+document.addEventListener("click", function(e) {
+  const btn = e.target.closest(".md-copy-btn, .md-run-btn");
+  if (!btn) return;
+  if (e._esbCodeHandled) return;
+  e._esbCodeHandled = true;
+  if (btn.classList.contains("md-copy-btn")) {
+    copyCode(btn);
+  } else if (btn.classList.contains("md-run-btn")) {
+    runCode(btn);
+  }
+});
 function openCodePreviewPanel(titleText, srcdoc) {
   const panel = $("codePreviewPanel");
   const body = $("codePreviewBody");
@@ -3509,11 +3536,23 @@ function renderQuizWidget(qid, data) {
     let qTextHtml;
     if (type === "fill") {
       const raw = q.q || "";
-      const parts = raw.split(/___+/);
+      // Normalize common blank markers to "___" so the split works regardless
+      // of whether the AI used ___, ____, [blank], {blank}, or _____.
+      const normalized = raw
+        .replace(/\[blank\]/gi, "___")
+        .replace(/\{blank\}/gi, "___")
+        .replace(/\b__{2,}\b/g, "___");
+      const hasPlaceholder = /___/.test(normalized);
+      const parts = normalized.split(/___+/);
       const inlineInput = `<input type="text" class="quiz-fill-inline" id="${qid}_q${qi}_fill"
         oninput="_quizFillInput('${qid}',${qi},this.value)"
         placeholder="\u2026" autocomplete="off" spellcheck="false" size="14">`;
-      const joined = parts.map((p, i) => escapeHtml(p) + (i < parts.length - 1 ? inlineInput : "")).join("");
+      let joined = parts.map((p, i) => escapeHtml(p) + (i < parts.length - 1 ? inlineInput : "")).join("");
+      // If the question has no ___ placeholder at all, append an input at the
+      // end so the user actually has something to type into.
+      if (!hasPlaceholder) {
+        joined = escapeHtml(raw) + " " + inlineInput;
+      }
       qTextHtml = `<div class="quiz-q-text quiz-q-fill-text">${qi + 1}. ${joined}</div>`;
     } else {
       qTextHtml = `<div class="quiz-q-text">${qi + 1}. ${escapeHtml(q.q)}${typeBadge}</div>`;
