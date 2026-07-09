@@ -473,7 +473,13 @@ class NotesApp {
         const sessionId = params.get('collab');
         if (sessionId) {
             this.joinCollabSession(sessionId);
-            window.history.replaceState({}, document.title, window.location.pathname);
+            // NOTE: We intentionally do NOT clear the ?collab= URL here.
+            // The address bar should keep showing ?collab=<sessionId> while
+            // the user is viewing the shared note — that way they can copy
+            // the link from the address bar to re-share it. When the user
+            // later opens a different note, updateOwnedLinkBar() will
+            // automatically replace the URL with ?owned=<id> (or a different
+            // ?collab=<id> if they switch to another shared note).
             return;
         }
         let restored = [];
@@ -1216,6 +1222,11 @@ class NotesApp {
         if (focus && textEditor && (this.collabIsOwner || this.collabPermission === 'edit')) {
             textEditor.focus();
         }
+        // Update the browser address bar to show ?collab=<sessionId> for this
+        // shared note. This makes the URL switch dynamically — e.g. if the
+        // user was previously viewing one of their own notes (?owned=...),
+        // opening a collab note changes the URL to ?collab=... and vice versa.
+        this.updateOwnedLinkBar(noteData);
     }
     updateCollabNoteTitle(title) {
         if (!this.collabMode || !this.collabNoteVisible) return;
@@ -2536,10 +2547,11 @@ class NotesApp {
                 dropdownValue.textContent = colorItem ? (colorItem.dataset.label || 'Default') : 'Default';
             }
         }
-        // Update the browser address bar with the personal `?owned=<id>` URL
-        // for this note. No visible UI bar is rendered — the URL lives only in
-        // the address bar so the user can copy-paste / bookmark it. Skipped for
-        // collab / shared notes (which are not owned by the local user).
+        // Update the browser address bar to reflect the currently-open note.
+        // For local notes this sets ?owned=<id>; for collab notes that route
+        // through setEditorForSession() the URL is set there instead. This
+        // call is what makes the URL switch DYNAMICALLY as the user clicks
+        // different notes in the sidebar.
         this.updateOwnedLinkBar(note);
         document.querySelectorAll('.note-item').forEach(item => {
             item.classList.toggle('active', item.dataset.noteId === noteId);
@@ -2763,20 +2775,17 @@ class NotesApp {
             this._setOwnerOnlyButtonsVisible(true);
             this._updateLeaveButtonVisibility();
             this.renderNotesCards();
-            // Only clear a stale ?owned= URL from the address bar — we must
-            // NOT clear ?collab= / ?share= / ?s= here, because their handlers
-            // (checkShareSessionFromURL and importNoteFromUrl) run LATER in
-            // the init sequence and need to read those parameters. Clearing
-            // them prematurely would silently break collab-join and
-            // share-import flows.
-            const search = window.location.search;
-            if (search &&
-                search.indexOf('owned=') !== -1 &&
-                search.indexOf('collab=') === -1 &&
-                search.indexOf('share=') === -1 &&
-                search.indexOf('s=') === -1) {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
+            // IMPORTANT: Do NOT clear the URL here. `showWelcomeScreenIfNeeded()`
+            // runs DURING init() (line 78), BEFORE `openOwnedNoteFromUrl()` and
+            // `importNoteFromUrl()` get a chance to read the URL (they run
+            // later in the DOMContentLoaded handler). Clearing the URL here
+            // would silently break ?owned= / ?collab= / ?share= / ?s= links.
+            //
+            // Stale URL cleanup is handled by the specific handlers:
+            //   - ?owned= : openOwnedNoteFromUrl() clears it if the note isn't found
+            //   - ?collab= : checkShareSessionFromURL() clears it after joining
+            //   - ?share= / ?s= : importNoteFromUrl() clears it after importing
+            //   - Any other URL : left alone (e.g. refresh on a non-notes page)
         }
     }
     insertTable() { this.saveSelection(); this.showTableModal(); }
@@ -4617,26 +4626,42 @@ class NotesApp {
         return true;
     }
     /**
-     * Refresh the browser address bar with the personal `?owned=<id>` URL for
-     * the currently-open note. Called from selectNote() so the URL auto-updates
-     * every time the user opens a different note — they can then copy-paste
-     * the URL straight from the browser's address bar to reopen this note
-     * later without hunting for it in the sidebar list.
+     * Refresh the browser address bar to reflect the currently-open note.
+     * Called from selectNote() (and setEditorForSession() for collab notes)
+     * so the URL auto-updates every time the user opens a different note.
+     *
+     * Behavior:
+     *   - Local note (the user's own)         → `?owned=<noteId>`
+     *   - Collab/shared note (active session) → `?collab=<sessionId>`
+     *   - No active note (welcome screen)     → URL cleared
+     *
+     * The URL switches DYNAMICALLY as the user opens different notes — e.g.
+     * if they're viewing a collab note (?collab=ABC) and then click one of
+     * their own notes in the sidebar, the URL changes to ?owned=<id>. If
+     * they click back to the collab note, it changes back to ?collab=ABC.
      *
      * No visible UI bar is rendered — the URL lives only in the address bar.
-     * Skipped for collab/shared notes (which are not the user's own) and when
-     * we're inside an active collab or share-import flow (those URLs are
-     * managed by their respective handlers and shouldn't be clobbered).
      */
     updateOwnedLinkBar(note) {
-        if (!note || note._isCollabNote) return;
-        const ownedUrl = `${window.location.origin}${window.location.pathname}?owned=${encodeURIComponent(note.id)}`;
-        const search = window.location.search;
-        if (!this.collabMode &&
-            search.indexOf('collab=') === -1 &&
-            search.indexOf('share=') === -1 &&
-            search.indexOf('s=') === -1) {
+        // Case 1: We're viewing an active collab/shared note → show ?collab=
+        if (this.collabMode && this.collabNoteVisible && this.collabSessionId) {
+            const collabUrl = `${window.location.origin}${window.location.pathname}?collab=${encodeURIComponent(this.collabSessionId)}`;
+            window.history.replaceState({}, document.title, collabUrl);
+            return;
+        }
+        // Case 2: We're viewing one of the user's own local notes → show ?owned=
+        if (note && !note._isCollabNote) {
+            const ownedUrl = `${window.location.origin}${window.location.pathname}?owned=${encodeURIComponent(note.id)}`;
             window.history.replaceState({}, document.title, ownedUrl);
+            return;
+        }
+        // Case 3: No active note (or a collab note that isn't currently
+        // visible) → clear the URL so it doesn't show a stale link.
+        // (showWelcomeScreenIfNeeded handles the welcome-screen case; this
+        // branch covers edge cases like switching to a collab note that
+        // failed to load.)
+        if (window.location.search) {
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     }
     async importNoteFromUrl() {
@@ -4658,19 +4683,15 @@ class NotesApp {
                 modifiedAt: new Date().toISOString()
             };
             this.notes.unshift(newNote);
+            // Clear the ?share= / ?s= URL BEFORE calling selectNote(), so
+            // that selectNote() → updateOwnedLinkBar() sets the new note's
+            // ?owned=<id> URL cleanly (without the stale ?share= still in
+            // the address bar confusing things).
+            window.history.replaceState({}, document.title, window.location.pathname);
             this.selectNote(newNote.id);
             this.renderNotesList();
             this.renderNotesCards();
             this.saveNotesToStorage();
-            // Clear the ?share= / ?s= URL now that we've consumed it, then
-            // re-write the address bar with the new note's ?owned=<id> URL
-            // so the user can copy-paste / bookmark it going forward.
-            // (selectNote() → updateOwnedLinkBar() skipped the URL update
-            // earlier because the ?share= param was still present — its guard
-            // prevents clobbering share/collab URLs. Now that we've cleared
-            // it, we call updateOwnedLinkBar() again to set ?owned=.)
-            window.history.replaceState({}, document.title, window.location.pathname);
-            this.updateOwnedLinkBar(newNote);
             setTimeout(() => this.showImportModal(data.t || 'Untitled'), 150);
         } catch (error) { console.error('Error importing note:', error); }
     }
