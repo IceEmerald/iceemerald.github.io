@@ -4905,9 +4905,6 @@ class NotesApp {
         const replaceAllBtn = document.getElementById('frReplaceAllBtn');
         if (prevBtn) prevBtn.disabled = !has;
         if (nextBtn) nextBtn.disabled = !has;
-        // Replace buttons are always disabled in view-only mode, even when
-        // there are matches — defense in depth alongside the openFindReplace()
-        // UI hiding and the _frReplaceOne/_frReplaceAll entry-point guards.
         if (replaceOneBtn) replaceOneBtn.disabled = !has || this.isViewOnly;
         if (replaceAllBtn) replaceAllBtn.disabled = !has || this.isViewOnly;
     }
@@ -4916,11 +4913,6 @@ NotesApp.memoryStorageFallback = new Map();
 document.addEventListener('DOMContentLoaded', () => {
     window.notesApp = new NotesApp();
     window.notesApp.ready.then(() => {
-        // Handle ?owned=<id> FIRST — it's the user opening one of their own
-        // notes via a personal link (the URL they copied from the browser
-        // address bar earlier). Only if that parameter is absent do we fall
-        // through to the ?share=<token> import path. (The ?collab=<id> path
-        // is handled separately inside init() via checkShareSessionFromURL.)
         if (!window.notesApp.openOwnedNoteFromUrl()) {
             window.notesApp.importNoteFromUrl();
         }
