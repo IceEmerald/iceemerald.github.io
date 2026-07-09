@@ -251,7 +251,7 @@ class NotesApp {
         });
         window.addEventListener('beforeunload', () => {
             if (this.collabSessionId && this.collabUser) {
-                if (this.collabMode && this.collabPermission === 'edit' && this.collabNoteData) {
+                if (this.collabMode && (this.collabPermission === 'edit' || this.collabIsOwner) && this.collabNoteData) {
                     try {
                         navigator.sendBeacon(
                             `${this.dbUrl}/sharednotes/${this.collabSessionId}.json`,
@@ -1108,14 +1108,13 @@ class NotesApp {
             if (el) el.style.display = visible ? '' : 'none';
         });
         // Keep the undo/redo buttons visually in sync with the view-only state.
-        // When `visible === false` we are a non-owner inside a shared session; if the
-        // owner has also set the permission to 'view', isViewOnly will be true and the
-        // buttons must be disabled. When `visible === true` (own note, or edit-permission
-        // collaborator), the buttons must always be enabled.
+        // Undo/redo should be enabled for any collaborator with edit permission,
+        // regardless of whether they are the session owner. Only disable when the
+        // session is truly view-only (non-owner + permission === 'view').
         const undoBtn = document.getElementById('undoBtn');
         const redoBtn = document.getElementById('redoBtn');
-        if (undoBtn) undoBtn.disabled = !visible || this.isViewOnly;
-        if (redoBtn) redoBtn.disabled = !visible || this.isViewOnly;
+        if (undoBtn) undoBtn.disabled = this.isViewOnly;
+        if (redoBtn) redoBtn.disabled = this.isViewOnly;
         this._updateLeaveButtonVisibility();
     }
     _hideLeaveButton() {
@@ -1374,13 +1373,13 @@ class NotesApp {
     _debouncedCollabPush() {
         if (this._collabPushTimer) clearTimeout(this._collabPushTimer);
         this._collabPushTimer = setTimeout(() => {
-            if (this.collabSessionId && this.collabPermission === 'edit' && this.collabNoteData) {
+            if (this.collabSessionId && (this.collabPermission === 'edit' || this.collabIsOwner) && this.collabNoteData) {
                 this._pushCollabNoteNow(this.collabNoteData);
             }
         }, 400);
     }
     _pushCollabNoteNow(noteData = this.collabNoteData) {
-        if (!this.collabSessionId || this.collabPermission !== 'edit' || !noteData) return;
+        if (!this.collabSessionId || (this.collabPermission !== 'edit' && !this.collabIsOwner) || !noteData) return;
         this._lastPushedModifiedAt = noteData.modifiedAt;
         this._dbPatch(`/sharednotes/${this.collabSessionId}`, { note: noteData });
     }
