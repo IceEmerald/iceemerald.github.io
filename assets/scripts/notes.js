@@ -2763,10 +2763,18 @@ class NotesApp {
             this._setOwnerOnlyButtonsVisible(true);
             this._updateLeaveButtonVisibility();
             this.renderNotesCards();
-            // Clear the browser address bar — there is no active note to own a
-            // link for on the welcome screen, so refresh shouldn't re-open a
-            // stale note via a leftover ?owned= parameter.
-            if (window.location.search) {
+            // Only clear a stale ?owned= URL from the address bar — we must
+            // NOT clear ?collab= / ?share= / ?s= here, because their handlers
+            // (checkShareSessionFromURL and importNoteFromUrl) run LATER in
+            // the init sequence and need to read those parameters. Clearing
+            // them prematurely would silently break collab-join and
+            // share-import flows.
+            const search = window.location.search;
+            if (search &&
+                search.indexOf('owned=') !== -1 &&
+                search.indexOf('collab=') === -1 &&
+                search.indexOf('share=') === -1 &&
+                search.indexOf('s=') === -1) {
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
         }
@@ -4654,7 +4662,15 @@ class NotesApp {
             this.renderNotesList();
             this.renderNotesCards();
             this.saveNotesToStorage();
+            // Clear the ?share= / ?s= URL now that we've consumed it, then
+            // re-write the address bar with the new note's ?owned=<id> URL
+            // so the user can copy-paste / bookmark it going forward.
+            // (selectNote() → updateOwnedLinkBar() skipped the URL update
+            // earlier because the ?share= param was still present — its guard
+            // prevents clobbering share/collab URLs. Now that we've cleared
+            // it, we call updateOwnedLinkBar() again to set ?owned=.)
             window.history.replaceState({}, document.title, window.location.pathname);
+            this.updateOwnedLinkBar(newNote);
             setTimeout(() => this.showImportModal(data.t || 'Untitled'), 150);
         } catch (error) { console.error('Error importing note:', error); }
     }
@@ -4868,6 +4884,9 @@ class NotesApp {
         const replaceAllBtn = document.getElementById('frReplaceAllBtn');
         if (prevBtn) prevBtn.disabled = !has;
         if (nextBtn) nextBtn.disabled = !has;
+        // Replace buttons are always disabled in view-only mode, even when
+        // there are matches — defense in depth alongside the openFindReplace()
+        // UI hiding and the _frReplaceOne/_frReplaceAll entry-point guards.
         if (replaceOneBtn) replaceOneBtn.disabled = !has || this.isViewOnly;
         if (replaceAllBtn) replaceAllBtn.disabled = !has || this.isViewOnly;
     }
@@ -4876,6 +4895,11 @@ NotesApp.memoryStorageFallback = new Map();
 document.addEventListener('DOMContentLoaded', () => {
     window.notesApp = new NotesApp();
     window.notesApp.ready.then(() => {
+        // Handle ?owned=<id> FIRST — it's the user opening one of their own
+        // notes via a personal link (the URL they copied from the browser
+        // address bar earlier). Only if that parameter is absent do we fall
+        // through to the ?share=<token> import path. (The ?collab=<id> path
+        // is handled separately inside init() via checkShareSessionFromURL.)
         if (!window.notesApp.openOwnedNoteFromUrl()) {
             window.notesApp.importNoteFromUrl();
         }
