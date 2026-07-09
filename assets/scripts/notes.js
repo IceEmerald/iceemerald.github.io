@@ -49,6 +49,10 @@ class NotesApp {
         this.collabNoteData = null;
         this.collabNoteId = null;
         this.collabNoteVisible = false;
+        // Mirrors the local "isViewOnly" computed in setEditorForSession so that
+        // every editing entry point (undo/redo, find&replace, execCommand, etc.) can
+        // cheaply check it without re-deriving the rule.
+        this.isViewOnly = false;
         this.collabSessions = new Map();
         this._activeCollabSessionId = null;
         this._collabMergeBaseContent = '';
@@ -1097,6 +1101,15 @@ class NotesApp {
             const el = document.getElementById(id);
             if (el) el.style.display = visible ? '' : 'none';
         });
+        // Keep the undo/redo buttons visually in sync with the view-only state.
+        // When `visible === false` we are a non-owner inside a shared session; if the
+        // owner has also set the permission to 'view', isViewOnly will be true and the
+        // buttons must be disabled. When `visible === true` (own note, or edit-permission
+        // collaborator), the buttons must always be enabled.
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        if (undoBtn) undoBtn.disabled = !visible || this.isViewOnly;
+        if (redoBtn) redoBtn.disabled = !visible || this.isViewOnly;
         this._updateLeaveButtonVisibility();
     }
     _hideLeaveButton() {
@@ -1133,11 +1146,20 @@ class NotesApp {
         const textEditor = document.getElementById('textEditor');
         const isViewOnly = !this.collabIsOwner && this.collabPermission === 'view';
         const isNonOwner = !this.collabIsOwner;
+        // Persist the computed view-only flag on the instance so every editing entry
+        // point can read it without re-deriving the rule.
+        this.isViewOnly = isViewOnly;
         this.collabNoteVisible = true;
         if (titleInput) {
             titleInput.value = noteData.title || 'Untitled Note';
             titleInput.disabled = isViewOnly;
         }
+        // Visually disable undo/redo in view-only mode so the user gets immediate
+        // feedback that those operations are blocked.
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        if (undoBtn) undoBtn.disabled = isViewOnly;
+        if (redoBtn) redoBtn.disabled = isViewOnly;
         if (textEditor) {
             const editorHasFocus = document.activeElement === textEditor;
             let savedOffset = null;
@@ -1438,6 +1460,7 @@ class NotesApp {
         this.collabPermission = 'edit';
         this.collabNoteData = null;
         this.collabNoteVisible = false;
+        this.isViewOnly = false;
         this._activeUsers = {};
         this.notes = this.notes.filter(n => !n._isCollabNote);
         if (this.currentNoteId && !this.notes.some(n => n.id === this.currentNoteId)) {
@@ -1477,6 +1500,7 @@ class NotesApp {
         this.collabPermission = 'edit';
         this.collabNoteData = null;
         this.collabNoteVisible = false;
+        this.isViewOnly = false;
         this._activeUsers = {};
         this._lastPushedModifiedAt = null;
         this.notes = this.notes.filter(n => !n._isCollabNote);
@@ -2048,8 +2072,19 @@ class NotesApp {
         });
         const undoBtn = document.getElementById('undoBtn');
         const redoBtn = document.getElementById('redoBtn');
-        if (undoBtn) undoBtn.addEventListener('click', () => { document.getElementById('textEditor').focus(); document.execCommand('undo'); });
-        if (redoBtn) redoBtn.addEventListener('click', () => { document.getElementById('textEditor').focus(); document.execCommand('redo'); });
+        if (undoBtn) undoBtn.addEventListener('click', () => {
+            // View-only collaborators must not be able to mutate the document,
+            // even locally — `execCommand('undo')` would silently bypass
+            // contentEditable=false in some browsers.
+            if (this.isViewOnly) return;
+            document.getElementById('textEditor').focus();
+            document.execCommand('undo');
+        });
+        if (redoBtn) redoBtn.addEventListener('click', () => {
+            if (this.isViewOnly) return;
+            document.getElementById('textEditor').focus();
+            document.execCommand('redo');
+        });
         const cutBtn = document.getElementById('cutBtn');
         const copyBtn = document.getElementById('copyBtn');
         const pasteBtn = document.getElementById('pasteBtn');
@@ -2109,9 +2144,21 @@ class NotesApp {
                 e.preventDefault();
                 this.openFindReplace();
             }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+            // Ctrl+H opens Find & Replace too, but in view-only mode the Replace UI
+            // is hidden — so there's no point opening the bar with a replace intent.
+            // We still allow Ctrl+F in view-only (find-only usage).
+            if ((e.ctrlKey || e.metaKey) && e.key === 'h' && !this.isViewOnly) {
                 e.preventDefault();
                 this.openFindReplace();
+            }
+            // Hard-block Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z in view-only. Some browsers
+            // still fire native undo even when contentEditable is false; this guard
+            // makes the behavior consistent across browsers.
+            if (this.isViewOnly && (e.ctrlKey || e.metaKey)) {
+                const k = e.key.toLowerCase();
+                if (k === 'z' || k === 'y') {
+                    e.preventDefault();
+                }
             }
         });
         editor.addEventListener('keydown', (e) => {
@@ -2208,10 +2255,25 @@ class NotesApp {
     restoreSelection() {
         if (this.savedSelection) {
             const editor = document.getElementById('textEditor');
-            if (editor) editor.focus();
+            if (!editor) return;
+            // Guard against detached ranges: if a collab sync re-rendered the
+            // editor's innerHTML between saveSelection() and restoreSelection(),
+            // the saved range's containers are no longer children of the editor.
+            // addRange() would silently no-op in that case, leaving highlight /
+            // font commands operating on the wrong (possibly collapsed) selection.
+            const sc = this.savedSelection.startContainer;
+            const ec = this.savedSelection.endContainer;
+            if (!sc || !ec || !editor.contains(sc) || !editor.contains(ec)) {
+                return;
+            }
+            editor.focus();
             const selection = window.getSelection();
             selection.removeAllRanges();
-            selection.addRange(this.savedSelection.cloneRange());
+            try {
+                selection.addRange(this.savedSelection.cloneRange());
+            } catch (e) {
+                // Silently ignore — the current browser selection will stand.
+            }
         }
     }
     switchRibbonTab(tabName) {
@@ -2223,6 +2285,10 @@ class NotesApp {
         });
     }
     executeCommand(command, value = null) {
+        // In view-only collab mode the only allowed clipboard action is 'copy'.
+        // 'cut', 'paste', and all formatting commands are blocked so the viewer
+        // cannot mutate the note even locally.
+        if (this.isViewOnly && command !== 'copy') return;
         document.getElementById('textEditor').focus();
         try {
             if (command === 'cut') { this.modernCut(); return; }
@@ -2274,8 +2340,18 @@ class NotesApp {
                 fontSize = element.style.fontSize.replace('px', '');
             if (!textColor && element.style && element.style.color)
                 textColor = element.style.color;
-            if (!backgroundColor && element.style && element.style.backgroundColor)
-                backgroundColor = element.style.backgroundColor;
+            if (!backgroundColor) {
+                // Use getComputedStyle (not just inline style) so the swatch
+                // reflects inherited / computed background colors — e.g. when a
+                // highlight was applied via execCommand('hiliteColor') which may
+                // emit <font style="background-color:..."> or <mark> rather than
+                // a <span> with inline style. This keeps the swatch in sync with
+                // what the user actually sees.
+                const bg = styles.backgroundColor;
+                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+                    backgroundColor = bg;
+                }
+            }
             // Also check <font> tag attributes
             if (!textColor && element.tagName && element.tagName.toLowerCase() === 'font' && element.getAttribute('color'))
                 textColor = element.getAttribute('color');
@@ -2333,6 +2409,17 @@ class NotesApp {
                     break;
                 case 'u':
                     if (this.isEditorFocused()) { e.preventDefault(); this.executeCommand('underline'); this.updateButtonStates(); }
+                    break;
+                // Defense-in-depth: also intercept Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z
+                // here, in addition to the document-level keydown handler in
+                // setupTextEditor(). Some browsers route keystrokes through
+                // different listeners depending on focus; having both guards
+                // guarantees view-only mode never lets undo/redo through.
+                case 'z':
+                case 'y':
+                    if (this.isViewOnly && this.isEditorFocused()) {
+                        e.preventDefault();
+                    }
                     break;
             }
         }
@@ -2424,6 +2511,13 @@ class NotesApp {
             if (!this.collabIsOwner) {
                 this._setOwnerOnlyButtonsVisible(true);
                 document.body.classList.remove('collab-non-owner', 'collab-view-only');
+                // Switching from a view-only shared note back to one of our own notes —
+                // the local isViewOnly flag must be reset so editing works again.
+                this.isViewOnly = false;
+                const undoBtn = document.getElementById('undoBtn');
+                const redoBtn = document.getElementById('redoBtn');
+                if (undoBtn) undoBtn.disabled = false;
+                if (redoBtn) redoBtn.disabled = false;
             }
             this._hideLeaveButton();
             const textEditor = document.getElementById('textEditor');
@@ -2442,6 +2536,11 @@ class NotesApp {
                 dropdownValue.textContent = colorItem ? (colorItem.dataset.label || 'Default') : 'Default';
             }
         }
+        // Update the browser address bar with the personal `?owned=<id>` URL
+        // for this note. No visible UI bar is rendered — the URL lives only in
+        // the address bar so the user can copy-paste / bookmark it. Skipped for
+        // collab / shared notes (which are not owned by the local user).
+        this.updateOwnedLinkBar(note);
         document.querySelectorAll('.note-item').forEach(item => {
             item.classList.toggle('active', item.dataset.noteId === noteId);
         });
@@ -2664,6 +2763,12 @@ class NotesApp {
             this._setOwnerOnlyButtonsVisible(true);
             this._updateLeaveButtonVisibility();
             this.renderNotesCards();
+            // Clear the browser address bar — there is no active note to own a
+            // link for on the welcome screen, so refresh shouldn't re-open a
+            // stale note via a leftover ?owned= parameter.
+            if (window.location.search) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
         }
     }
     insertTable() { this.saveSelection(); this.showTableModal(); }
@@ -4144,10 +4249,29 @@ class NotesApp {
         this.restoreSelection();
         const selection = window.getSelection();
         if (selection.rangeCount === 0) return;
+        const editor = document.getElementById('textEditor');
+        if (!editor) return;
         const range = selection.getRangeAt(0);
+        // Bail out if the restored range is outside the editor — this happens
+        // when the saved range got detached (e.g. by a collab sync re-render).
+        // Operating on a stale range would either silently no-op or apply the
+        // highlight to the wrong element, which is the root cause of the
+        // "highlight sometimes doesn't apply correctly" symptom.
+        if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) {
+            return;
+        }
         const isNone = !color || color === 'transparent' || color === 'none';
         if (range.collapsed) {
             if (!isNone) {
+                // Clean up any prior orphaned temp-formatting span first, so
+                // repeated "pick color with no selection" actions don't stack
+                // up zero-width-space spans that later escape into the saved
+                // note content (another source of "highlight doesn't clear").
+                if (this.tempFormattingSpan && this.tempFormattingSpan.parentNode) {
+                    this.tempFormattingSpan.parentNode.removeChild(this.tempFormattingSpan);
+                    this.tempFormattingSpan = null;
+                    this.tempFormattingStyles = null;
+                }
                 const span = document.createElement('span');
                 span.style.backgroundColor = color;
                 span.className = 'temp-formatting';
@@ -4161,39 +4285,7 @@ class NotesApp {
             }
         } else {
             if (isNone) {
-                const editor = document.getElementById('textEditor');
-                const unwrapSpan = (el) => {
-                    const parent = el.parentNode;
-                    if (!parent) return;
-                    while (el.firstChild) parent.insertBefore(el.firstChild, el);
-                    parent.removeChild(el);
-                };
-                let ancestor = range.commonAncestorContainer;
-                if (ancestor.nodeType === Node.TEXT_NODE) ancestor = ancestor.parentElement;
-                let cur = ancestor;
-                while (cur && cur !== editor && cur !== document.body) {
-                    if (cur.nodeType === Node.ELEMENT_NODE && cur.style && cur.style.backgroundColor) {
-                        cur.style.removeProperty('background-color');
-                        if (cur.tagName === 'SPAN' && (!cur.getAttribute('style') || cur.getAttribute('style').trim() === '') && !cur.className) {
-                            const next = cur.parentElement;
-                            unwrapSpan(cur);
-                            cur = next;
-                            continue;
-                        }
-                    }
-                    cur = cur.parentElement;
-                }
-                if (ancestor && ancestor !== editor) {
-                    const spans = Array.from(ancestor.querySelectorAll('span[style]'));
-                    for (let i = spans.length - 1; i >= 0; i--) {
-                        const el = spans[i];
-                        try { if (!range.intersectsNode(el)) continue; } catch { continue; }
-                        el.style.removeProperty('background-color');
-                        if (el.tagName === 'SPAN' && (!el.getAttribute('style') || el.getAttribute('style').trim() === '') && !el.className) {
-                            unwrapSpan(el);
-                        }
-                    }
-                }
+                this._clearHighlightInRange(editor, range);
             } else {
                 const span = document.createElement('span');
                 span.style.backgroundColor = color;
@@ -4203,10 +4295,130 @@ class NotesApp {
                     range.selectNodeContents(span);
                     selection.removeAllRanges();
                     selection.addRange(range);
-                } catch { document.execCommand('hiliteColor', false, color); }
+                } catch (e) {
+                    // Fallback for edge cases (e.g. selection crossing element
+                    // boundaries that extractContents can't serialize). Try
+                    // hiliteColor first, then backColor (Firefox).
+                    try { document.execCommand('hiliteColor', false, color); }
+                    catch (_) { try { document.execCommand('backColor', false, color); } catch (__) {} }
+                }
             }
         }
         this.updateNoteContent();
+    }
+    /**
+     * Strip background-color from every element that intersects the given range.
+     *
+     * This replaces the previous buggy clear logic which:
+     *   1. Skipped descendant spans entirely when the range's common ancestor
+     *      was the editor itself (i.e. multi-paragraph selections) — causing
+     *      "highlight doesn't clear" when the user selected across paragraphs.
+     *   2. Lost access to descendant spans after unwrapping the ancestor itself.
+     *   3. Only matched <span style="background-color">, ignoring <font> and
+     *      <mark> elements that execCommand fallbacks may have produced.
+     *
+     * The new implementation walks the entire subtree of the range's root
+     * (the editor itself when the selection spans multiple blocks), collects
+     * every element that has any background-color set, and strips it —
+     * unwrapping the element if it has no remaining styling.
+     */
+    _clearHighlightInRange(editor, range) {
+        const unwrapElement = (el) => {
+            const parent = el.parentNode;
+            if (!parent) return;
+            // Move children out before removing the wrapper.
+            while (el.firstChild) parent.insertBefore(el.firstChild, el);
+            parent.removeChild(el);
+            // Normalize adjacent text nodes that may have been split.
+            if (parent.normalize) parent.normalize();
+        };
+        const hasBackgroundColor = (el) => {
+            if (!el.style) return false;
+            if (el.style.backgroundColor) return true;
+            // Legacy <font bgcolor="..."> from old execCommand output.
+            if (el.tagName === 'FONT' && el.getAttribute('bgcolor')) return true;
+            return false;
+        };
+        const stripBackgroundColor = (el) => {
+            if (el.style && el.style.backgroundColor) {
+                el.style.removeProperty('background-color');
+            }
+            if (el.tagName === 'FONT' && el.getAttribute('bgcolor')) {
+                el.removeAttribute('bgcolor');
+            }
+        };
+        const isUnwrappable = (el) => {
+            if (el.tagName === 'SPAN') {
+                const style = el.getAttribute('style');
+                return (!style || style.trim() === '') && !el.className;
+            }
+            // Unwrap legacy <font> tags that have no remaining attributes.
+            if (el.tagName === 'FONT') {
+                return !el.getAttribute('color') && !el.getAttribute('bgcolor') &&
+                       !el.getAttribute('size') && !el.getAttribute('face');
+            }
+            return false;
+        };
+        const intersectsRange = (el) => {
+            try { return range.intersectsNode(el); }
+            catch (e) { return false; }
+        };
+
+        // Step 1: walk up from the range's common ancestor, clearing any
+        // ancestor element that fully contains the range and has a background.
+        // This handles the case where the entire selection sits inside a
+        // single highlighted wrapper.
+        let ancestor = range.commonAncestorContainer;
+        if (ancestor.nodeType === Node.TEXT_NODE) ancestor = ancestor.parentElement;
+        let cur = ancestor;
+        while (cur && cur !== editor && cur !== document.body) {
+            if (cur.nodeType === Node.ELEMENT_NODE && hasBackgroundColor(cur)) {
+                stripBackgroundColor(cur);
+                if (isUnwrappable(cur)) {
+                    const next = cur.parentElement;
+                    unwrapElement(cur);
+                    cur = next;
+                    continue;
+                }
+            }
+            cur = cur.parentElement;
+        }
+
+        // Step 2: collect every descendant of the root that has a background
+        // color AND intersects the range. The root is the editor itself when
+        // the selection spans multiple block elements (the previous code
+        // bailed out in this case — that was the main "doesn't clear" bug).
+        ancestor = range.commonAncestorContainer;
+        if (ancestor.nodeType === Node.TEXT_NODE) ancestor = ancestor.parentElement;
+        const root = (ancestor && editor.contains(ancestor)) ? ancestor : editor;
+
+        const candidates = [];
+        const walker = document.createTreeWalker(
+            root,
+            NodeFilter.SHOW_ELEMENT,
+            {
+                acceptNode: (node) => {
+                    // IMPORTANT: use FILTER_SKIP (not FILTER_REJECT) here.
+                    // FILTER_REJECT would skip the node's entire subtree, so
+                    // a <p> without a background-color would cause us to miss
+                    // the highlighted <span> inside it. FILTER_SKIP visits the
+                    // node's children even when the node itself is filtered out.
+                    if (!hasBackgroundColor(node)) return NodeFilter.FILTER_SKIP;
+                    if (!intersectsRange(node)) return NodeFilter.FILTER_SKIP;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            }
+        );
+        while (walker.nextNode()) candidates.push(walker.currentNode);
+
+        // Step 3: strip in reverse order (deepest first) so unwrapping an
+        // outer element doesn't invalidate our references to inner ones.
+        for (let i = candidates.length - 1; i >= 0; i--) {
+            const el = candidates[i];
+            if (!el.parentNode) continue; // already removed by an earlier unwrap
+            stripBackgroundColor(el);
+            if (isUnwrappable(el)) unwrapElement(el);
+        }
     }
     insertTextAtSelection(text) {
         const selection = window.getSelection();
@@ -4297,8 +4509,17 @@ class NotesApp {
             if (!exportModal) return;
             this.saveSelection();
             const MAX_URL_LENGTH = 8215;
-            const baseUrl = `${window.location.origin}${window.location.pathname}?s=`;
-            const token = await compressToUrl(JSON.stringify({ t: note.title, c: note.content }));
+            // The share link parameter was renamed from `s` to `share` for clarity.
+            // Old `?s=` links are still accepted on import for backward compatibility.
+            const baseUrl = `${window.location.origin}${window.location.pathname}?share=`;
+            // Include the note's color (`cl`) in the export payload so the receiver
+            // sees the same background color the sender chose. Previously the color
+            // was dropped here and hardcoded to white on import.
+            const token = await compressToUrl(JSON.stringify({
+                t: note.title,
+                c: note.content,
+                cl: note.color || '#ffffff'
+            }));
             const fullUrl = baseUrl + token;
             if (fullUrl.length > MAX_URL_LENGTH) {
                 exportModal.classList.add('show');
@@ -4317,7 +4538,7 @@ class NotesApp {
                 return;
             }
             if (copyBtn) copyBtn.disabled = false;
-            const shareLink = `${window.location.origin}${window.location.pathname}?s=${token}`;
+            const shareLink = `${window.location.origin}${window.location.pathname}?share=${token}`;
             exportModal.classList.add('show');
             exportLink.value = shareLink;
             exportLink.select();
@@ -4351,9 +4572,70 @@ class NotesApp {
             copyBtn.addEventListener('click', handleCopy);
         } catch (error) { console.error('Error encoding note:', error); }
     }
+    /**
+     * Open the user's own note via the `?owned=<id>` URL parameter.
+     *
+     * Unlike `?share=` (which imports a copy of someone else's note) and
+     * `?collab=` (which joins a live collaboration session), `?owned=` is a
+     * purely personal link: it lets the user bookmark or copy-paste a direct
+     * link to one of their own notes from the browser address bar so they
+     * don't have to hunt for it in the sidebar list. If the note id isn't in
+     * the local storage (e.g. the user is on a different device), we fall
+     * back to the welcome screen.
+     *
+     * Returns true if the parameter was present (so the caller knows to skip
+     * the `?share=` import path).
+     */
+    openOwnedNoteFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const ownedId = params.get('owned');
+        if (!ownedId) return false;
+        // Only open notes the user actually owns locally. Collab virtual notes
+        // (note._isCollabNote === true) are not "owned" and must not be opened
+        // through this path — that's what ?collab= is for.
+        const note = this.notes.find(n => n.id === ownedId && !n._isCollabNote);
+        if (note) {
+            this.selectNote(ownedId);
+            // selectNote() already re-wrote the address bar with the current
+            // note's ?owned=<id> URL via updateOwnedLinkBar(), so we leave it
+            // intact and DON'T clear it here.
+        } else {
+            // Note not found locally — clear the stale ?owned= URL (so refresh
+            // doesn't keep re-triggering this path) and show the welcome screen
+            // so the user can pick another note.
+            this.showWelcomeScreenIfNeeded();
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        return true;
+    }
+    /**
+     * Refresh the browser address bar with the personal `?owned=<id>` URL for
+     * the currently-open note. Called from selectNote() so the URL auto-updates
+     * every time the user opens a different note — they can then copy-paste
+     * the URL straight from the browser's address bar to reopen this note
+     * later without hunting for it in the sidebar list.
+     *
+     * No visible UI bar is rendered — the URL lives only in the address bar.
+     * Skipped for collab/shared notes (which are not the user's own) and when
+     * we're inside an active collab or share-import flow (those URLs are
+     * managed by their respective handlers and shouldn't be clobbered).
+     */
+    updateOwnedLinkBar(note) {
+        if (!note || note._isCollabNote) return;
+        const ownedUrl = `${window.location.origin}${window.location.pathname}?owned=${encodeURIComponent(note.id)}`;
+        const search = window.location.search;
+        if (!this.collabMode &&
+            search.indexOf('collab=') === -1 &&
+            search.indexOf('share=') === -1 &&
+            search.indexOf('s=') === -1) {
+            window.history.replaceState({}, document.title, ownedUrl);
+        }
+    }
     async importNoteFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        const token = params.get('s');
+        // Accept both the new `share` parameter and the legacy `s` parameter
+        // so existing shared links continue to work after the rename.
+        const token = params.get('share') || params.get('s');
         if (!token) return;
         try {
             const data = JSON.parse(await decompressFromUrl(token));
@@ -4361,7 +4643,9 @@ class NotesApp {
                 id: this.generateId(),
                 title: data.t || 'Untitled',
                 content: data.c || '',
-                color: '#ffffff',
+                // Read the exported color (`cl`) if present, defaulting to white
+                // for legacy links that were generated before color was included.
+                color: (typeof data.cl === 'string' && data.cl) ? data.cl : '#ffffff',
                 createdAt: new Date().toISOString(),
                 modifiedAt: new Date().toISOString()
             };
@@ -4421,6 +4705,14 @@ class NotesApp {
         const bar = document.getElementById('findReplaceBar');
         if (!bar) return;
         bar.style.display = 'block';
+        // In view-only mode, hide the Replace UI so the user can only search
+        // (and copy text via the browser's native selection + Ctrl+C). The
+        // Replace One / Replace All buttons are also disabled in
+        // _frUpdateButtons() as a defense-in-depth measure.
+        const replaceRow = document.getElementById('frReplaceRow');
+        if (replaceRow) {
+            replaceRow.style.display = this.isViewOnly ? 'none' : '';
+        }
         const findInput = document.getElementById('frFindInput');
         const sel = window.getSelection();
         if (sel && sel.toString().trim()) {
@@ -4528,6 +4820,10 @@ class NotesApp {
     }
 
     _frReplaceOne() {
+        // View-only collaborators must not be able to mutate the document.
+        // Without this guard, mark.parentNode.replaceChild() below would
+        // bypass contentEditable=false and silently edit the note locally.
+        if (this.isViewOnly) return;
         if (this._frCurrent < 0 || !this._frMatches[this._frCurrent]) return;
         const replaceVal = document.getElementById('frReplaceInput')?.value || '';
         const mark = this._frMatches[this._frCurrent];
@@ -4545,6 +4841,8 @@ class NotesApp {
     }
 
     _frReplaceAll() {
+        // View-only guard — see _frReplaceOne for rationale.
+        if (this.isViewOnly) return;
         if (!this._frMatches.length) return;
         const replaceVal = document.getElementById('frReplaceInput')?.value || '';
         this._frMatches.forEach(mark => {
@@ -4570,14 +4868,18 @@ class NotesApp {
         const replaceAllBtn = document.getElementById('frReplaceAllBtn');
         if (prevBtn) prevBtn.disabled = !has;
         if (nextBtn) nextBtn.disabled = !has;
-        if (replaceOneBtn) replaceOneBtn.disabled = !has;
-        if (replaceAllBtn) replaceAllBtn.disabled = !has;
+        if (replaceOneBtn) replaceOneBtn.disabled = !has || this.isViewOnly;
+        if (replaceAllBtn) replaceAllBtn.disabled = !has || this.isViewOnly;
     }
 }
 NotesApp.memoryStorageFallback = new Map();
 document.addEventListener('DOMContentLoaded', () => {
     window.notesApp = new NotesApp();
-    window.notesApp.ready.then(() => window.notesApp.importNoteFromUrl());
+    window.notesApp.ready.then(() => {
+        if (!window.notesApp.openOwnedNoteFromUrl()) {
+            window.notesApp.importNoteFromUrl();
+        }
+    });
 });
 window.addEventListener('beforeunload', () => {
     const app = window.notesApp;
