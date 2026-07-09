@@ -4,6 +4,40 @@
     box-sizing: border-box;
 }
 
+/* ============================================================================
+   CSS VARIABLE DEFINITIONS (theme tokens)
+   ----------------------------------------------------------------------------
+   These variables were referenced via var(--X) throughout the stylesheet but
+   were never defined, which meant every element using them without a fallback
+   value rendered with no background / no border / no color. The most visible
+   symptom was the "Generating quiz..." loading card having no background box
+   (while the "Generating image" card worked because it had inline fallback
+   values like var(--bg-secondary, #1e1e1e)).
+
+   Defining them here fixes the quiz loading card AND every other element that
+   uses these tokens: modals, settings panels, library tabs, memory items,
+   quiz fill-in-the-blank inputs, file preview panels, onboarding steps, etc.
+   Values are inferred from the fallback values already present in the
+   img-gen-loading block and the body/scrollbar colors.
+   ============================================================================ */
+:root {
+    --bg: #1a1a1a;                       /* page background (matches body) */
+    --bg-secondary: #1e1e1e;             /* card / panel background */
+    --border: rgba(255,255,255,0.10);    /* hairline borders on dark */
+    --text: #e0e0e0;                     /* primary text */
+    --text-muted: #888888;               /* secondary / placeholder text */
+    --hover: #2a2a2a;                    /* hover background */
+}
+
+body.light-mode {
+    --bg: #ffffff;
+    --bg-secondary: #ffffff;
+    --border: rgba(0,0,0,0.12);
+    --text: #1a1a1a;
+    --text-muted: #666666;
+    --hover: #f0f0f0;
+}
+
 *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
