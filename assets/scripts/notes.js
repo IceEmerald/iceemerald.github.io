@@ -4857,9 +4857,6 @@ class NotesApp {
     }
 
     _frReplaceOne() {
-        // View-only collaborators must not be able to mutate the document.
-        // Without this guard, mark.parentNode.replaceChild() below would
-        // bypass contentEditable=false and silently edit the note locally.
         if (this.isViewOnly) return;
         if (this._frCurrent < 0 || !this._frMatches[this._frCurrent]) return;
         const replaceVal = document.getElementById('frReplaceInput')?.value || '';

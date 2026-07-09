@@ -2954,9 +2954,6 @@
             justify-content: center;
         }
     }
-
-    /* Visually dim undo/redo buttons when disabled in view-only collab mode,
-       so users get immediate feedback that those actions are blocked. */
     .ribbon-btn:disabled,
     #undoBtn:disabled,
     #redoBtn:disabled {
