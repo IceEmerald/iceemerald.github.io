@@ -4012,6 +4012,16 @@ async function submitUserMsgEdit(msgId) {
     return;
   }
   cancelUserMsgEdit(msgId);
+  // Capture the original attachments BEFORE truncating conv.messages so we can
+  // reattach them to the edited message. Without this, the edited message used
+  // to be saved with `files: []`, silently stripping every attachment the
+  // user originally sent to the AI.
+  const originalFiles = (() => {
+    if (!conv) return [];
+    const idx = conv.messages.findIndex((m) => m.id === msgId);
+    if (idx < 0) return [];
+    return Array.isArray(conv.messages[idx].files) ? conv.messages[idx].files.map((f) => ({ ...f })) : [];
+  })();
   if (conv) {
     const msgIdx = conv.messages.findIndex((m) => m.id === msgId);
     if (msgIdx >= 0) {
@@ -4019,12 +4029,12 @@ async function submitUserMsgEdit(msgId) {
       if (!conv._editBranches[branchRootId]) conv._editBranches[branchRootId] = { variants: [], current: -1 };
       const b = conv._editBranches[branchRootId];
       if (b.variants.length === 0) {
-        b.variants.push({ text: conv.messages[msgIdx].text, tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })) });
+        b.variants.push({ text: conv.messages[msgIdx].text, files: (conv.messages[msgIdx].files || []).map((f) => ({ ...f })), tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })) });
       } else {
         const ci = b.current >= 0 ? b.current : b.variants.length - 1;
-        b.variants[ci] = { ...b.variants[ci], text: conv.messages[msgIdx].text, tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })) };
+        b.variants[ci] = { ...b.variants[ci], text: conv.messages[msgIdx].text, files: (conv.messages[msgIdx].files || []).map((f) => ({ ...f })), tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })) };
       }
-      b.variants.push({ text: newText, tail: null });
+      b.variants.push({ text: newText, files: originalFiles.map((f) => ({ ...f })), tail: null });
       b.current = b.variants.length - 1;
       conv.messages = conv.messages.slice(0, msgIdx);
       upsertConv(conv);
@@ -4042,18 +4052,28 @@ async function submitUserMsgEdit(msgId) {
   }
   const newMsgId = genId();
   if (conv) {
-    conv.messages.push({ role: "user", text: newText, id: newMsgId, _editBranchRef: branchRootId, files: [] });
+    conv.messages.push({ role: "user", text: newText, id: newMsgId, _editBranchRef: branchRootId, files: originalFiles.map((f) => ({ ...f })) });
     upsertConv(conv);
   } else {
     state.tempHistory.push({ role: "user", parts: [{ text: newText }] });
   }
-  appendUserMessageDOM(newText, [], newMsgId, branchRootId);
+  appendUserMessageDOM(newText, originalFiles, newMsgId, branchRootId);
   if (conv) updateBranchNavDOM(branchRootId);
   scrollToBottom();
   const typingEl = $("typingIndicator");
   typingEl.style.display = "flex";
   scrollToBottom();
   const history = conv ? buildHistory(conv) : [...state.tempHistory];
+  // Re-attach the original files to the latest user turn in history. Without
+  // this, the AI never receives the attachments on resubmit — `buildHistory`
+  // only emits text parts, so the file content was being silently dropped.
+  if (originalFiles.length && history.length) {
+    const last = history[history.length - 1];
+    if (last && last.parts && last.parts.length) {
+      const fileParts = buildFileParts(originalFiles);
+      if (fileParts.length) last.parts.push(...fileParts);
+    }
+  }
   state.isStreaming = true;
   state.abortCtrl = new AbortController();
   setSendState(true);
@@ -4257,10 +4277,11 @@ function navigateBranch(originalMsgId, dir) {
   if (branchInfo.variants[branchInfo.current]) {
     branchInfo.variants[branchInfo.current].text = conv.messages[startIdx].text;
     branchInfo.variants[branchInfo.current].tail = conv.messages.slice(startIdx + 1).map((m) => ({ ...m }));
+    branchInfo.variants[branchInfo.current].files = (conv.messages[startIdx].files || []).map((f) => ({ ...f }));
   }
   branchInfo.current = newIdx;
   const target = branchInfo.variants[newIdx];
-  const newUserMsg = { role: "user", text: target.text, id: genId(), _editBranchRef: originalMsgId, files: [] };
+  const newUserMsg = { role: "user", text: target.text, id: genId(), _editBranchRef: originalMsgId, files: (target.files || []).map((f) => ({ ...f })) };
   conv.messages = [
     ...conv.messages.slice(0, startIdx),
     newUserMsg,
