@@ -2029,14 +2029,8 @@ async function handleSend() {
     state.tempHistory.push({ role: "user", parts: [{ text }] });
   }
   const history = buildHistory(conv);
-  // buildHistory() now re-attaches files from conv.messages[].files, so
-  // for the conv case the files are already in the last turn's parts.
-  // Only manually append for the tempHistory (no-conv) case, which
-  // doesn't store files and is returned raw by buildHistory.
-  if (!conv) {
-    const fileParts = buildFileParts(files);
-    if (fileParts.length) history[history.length - 1].parts.push(...fileParts);
-  }
+  const fileParts = buildFileParts(files);
+  if (fileParts.length) history[history.length - 1].parts.push(...fileParts);
   const urlsInMsg = extractUrls(text);
   const _wsNeeded = detectWebSearchIntent(text) || urlsInMsg.length > 0;
   let _webSources = [];
@@ -2355,18 +2349,9 @@ function buildHistory(conv) {
       if (!isRecent && text.length > HISTORY_MAX_CHARS) {
         text = text.slice(0, HISTORY_MAX_CHARS) + "\n[...content truncated...]";
       }
-      const parts = [{ text }];
-      // Re-attach files from the stored user message so that edits and
-      // regenerations still see the original attachments (images, pdfs,
-      // text files). buildFileParts() handles inlineData encoding. This
-      // is what makes the AI keep seeing the image on 2nd/3rd regen.
-      if (m.role === "user" && m.files && m.files.length) {
-        const fileParts = buildFileParts(m.files);
-        if (fileParts.length) parts.push(...fileParts);
-      }
       return {
         role: m.role === "user" ? "user" : "model",
-        parts
+        parts: [{ text }]
       };
     });
     if (window._quizzes) {
@@ -3957,10 +3942,6 @@ async function copyUserMsgText() {
   );
 }
 const _editOriginals = /* @__PURE__ */ new Map();
-// Saved in-progress attachment composition when the user starts editing an
-// old message. Restored on edit submit/cancel so the input bar returns to
-// whatever the user was composing before they clicked Edit.
-let _editSavedAttachments = null;
 const MAX_CHAT_BRANCH_VARIANTS = 10;
 function showChatBranchLimitToast(kind) {
   const label = kind === "ai" ? "regenerate this AI answer" : "edit this message";
@@ -3996,30 +3977,12 @@ function editUserMsg(msgId) {
     <button class="user-edit-btn user-edit-btn--submit" onclick="submitUserMsgEdit('${msgId}')">Submit</button>
     <button class="user-edit-btn user-edit-btn--cancel" onclick="cancelUserMsgEdit('${msgId}')">Cancel</button>`;
   textEl.insertAdjacentElement("afterend", actions);
-  // Preserve existing attachments across the edit: copy the message's
-  // files into the attachment bar so the user can remove (x) or add
-  // more via the paperclip. The previous in-progress composition (if
-  // any) is saved and restored on submit/cancel.
-  _editSavedAttachments = [...(state.attachments || [])];
-  if (msgRecord?.files?.length) {
-    state.attachments = msgRecord.files.map((f) => ({ ...f }));
-    renderAttachmentPreviews();
-  } else {
-    state.attachments = [];
-    renderAttachmentPreviews();
-  }
   ta.focus();
   ta.selectionStart = ta.value.length;
 }
 function cancelUserMsgEdit(msgId) {
   const originalText = _editOriginals.get(msgId) || "";
   _editOriginals.delete(msgId);
-  // Restore the user's in-progress attachment composition.
-  if (_editSavedAttachments !== null) {
-    state.attachments = _editSavedAttachments;
-    _editSavedAttachments = null;
-    renderAttachmentPreviews();
-  }
   const msgEl = document.querySelector(`.message--user[data-msg-id="${msgId}"]`);
   if (!msgEl) return;
   const textEl = msgEl.querySelector(".message-text.user-text");
@@ -4056,12 +4019,12 @@ async function submitUserMsgEdit(msgId) {
       if (!conv._editBranches[branchRootId]) conv._editBranches[branchRootId] = { variants: [], current: -1 };
       const b = conv._editBranches[branchRootId];
       if (b.variants.length === 0) {
-        b.variants.push({ text: conv.messages[msgIdx].text, tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })), files: [...(conv.messages[msgIdx].files || [])] });
+        b.variants.push({ text: conv.messages[msgIdx].text, tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })) });
       } else {
         const ci = b.current >= 0 ? b.current : b.variants.length - 1;
-        b.variants[ci] = { ...b.variants[ci], text: conv.messages[msgIdx].text, tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })), files: [...(conv.messages[msgIdx].files || [])] };
+        b.variants[ci] = { ...b.variants[ci], text: conv.messages[msgIdx].text, tail: conv.messages.slice(msgIdx + 1).map((m) => ({ ...m })) };
       }
-      b.variants.push({ text: newText, tail: null, files: [...(state.attachments || [])] });
+      b.variants.push({ text: newText, tail: null });
       b.current = b.variants.length - 1;
       conv.messages = conv.messages.slice(0, msgIdx);
       upsertConv(conv);
@@ -4079,19 +4042,12 @@ async function submitUserMsgEdit(msgId) {
   }
   const newMsgId = genId();
   if (conv) {
-    const newFiles = (state.attachments || []).map((f) => ({ ...f }));
-    conv.messages.push({ role: "user", text: newText, id: newMsgId, _editBranchRef: branchRootId, files: newFiles });
+    conv.messages.push({ role: "user", text: newText, id: newMsgId, _editBranchRef: branchRootId, files: [] });
     upsertConv(conv);
   } else {
     state.tempHistory.push({ role: "user", parts: [{ text: newText }] });
   }
-  appendUserMessageDOM(newText, newFiles || [], newMsgId, branchRootId);
-  // Restore the user's in-progress attachment composition (if any).
-  if (_editSavedAttachments !== null) {
-    state.attachments = _editSavedAttachments;
-    _editSavedAttachments = null;
-    renderAttachmentPreviews();
-  }
+  appendUserMessageDOM(newText, [], newMsgId, branchRootId);
   if (conv) updateBranchNavDOM(branchRootId);
   scrollToBottom();
   const typingEl = $("typingIndicator");
@@ -4301,11 +4257,10 @@ function navigateBranch(originalMsgId, dir) {
   if (branchInfo.variants[branchInfo.current]) {
     branchInfo.variants[branchInfo.current].text = conv.messages[startIdx].text;
     branchInfo.variants[branchInfo.current].tail = conv.messages.slice(startIdx + 1).map((m) => ({ ...m }));
-    branchInfo.variants[branchInfo.current].files = [...(conv.messages[startIdx].files || [])];
   }
   branchInfo.current = newIdx;
   const target = branchInfo.variants[newIdx];
-  const newUserMsg = { role: "user", text: target.text, id: genId(), _editBranchRef: originalMsgId, files: [...(target.files || [])] };
+  const newUserMsg = { role: "user", text: target.text, id: genId(), _editBranchRef: originalMsgId, files: [] };
   conv.messages = [
     ...conv.messages.slice(0, startIdx),
     newUserMsg,
