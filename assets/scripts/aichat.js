@@ -237,17 +237,6 @@ function buildFileParts(files) {
     "php",
     "env"
   ]);
-  // Helper: emit a small text part that tells the model what file is coming
-  // next. This makes the filename available to the AI even for binary blobs
-  // (images, PDFs, audio) where the filename isn't recoverable from the
-  // inline data alone. The model can reference "report.pdf" or "screenshot.png"
-  // by name in its answer, which feels much more natural.
-  const _fileMetaPart = (f) => {
-    const sizeKb = f.size ? Math.max(1, Math.round(f.size / 1024)) : null;
-    const sizeStr = sizeKb ? `${sizeKb} KB` : "unknown size";
-    const meta = `[Attached file: "${f.name}" — type: ${f.type || "unknown"}, ${sizeStr}]`;
-    return { text: meta };
-  };
   for (const f of files) {
     const type = (f.type || "application/octet-stream").toLowerCase();
     const ext = (f.name || "").split(".").pop().toLowerCase();
@@ -257,27 +246,16 @@ function buildFileParts(files) {
         const txt = `[File: ${f.name}]
 ${f.extractedText}`;
         const b642 = btoa(unescape(encodeURIComponent(txt)));
-        // Even for Office docs, emit a separate metadata part so the model
-        // can reference the filename without parsing it out of the text body.
-        parts.push(_fileMetaPart(f));
         parts.push({ inlineData: { mimeType: "text/plain", data: b642 } });
       } catch (e) {
         unreadable.push(f.name);
       }
       continue;
     }
-    if (!f.data) {
-      // No inline data — still emit metadata so the model knows a file was
-      // attached by name (e.g. an unreadable binary the user referenced).
-      parts.push(_fileMetaPart(f));
-      unreadable.push(f.name);
-      continue;
-    }
+    if (!f.data) continue;
     const b64 = f.data.includes(",") ? f.data.split(",")[1] : f.data;
     const isInline = INLINE_PREFIXES.some((p) => type.startsWith(p)) || INLINE_EXACT.has(type);
     const isTextExt = TEXT_EXTS.has(ext);
-    // Always emit filename metadata first, then the actual content.
-    parts.push(_fileMetaPart(f));
     if (isInline) {
       parts.push({ inlineData: { mimeType: type, data: b64 } });
     } else if (isTextExt) {
@@ -603,9 +581,6 @@ function renameConvPrompt(id) {
     const title = document.getElementById("renameInput").value.trim();
     if (title) {
       conv.title = title;
-      // Mark as user-renamed so the auto-title generator doesn't overwrite
-      // the user's chosen name on the next first-exchange title refresh.
-      conv._renamedByUser = true;
       upsertConv(conv);
       renderSidebar();
       closeModal("renameModal");
@@ -1358,9 +1333,6 @@ function loadConversation(id) {
     if (m.role === "user") appendUserMessageDOM(m.text, m.files || [], m.id || null, m._editBranchRef || null);
     else appendStoredAIMessage(m);
   });
-  // Wire up click/keyboard handlers on any saved Thinking panels so users
-  // can expand/collapse the model's reasoning on past messages.
-  try { bindThinkingPaners(document); } catch {}
   if (conv._editBranches) {
     Object.keys(conv._editBranches).forEach((origId) => updateBranchNavDOM(origId));
   }
@@ -1971,50 +1943,6 @@ function buildMessageActionsEl(msgId) {
   _actDiv.appendChild(_dislikeBtn);
   return _actDiv;
 }
-/**
- * Build the expandable Thinking panel markup.
- *
- * Used in two places:
- *   1. Live streaming: created lazily in _ensureThinkingPanel() — start
- *      expanded, auto-collapse when stream finishes.
- *   2. Saved-message render: built from m.thinkingText on page reload —
- *      start collapsed (the thinking already happened).
- *
- * The header is keyboard-accessible (role=button, tabindex=0, Enter/Space).
- */
-function buildThinkingPanelHTML(msgId, thinkingText, startExpanded) {
-  const esc = escapeHtml(thinkingText || "");
-  return `<div class="thinking-panel${startExpanded ? " thinking-panel--open" : ""}" data-thinking-for="${msgId}">
-    <div class="thinking-header" role="button" tabindex="0" aria-expanded="${startExpanded ? "true" : "false"}" aria-controls="thinkingContent-${msgId}">
-      <svg class="thinking-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-      <span class="thinking-title">Thinking</span>
-      <span class="thinking-pulse thinking-pulse--done" aria-hidden="true"></span>
-    </div>
-    <div class="thinking-content" id="thinkingContent-${msgId}"><div class="thinking-text">${esc}</div></div>
-  </div>`;
-}
-// Wire up click/keyboard handlers for any static thinking panels (rendered
-// from saved conversations on page load). Live-streaming panels wire their
-// own handlers in _ensureThinkingPanel().
-function bindThinkingPaners(rootEl) {
-  const scope = rootEl || document;
-  scope.querySelectorAll(".thinking-panel:not([data-bound])").forEach((panel) => {
-    panel.dataset.bound = "1";
-    const header = panel.querySelector(".thinking-header");
-    if (!header) return;
-    const toggle = () => {
-      const open = panel.classList.toggle("thinking-panel--open");
-      header.setAttribute("aria-expanded", open ? "true" : "false");
-    };
-    header.addEventListener("click", toggle);
-    header.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        toggle();
-      }
-    });
-  });
-}
 function appendAIMessageDOM(text, msgId, streaming = false) {
   const typingEl = $("typingIndicator");
   const div = document.createElement("div");
@@ -2072,7 +2000,6 @@ async function handleSend() {
   if (!state.isTemp && !state.convId) {
     state.convId = genId();
   }
-  let _isNewConvAtSend = false; // set when conv is first created below; used at the end to fire /generate-title
   textarea.value = "";
   textarea.style.height = "auto";
   clearAttachments();
@@ -2093,17 +2020,12 @@ async function handleSend() {
   } : null;
   if (conv) {
     const isNewConv = !getConv(conv.id);
-    // Remember "was this conv new at send time" so the title-generator only
-    // fires on the first exchange. Declared with `let` outside this block
-    // so it's in scope at the end of handleSend where the AI message lands.
-    _isNewConvAtSend = isNewConv;
     conv.messages.push({ role: "user", text, files: files.map((f) => ({ name: f.name, type: f.type, size: f.size, data: f.data || void 0, extractedText: f.extractedText })), id: userMsgId });
     upsertConv(conv);
     if (isNewConv) updateTopbarTitle(conv.title);
     renderSidebar();
     addFilesToLibrary(files, conv.id);
   } else {
-    _isNewConvAtSend = false;
     state.tempHistory.push({ role: "user", parts: [{ text }] });
   }
   const history = buildHistory(conv);
@@ -2198,60 +2120,10 @@ async function handleSend() {
   let fullText = "";
   let _usedModelId = "";
   let _usedModelName = "";
-  // ── Thinking UI state ──
-  // The expandable "Thinking..." panel that appears above the AI's answer
-  // while the model is reasoning. Created lazily on the first thought chunk.
-  let thinkingPanelEl = null;
-  let thinkingTextEl  = null;
-  let thinkingFullText = "";
-  let thinkingVisible = true; // expanded while streaming
-  const _ensureThinkingPanel = () => {
-    if (thinkingPanelEl || !aiDiv) return;
-    const body = aiDiv.querySelector(".message-body");
-    if (!body) return;
-    thinkingPanelEl = document.createElement("div");
-    thinkingPanelEl.className = "thinking-panel" + (thinkingVisible ? " thinking-panel--open" : "");
-    thinkingPanelEl.innerHTML = `
-      <div class="thinking-header" role="button" tabindex="0" aria-expanded="${thinkingVisible}" aria-controls="thinkingContent-${msgId}">
-        <svg class="thinking-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        <span class="thinking-title">Thinking</span>
-        <span class="thinking-pulse" aria-hidden="true"></span>
-      </div>
-      <div class="thinking-content" id="thinkingContent-${msgId}"><div class="thinking-text"></div></div>`;
-    body.insertBefore(thinkingPanelEl, body.querySelector(".message-text"));
-    thinkingTextEl = thinkingPanelEl.querySelector(".thinking-text");
-    const header = thinkingPanelEl.querySelector(".thinking-header");
-    header.addEventListener("click", () => {
-      thinkingVisible = !thinkingVisible;
-      thinkingPanelEl.classList.toggle("thinking-panel--open", thinkingVisible);
-      header.setAttribute("aria-expanded", String(thinkingVisible));
-    });
-    header.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        header.click();
-      }
-    });
-  };
-  const _onThought = (chunk) => {
-    if (!aiDiv) {
-      typingEl.style.display = "none";
-      aiDiv = appendAIMessageDOM("", msgId, true);
-      textEl = aiDiv.querySelector(".message-text");
-      textEl.classList.add("stream-reveal");
-    }
-    _ensureThinkingPanel();
-    thinkingFullText += chunk;
-    if (thinkingTextEl) {
-      thinkingTextEl.textContent = thinkingFullText;
-    }
-    scrollToBottom();
-  };
   const _streamOpts = {
     useUrlContext: urlsInMsg.length > 0,
     userText: text,
-    files,
-    onThought: _onThought
+    files
   };
   const MAX_CONTINUATIONS = 4;
   let continueCount = 0;
@@ -2414,17 +2286,6 @@ async function handleSend() {
       aiDiv.dataset.modelId = _usedModelId || "";
       aiDiv.dataset.modelName = _usedModelName || "";
     }
-    // ── Auto-collapse the thinking panel when the stream finishes ──
-    // The user can still click to re-expand. We also persist the thinking
-    // text to the conversation so it survives page reload.
-    if (thinkingPanelEl && thinkingFullText) {
-      thinkingVisible = false;
-      thinkingPanelEl.classList.remove("thinking-panel--open");
-      const _hdr = thinkingPanelEl.querySelector(".thinking-header");
-      if (_hdr) _hdr.setAttribute("aria-expanded", "false");
-      const _pulse = thinkingPanelEl.querySelector(".thinking-pulse");
-      if (_pulse) _pulse.classList.add("thinking-pulse--done");
-    }
     const savedText = memoryAdded ? memMatches.map((m) => m[0]).join(" ") + " " + displayText : displayText;
     if (conv) {
       conv.messages.push({
@@ -2438,8 +2299,7 @@ async function handleSend() {
         quizData: quizData || void 0,
         quizTextBefore: quizData ? beforeQuizText : void 0,
         quizTextAfter: quizData ? afterQuizText : void 0,
-        imagePrompt: _imgPrompt || void 0,
-        thinkingText: thinkingFullText || void 0
+        imagePrompt: _imgPrompt || void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -2451,20 +2311,6 @@ async function handleSend() {
     }
     if (_imgPrompt) {
       processImageGenTag(aiDiv, _imgPrompt, state.convId, msgId);
-    }
-    // ── Auto-generate a descriptive conversation title ──
-    // Fires only on the FIRST exchange of a new conversation. The old
-    // behavior was `text.slice(0, 55)` (a truncated copy of the user's
-    // first message) — which produced ugly titles like "coba dong kamu yapping
-    // panjan...". The new behavior asks the worker to summarize the exchange
-    // into a 3-7 word descriptive title. Falls back to the old truncation
-    // on any error so the conversation is never left untitled.
-    if (conv && _isNewConvAtSend && !state.isTemp) {
-      // Fire-and-forget — don't block the UI. If it fails or times out,
-      // the conversation keeps its initial truncated title.
-      try {
-        generateConversationTitle(conv.id, text, savedText).catch(() => {});
-      } catch {}
     }
   } else if (aiDiv && textEl) {
     // No text came back (request error / cancellation / empty response).
@@ -2782,65 +2628,14 @@ function _switchToAutoDueToUnavailableModel(failedModelId, reason) {
   }
   showToast(`${_aiSvgCheck} Switched to Auto \u2014 selected model isn't available.`);
 }
-/**
- * Ask the worker to generate a short, descriptive title for a conversation
- * based on its first user message + first AI response. Updates the conv in
- * storage, refreshes the sidebar item, and updates the topbar title if the
- * user is still viewing this conversation.
- *
- * Silent on failure — the conv keeps its initial truncated title.
- */
-async function generateConversationTitle(convId, userMessage, aiMessage) {
-  if (!convId || !userMessage) return;
-  try {
-    const res = await fetch(`${CHAT_WORKER_URL}/generate-title`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userMessage, aiMessage: aiMessage || "" })
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!data || !data.title || typeof data.title !== "string") return;
-    const newTitle = data.title.trim().slice(0, 80);
-    if (!newTitle) return;
-    // Re-read the conv in case it changed while we were waiting.
-    const arr = loadConvs();
-    const conv = arr.find((c) => c.id === convId);
-    if (!conv) return;
-    // Don't overwrite a title the user manually renamed. We mark manually-
-    // renamed convs with `_renamedByUser: true` in the rename modal handler.
-    // If that flag is set, skip the auto-title.
-    if (conv._renamedByUser) return;
-    conv.title = newTitle;
-    conv.updatedAt = Date.now();
-    saveConvs(arr);
-    // Refresh sidebar + topbar if applicable.
-    renderSidebar();
-    if (state.convId === convId && !state.isTemp) {
-      updateTopbarTitle(newTitle);
-    }
-  } catch (e) {
-    // Silent — the conv keeps its initial truncated title.
-    console.warn("generateConversationTitle failed:", e);
-  }
-}
 async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
-  // onThought is optional. If provided, the parser routes `thought: true`
-  // parts to it (used by the expandable Thinking UI). If absent, thought
-  // parts are folded back into onChunk (legacy behavior).
-  const onThought = options.onThought;
   const requestedId = options.model || getSelectedModelId();
-  const settings = loadSettings();
-  // thinking setting: default true for capable models, false for lite ("cream")
-  // The user can override via Settings > Behavior > Thinking toggle.
-  const thinkingEnabled = settings.thinking !== false;
   const reqBody = {
     contents: history,
     memories: loadMemories(),
-    userDisplayName: (settings.userName || "").trim() || null,
+    userDisplayName: (loadSettings().userName || "").trim() || null,
     useUrlContext: !!options.useUrlContext,
-    tools: options.tools || [],
-    thinking: thinkingEnabled
+    tools: options.tools || []
   };
   const url = `${CHAT_WORKER_URL}/chat?model=${encodeURIComponent(requestedId)}`;
   let res;
@@ -2946,19 +2741,7 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
           const candidate = json.candidates?.[0];
           if (candidate?.content?.parts) {
             for (const part of candidate.content.parts) {
-              if (part.text) {
-                // Gemini streams reasoning separately as `thought: true` parts.
-                // Route them to onThought (the expandable Thinking panel),
-                // not the main answer. Falls back to onChunk if no onThought
-                // was wired up — preserves backward compat for any caller
-                // that still uses the simple (history, _, onChunk) signature.
-                if (part.thought === true) {
-                  if (typeof onThought === "function") onThought(part.text);
-                  else onChunk(part.text);
-                } else {
-                  onChunk(part.text);
-                }
-              }
+              if (part.text) onChunk(part.text);
             }
           }
           if (candidate?.finishReason) {
@@ -3154,21 +2937,14 @@ function openSettings() {
   $("settName").value = s.userName || "";
   _pendingTheme = s.theme || "system";
   _pendingAvatar = s.avatar || null;
-  _pendingThinking = s.thinking !== false;
   _refreshSettThemeUI(_pendingTheme);
   _refreshSettAvatarUI(s.userName || "", _pendingAvatar);
-  _refreshSettThinkingUI(_pendingThinking);
   el.classList.add("open");
 }
 function saveSettings() {
   const name = $("settName")?.value.trim() || "You";
   const s = loadSettings();
-  // Read the thinking toggle state from the settings modal. The toggle is
-  // a switch element with id="settThinkingToggle"; its active state is
-  // tracked via the `aria-checked` attribute (set by selectSettThinking).
-  const thinkingToggle = $("settThinkingToggle");
-  const thinkingWanted = thinkingToggle ? thinkingToggle.getAttribute("aria-checked") === "true" : s.thinking !== false;
-  const newS = { ...s, userName: name, theme: _pendingTheme || "system", avatar: _pendingAvatar !== void 0 ? _pendingAvatar : s.avatar || null, thinking: thinkingWanted };
+  const newS = { ...s, userName: name, theme: _pendingTheme || "system", avatar: _pendingAvatar !== void 0 ? _pendingAvatar : s.avatar || null };
   saveSettingsObj(newS);
   applyTheme(newS.theme);
   closeModal("settingsModal");
@@ -3183,24 +2959,6 @@ function saveSettings() {
       `Hi ${escapeHtml(name)}! Ready when you are.`
     ];
     nh.innerHTML = greets[_cryptoInt(greets.length)];
-  }
-}
-// Toggle the thinking on/off switch in Settings. `wanted` is the new state.
-// We update the visual + aria-checked, but don't persist until Save is clicked.
-let _pendingThinking = null;
-function selectSettThinking(wanted) {
-  _pendingThinking = wanted;
-  const toggle = $("settThinkingToggle");
-  if (toggle) {
-    toggle.setAttribute("aria-checked", wanted ? "true" : "false");
-    toggle.classList.toggle("sett-switch--on", wanted);
-  }
-}
-function _refreshSettThinkingUI(wanted) {
-  const toggle = $("settThinkingToggle");
-  if (toggle) {
-    toggle.setAttribute("aria-checked", wanted ? "true" : "false");
-    toggle.classList.toggle("sett-switch--on", wanted);
   }
 }
 function selectSettTheme(t) {
@@ -4034,7 +3792,6 @@ function appendStoredAIMessage(m) {
     <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
     <div class="message-body">
       <div class="message-sender">EmeraldBot</div>
-      ${m.thinkingText ? buildThinkingPanelHTML(m.id || genId(), m.thinkingText, false) : ""}
       <div class="message-text md-content"${_initText ? "" : ' style="display:none"'}>${_initHTML}</div>
     </div>`;
   if (hasMemory) {
@@ -4064,21 +3821,6 @@ function appendStoredAIMessage(m) {
   }
   div.querySelector(".message-body").appendChild(buildMessageActionsEl(m.id || genId()));
   if (m.imageData) {
-    // Re-derive the descriptive filename from the saved prompt so reloads
-    // use the same name as the original generation.
-    const _slugify = (s) => {
-      const out = String(s || "")
-        .toLowerCase()
-        .normalize("NFKD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .replace(/-{2,}/g, "-");
-      return out.slice(0, 50).replace(/-+$/, "");
-    };
-    const _ext = (m.imageData.match(/^data:image\/([a-zA-Z]+)/) || [])[1] === "jpeg" ? "jpg" : "png";
-    const _imgSlug = _slugify(m.imagePrompt);
-    const _imgFileName = (_imgSlug || "emeraldbot-image") + "." + _ext;
     const wrapper = document.createElement("div");
     wrapper.className = "img-gen-result";
     const img = document.createElement("img");
@@ -4088,7 +3830,7 @@ function appendStoredAIMessage(m) {
     const dlLink = document.createElement("a");
     dlLink.className = "img-gen-download";
     dlLink.href = m.imageData;
-    dlLink.download = _imgFileName;
+    dlLink.download = "emeraldbot-image.png";
     dlLink.title = "Download image";
     dlLink.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
     wrapper.appendChild(img);
@@ -4901,22 +4643,6 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId) {
     const dataUrl = await blobToDataURL(blob);
     const ct = blob.type || "";
     const ext = ct.includes("jpeg") || ct.includes("jpg") ? "jpg" : ct.includes("png") ? "png" : "png";
-    // Derive a descriptive filename from the prompt instead of the generic
-    // "emeraldbot-image.png". Slugify: lowercase, replace non-alphanumeric
-    // runs with hyphens, collapse repeats, trim, cap at ~50 chars so the
-    // filename stays manageable in OS file pickers.
-    const _slugify = (s) => {
-      const out = String(s || "")
-        .toLowerCase()
-        .normalize("NFKD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .replace(/-{2,}/g, "-");
-      return out.slice(0, 50).replace(/-+$/, "");
-    };
-    const slug = _slugify(prompt);
-    const imageFileName = (slug || "emeraldbot-image") + "." + ext;
     const wrapper = document.createElement("div");
     wrapper.className = "img-gen-result";
     const img = document.createElement("img");
@@ -4926,7 +4652,7 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId) {
     const dlLink = document.createElement("a");
     dlLink.className = "img-gen-download";
     dlLink.href = dataUrl;
-    dlLink.download = imageFileName;
+    dlLink.download = "emeraldbot-image." + ext;
     dlLink.title = "Download image";
     dlLink.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
     wrapper.appendChild(img);
