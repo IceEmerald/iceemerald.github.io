@@ -2023,7 +2023,9 @@ async function handleSend() {
     conv.messages.push({ role: "user", text, files: files.map((f) => ({ name: f.name, type: f.type, size: f.size, data: f.data || void 0, extractedText: f.extractedText })), id: userMsgId });
     upsertConv(conv);
     if (isNewConv) updateTopbarTitle(conv.title);
-    renderSidebar();
+    // Defer sidebar re-render to avoid blocking the critical path to fetch().
+    // The sidebar update is purely cosmetic and doesn't affect the API call.
+    requestAnimationFrame(() => renderSidebar());
     addFilesToLibrary(files, conv.id);
   } else {
     state.tempHistory.push({ role: "user", parts: [{ text }] });
@@ -2129,6 +2131,22 @@ async function handleSend() {
   let continueCount = 0;
   let continueEl = null;
   let _groundingMetadata = null;
+  // Batch streaming renders to one per animation frame.
+  // Without this, every SSE chunk triggers a full markdown parse + highlight.js
+  // + KaTeX + DOMPurify + innerHTML replacement — O(n²) total work that causes
+  // visible stutter and blocks the main thread.
+  let _rafPending = false;
+  const _scheduleRender = () => {
+    if (_rafPending) return;
+    _rafPending = true;
+    requestAnimationFrame(() => {
+      _rafPending = false;
+      if (!textEl) return;
+      const _sd = _streamDisplayText(fullText);
+      textEl.innerHTML = (_sd.text ? renderMarkdown(_sd.text) : "") + (_sd.quizStarted ? quizLoadingCardHTML() : '<span class="stream-cursor" aria-hidden="true"></span>');
+      scrollToBottom();
+    });
+  };
   const _doStream = async (h) => streamEmeraldBot(h, apiKey, (chunk) => {
     fullText += chunk;
     if (!aiDiv) {
@@ -2137,9 +2155,7 @@ async function handleSend() {
       textEl = aiDiv.querySelector(".message-text");
       textEl.classList.add("stream-reveal");
     }
-    const _sd = _streamDisplayText(fullText);
-    textEl.innerHTML = (_sd.text ? renderMarkdown(_sd.text) : "") + (_sd.quizStarted ? quizLoadingCardHTML() : '<span class="stream-cursor" aria-hidden="true"></span>');
-    scrollToBottom();
+    _scheduleRender();
   }, _streamOpts);
   try {
     let _streamResult = await _doStream(history);
@@ -2630,10 +2646,13 @@ function _switchToAutoDueToUnavailableModel(failedModelId, reason) {
 }
 async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
   const requestedId = options.model || getSelectedModelId();
+  // Cache storage reads — avoids 3+ redundant synchronous IDB/localStorage
+  // round-trips on the critical path before the network request.
+  const _settings = loadSettings();
   const reqBody = {
     contents: history,
     memories: loadMemories(),
-    userDisplayName: (loadSettings().userName || "").trim() || null,
+    userDisplayName: (_settings.userName || "").trim() || null,
     useUrlContext: !!options.useUrlContext,
     tools: options.tools || []
   };
@@ -2694,10 +2713,8 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
     }
   }
   if (requestedId === "auto" || autoSwitched) {
-    try {
-      refreshModelSelectorUI();
-    } catch {
-    }
+    // Defer UI updates — don't block the critical path to first stream byte.
+    requestAnimationFrame(() => { try { refreshModelSelectorUI(); } catch {} });
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

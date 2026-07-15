@@ -4300,8 +4300,7 @@ body.light-mode .fp-text-code {
     justify-content: center;
     align-items: center;
     gap: 10px;
-    padding: 25px 20px 8px;
-    border-bottom: 1px solid var(--border);
+    padding: 25px 20px 25px;
     flex-shrink: 0;
 }
 
@@ -4405,7 +4404,6 @@ body.light-mode .fp-text-code {
     gap: 8px;
     justify-content: flex-end;
     padding: 14px 20px;
-    border-top: 1px solid var(--border);
     flex-shrink: 0;
 }
 
