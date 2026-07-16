@@ -6,27 +6,31 @@
     var dpr = window.devicePixelRatio || 1;
 
     /* ── Rotation state ──────────────────────────────── */
-    var angle = -80;          // longitude rotation (degrees)
-    var tilt = 18;           // latitude tilt (degrees)
+    var angle = -80;
+    var tilt = 18;
     var cx, cy, r;
 
     /* ── Drag / interaction state ────────────────────── */
     var isDragging = false;
     var lastPointerX = 0;
     var lastPointerY = 0;
-    var velX = 0;     // momentum velocity (deg/frame)
+    var velX = 0;
     var velY = 0;
     var lastMoveTime = 0;
     var autoRotate = true;
     var resumeTimer = null;
 
-    var SENS_X = 0.18;    // deg per px horizontal
-    var SENS_Y = 0.12;    // deg per px vertical
+    var SENS_X = 0.18;
+    var SENS_Y = 0.12;
     var MAX_TILT = 75;
     var FRICTION = 0.955;
     var AUTO_SPEED = 0.05;
     var RESUME_MS = 1000;
     var VEL_STOP = 0.003;
+
+    /* ── Phone detection — disable manual rotation ──── */
+    var isPhone = window.matchMedia('(max-width: 768px)').matches
+               || ('ontouchstart' in window && !window.matchMedia('(pointer: fine)').matches);
 
     /* ── Detailed continent outlines ─────────────────── */
     var continents = [
@@ -87,7 +91,6 @@
         var y3 = Math.sin(latR);
         var z3 = Math.cos(latR) * Math.cos(lonR);
 
-        /* Rotate around X-axis by tilt */
         var yT = y3 * Math.cos(tiltR) - z3 * Math.sin(tiltR);
         var zT = y3 * Math.sin(tiltR) + z3 * Math.cos(tiltR);
 
@@ -303,15 +306,30 @@
         resumeTimer = setTimeout(function () { autoRotate = true; }, RESUME_MS);
     }
 
+    /* Mouse events — always attach (won't fire on phones) */
     canvas.addEventListener('mousedown', onPointerDown);
     window.addEventListener('mousemove', onPointerMove);
     window.addEventListener('mouseup', onPointerUp);
-    canvas.addEventListener('touchstart', onPointerDown, { passive: false });
-    window.addEventListener('touchmove', onPointerMove, { passive: false });
-    window.addEventListener('touchend', onPointerUp);
 
-    /* Prevent context menu on long-press (mobile) */
-    canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    /* Touch events — only on non-phone devices */
+    if (!isPhone) {
+        canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+        window.addEventListener('touchmove', onPointerMove, { passive: false });
+        window.addEventListener('touchend', onPointerUp);
+    }
+
+    /* Prevent context menu on long-press (non-phone touch only) */
+    if (!isPhone) {
+        canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    }
+
+    /* On phone, force auto-rotate and set default cursor */
+    if (isPhone) {
+        autoRotate = true;
+        canvas.style.cursor = 'default';
+    } else {
+        canvas.style.cursor = 'grab';
+    }
 
     /* ── Main render loop ────────────────────────────── */
     function draw() {
@@ -324,7 +342,6 @@
             canvas.height = needH;
         }
 
-        /* Apply momentum when not dragging and not auto-rotating */
         if (!isDragging && !autoRotate) {
             angle += velX;
             tilt += velY;
@@ -335,7 +352,6 @@
             if (Math.abs(velY) < VEL_STOP) velY = 0;
         }
 
-        /* Auto-rotate */
         if (autoRotate) {
             angle += AUTO_SPEED;
         }
@@ -347,14 +363,12 @@
         cy = h / 2;
         r = Math.min(cx, cy) * 0.78;
 
-        /* Drop shadow */
         var sGrd = ctx.createRadialGradient(cx + 2, cy + 4, r * 0.7, cx + 2, cy + 4, r * 1.25);
         sGrd.addColorStop(0, 'rgba(35,154,77,0.035)');
         sGrd.addColorStop(1, 'rgba(35,154,77,0)');
         ctx.beginPath(); ctx.arc(cx + 2, cy + 4, r * 1.25, 0, Math.PI * 2);
         ctx.fillStyle = sGrd; ctx.fill();
 
-        /* Atmospheric glow (3 layers) */
         for (var gi = 3; gi >= 1; gi--) {
             var gR = r + gi * 10;
             var aG = ctx.createRadialGradient(cx, cy, r - 2, cx, cy, gR);
@@ -365,7 +379,6 @@
             ctx.fillStyle = aG; ctx.fill();
         }
 
-        /* Clip to sphere */
         ctx.save();
         ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
 
@@ -380,7 +393,6 @@
 
         ctx.restore();
 
-        /* 3D shading */
         var shG = ctx.createRadialGradient(
             cx - r * 0.35, cy - r * 0.35, r * 0.05,
             cx + r * 0.1, cy + r * 0.1, r * 1.1
@@ -392,15 +404,12 @@
         ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.fillStyle = shG; ctx.fill();
 
-        /* Outer ring */
         ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(35,154,77,0.2)'; ctx.lineWidth = 1.2; ctx.stroke();
 
-        /* Inner rim highlight */
         ctx.beginPath(); ctx.arc(cx, cy, r - 0.8, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5; ctx.stroke();
 
-        /* Edge atmosphere fade */
         var eG = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
         eG.addColorStop(0, 'rgba(244,249,245,0)');
         eG.addColorStop(1, 'rgba(244,249,245,0.4)');
