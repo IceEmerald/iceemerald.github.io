@@ -28,9 +28,19 @@
     var RESUME_MS = 1000;
     var VEL_STOP = 0.003;
 
-    /* ── Phone detection — disable manual rotation ──── */
+    /* ── Phone detection ─────────────────────────────── */
     var isPhone = window.matchMedia('(max-width: 768px)').matches
                || ('ontouchstart' in window && !window.matchMedia('(pointer: fine)').matches);
+
+    /* On phone: force scroll, disable all interaction */
+    if (isPhone) {
+        canvas.style.touchAction = 'auto';
+        canvas.style.cursor = 'default';
+        autoRotate = true;
+    } else {
+        canvas.style.touchAction = 'none';
+        canvas.style.cursor = 'grab';
+    }
 
     /* ── Detailed continent outlines ─────────────────── */
     var continents = [
@@ -94,21 +104,14 @@
         var yT = y3 * Math.cos(tiltR) - z3 * Math.sin(tiltR);
         var zT = y3 * Math.sin(tiltR) + z3 * Math.cos(tiltR);
 
-        return {
-            x: cx + r * x3,
-            y: cy - r * yT,
-            z: zT,
-            lat: lat, lon: lon
-        };
+        return { x: cx + r * x3, y: cy - r * yT, z: zT, lat: lat, lon: lon };
     }
 
     function edgePoint(p1, p2) {
         var dz = p1.z - p2.z;
         if (Math.abs(dz) < 1e-6) return null;
         var t = p1.z / dz;
-        var lat = p1.lat + t * (p2.lat - p1.lat);
-        var lon = p1.lon + t * (p2.lon - p1.lon);
-        return project(lat, lon);
+        return project(p1.lat + t * (p2.lat - p1.lat), p1.lon + t * (p2.lon - p1.lon));
     }
 
     /* ── Smooth Catmull-Rom path ─────────────────────── */
@@ -311,24 +314,12 @@
     window.addEventListener('mousemove', onPointerMove);
     window.addEventListener('mouseup', onPointerUp);
 
-    /* Touch events — only on non-phone devices */
+    /* Touch events — desktop/tablet with pointer only; never on phones */
     if (!isPhone) {
         canvas.addEventListener('touchstart', onPointerDown, { passive: false });
         window.addEventListener('touchmove', onPointerMove, { passive: false });
         window.addEventListener('touchend', onPointerUp);
-    }
-
-    /* Prevent context menu on long-press (non-phone touch only) */
-    if (!isPhone) {
         canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    }
-
-    /* On phone, force auto-rotate and set default cursor */
-    if (isPhone) {
-        autoRotate = true;
-        canvas.style.cursor = 'default';
-    } else {
-        canvas.style.cursor = 'grab';
     }
 
     /* ── Main render loop ────────────────────────────── */
