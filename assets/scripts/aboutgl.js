@@ -32,7 +32,6 @@
     var isPhone = window.matchMedia('(max-width: 768px)').matches
                || ('ontouchstart' in window && !window.matchMedia('(pointer: fine)').matches);
 
-    /* On phone: force scroll, disable all interaction */
     if (isPhone) {
         canvas.style.touchAction = 'auto';
         canvas.style.cursor = 'default';
@@ -326,6 +325,30 @@
     function draw() {
         var w = canvas.offsetWidth;
         var h = canvas.offsetHeight;
+
+        /* Safety: if canvas has no size (mobile CSS issue), size it from viewport */
+        if (w < 10 || h < 10) {
+            var box = document.getElementById('globe-box');
+            if (box) {
+                var vw = window.innerWidth;
+                var vh = window.innerHeight;
+                box.style.width = (vw - 32) + 'px';
+                box.style.height = Math.min(vw - 32, vh * 0.55) + 'px';
+                box.style.margin = '0 auto';
+                box.style.position = 'relative';
+            }
+            w = canvas.offsetWidth;
+            h = canvas.offsetHeight;
+        }
+
+        /* Also ensure the canvas fills its parent */
+        if (canvas.parentElement) {
+            var pw = canvas.parentElement.clientWidth;
+            var ph = canvas.parentElement.clientHeight;
+            if (canvas.style.width !== pw + 'px') canvas.style.width = pw + 'px';
+            if (canvas.style.height !== ph + 'px') canvas.style.height = ph + 'px';
+        }
+
         var needW = Math.round(w * dpr);
         var needH = Math.round(h * dpr);
         if (canvas.width !== needW || canvas.height !== needH) {
@@ -413,13 +436,41 @@
     requestAnimationFrame(draw);
 })();
 
-/* ── Globe box — scroll-driven expand ─────────────────── */
+/* ── Globe box — scroll-driven expand (desktop only) ──── */
 (function () {
     var section = document.getElementById('globe-section');
     var box = document.getElementById('globe-box');
     if (!section || !box) return;
-    if (window.matchMedia('(max-width: 760px)').matches) return;
 
+    var isMobile = window.matchMedia('(max-width: 760px)').matches;
+
+    if (isMobile) {
+        /* ── Mobile: size the globe-box properly ─────── */
+        function sizeMobile() {
+            var vw = window.innerWidth;
+            var vh = window.innerHeight;
+            var size = Math.min(vw - 32, 400);
+            box.style.width = size + 'px';
+            box.style.height = size + 'px';
+            box.style.margin = '0 auto';
+            box.style.position = 'relative';
+            box.style.borderRadius = '16px';
+            box.style.overflow = 'hidden';
+
+            /* Make sure canvas fills the box */
+            var canvas = box.querySelector('canvas');
+            if (canvas) {
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+                canvas.style.display = 'block';
+            }
+        }
+        sizeMobile();
+        window.addEventListener('resize', sizeMobile, { passive: true });
+        return;
+    }
+
+    /* ── Desktop: scroll-driven expand ──────────────── */
     function update() {
         var rect = section.getBoundingClientRect();
         var viewH = window.innerHeight;
