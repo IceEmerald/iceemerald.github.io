@@ -4,6 +4,7 @@
     if (!canvas) return;
     var ctx = canvas.getContext('2d');
     var dpr = window.devicePixelRatio || 1;
+    var BREAKPOINT = 720;
 
     /* ── Rotation state ──────────────────────────────── */
     var angle = -80;
@@ -19,6 +20,7 @@
     var lastMoveTime = 0;
     var autoRotate = true;
     var resumeTimer = null;
+    var isMobile = window.innerWidth < BREAKPOINT;
 
     var SENS_X = 0.18;
     var SENS_Y = 0.12;
@@ -27,19 +29,6 @@
     var AUTO_SPEED = 0.05;
     var RESUME_MS = 1000;
     var VEL_STOP = 0.003;
-
-    /* ── Phone detection ─────────────────────────────── */
-    var isPhone = window.matchMedia('(max-width: 768px)').matches
-               || ('ontouchstart' in window && !window.matchMedia('(pointer: fine)').matches);
-
-    if (isPhone) {
-        canvas.style.touchAction = 'auto';
-        canvas.style.cursor = 'default';
-        autoRotate = true;
-    } else {
-        canvas.style.touchAction = 'none';
-        canvas.style.cursor = 'grab';
-    }
 
     /* ── Detailed continent outlines ─────────────────── */
     var continents = [
@@ -95,14 +84,11 @@
         var latR = lat * Math.PI / 180;
         var lonR = (lon - angle) * Math.PI / 180;
         var tiltR = tilt * Math.PI / 180;
-
         var x3 = Math.cos(latR) * Math.sin(lonR);
         var y3 = Math.sin(latR);
         var z3 = Math.cos(latR) * Math.cos(lonR);
-
         var yT = y3 * Math.cos(tiltR) - z3 * Math.sin(tiltR);
         var zT = y3 * Math.sin(tiltR) + z3 * Math.cos(tiltR);
-
         return { x: cx + r * x3, y: cy - r * yT, z: zT, lat: lat, lon: lon };
     }
 
@@ -116,339 +102,239 @@
     /* ── Smooth Catmull-Rom path ─────────────────────── */
     function traceSmoothPath(pts) {
         if (pts.length < 2) return;
-        if (pts.length === 2) {
-            ctx.moveTo(pts[0].x, pts[0].y);
-            ctx.lineTo(pts[1].x, pts[1].y);
-            return;
-        }
+        if (pts.length === 2) { ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(pts[1].x, pts[1].y); return; }
         ctx.moveTo(pts[0].x, pts[0].y);
         var T = 5;
         for (var i = 0; i < pts.length - 1; i++) {
-            var p0 = pts[i === 0 ? 0 : i - 1];
-            var p1 = pts[i];
-            var p2 = pts[i + 1];
-            var p3 = pts[i + 2 >= pts.length ? pts.length - 1 : i + 2];
-            ctx.bezierCurveTo(
-                p1.x + (p2.x - p0.x) / T, p1.y + (p2.y - p0.y) / T,
-                p2.x - (p3.x - p1.x) / T, p2.y - (p3.y - p1.y) / T,
-                p2.x, p2.y
-            );
+            var p0 = pts[i === 0 ? 0 : i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2 >= pts.length ? pts.length - 1 : i + 2];
+            ctx.bezierCurveTo(p1.x + (p2.x - p0.x) / T, p1.y + (p2.y - p0.y) / T, p2.x - (p3.x - p1.x) / T, p2.y - (p3.y - p1.y) / T, p2.x, p2.y);
         }
     }
 
-    /* ── Grid / graticule ────────────────────────────── */
+    /* ── Drawing helpers ─────────────────────────────── */
     function drawGrid() {
-        ctx.strokeStyle = 'rgba(35,154,77,0.055)';
-        ctx.lineWidth = 0.5;
-        for (var lat = -60; lat <= 60; lat += 30) {
-            ctx.beginPath();
-            var started = false;
-            for (var lon = -180; lon <= 180; lon += 3) {
-                var p = project(lat, lon);
-                if (p.z > 0) { if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y); }
-                else started = false;
-            }
-            ctx.stroke();
-        }
-        for (var lon2 = -180; lon2 < 180; lon2 += 30) {
-            ctx.beginPath();
-            var started2 = false;
-            for (var lat2 = -90; lat2 <= 90; lat2 += 3) {
-                var p2 = project(lat2, lon2);
-                if (p2.z > 0) { if (!started2) { ctx.moveTo(p2.x, p2.y); started2 = true; } else ctx.lineTo(p2.x, p2.y); }
-                else started2 = false;
-            }
-            ctx.stroke();
-        }
+        ctx.strokeStyle = 'rgba(35,154,77,0.055)'; ctx.lineWidth = 0.5;
+        for (var lat = -60; lat <= 60; lat += 30) { ctx.beginPath(); var s = false; for (var lon = -180; lon <= 180; lon += 3) { var p = project(lat, lon); if (p.z > 0) { if (!s) { ctx.moveTo(p.x, p.y); s = true; } else ctx.lineTo(p.x, p.y); } else s = false; } ctx.stroke(); }
+        for (var lon2 = -180; lon2 < 180; lon2 += 30) { ctx.beginPath(); var s2 = false; for (var lat2 = -90; lat2 <= 90; lat2 += 3) { var p2 = project(lat2, lon2); if (p2.z > 0) { if (!s2) { ctx.moveTo(p2.x, p2.y); s2 = true; } else ctx.lineTo(p2.x, p2.y); } else s2 = false; } ctx.stroke(); }
     }
 
     function drawEquator() {
-        ctx.beginPath();
-        var started = false;
-        for (var lon = -180; lon <= 180; lon += 2) {
-            var p = project(0, lon);
-            if (p.z > 0) { if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y); }
-            else started = false;
-        }
-        ctx.strokeStyle = 'rgba(35,154,77,0.11)';
-        ctx.lineWidth = 0.7;
-        ctx.stroke();
+        ctx.beginPath(); var s = false;
+        for (var lon = -180; lon <= 180; lon += 2) { var p = project(0, lon); if (p.z > 0) { if (!s) { ctx.moveTo(p.x, p.y); s = true; } else ctx.lineTo(p.x, p.y); } else s = false; }
+        ctx.strokeStyle = 'rgba(35,154,77,0.11)'; ctx.lineWidth = 0.7; ctx.stroke();
     }
 
-    /* ── Connection arcs ─────────────────────────────── */
     function drawArcs() {
         for (var ci = 0; ci < connections.length; ci++) {
-            var pair = connections[ci];
-            var c1 = cities[pair[0]], c2 = cities[pair[1]];
-            var p1 = project(c1[0], c1[1]);
-            var p2 = project(c2[0], c2[1]);
+            var pair = connections[ci], c1 = cities[pair[0]], c2 = cities[pair[1]];
+            var p1 = project(c1[0], c1[1]), p2 = project(c2[0], c2[1]);
             if (p1.z < 0.1 || p2.z < 0.1) continue;
-
-            var midLat = (c1[0] + c2[0]) / 2;
-            var midLon = (c1[1] + c2[1]) / 2;
             var dist = Math.sqrt(Math.pow(c1[0] - c2[0], 2) + Math.pow(c1[1] - c2[1], 2));
-            var elev = Math.min(dist * 0.35, 28);
-            var pM = project(midLat + elev, midLon);
-
+            var pM = project((c1[0] + c2[0]) / 2 + Math.min(dist * 0.35, 28), (c1[1] + c2[1]) / 2);
             var avgZ = (p1.z + p2.z) / 2;
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            if (pM.z > 0) ctx.quadraticCurveTo(pM.x, pM.y, p2.x, p2.y);
-            else ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = 'rgba(35,154,77,' + (0.04 + 0.06 * avgZ).toFixed(3) + ')';
-            ctx.lineWidth = 0.6;
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
+            if (pM.z > 0) ctx.quadraticCurveTo(pM.x, pM.y, p2.x, p2.y); else ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = 'rgba(35,154,77,' + (0.04 + 0.06 * avgZ).toFixed(3) + ')'; ctx.lineWidth = 0.6; ctx.stroke();
         }
     }
 
-    /* ── Continents ──────────────────────────────────── */
     function drawContinents() {
         for (var ci = 0; ci < continents.length; ci++) {
-            var continent = continents[ci];
-            var n = continent.length;
-            var pts = [];
-            for (var pi = 0; pi < n; pi++) {
-                pts.push(project(continent[pi][0], continent[pi][1]));
-            }
-
+            var continent = continents[ci], n = continent.length, pts = [];
+            for (var pi = 0; pi < n; pi++) pts.push(project(continent[pi][0], continent[pi][1]));
             var segs = [], cur = [];
             for (var i = 0; i < n; i++) {
-                var p = pts[i];
-                var pn = pts[(i + 1) % n];
+                var p = pts[i], pn = pts[(i + 1) % n];
                 if (p.z > 0.01) cur.push({ x: p.x, y: p.y });
-                if (p.z > 0.01 && pn.z <= 0.01) {
-                    var ep = edgePoint(p, pn);
-                    if (ep) cur.push(ep);
-                    if (cur.length > 1) segs.push(cur);
-                    cur = [];
-                }
-                if (p.z <= 0.01 && pn.z > 0.01) {
-                    var ep2 = edgePoint(p, pn);
-                    cur = ep2 ? [ep2] : [];
-                }
+                if (p.z > 0.01 && pn.z <= 0.01) { var ep = edgePoint(p, pn); if (ep) cur.push(ep); if (cur.length > 1) segs.push(cur); cur = []; }
+                if (p.z <= 0.01 && pn.z > 0.01) { var ep2 = edgePoint(p, pn); cur = ep2 ? [ep2] : []; }
             }
-            if (cur.length > 0 && segs.length > 0) segs[0] = cur.concat(segs[0]);
-            else if (cur.length > 1) segs.push(cur);
-
+            if (cur.length > 0 && segs.length > 0) segs[0] = cur.concat(segs[0]); else if (cur.length > 1) segs.push(cur);
             for (var si = 0; si < segs.length; si++) {
-                var seg = segs[si];
-                if (seg.length < 2) continue;
-                ctx.beginPath(); traceSmoothPath(seg); ctx.closePath();
-                ctx.fillStyle = 'rgba(35,154,77,0.11)'; ctx.fill();
-
-                ctx.beginPath(); traceSmoothPath(seg);
-                ctx.strokeStyle = 'rgba(35,154,77,0.34)';
-                ctx.lineWidth = 0.9; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-                ctx.stroke();
+                var seg = segs[si]; if (seg.length < 2) continue;
+                ctx.beginPath(); traceSmoothPath(seg); ctx.closePath(); ctx.fillStyle = 'rgba(35,154,77,0.11)'; ctx.fill();
+                ctx.beginPath(); traceSmoothPath(seg); ctx.strokeStyle = 'rgba(35,154,77,0.34)'; ctx.lineWidth = 0.9; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
             }
         }
     }
 
-    /* ── City dots ───────────────────────────────────── */
     function drawCities() {
         for (var i = 0; i < cities.length; i++) {
-            var p = project(cities[i][0], cities[i][1]);
-            if (p.z < 0.12) continue;
+            var p = project(cities[i][0], cities[i][1]); if (p.z < 0.12) continue;
             var glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 6);
-            glow.addColorStop(0, 'rgba(35,154,77,' + (0.18 * p.z).toFixed(3) + ')');
-            glow.addColorStop(1, 'rgba(35,154,77,0)');
-            ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-            ctx.fillStyle = glow; ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, Math.max(0.8, 1.5 * p.z), 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(35,154,77,' + (0.3 + 0.45 * p.z).toFixed(3) + ')';
-            ctx.fill();
+            glow.addColorStop(0, 'rgba(35,154,77,' + (0.18 * p.z).toFixed(3) + ')'); glow.addColorStop(1, 'rgba(35,154,77,0)');
+            ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fillStyle = glow; ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.8, 1.5 * p.z), 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(35,154,77,' + (0.3 + 0.45 * p.z).toFixed(3) + ')'; ctx.fill();
         }
     }
 
-    /* ── Pointer helpers ─────────────────────────────── */
+    /* ── Pointer handlers ────────────────────────────── */
     function getPointerPos(e) {
         if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
         return { x: e.clientX, y: e.clientY };
     }
 
     function onPointerDown(e) {
-        isDragging = true;
-        var pos = getPointerPos(e);
-        lastPointerX = pos.x;
-        lastPointerY = pos.y;
-        velX = 0; velY = 0;
-        lastMoveTime = performance.now();
-        canvas.style.cursor = 'grabbing';
-        autoRotate = false;
-        if (resumeTimer) { clearTimeout(resumeTimer); resumeTimer = null; }
+        isDragging = true; var pos = getPointerPos(e);
+        lastPointerX = pos.x; lastPointerY = pos.y; velX = 0; velY = 0;
+        lastMoveTime = performance.now(); canvas.style.cursor = 'grabbing';
+        autoRotate = false; if (resumeTimer) { clearTimeout(resumeTimer); resumeTimer = null; }
     }
 
     function onPointerMove(e) {
-        if (!isDragging) return;
-        e.preventDefault();
-        var pos = getPointerPos(e);
-        var dx = pos.x - lastPointerX;
-        var dy = pos.y - lastPointerY;
-        var now = performance.now();
-        var dt = Math.max(1, now - lastMoveTime);
-
-        angle -= dx * SENS_X;
-        tilt += dy * SENS_Y;
-        tilt = Math.max(-MAX_TILT, Math.min(MAX_TILT, tilt));
-
-        velX = -dx * SENS_X / dt * 16;
-        velY = dy * SENS_Y / dt * 16;
-
-        lastPointerX = pos.x;
-        lastPointerY = pos.y;
-        lastMoveTime = now;
+        if (!isDragging) return; e.preventDefault(); var pos = getPointerPos(e);
+        var dx = pos.x - lastPointerX, dy = pos.y - lastPointerY;
+        var now = performance.now(), dt = Math.max(1, now - lastMoveTime);
+        angle -= dx * SENS_X; tilt += dy * SENS_Y; tilt = Math.max(-MAX_TILT, Math.min(MAX_TILT, tilt));
+        velX = -dx * SENS_X / dt * 16; velY = dy * SENS_Y / dt * 16;
+        lastPointerX = pos.x; lastPointerY = pos.y; lastMoveTime = now;
     }
 
     function onPointerUp() {
-        if (!isDragging) return;
-        isDragging = false;
+        if (!isDragging) return; isDragging = false;
         canvas.style.cursor = 'grab';
         resumeTimer = setTimeout(function () { autoRotate = true; }, RESUME_MS);
     }
 
-    /* Mouse events — always attach (won't fire on phones) */
+    function preventCtx(e) { e.preventDefault(); }
+
+    /* ── Dynamic touch listener management ───────────── */
+    var touchAttached = false;
+
+    function attachTouch() {
+        if (touchAttached) return;
+        canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+        window.addEventListener('touchmove', onPointerMove, { passive: false });
+        window.addEventListener('touchend', onPointerUp);
+        canvas.addEventListener('contextmenu', preventCtx);
+        touchAttached = true;
+    }
+
+    function detachTouch() {
+        if (!touchAttached) return;
+        canvas.removeEventListener('touchstart', onPointerDown);
+        window.removeEventListener('touchmove', onPointerMove);
+        window.removeEventListener('touchend', onPointerUp);
+        canvas.removeEventListener('contextmenu', preventCtx);
+        touchAttached = false;
+    }
+
+    /* ── Mode switch: called on load + every resize ──── */
+    function applyMode() {
+        var wasMobile = isMobile;
+        isMobile = window.innerWidth < BREAKPOINT;
+
+        /* Crossed the breakpoint — reset drag state */
+        if (wasMobile !== isMobile) {
+            isDragging = false; velX = 0; velY = 0;
+            if (resumeTimer) { clearTimeout(resumeTimer); resumeTimer = null; }
+        }
+
+        if (isMobile) {
+            canvas.style.touchAction = 'auto';
+            canvas.style.cursor = 'default';
+            autoRotate = true;
+            detachTouch();
+        } else {
+            canvas.style.touchAction = 'none';
+            canvas.style.cursor = 'grab';
+            attachTouch();
+        }
+    }
+
+    /* Mouse — always on (doesn't fire on phones) */
     canvas.addEventListener('mousedown', onPointerDown);
     window.addEventListener('mousemove', onPointerMove);
     window.addEventListener('mouseup', onPointerUp);
 
-    /* Touch events — desktop/tablet with pointer only; never on phones */
-    if (!isPhone) {
-        canvas.addEventListener('touchstart', onPointerDown, { passive: false });
-        window.addEventListener('touchmove', onPointerMove, { passive: false });
-        window.addEventListener('touchend', onPointerUp);
-        canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    }
+    /* Initial mode + live resize */
+    applyMode();
+    window.addEventListener('resize', applyMode, { passive: true });
 
     /* ── Main render loop ────────────────────────────── */
     function draw() {
-        var w = canvas.offsetWidth;
-        var h = canvas.offsetHeight;
+        var w = canvas.offsetWidth, h = canvas.offsetHeight;
 
-        /* Safety: if canvas has no size (mobile CSS issue), size it from viewport */
-        if (w < 10 || h < 10) {
-            var box = document.getElementById('globe-box');
-            if (box) {
-                var vw = window.innerWidth;
-                var vh = window.innerHeight;
-                box.style.width = (vw - 32) + 'px';
-                box.style.height = Math.min(vw - 32, vh * 0.55) + 'px';
-                box.style.margin = '0 auto';
-                box.style.position = 'relative';
-            }
-            w = canvas.offsetWidth;
-            h = canvas.offsetHeight;
-        }
-
-        /* Also ensure the canvas fills its parent */
+        /* Safety: force canvas to fill parent */
         if (canvas.parentElement) {
-            var pw = canvas.parentElement.clientWidth;
-            var ph = canvas.parentElement.clientHeight;
-            if (canvas.style.width !== pw + 'px') canvas.style.width = pw + 'px';
-            if (canvas.style.height !== ph + 'px') canvas.style.height = ph + 'px';
+            var pw = canvas.parentElement.clientWidth, ph = canvas.parentElement.clientHeight;
+            if (pw > 0 && ph > 0) {
+                canvas.style.width = pw + 'px';
+                canvas.style.height = ph + 'px';
+                w = pw; h = ph;
+            }
         }
+        if (w < 10) w = 300;
+        if (h < 10) h = 300;
 
-        var needW = Math.round(w * dpr);
-        var needH = Math.round(h * dpr);
-        if (canvas.width !== needW || canvas.height !== needH) {
-            canvas.width = needW;
-            canvas.height = needH;
-        }
+        var needW = Math.round(w * dpr), needH = Math.round(h * dpr);
+        if (canvas.width !== needW || canvas.height !== needH) { canvas.width = needW; canvas.height = needH; }
 
         if (!isDragging && !autoRotate) {
-            angle += velX;
-            tilt += velY;
-            tilt = Math.max(-MAX_TILT, Math.min(MAX_TILT, tilt));
-            velX *= FRICTION;
-            velY *= FRICTION;
-            if (Math.abs(velX) < VEL_STOP) velX = 0;
-            if (Math.abs(velY) < VEL_STOP) velY = 0;
+            angle += velX; tilt += velY; tilt = Math.max(-MAX_TILT, Math.min(MAX_TILT, tilt));
+            velX *= FRICTION; velY *= FRICTION;
+            if (Math.abs(velX) < VEL_STOP) velX = 0; if (Math.abs(velY) < VEL_STOP) velY = 0;
         }
-
-        if (autoRotate) {
-            angle += AUTO_SPEED;
-        }
+        if (autoRotate) angle += AUTO_SPEED;
 
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
+        cx = w / 2; cy = h / 2; r = Math.min(cx, cy) * 0.78;
 
-        cx = w / 2;
-        cy = h / 2;
-        r = Math.min(cx, cy) * 0.78;
-
+        /* Drop shadow */
         var sGrd = ctx.createRadialGradient(cx + 2, cy + 4, r * 0.7, cx + 2, cy + 4, r * 1.25);
-        sGrd.addColorStop(0, 'rgba(35,154,77,0.035)');
-        sGrd.addColorStop(1, 'rgba(35,154,77,0)');
-        ctx.beginPath(); ctx.arc(cx + 2, cy + 4, r * 1.25, 0, Math.PI * 2);
-        ctx.fillStyle = sGrd; ctx.fill();
+        sGrd.addColorStop(0, 'rgba(35,154,77,0.035)'); sGrd.addColorStop(1, 'rgba(35,154,77,0)');
+        ctx.beginPath(); ctx.arc(cx + 2, cy + 4, r * 1.25, 0, Math.PI * 2); ctx.fillStyle = sGrd; ctx.fill();
 
+        /* Atmospheric glow */
         for (var gi = 3; gi >= 1; gi--) {
             var gR = r + gi * 10;
             var aG = ctx.createRadialGradient(cx, cy, r - 2, cx, cy, gR);
-            aG.addColorStop(0, 'rgba(35,154,77,0)');
-            aG.addColorStop(0.4, 'rgba(35,154,77,' + (0.025 * gi).toFixed(3) + ')');
-            aG.addColorStop(1, 'rgba(35,154,77,0)');
-            ctx.beginPath(); ctx.arc(cx, cy, gR, 0, Math.PI * 2);
-            ctx.fillStyle = aG; ctx.fill();
+            aG.addColorStop(0, 'rgba(35,154,77,0)'); aG.addColorStop(0.4, 'rgba(35,154,77,' + (0.025 * gi).toFixed(3) + ')'); aG.addColorStop(1, 'rgba(35,154,77,0)');
+            ctx.beginPath(); ctx.arc(cx, cy, gR, 0, Math.PI * 2); ctx.fillStyle = aG; ctx.fill();
         }
 
-        ctx.save();
-        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
-
-        ctx.fillStyle = 'rgba(35,154,77,0.015)';
-        ctx.fillRect(0, 0, w, h);
-
-        drawGrid();
-        drawEquator();
-        drawArcs();
-        drawContinents();
-        drawCities();
-
+        /* Clip to sphere */
+        ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = 'rgba(35,154,77,0.015)'; ctx.fillRect(0, 0, w, h);
+        drawGrid(); drawEquator(); drawArcs(); drawContinents(); drawCities();
         ctx.restore();
 
-        var shG = ctx.createRadialGradient(
-            cx - r * 0.35, cy - r * 0.35, r * 0.05,
-            cx + r * 0.1, cy + r * 0.1, r * 1.1
-        );
-        shG.addColorStop(0, 'rgba(255,255,255,0.055)');
-        shG.addColorStop(0.35, 'rgba(255,255,255,0.01)');
-        shG.addColorStop(0.7, 'rgba(0,0,0,0.02)');
-        shG.addColorStop(1, 'rgba(0,0,0,0.07)');
-        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fillStyle = shG; ctx.fill();
+        /* 3D shading */
+        var shG = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.05, cx + r * 0.1, cy + r * 0.1, r * 1.1);
+        shG.addColorStop(0, 'rgba(255,255,255,0.055)'); shG.addColorStop(0.35, 'rgba(255,255,255,0.01)');
+        shG.addColorStop(0.7, 'rgba(0,0,0,0.02)'); shG.addColorStop(1, 'rgba(0,0,0,0.07)');
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = shG; ctx.fill();
 
-        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(35,154,77,0.2)'; ctx.lineWidth = 1.2; ctx.stroke();
+        /* Rings */
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(35,154,77,0.2)'; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, r - 0.8, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5; ctx.stroke();
 
-        ctx.beginPath(); ctx.arc(cx, cy, r - 0.8, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5; ctx.stroke();
-
+        /* Edge fade */
         var eG = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
-        eG.addColorStop(0, 'rgba(244,249,245,0)');
-        eG.addColorStop(1, 'rgba(244,249,245,0.4)');
-        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fillStyle = eG; ctx.fill();
+        eG.addColorStop(0, 'rgba(244,249,245,0)'); eG.addColorStop(1, 'rgba(244,249,245,0.4)');
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = eG; ctx.fill();
 
         requestAnimationFrame(draw);
     }
-
     requestAnimationFrame(draw);
 })();
 
-/* ── Globe box — scroll-driven expand (desktop only) ──── */
+/* ── Globe box — responsive sizing (mobile + desktop) ─── */
 (function () {
     var section = document.getElementById('globe-section');
     var box = document.getElementById('globe-box');
     if (!section || !box) return;
+    var BREAKPOINT = 720;
 
-    var isMobile = window.matchMedia('(max-width: 760px)').matches;
+    function update() {
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var canvas = box.querySelector('canvas');
 
-    if (isMobile) {
-        /* ── Mobile: size the globe-box properly ─────── */
-        function sizeMobile() {
-            var vw = window.innerWidth;
-            var vh = window.innerHeight;
+        if (vw < BREAKPOINT) {
+            /* ── Mobile: fixed square, centered ───────── */
             var size = Math.min(vw - 32, 400);
             box.style.width = size + 'px';
             box.style.height = size + 'px';
@@ -456,38 +342,34 @@
             box.style.position = 'relative';
             box.style.borderRadius = '16px';
             box.style.overflow = 'hidden';
+        } else {
+            /* ── Desktop: scroll-driven expand ────────── */
+            var rect = section.getBoundingClientRect();
+            var scroll = -rect.top;
+            var progress = Math.max(0, Math.min(1, scroll / vh));
+            var ease = progress < 0.5
+                ? 2 * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-            /* Make sure canvas fills the box */
-            var canvas = box.querySelector('canvas');
-            if (canvas) {
-                canvas.style.width = '100%';
-                canvas.style.height = '100%';
-                canvas.style.display = 'block';
-            }
+            var minW = Math.min(760, vw - 48);
+            var maxW = vw;
+            var minH = 520;
+            var maxH = vh;
+
+            box.style.width = (minW + (maxW - minW) * ease) + 'px';
+            box.style.height = (minH + (maxH - minH) * ease) + 'px';
+            box.style.borderRadius = (20 * (1 - ease)) + 'px';
+            box.style.margin = '';
+            box.style.position = '';
+            box.style.overflow = '';
         }
-        sizeMobile();
-        window.addEventListener('resize', sizeMobile, { passive: true });
-        return;
-    }
 
-    /* ── Desktop: scroll-driven expand ──────────────── */
-    function update() {
-        var rect = section.getBoundingClientRect();
-        var viewH = window.innerHeight;
-        var scroll = -rect.top;
-        var progress = Math.max(0, Math.min(1, scroll / viewH));
-        var ease = progress < 0.5
-            ? 2 * progress * progress
-            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-        var minW = Math.min(760, window.innerWidth - 48);
-        var maxW = window.innerWidth;
-        var minH = 520;
-        var maxH = viewH;
-
-        box.style.width = (minW + (maxW - minW) * ease) + 'px';
-        box.style.height = (minH + (maxH - minH) * ease) + 'px';
-        box.style.borderRadius = (20 * (1 - ease)) + 'px';
+        /* Always ensure canvas fills the box */
+        if (canvas) {
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
+            canvas.style.display = 'block';
+        }
     }
 
     window.addEventListener('scroll', update, { passive: true });
@@ -510,12 +392,7 @@
     }
 
     var ticking = false;
-    function onScroll() {
-        if (ticking) return;
-        ticking = true;
-        requestAnimationFrame(function () { syncNavState(); ticking = false; });
-    }
-
+    function onScroll() { if (ticking) return; ticking = true; requestAnimationFrame(function () { syncNavState(); ticking = false; }); }
     window.addEventListener('scroll', onScroll, { passive: true });
     syncNavState();
 })();
