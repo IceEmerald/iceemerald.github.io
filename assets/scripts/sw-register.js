@@ -1,5 +1,14 @@
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').then(function () {
+    navigator.serviceWorker.register('/sw.js').then(function (registration) {
         console.log('Service Worker registered!');
+        registration.addEventListener('updatefound', function () {
+            var newWorker = registration.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', function () {
+                if (newWorker.state === 'activated') {
+                    window.location.reload();
+                }
+            });
+        });
     });
 }
