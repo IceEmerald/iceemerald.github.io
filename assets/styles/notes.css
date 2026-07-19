@@ -2971,10 +2971,3 @@
         cursor: not-allowed;
         pointer-events: none;
     }
-navbar {
-    width: 100%;
-    border-bottom: transparent;
-    background-color: transparent;
-    height: 4.5rem; 
-    position: relative; 
-}
