@@ -1668,6 +1668,7 @@
         }
         .sidebar-backdrop {
             background: rgba(0,0,0,0.5) !important;
+            z-index: 900;
         }
         .notes-list,
         .text-editor {
