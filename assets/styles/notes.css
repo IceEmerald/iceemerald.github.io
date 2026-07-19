@@ -449,7 +449,6 @@
         overflow-y: auto;
         overflow-x: hidden;
         padding: 5px 10px;
-        margin-right: 10px;
     }
     .note-item {
         background: rgba(255, 255, 255, 0.95);
@@ -1228,7 +1227,11 @@
             overflow: hidden;
         }
         .ribbon {
-            margin: 8px;
+            margin-top: 0px;
+            margin-left: 8px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            border-radius: 8px;
             border-radius: 10px; 
         }
         .ribbon-tabs {
@@ -1561,7 +1564,10 @@
     }
     @media (max-width: 480px) {
         .ribbon {
-            margin: 6px;
+            margin-top: 0px;
+            margin-left: 6px;
+            margin-right: 6px;
+            margin-bottom: 6px;
             border-radius: 8px;
         }
         .ribbon-content {
