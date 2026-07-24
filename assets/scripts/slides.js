@@ -113,7 +113,7 @@ class SlidesApp {
         // State
         this.presentations = [];   // metadata index [{id, title, updatedAt, slideCount}]
         this.pres = null;          // current full presentation
-        this.slideIdx = 0;         // active slide index
+            this.slideIdx = 0;         // active slide index
         this.selectedId = null;    // selected element id
         this.editingId = null;     // element in text-edit mode
         this.savedSelection = null; // saved selection range for toolbar button clicks
@@ -504,7 +504,7 @@ class SlidesApp {
             document.getElementById('slideCanvas').innerHTML = '';
             history.replaceState(null, '', location.pathname);
             this.showWelcomeScreen(true);
-        }
+            }
         this.renderWelcomeCards();
         this.showToast('Presentation deleted.');
     }
@@ -1242,6 +1242,7 @@ class SlidesApp {
         const div = document.createElement('div');
         div.id = `el-${el.id}`;
         div.className = `slide-el slide-el-${el.type}`;
+        div.draggable = false;
         div.style.cssText = `
             left:${el.x}px; top:${el.y}px;
             width:${el.w}px; height:${el.h}px;
@@ -1508,7 +1509,11 @@ class SlidesApp {
             const c = domEl.querySelector('.text-content');
             if (c && this.editingId !== id) c.innerHTML = el.html || '';
         } else if (el.type === 'shape') {
-            domEl.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
+            if (el.shape === 'icon' || el.shape === 'chart') {
+                domEl.innerHTML = el.svg || '';
+            } else {
+                domEl.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
+            }
         } else if (el.type === 'image') {
             // Re-render image with current crop
             const crop = el.crop || { l: 0, t: 0, r: 0, b: 0 };
@@ -1888,7 +1893,11 @@ class SlidesApp {
                 d.style.wordBreak = 'break-word';
                 d.innerHTML = el.html || '';
             } else if (el.type === 'shape') {
-                d.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
+                if (el.shape === 'icon' || el.shape === 'chart') {
+                    d.innerHTML = el.svg || '';
+                } else {
+                    d.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
+                }
             } else if (el.type === 'image') {
                 const crop = el.crop || { l: 0, t: 0, r: 0, b: 0 };
                 const visibleW = 1 - crop.l - crop.r;
@@ -2338,7 +2347,7 @@ class SlidesApp {
         document.getElementById('presentationTitle')?.addEventListener('input', (e) => {
             if (!this.pres) return;
             this.pres.title = e.target.value || 'Untitled Presentation';
-            this.scheduleSave();
+                this.scheduleSave();
         });
 
         // Delete modal
@@ -2540,28 +2549,82 @@ class SlidesApp {
     // File leaves the editor and takes you to a file-management surface.
     _switchTab(target) {
         const tabs = document.querySelectorAll('.ribbon-tab[data-tab]');
-        const panels = document.querySelectorAll('.ribbon-panel[data-panel]');
         const targetTab = document.querySelector(`.ribbon-tab[data-tab="${target}"]`);
         if (!targetTab) return;
 
-        tabs.forEach(t => t.classList.toggle('active', t === targetTab));
-
         if (target === 'file') {
-            // Open welcome screen, hide all ribbon panels. Keep ribbon visible
-            // so the File tab itself stays visible as the active tab.
-            panels.forEach(p => p.classList.remove('active'));
-            this.closePresentation();
+            // File tab: blur-out current panel, then handle file logic
+            const activePanel = document.querySelector('.ribbon-panel.active');
+            if (activePanel) {
+                activePanel.classList.add('blur-out');
+                activePanel.classList.remove('active');
+                activePanel.addEventListener('transitionend', function handler() {
+                    activePanel.removeEventListener('transitionend', handler);
+                    activePanel.classList.remove('blur-out');
+                });
+            }
+            tabs.forEach(t => t.classList.toggle('active', t === targetTab));
+            if (this.pres) {
+                this.openFileModal();
+            } else {
+                this.showWelcomeScreen(true);
+            }
             this._activeTab = target;
             this._closePortal(false);
             this._updateRibbonTabIndicator();
             return;
         }
 
-        // Normal tab switch: activate the matching ribbon panel.
-        panels.forEach(p => p.classList.toggle('active', p.dataset.panel === target));
+        const currentPanel = document.querySelector('.ribbon-panel.active');
+        const targetPanel = document.querySelector(`.ribbon-panel[data-panel="${target}"]`);
+
+        // If switching to the same tab, do nothing
+        if (currentPanel && currentPanel === targetPanel) {
+            this._activeTab = target;
+            this._updateRibbonTabIndicator();
+            return;
+        }
+
+        // Move the indicator to the new tab IMMEDIATELY (before blur-out)
+        // so the underline slides at the same instant the user clicks.
+        tabs.forEach(t => t.classList.toggle('active', t === targetTab));
         this._activeTab = target;
-        this._closePortal(false);
         this._updateRibbonTabIndicator();
+
+        // Don't switch panel content yet — do it after blur-out
+        const doSwitch = () => {
+            // Hide old panel fully
+            currentPanel.classList.remove('blur-out');
+            // Show new panel (blur-in)
+            if (targetPanel) targetPanel.classList.add('active');
+            this._closePortal(false);
+        };
+
+        if (currentPanel) {
+            // Step 1: blur-out the current panel (keeps position: relative, no layout shift)
+            currentPanel.classList.add('blur-out');
+            currentPanel.classList.remove('active');
+
+            const onBlurred = () => {
+                currentPanel.removeEventListener('transitionend', onBlurred);
+                doSwitch();
+            };
+            currentPanel.addEventListener('transitionend', onBlurred);
+
+            // Fallback timeout
+            setTimeout(() => {
+                if (currentPanel.classList.contains('blur-out')) {
+                    doSwitch();
+                }
+            }, 220);
+        } else {
+            // No current panel — switch immediately
+            if (targetPanel) targetPanel.classList.add('active');
+            tabs.forEach(t => t.classList.toggle('active', t === targetTab));
+            this._activeTab = target;
+            this._closePortal(false);
+            this._updateRibbonTabIndicator();
+        }
     }
 
     // Position the sliding underline indicator under the active ribbon tab.
@@ -2908,13 +2971,55 @@ class SlidesApp {
                 this.duplicatePresentationAs(title.trim());
             }
         });
-        document.getElementById('fileRenameBtn')?.addEventListener('click', () => {
-            const input = document.getElementById('presentationTitle');
-            if (input) { input.focus(); input.select(); }
-            this.showToast('Edit the title in the sidebar.');
-        });
         document.getElementById('fileExportPptxBigBtn')?.addEventListener('click', () => this.exportPPTX());
         document.getElementById('fileExportPdfBigBtn')?.addEventListener('click', () => this.exportPDF());
+
+        // ── FILE MODAL BUTTONS ──
+        // Close X button in header
+        document.getElementById('fileModalCloseXBtn')?.addEventListener('click', () => this.closeFileModal());
+        // Backdrop click (click on the overlay itself, not the panel)
+        document.getElementById('fileModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'fileModal') this.closeFileModal();
+        });
+        // Rename: focus the name input in the overlay
+        document.getElementById('fileRenameBtn')?.addEventListener('click', () => {
+            const nameInput = document.getElementById('fileModalNameInput');
+            if (nameInput) { nameInput.focus(); nameInput.select(); }
+        });
+        document.getElementById('fileDeleteBtn')?.addEventListener('click', () => {
+            this.closeFileModal();
+            if (this.pres) this.confirmDeletePresentation(this.pres.id);
+        });
+        document.getElementById('fileCloseBtn')?.addEventListener('click', () => {
+            this.closeFileModal();
+            this.closePresentation();
+        });
+        document.getElementById('fileExportPdfBtn')?.addEventListener('click', () => {
+            this.closeFileModal();
+            this.exportPDF();
+        });
+        document.getElementById('fileExportPptxBtn')?.addEventListener('click', () => {
+            this.closeFileModal();
+            this.exportPPTX();
+        });
+        document.getElementById('fileExportSvgBtn')?.addEventListener('click', () => {
+            this.closeFileModal();
+            this.exportSVGs();
+        });
+        // Name input: save on Enter, live-update title
+        document.getElementById('fileModalNameInput')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.target.blur();
+                this.closeFileModal();
+            }
+        });
+        document.getElementById('fileModalNameInput')?.addEventListener('input', (e) => {
+            if (!this.pres) return;
+            this.pres.title = e.target.value.trim() || 'Untitled Presentation';
+            const titleInput = document.getElementById('presentationTitle');
+            if (titleInput) titleInput.value = this.pres.title;
+            this.scheduleSave();
+        });
 
         // ── DRAW (inside Insert tab — toggles bottom drawing toolbar) ──
         this._drawColor = '#000000';
@@ -3581,7 +3686,7 @@ class SlidesApp {
                 <button id="irRead" style="padding:10px 20px;background:#fff;color:#1a1a1a;border:1px solid #ddd;border-radius:6px;font-size:14px;cursor:pointer;">Read Aloud</button>
             </div>`;
         document.body.appendChild(overlay);
-        const close = () => overlay.remove();
+        const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
         overlay.querySelector('#irClose').addEventListener('click', close);
         overlay.querySelector('#irRead').addEventListener('click', () => {
             if ('speechSynthesis' in window) {
@@ -3689,30 +3794,33 @@ class SlidesApp {
     // ── HELP MODAL ──
     showHelpModal(title, lines) {
         const overlay = document.createElement('div');
-        overlay.className = 'link-modal';
-        overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+        overlay.className = 'delete-modal';
         const list = Array.isArray(lines) ? lines : [lines];
         const items = list.map(l => Array.isArray(l)
-            ? `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;"><strong>${l[0]}</strong><span>${l[1]}</span></div>`
-            : `<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;">${l}</div>`
+            ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:14px;font-family:'DM Sans',sans-serif;"><strong style="color:rgba(44,62,80,0.9);">${l[0]}</strong><span style="color:rgba(44,62,80,0.7);">${l[1]}</span></div>`
+            : `<div style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:14px;color:rgba(44,62,80,0.7);font-family:'DM Sans',sans-serif;">${l}</div>`
         ).join('');
         overlay.innerHTML = `
-            <div class="link-modal-content" style="max-width:520px;">
-                <div class="link-modal-header">
-                    <h3 class="link-modal-title">${title}</h3>
-                    <button class="link-modal-close" title="Close" style="background:transparent;border:none;color:#666;font-size:22px;cursor:pointer;margin-left:auto;">&times;</button>
+            <div class="delete-modal-content" style="max-width:520px;">
+                <div class="delete-modal-header">
+                    <div class="delete-modal-icon" style="background:#f97316;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                    </div>
+                    <h3 class="delete-modal-title">${title}</h3>
                 </div>
-                <div class="link-modal-body" style="max-height:60vh;overflow-y:auto;">
+                <div class="delete-modal-body">
                     ${items}
                 </div>
-                <div class="link-modal-actions">
-                    <button class="link-modal-btn link-modal-btn-create" style="background:#f97316;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">Close</button>
+                <div class="delete-modal-actions">
+                    <button class="delete-modal-btn delete-modal-btn-cancel close-btn" style="min-width:120px;">Close</button>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
-        const close = () => overlay.remove();
-        overlay.querySelector('.link-modal-close').addEventListener('click', close);
-        overlay.querySelector('.link-modal-btn-create').addEventListener('click', close);
+        const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
+        requestAnimationFrame(() => overlay.classList.add('show'));
+        overlay.querySelector('.close-btn').addEventListener('click', close);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     }
 
@@ -3733,33 +3841,40 @@ class SlidesApp {
             { name: 'Lock',      svg: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>' },
         ];
         const overlay = document.createElement('div');
-        overlay.className = 'link-modal';
-        overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+        overlay.className = 'delete-modal';
         overlay.innerHTML = `
-            <div class="link-modal-content" style="max-width:480px;">
-                <div class="link-modal-header"><h3 class="link-modal-title">Insert Icon</h3>
-                    <button class="link-modal-close" style="background:transparent;border:none;color:#666;font-size:22px;cursor:pointer;margin-left:auto;">&times;</button>
+            <div class="delete-modal-content" style="max-width:480px;">
+                <button class="modal-close-btn">&times;</button>
+                <div class="delete-modal-header">
+                    <div class="delete-modal-icon" style="background:#f97316;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="4"/>
+                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
+                        </svg>
+                    </div>
+                    <h3 class="delete-modal-title">Insert Icon</h3>
                 </div>
-                <div class="link-modal-body">
-                    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">
+                <div class="delete-modal-body">
+                    <div class="picker-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">
                         ${icons.map((ic, i) => `
-                            <button class="icon-pick" data-idx="${i}" title="${ic.name}" style="padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic.svg}</svg>
+                            <button class="icon-pick" data-idx="${i}" title="${ic.name}">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic.svg}</svg>
                             </button>
                         `).join('')}
                     </div>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
-        const close = () => overlay.remove();
-        overlay.querySelector('.link-modal-close').addEventListener('click', close);
+        requestAnimationFrame(() => overlay.classList.add('show'));
+        const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
+        overlay.querySelector('.modal-close-btn').addEventListener('click', close);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
         overlay.querySelectorAll('.icon-pick').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idx = parseInt(btn.dataset.idx, 10);
                 const ic = icons[idx];
-                const svgStr = `<svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">${ic.svg}</svg>`;
-                const el = { id: uid(), type: 'shape', x: 380, y: 220, w: 80, h: 80, r: 0, z: 1, shape: 'icon', svg: svgStr, fill: 'none', stroke: '#1a1a1a', strokeWidth: 2, opacity: 1 };
+                const svgStr = `<svg viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">${ic.svg}</svg>`;
+                const el = { id: uid(), type: 'shape', x: 380, y: 220, w: 80, h: 80, r: 0, z: 1, shape: 'icon', svg: svgStr, fill: 'none', stroke: '#374151', strokeWidth: 2, opacity: 1 };
                 this.addElement(el);
                 this.showToast(`Inserted "${ic.name}" icon.`);
                 close();
@@ -3815,22 +3930,28 @@ class SlidesApp {
     openSymbolPicker() {
         const symbols = ['★','☆','✓','✗','♥','♦','♣','♠','→','←','↑','↓','↔','↕','⇒','⇐','⇑','⇓','∞','∴','∵','≈','≠','≤','≥','±','×','÷','∑','∏','∫','∂','∇','√','∝','∠','⊥','∼','≡','∈','∉','⊂','⊃','∪','∩','∀','∃','ƒ','ℵ','π','ε','μ','Ω','α','β','γ','δ','λ','σ','φ','ψ','ω','Σ','Π','Δ','Γ','Θ','Λ','Φ','Ψ','Ω','①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','●','○','■','□','▲','△','▼','▽','◆','◇','✔','✘','✚','✦','✧','✩','✪','✫','✬','✭','✮','✯','✰','✱','✲','✳','✴','✵','✶','✷','✸','✹','✺','✻','✼','✽','✾','✿','❀','❁','❂','❃','❄','❅','❆','❇','❈','❉','❊','❋'];
         const overlay = document.createElement('div');
-        overlay.className = 'link-modal';
-        overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+        overlay.className = 'delete-modal';
         overlay.innerHTML = `
-            <div class="link-modal-content" style="max-width:520px;">
-                <div class="link-modal-header"><h3 class="link-modal-title">Insert Symbol</h3>
-                    <button class="link-modal-close" style="background:transparent;border:none;color:#666;font-size:22px;cursor:pointer;margin-left:auto;">&times;</button>
+            <div class="delete-modal-content" style="max-width:520px;">
+                <button class="modal-close-btn">&times;</button>
+                <div class="delete-modal-header">
+                    <div class="delete-modal-icon" style="background:#f97316;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                        </svg>
+                    </div>
+                    <h3 class="delete-modal-title">Insert Symbol</h3>
                 </div>
-                <div class="link-modal-body" style="max-height:50vh;overflow-y:auto;">
-                    <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;">
-                        ${symbols.map((s, i) => `<button class="sym-pick" data-s="${s}" style="padding:8px;background:#fff;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;font-size:18px;">${s}</button>`).join('')}
+                <div class="delete-modal-body" style="margin-bottom:16px;max-height:50vh;overflow-y:auto;">
+                    <div class="picker-grid" style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;">
+                        ${symbols.map((s, i) => `<button class="sym-pick" data-s="${s}">${s}</button>`).join('')}
                     </div>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
-        const close = () => overlay.remove();
-        overlay.querySelector('.link-modal-close').addEventListener('click', close);
+        requestAnimationFrame(() => overlay.classList.add('show'));
+        const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
+        overlay.querySelector('.modal-close-btn').addEventListener('click', close);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
         overlay.querySelectorAll('.sym-pick').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -4050,6 +4171,117 @@ class SlidesApp {
         }
     }
 
+
+    // ── File Modal ──────────────────────────────────────
+
+    openFileModal() {
+        const modal = document.getElementById('fileModal');
+        if (!modal || !this.pres) return;
+        // Populate the name input with current presentation title
+        const nameInput = document.getElementById('fileModalNameInput');
+        if (nameInput) nameInput.value = this.pres.title || 'Untitled Presentation';
+        modal.classList.add('show');
+    }
+
+    closeFileModal() {
+        const modal = document.getElementById('fileModal');
+        if (!modal) return;
+        // Save the name input value before closing
+        const nameInput = document.getElementById('fileModalNameInput');
+        if (nameInput && this.pres) {
+            const newTitle = nameInput.value.trim() || 'Untitled Presentation';
+            if (newTitle !== this.pres.title) {
+                this.pres.title = newTitle;
+                const titleInput = document.getElementById('presentationTitle');
+                if (titleInput) titleInput.value = newTitle;
+                this.scheduleSave();
+            }
+        }
+        modal.classList.add('closing');
+        setTimeout(() => { modal.classList.remove('show'); modal.classList.remove('closing'); }, 250);
+        // Switch back to Home tab after closing
+        this._switchTab('home');
+    }
+
+    exportSVGs() {
+        if (!this.pres) { this.showToast('No presentation open.'); return; }
+        const slides = this.pres.slides;
+        if (!slides || slides.length === 0) { this.showToast('No slides to export.'); return; }
+
+        // Generate SVGs for each slide
+        const svgStrings = slides.map((slide, i) => {
+            const w = 960, h = 540;
+            let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`;
+
+            // Background
+            const bg = slide.bg || '#ffffff';
+            if (bg.includes('gradient')) {
+                svgContent += `<defs><linearGradient id="slideBg${i}" x1="0%" y1="0%" x2="100%" y2="100%">`;
+                // Parse gradient colors (simple approach)
+                const colors = bg.match(/#[0-9a-fA-F]{6}/g) || ['#667eea', '#764ba2'];
+                colors.forEach((c, ci) => {
+                    svgContent += `<stop offset="${ci * 100 / Math.max(colors.length - 1, 1)}%" style="stop-color:${c}"/>`;
+                });
+                svgContent += `</linearGradient></defs>`;
+                svgContent += `<rect width="${w}" height="${h}" fill="url(#slideBg${i})"/>`;
+            } else {
+                svgContent += `<rect width="${w}" height="${h}" fill="${bg}"/>`;
+            }
+
+            // Elements
+            (slide.elements || []).forEach(el => {
+                if (el.type === 'text' && el.html) {
+                    const fontSize = el.fontSize || 24;
+                    const fontFamily = el.fontFamily || 'DM Sans, sans-serif';
+                    const fill = el.fill || '#1a1a1a';
+                    const anchor = el.textAlign === 'center' ? 'middle' : (el.textAlign === 'right' ? 'end' : 'start');
+                    const x = el.textAlign === 'center' ? el.x + el.w / 2 : (el.textAlign === 'right' ? el.x + el.w : el.x + 4);
+                    svgContent += `<text x="${x}" y="${el.y + fontSize}" font-size="${fontSize}" font-family="${fontFamily}" fill="${fill}" text-anchor="${anchor}">${el.html.replace(/<[^>]*>/g, '')}</text>`;
+                } else if (el.type === 'shape' && el.svg) {
+                    svgContent += `<g transform="translate(${el.x},${el.y})"><svg width="${el.w}" height="${el.h}" viewBox="0 0 ${el.w} ${el.h}">${el.svg}</svg></g>`;
+                } else if (el.type === 'shape' && el.shape === 'rect') {
+                    svgContent += `<rect x="${el.x}" y="${el.y}" width="${el.w}" height="${el.h}" rx="${el.r || 0}" fill="${el.fill || '#e5e7eb'}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" opacity="${el.opacity || 1}"/>`;
+                } else if (el.type === 'shape' && el.shape === 'ellipse') {
+                    svgContent += `<ellipse cx="${el.x + el.w/2}" cy="${el.y + el.h/2}" rx="${el.w/2}" ry="${el.h/2}" fill="${el.fill || '#e5e7eb'}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" opacity="${el.opacity || 1}"/>`;
+                } else if (el.type === 'shape' && el.shape === 'line') {
+                    svgContent += `<line x1="${el.x}" y1="${el.y}" x2="${el.x + el.w}" y2="${el.y + el.h}" stroke="${el.stroke || '#1a1a1a'}" stroke-width="${el.strokeWidth || 2}" opacity="${el.opacity || 1}"/>`;
+                } else if (el.type === 'image' && el.src) {
+                    svgContent += `<image x="${el.x}" y="${el.y}" width="${el.w}" height="${el.h}" href="${el.src}" opacity="${el.opacity || 1}"/>`;
+                }
+            });
+
+            svgContent += '</svg>';
+            return { name: `slide_${i + 1}.svg`, content: svgContent };
+        });
+
+        // Download as ZIP
+        if (typeof JSZip === 'undefined') {
+            // Fallback: download individual SVGs
+            svgStrings.forEach(s => {
+                const blob = new Blob([s.content], { type: 'image/svg+xml' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = s.name;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+            this.showToast(`Exported ${svgStrings.length} SVG files.`);
+            return;
+        }
+
+        const zip = new JSZip();
+        svgStrings.forEach(s => zip.file(s.name, s.content));
+        zip.generateAsync({ type: 'blob' }).then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const title = (this.pres.title || 'Untitled_Presentation').replace(/[^a-zA-Z0-9]+/g, '_');
+            a.href = url; a.download = `${title}_svgs.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+            this.showToast(`Exported ${svgStrings.length} slides as SVGs (ZIP).`);
+        });
+    }
+
     // ── Delete Modal (presentations only — slide deletion is direct & undoable) ──
     confirmDeletePresentation(id) {
         this._deleteTarget = { type: 'pres', id };
@@ -4059,17 +4291,21 @@ class SlidesApp {
     }
 
     closeDeleteModal() {
-        document.getElementById('deleteModal')?.classList.remove('show');
+        const modal = document.getElementById('deleteModal');
+        if (!modal) { this._deleteTarget = null; return; }
+        modal.classList.add('closing');
+        setTimeout(() => { modal.classList.remove('show'); modal.classList.remove('closing'); }, 230);
         this._deleteTarget = null;
     }
 
     confirmDelete() {
         if (!this._deleteTarget) { this.closeDeleteModal(); return; }
         const target = this._deleteTarget;
-        // Close modal FIRST (which nulls _deleteTarget) but we already captured `target`
-        document.getElementById('deleteModal')?.classList.remove('show');
+        // Animate closing, then perform deletion after animation finishes
+        const modal = document.getElementById('deleteModal');
+        if (modal) { modal.classList.add('closing'); setTimeout(() => { modal.classList.remove('show'); modal.classList.remove('closing'); }, 230); }
         this._deleteTarget = null;
-        if (target.type === 'pres') this.deletePresentation(target.id);
+        setTimeout(() => { if (target.type === 'pres') this.deletePresentation(target.id); }, 250);
     }
 
     // ── Background Picker ──────────────────────────────────────
@@ -4082,7 +4318,8 @@ class SlidesApp {
     }
 
     closeBgPicker() {
-        document.getElementById('bgPickerModal')?.classList.remove('show');
+        const bgModal = document.getElementById('bgPickerModal');
+        if (bgModal) { bgModal.classList.add('closing'); setTimeout(() => { bgModal.classList.remove('show'); bgModal.classList.remove('closing'); }, 230); }
     }
 
     applyBgPicker() {
@@ -4189,19 +4426,11 @@ class SlidesApp {
                         const w = thumb.clientWidth || 220;
                         const s = w / 960;
                         inner.style.transform = `scale(${s})`;
-                        inner.style.height = Math.round(540 * s) + 'px';
                         thumb.style.height = Math.round(540 * s) + 'px';
                     });
                 }
 
-                const delBtn = document.createElement('button');
-                delBtn.className = 'presentation-card-del';
-                delBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-                delBtn.title = 'Delete presentation';
-                delBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.confirmDeletePresentation(meta.id);
-                });
+                
 
                 const info = document.createElement('div');
                 info.className = 'presentation-card-info';
@@ -4211,7 +4440,7 @@ class SlidesApp {
                 `;
 
                 card.appendChild(thumb);
-                card.appendChild(delBtn);
+                
                 card.appendChild(info);
                 card.addEventListener('click', () => this.openPresentation(meta.id));
                 frag.appendChild(card);
@@ -4250,6 +4479,11 @@ class SlidesApp {
 
         // Try fullscreen – re-render slide once the viewport actually resizes
         this._presentFullscreenHandler = () => {
+            // If fullscreen was exited while presenting (e.g. user pressed native F11), end the presentation entirely
+            if (!document.fullscreenElement && !document.webkitFullscreenElement && this.isPresenting) {
+                this.endPresentation();
+                return;
+            }
             if (this.isPresenting) this.renderPresentSlide();
         };
         this._presentResizeHandler = () => {
@@ -4274,7 +4508,7 @@ class SlidesApp {
 
     _presentKeyHandler = (e) => {
         if (!this.isPresenting) return;
-        if (e.key === 'Escape')      this.endPresentation();
+        if (e.key === 'Escape' || e.key === 'F11') { e.preventDefault(); this.endPresentation(); return; }
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); this.presentNext(); }
         if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); this.presentPrev(); }
     };
@@ -4335,7 +4569,11 @@ class SlidesApp {
                 d.style.whiteSpace = 'pre-wrap';
                 d.innerHTML = el.html || '';
             } else if (el.type === 'shape') {
-                d.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
+                if (el.shape === 'icon' || el.shape === 'chart') {
+                    d.innerHTML = el.svg || '';
+                } else {
+                    d.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
+                }
             } else if (el.type === 'image') {
                 const crop = el.crop || { l: 0, t: 0, r: 0, b: 0 };
                 const visibleW = 1 - crop.l - crop.r;

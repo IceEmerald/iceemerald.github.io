@@ -17,15 +17,33 @@
     }
 }
 
-@keyframes slideUpModal {
+@keyframes fadeInModal {
     0% {
         opacity: 0;
-        transform: translateY(24px) scale(0.95);
     }
 
     100% {
         opacity: 1;
-        transform: translateY(0px) scale(1);
+    }
+}
+
+@keyframes fadeOutModal {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes fadeOutOverlay {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
     }
 }
 
@@ -313,6 +331,7 @@ html {
     position: relative;
     z-index: 10;
     flex-shrink: 0;
+    min-height: 100px;
     transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 1;
     transform: translateY(0px);
@@ -390,7 +409,7 @@ body.no-active-note .ribbon, body.no-active-note .ribbon-tabs {
 }
 
 .ribbon-panel {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: nowrap;
@@ -399,10 +418,37 @@ body.no-active-note .ribbon, body.no-active-note .ribbon-tabs {
     padding-right: 12px;
     padding-left: 12px;
     margin: 0px auto;
+    /* Hidden state: stacked invisible, no layout impact */
+    opacity: 0;
+    filter: blur(4px);
+    visibility: hidden;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    transition: opacity 0.3s ease-out, filter 0.3s ease-out, visibility 0s 0.3s;
+    will-change: opacity, filter;
 }
 
 .ribbon-panel.active {
-    display: flex;
+    /* Visible state: in-flow, no blur */
+    opacity: 1;
+    filter: blur(0px);
+    visibility: visible;
+    pointer-events: auto;
+    position: relative;
+    transition: opacity 0.3s ease-out, filter 0.3s ease-out, visibility 0s;
+}
+
+.ribbon-panel.blur-out {
+    /* Leaving state: keeps position: relative so layout doesn't shift */
+    opacity: 0;
+    filter: blur(4px);
+    visibility: visible;
+    pointer-events: none;
+    position: relative;
+    transition: opacity 0.18s ease-in, filter 0.18s ease-in, visibility 0s 0.18s;
 }
 
 .ribbon-group {
@@ -1519,7 +1565,6 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
 .notes-section {
     display: flex;
     flex-direction: column;
-    gap: 20px;
     flex: 1 1 0%;
     overflow: hidden;
 }
@@ -2525,13 +2570,14 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 100000;
     opacity: 0;
     visibility: hidden;
-    transition: 0.3s;
+    transition: all 0.3s ease;
 }
 
 .delete-modal.show {
@@ -2539,15 +2585,25 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
     visibility: visible;
 }
 
+.delete-modal.show .delete-modal-content {
+    opacity: 1;
+    animation: fadeInModal 0.25s ease both;
+}
+
 .delete-modal-content {
+    position: relative;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     border-radius: 12px;
     padding: 24px;
     max-width: 400px;
     width: 90%;
     box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px;
     border: 1px solid rgba(255, 255, 255, 0.2);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    will-change: opacity;
 }
 
 .delete-modal-header {
@@ -2774,13 +2830,14 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
     height: 100%;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 100000;
     opacity: 0;
     visibility: hidden;
-    transition: 0.3s;
+    transition: all 0.3s ease;
 }
 
 .link-modal.show {
@@ -2789,8 +2846,10 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
 }
 
 .link-modal-content {
+    position: relative;
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     border-radius: 12px;
     padding: 24px;
     max-width: 480px;
@@ -2798,14 +2857,13 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
     box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     opacity: 0;
-    transform: scale(1);
-    transition: opacity 0.25s;
+    transition: opacity 0.3s ease;
     will-change: opacity;
 }
 
 .link-modal.show .link-modal-content {
     opacity: 1;
-    animation: 0.25s ease 0s 1 normal both running fadeIn;
+    animation: fadeInModal 0.25s ease both;
 }
 
 .link-modal-header {
@@ -3872,6 +3930,8 @@ body.no-active-note .ribbon {
     cursor: move;
     outline: none;
     user-select: none;
+    -webkit-user-drag: none;
+    user-drag: none;
 }
 
 .slide-el:hover:not(.selected):not(.editing) {
@@ -3886,7 +3946,7 @@ body.no-active-note .ribbon {
 
 .slide-el.editing {
     cursor: text;
-    outline: rgb(59, 130, 246) solid 2px;
+    outline: 2px solid var(--ui-accent);
     outline-offset: 1px;
     overflow: visible;
 }
@@ -4557,7 +4617,6 @@ body.no-active-note .ribbon {
 .presentation-card:hover {
     background: rgb(255, 255, 255);
     box-shadow: rgba(249, 115, 22, 0.12) 0px 8px 24px;
-    transform: translateY(-3px);
     border-color: rgba(249, 115, 22, 0.2);
 }
 
@@ -4603,36 +4662,7 @@ body.no-active-note .ribbon {
     font-family: "DM Sans", sans-serif;
 }
 
-.presentation-card-del {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.55);
-    color: white;
-    border-width: medium;
-    border-style: none;
-    border-color: currentcolor;
-    border-image: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s, background 0.2s;
-    z-index: 2;
-    backdrop-filter: blur(4px);
-}
-
-.presentation-card:hover .presentation-card-del {
-    opacity: 1;
-}
-
-.presentation-card-del:hover {
-    background: rgba(220, 53, 69, 0.85);
-}
+/* (presentation-card-del removed — no X button on welcome cards) */
 
 .editor-statusbar {
     align-items: center;
@@ -4765,6 +4795,12 @@ body.no-active-note .editor-header, body.no-active-note .editor-content, body.no
 @media (max-width: 1023px) {
     .ribbon-panel {
         display: flex !important;
+        position: relative !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        filter: none !important;
+        transform: none !important;
+        pointer-events: auto !important;
     }
 
     .ribbon-content {
@@ -4895,14 +4931,6 @@ body.no-active-note .editor-header, body.no-active-note .editor-content, body.no
 
 .ribbon-tabs-legacy-removed {
     display: none;
-}
-
-.ribbon-panel[data-panel] {
-    display: none;
-}
-
-.ribbon-panel[data-panel].active {
-    display: flex;
 }
 
 .transition-grid {
@@ -5479,12 +5507,273 @@ body.view-notes .editor-area {
     align-items: center;
 }
 
-/* Modal picker grid (icons, symbols) hover state */
+/* Modal picker grid (icons, symbols) base + hover */
+.icon-pick,
+.sym-pick {
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 18px;
+    color: rgba(44, 62, 80, 0.8);
+    outline: none;
+}
 .icon-pick:hover,
 .sym-pick:hover {
-    background: var(--ui-accent-soft) !important;
-    border-color: var(--ui-accent) !important;
-    transform: translateY(-1px);
+    background: var(--ui-accent-soft);
+    border-color: var(--ui-accent-border);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.15);
+}
+.icon-pick:active,
+.sym-pick:active {
+    transform: translateY(0);
+    background: var(--ui-accent-selected);
+}
+
+.delete-modal.closing {
+    animation: fadeOutOverlay 0.23s ease forwards;
+    pointer-events: none;
+}
+
+.delete-modal.closing .delete-modal-content {
+    animation: fadeOutModal 0.23s ease-in forwards;
+}
+
+.link-modal.closing {
+    animation: fadeOutOverlay 0.23s ease forwards;
+    pointer-events: none;
+}
+
+.link-modal.closing .link-modal-content {
+    animation: fadeOutModal 0.23s ease-in forwards;
+}
+
+
+/* ── File Management Overlay (AIChat Settings-style centered card) ─── */
+.file-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+    z-index: 9999;
+    padding: 20px;
+}
+
+.file-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.file-overlay.closing {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.file-overlay-card {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    max-width: 420px;
+    width: 100%;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.file-overlay.show .file-overlay-card {
+    opacity: 1;
+    animation: fadeInModal 0.25s ease both;
+}
+
+.file-overlay.closing .file-overlay-card {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+/* Header */
+.file-overlay-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 24px;
+    position: relative;
+}
+
+.file-overlay-header-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(30, 41, 59, 0.92);
+    letter-spacing: -0.02em;
+    text-align: center;
+}
+
+.file-overlay-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(108, 117, 125, 0.5);
+    transition: background 0.15s, color 0.15s;
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.file-overlay-close-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: rgba(44, 62, 80, 0.7);
+}
+
+/* Body (scrollable) */
+.file-overlay-body {
+    padding-top: 0px;
+    padding-left: 24px;
+    padding-right: 24px;
+    padding-bottom: 24px;
+    overflow-y: auto;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Section */
+.file-overlay-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.file-overlay-section-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: rgb(70 70 70 / 50%);
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+/* Name input */
+.file-overlay-name-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(30, 41, 59, 0.92);
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    padding: 12px 16px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+    letter-spacing: -0.01em;
+}
+
+.file-overlay-name-input:focus {
+    border-color: rgba(249, 115, 22, 0.4);
+    background: rgba(249, 115, 22, 0.03);
+}
+
+/* Actions row (side-by-side layout for Delete & Close) */
+.file-overlay-actions-row {
+    display: flex;
+    gap: 10px;
+}
+
+/* Action buttons (icon + text) */
+.file-overlay-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(44, 62, 80, 0.82);
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 11px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    width: 100%;
+    letter-spacing: -0.01em;
+}
+
+.file-overlay-action-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: rgba(30, 41, 59, 0.95);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+.file-overlay-action-btn svg {
+    flex-shrink: 0;
+    color: rgba(108, 117, 125, 0.45);
+    transition: color 0.15s;
+}
+
+.file-overlay-action-btn:hover svg {
+    color: rgba(44, 62, 80, 0.65);
+}
+
+.file-overlay-action-btn--danger {
+    color: #dc3545;
+    border-color: rgba(220, 53, 69, 0.12);
+    background: rgba(220, 53, 69, 0.04);
+}
+
+.file-overlay-action-btn--danger:hover {
+    color: #c82333;
+    background: rgba(220, 53, 69, 0.1);
+    border-color: rgba(220, 53, 69, 0.2);
+}
+
+.file-overlay-action-btn--danger svg {
+    color: #dc3545;
+}
+
+.file-overlay-action-btn--danger:hover svg {
+    color: #c82333;
+}
+
+/* Close button — AIChat-style (absolute positioned, minimal) */
+.modal-close-btn {
+    background: none;
+    border: none;
+    color: rgba(108, 117, 125, 0.6);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    line-height: 1;
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+    transition: color 0.15s, background 0.15s;
+}
+
+.modal-close-btn:hover {
+    color: rgba(44, 62, 80, 0.9);
+    background: rgba(0, 0, 0, 0.05);
 }
 
 /* ── Custom Video Player ──────────────────────────────────── */
