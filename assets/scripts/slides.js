@@ -10,6 +10,12 @@ function uid() {
     return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+function generateSecureId(length = 9) {
+    const arr = new Uint8Array(Math.ceil(length / 2));
+    crypto.getRandomValues(arr);
+    return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('').slice(0, length);
+}
+
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 
 function htmlToText(html) {
@@ -22,7 +28,12 @@ function formatDate(ts) {
     return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// Shape SVG generator
+// Strip // comment lines from .emeraldcore files before JSON.parse()
+function stripComments(text) {
+    return text.split('\n').map(line => line.replace(/^\s*\/\/.*$/, '')).join('\n');
+}
+
+// Shape SVG generator — PowerPoint-style comprehensive shape set
 function shapeSVG(shape, fill, stroke, strokeWidth) {
     const sw = (stroke === 'none' || !stroke) ? 0 : (strokeWidth || 2);
     const f = fill === 'none' ? 'none' : (fill || '#f97316');
@@ -30,32 +41,159 @@ function shapeSVG(shape, fill, stroke, strokeWidth) {
     const attrs = `fill="${f}" stroke="${s}" stroke-width="${sw}"`;
     const pad = sw / 2;
 
-    const star5 = () => {
-        const outer = 50 - pad, inner = outer * 0.4, pts = [];
-        for (let i = 0; i < 10; i++) {
+    // Helper: star polygon with N points
+    const starPts = (n, outerR, innerRatio) => {
+        const outer = outerR - pad, inner = outer * innerRatio, pts = [];
+        const total = n * 2;
+        for (let i = 0; i < total; i++) {
             const r = i % 2 === 0 ? outer : inner;
-            const a = (i * 36 - 90) * Math.PI / 180;
+            const a = (i * (360 / total) - 90) * Math.PI / 180;
             pts.push(`${50 + r * Math.cos(a)},${50 + r * Math.sin(a)}`);
         }
         return pts.join(' ');
     };
 
-    const hex = () => Array.from({ length: 6 }, (_, i) => {
-        const a = (i * 60 - 90) * Math.PI / 180;
-        const r = 50 - pad;
-        return `${50 + r * Math.cos(a)},${50 + r * Math.sin(a)}`;
-    }).join(' ');
+    // Helper: regular polygon with N sides
+    const polyPts = (n, rVal) => {
+        const r = rVal - pad;
+        return Array.from({ length: n }, (_, i) => {
+            const a = (i * (360 / n) - 90) * Math.PI / 180;
+            return `${50 + r * Math.cos(a)},${50 + r * Math.sin(a)}`;
+        }).join(' ');
+    };
 
     const map = {
-        rect:    `<rect x="${pad}" y="${pad}" width="${100 - sw}" height="${100 - sw}" ${attrs}/>`,
-        rounded: `<rect x="${pad}" y="${pad}" width="${100 - sw}" height="${100 - sw}" rx="10" ry="10" ${attrs}/>`,
-        ellipse: `<ellipse cx="50" cy="50" rx="${50 - pad}" ry="${50 - pad}" ${attrs}/>`,
-        triangle:`<polygon points="50,${pad} ${100 - pad},${100 - pad} ${pad},${100 - pad}" ${attrs}/>`,
-        diamond: `<polygon points="50,${pad} ${100 - pad},50 50,${100 - pad} ${pad},50" ${attrs}/>`,
-        star:    `<polygon points="${star5()}" ${attrs}/>`,
-        arrow:   `<polygon points="${pad},35 70,35 70,${10 + pad} ${100 - pad},50 70,${90 - pad} 70,65 ${pad},65" ${attrs}/>`,
-        hexagon: `<polygon points="${hex()}" ${attrs}/>`,
-        line:    `<line x1="${pad}" y1="50" x2="${100 - pad}" y2="50" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 3)}" stroke-linecap="round"/>`,
+        // ─── Rectangles ───
+        rect:            `<rect x="${pad}" y="${pad}" width="${100-sw}" height="${100-sw}" ${attrs}/>`,
+        rounded:         `<rect x="${pad}" y="${pad}" width="${100-sw}" height="${100-sw}" rx="12" ry="12" ${attrs}/>`,
+        snipSame:        `<polygon points="${pad},12 12,${pad} ${100-pad},${pad} ${100-pad},${100-sw} ${pad},${100-sw}" ${attrs}/>`,
+        snipDiagonal:    `<polygon points="${pad},${100-sw} 30,${pad} ${100-pad},${pad} ${100-pad},${100-sw}" ${attrs}/>`,
+        roundSame:       `<rect x="${pad}" y="${pad}" width="${100-sw}" height="${100-sw}" rx="18" ry="6" ${attrs}/>`,
+        roundDiagonal:   `<path d="M${pad},18 A18,18 0 0 1 18,${pad} H${100-pad} V${100-pad} H${pad} Z" ${attrs}/>`,
+        snipRound:       `<polygon points="${pad},12 12,${pad} ${100-pad},${pad} ${100-pad},${100-sw} ${pad},${100-sw}" ${attrs}/>`,
+        plaque:          `<path d="M8,${pad} C18,${pad} 82,${pad} 92,8 C92,18 92,82 92,92 C82,92 18,92 ${pad},92 C${pad},82 ${pad},18 ${pad},8 Z" ${attrs}/>`,
+        chamfer:         `<polygon points="10,${pad} ${100-pad-10},${pad} ${100-pad},${pad+10} ${100-pad},${100-pad-10} ${100-pad-10},${100-pad} ${pad+10},${100-pad} ${pad},${100-pad-10} ${pad},${pad+10}" ${attrs}/>`,
+        frameRect:       `<rect x="${pad}" y="${pad}" width="${100-sw}" height="${100-sw}" rx="2" ry="2" ${attrs}/><rect x="${pad+8}" y="${pad+8}" width="${100-sw-16}" height="${100-sw-16}" fill="none" ${attrs}/>`,
+        crossRect:       `<polygon points="${pad},30 30,${pad} 70,${pad} ${100-pad},30 ${100-pad},70 70,${100-pad} 30,${100-pad} ${pad},70" ${attrs}/>`,
+        ribbon:          `<path d="M${pad},12 L12,${pad} L88,${pad} L${100-pad},12 L88,${100-sw-12} L50,88 L12,${100-sw-12} Z" ${attrs}/>`,
+        foldCorner:      `<path d="M${pad},${pad} H${100-sw-16} V${100-sw-16} H${pad} Z M${100-sw},${100-sw} L${100-sw-16},${100-sw-16} V${100-sw} Z" ${attrs}/>`,
+
+        // ─── Basic Shapes ───
+        ellipse:         `<ellipse cx="50" cy="50" rx="${50-pad}" ry="${50-pad}" ${attrs}/>`,
+        triangle:        `<polygon points="50,${pad} ${100-pad},${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+        rightTriangle:   `<polygon points="${pad},${pad} ${100-pad},${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+        diamond:         `<polygon points="50,${pad} ${100-pad},50 50,${100-pad} ${pad},50" ${attrs}/>`,
+        pentagon:        `<polygon points="${polyPts(5, 50)}" ${attrs}/>`,
+        hexagon:         `<polygon points="${polyPts(6, 50)}" ${attrs}/>`,
+        heptagon:        `<polygon points="${polyPts(7, 50)}" ${attrs}/>`,
+        octagon:         `<polygon points="${polyPts(8, 50)}" ${attrs}/>`,
+        decagon:         `<polygon points="${polyPts(10, 50)}" ${attrs}/>`,
+        dodecagon:       `<polygon points="${polyPts(12, 50)}" ${attrs}/>`,
+        parallelogram:   `<polygon points="25,${pad} ${100-pad},${pad} ${100-pad-25},${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+        trapezoid:       `<polygon points="25,${pad} ${100-pad-25},${pad} ${100-pad},${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+        cross:           `<polygon points="35,${pad} 65,${pad} 65,35 ${100-pad},35 ${100-pad},65 65,65 65,${100-pad} 35,${100-pad} 35,65 ${pad},65 ${pad},35" ${attrs}/>`,
+        plus:            `<polygon points="40,${pad} 60,${pad} 60,40 ${100-pad},40 ${100-pad},60 60,60 60,${100-pad} 40,${100-pad} 40,60 ${pad},60 ${pad},40" ${attrs}/>`,
+        donut:           `<circle cx="50" cy="50" r="${50-pad}" ${attrs}/><circle cx="50" cy="50" r="${25}" fill="none" stroke="${s === 'none' ? f : s}" stroke-width="${sw}"/>`,
+        teardrop:        `<path d="M50,${pad} C80,${pad} ${100-pad},35 ${100-pad},50 C${100-pad},75 75,${100-pad} 50,${100-pad} C25,${100-pad} ${pad},75 ${pad},50 C${pad},35 20,${pad} 50,${pad} Z" ${attrs}/>`,
+        heart:           `<path d="M50,90 C25,70 ${pad},55 ${pad},35 C${pad},15 20,${pad} 35,${pad} C45,${pad} 50,10 50,25 C50,10 55,${pad} 65,${pad} C80,${pad} ${100-pad},15 ${100-pad},35 C${100-pad},55 75,70 50,90 Z" ${attrs}/>`,
+        lightning:       `<polygon points="55,${pad} 35,42 50,42 25,${100-pad} 50,58 40,58 65,${100-pad}" ${attrs}/>`,
+        sun:             `<circle cx="50" cy="50" r="18" ${attrs}/><line x1="50" y1="${pad}" x2="50" y2="18" stroke="${s=== 'none'?f:s}" stroke-width="3"/><line x1="50" y1="82" x2="50" y2="${100-pad}" stroke="${s==='none'?f:s}" stroke-width="3"/><line x1="${pad}" y1="50" x2="18" y2="50" stroke="${s==='none'?f:s}" stroke-width="3"/><line x1="82" y1="50" x2="${100-pad}" y2="50" stroke="${s==='none'?f:s}" stroke-width="3"/><line x1="20" y1="20" x2="28" y2="28" stroke="${s==='none'?f:s}" stroke-width="3"/><line x1="72" y1="28" x2="80" y2="20" stroke="${s==='none'?f:s}" stroke-width="3"/><line x1="20" y1="80" x2="28" y2="72" stroke="${s==='none'?f:s}" stroke-width="3"/><line x1="72" y1="72" x2="80" y2="80" stroke="${s==='none'?f:s}" stroke-width="3"/>`,
+        moon:            `<path d="M40,${pad} A40,40 0 1 0 40,${100-pad} A30,30 0 0 1 40,${pad} Z" ${attrs}/>`,
+        cloud:           `<path d="M25,70 A18,18 0 0 1 25,45 A22,22 0 0 1 50,${pad} A22,22 0 0 1 75,30 A18,18 0 0 1 ${100-pad},55 A14,14 0 0 1 85,70 Z" ${attrs}/>`,
+        blockArc:        `<path d="M20,50 A30,30 0 0 1 80,50 A30,30 0 0 0 20,50 Z" ${attrs}/>`,
+        wave:            `<path d="M${pad},50 C20,25 35,25 50,50 C65,75 80,75 ${100-pad},50" ${attrs}/>`,
+        noSymbol:        `<circle cx="50" cy="50" r="${45-pad}" ${attrs}/><line x1="18" y1="18" x2="82" y2="82" stroke="${s==='none'?f:s}" stroke-width="${Math.max(sw,4)}"/>`,
+        smile:           `<circle cx="50" cy="50" r="${45-pad}" ${attrs}/><circle cx="35" cy="40" r="4" fill="${f}" stroke="none"/><circle cx="65" cy="40" r="4" fill="${f}" stroke="none"/><path d="M30,60 Q50,80 70,60" fill="none" stroke="${s==='none'?f:s}" stroke-width="3"/>`,
+        cube:            `<polygon points="30,${pad+10} 70,${pad} ${100-pad},30 ${100-pad},70 60,${100-pad} ${pad},80" ${attrs}/><line x1="30" y1="${pad+10}" x2="30" y2="55" stroke="${s==='none'?f:s}" stroke-width="1"/><line x1="30" y1="55" x2="${pad}" y2="80" stroke="${s==='none'?f:s}" stroke-width="1"/><line x1="30" y1="55" x2="60" y2="${100-pad}" stroke="${s==='none'?f:s}" stroke-width="1"/>`,
+        can:             `<ellipse cx="50" cy="${pad+8}" rx="${38-pad}" ry="8" ${attrs}/><rect x="${pad+12}" y="${pad+8}" width="${100-sw-24}" height="${76}" ${attrs}/><ellipse cx="50" cy="${100-pad-4}" rx="${38-pad}" ry="8" ${attrs}/>`,
+        scroll:          `<path d="M${pad+5},15 C15,8 ${pad},8 ${pad},15 V85 C${pad},92 15,92 ${pad+5},85 H${100-pad-5} C85,92 ${100-pad},92 ${100-pad},85 V15 C${100-pad},8 85,8 ${100-pad-5},15 Z" ${attrs}/>`,
+        bracketL:        `<path d="M${100-pad},${pad} H30 C10,${pad} ${pad},10 ${pad},30 V70 C${pad},90 10,${100-pad} 30,${100-pad} H${100-pad}" ${attrs}/>`,
+        bracketR:        `<path d="M${pad},${pad} H70 C90,${pad} ${100-pad},10 ${100-pad},30 V70 C${100-pad},90 90,${100-pad} 70,${100-pad} H${pad}" ${attrs}/>`,
+        braceL:          `<path d="M${100-pad},${pad} H35 Q10,${pad} ${pad},25 Q${pad},50 25,50 Q${pad},50 ${pad},75 Q${pad},${100-pad} 35,${100-pad} H${100-pad}" ${attrs}/>`,
+        braceR:          `<path d="M${pad},${pad} H65 Q90,${pad} ${100-pad},25 Q${100-pad},50 75,50 Q${100-pad},50 ${100-pad},75 Q${100-pad},${100-pad} 65,${100-pad} H${pad}" ${attrs}/>`,
+        diagonalStripe:  `<polygon points="${pad},${pad} ${100-pad},${pad} ${pad},${100-pad}" ${attrs}/>`,
+        chord:           `<path d="M20,50 A30,30 0 0 1 80,50 L20,50 Z" ${attrs}/>`,
+        pie:             `<path d="M50,50 L50,${pad} A${50-pad},${50-pad} 0 0 1 ${100-pad},50 Z" ${attrs}/>`,
+        leftParen:       `<path d="M75,${pad} C35,${pad} ${pad},25 ${pad},50 C${pad},75 35,${100-pad} 75,${100-pad}" ${attrs}/>`,
+        rightParen:      `<path d="M25,${pad} C65,${pad} ${100-pad},25 ${100-pad},50 C${100-pad},75 65,${100-pad} 25,${100-pad}" ${attrs}/>`,
+        corner:          `<polygon points="${pad},${pad} ${100-pad},${pad} ${pad},${100-pad}" ${attrs}/>`,
+        halfFrame:       `<polygon points="${pad},${pad} ${100-pad},${pad} ${100-pad},50 50,50 50,${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+
+        // ─── Block Arrows ───
+        arrow:           `<polygon points="${pad},35 70,35 70,${10+pad} ${100-pad},50 70,${90-pad} 70,65 ${pad},65" ${attrs}/>`,
+        arrowLeft:       `<polygon points="${100-pad},35 30,35 30,${10+pad} ${pad},50 30,${90-pad} 30,65 ${100-pad},65" ${attrs}/>`,
+        arrowUp:         `<polygon points="35,${100-pad} 35,30 ${10+pad},30 50,${pad} ${90-pad},30 65,30 65,${100-pad}" ${attrs}/>`,
+        arrowDown:       `<polygon points="35,${pad} 35,70 ${10+pad},70 50,${100-pad} ${90-pad},70 65,70 65,${pad}" ${attrs}/>`,
+        arrowLR:         `<polygon points="${pad},50 25,${10+pad} 25,35 75,35 75,${10+pad} ${100-pad},50 75,${90-pad} 75,65 25,65 25,${90-pad}" ${attrs}/>`,
+        arrowUD:         `<polygon points="50,${pad} ${10+pad},25 35,25 35,75 ${10+pad},75 50,${100-pad} ${90-pad},75 65,75 65,25 ${90-pad},25" ${attrs}/>`,
+        arrowQuad:       `<polygon points="${pad},50 25,${10+pad} 25,25 50,25 75,${10+pad} ${100-pad},50 75,${90-pad} 75,75 50,75 25,${90-pad}" ${attrs}/>`,
+        arrowNotched:    `<polygon points="${pad},35 35,35 35,${10+pad} ${100-pad},50 35,${90-pad} 35,65 ${pad},65 20,50" ${attrs}/>`,
+        arrowBent:       `<polygon points="${pad},${100-pad} ${pad},35 55,35 55,${10+pad} ${100-pad},50 55,${90-pad} 55,35 ${100-pad},35" ${attrs}/>`,
+        arrowUturn:      `<polygon points="${pad},50 25,${10+pad} 25,25 25,65 ${100-pad},65 ${100-pad},50 75,${90-pad} 75,75 ${pad},75" ${attrs}/>`,
+        arrowStriped:    `<polygon points="${pad},35 35,35 35,${10+pad} ${100-pad},50 35,${90-pad} 35,65 ${pad},65" ${attrs}/><rect x="${pad}" y="42" width="5" height="16" fill="${f}" stroke="none"/>`,
+        arrowChevron:    `<polygon points="${pad},50 35,${10+pad} 35,35 ${100-pad},50 35,${90-pad} 35,65" ${attrs}/>`,
+        arrowPentagon:   `<polygon points="${pad},50 35,${pad} 35,35 ${100-pad},50 35,${100-pad} 35,65 ${pad},65" ${attrs}/>`,
+        arrowCalloutR:   `<polygon points="${pad},${pad} 70,${pad} 70,35 ${100-pad},50 70,65 70,${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+        arrowCalloutL:   `<polygon points="${100-pad},${pad} 30,${pad} 30,35 ${pad},50 30,65 30,${100-pad} ${100-pad},${100-pad}" ${attrs}/>`,
+        arrowCalloutU:   `<polygon points="${pad},${100-pad} ${pad},30 35,30 50,${pad} 65,30 ${100-pad},${100-pad} 65,30 ${pad},${100-pad}" ${attrs}/>`,
+        arrowCalloutD:   `<polygon points="${pad},${pad} ${pad},70 35,70 50,${100-pad} 65,70 ${100-pad},${pad} 65,70 ${pad},${pad}" ${attrs}/>`,
+        arrowCircular:   `<path d="M50,${pad} A40,40 0 1 1 ${pad},50 L15,40 L${pad},50" ${attrs}/>`,
+
+        // ─── Stars ───
+        star:            `<polygon points="${starPts(5, 50, 0.4)}" ${attrs}/>`,
+        star4:           `<polygon points="${starPts(4, 50, 0.25)}" ${attrs}/>`,
+        star6:           `<polygon points="${starPts(6, 50, 0.5)}" ${attrs}/>`,
+        star8:           `<polygon points="${starPts(8, 50, 0.4)}" ${attrs}/>`,
+        star10:          `<polygon points="${starPts(10, 50, 0.4)}" ${attrs}/>`,
+        star12:          `<polygon points="${starPts(12, 50, 0.4)}" ${attrs}/>`,
+        star16:          `<polygon points="${starPts(16, 50, 0.45)}" ${attrs}/>`,
+        star24:          `<polygon points="${starPts(24, 50, 0.5)}" ${attrs}/>`,
+        star32:          `<polygon points="${starPts(32, 50, 0.55)}" ${attrs}/>`,
+        seal1:           `<polygon points="50,${pad} 55,30 70,25 60,38 65,50 50,45 35,50 40,38 30,25 45,30" ${attrs}/>`,
+        seal2:           `<polygon points="50,${pad} 62,18 75,${pad+5} 68,32 85,35 72,48 85,62 68,58 75,75 62,68 50,85 38,68 25,75 32,58 15,62 28,48 15,35 32,32 25,${pad+5} 38,18" ${attrs}/>`,
+        starRibbon:      `<polygon points="${starPts(5, 50, 0.4)}" ${attrs}/><polygon points="30,85 40,75 50,90 60,75 70,85" fill="${f}" stroke="${s==='none'?f:s}" stroke-width="${sw}"/>`,
+
+        // ─── Callouts ───
+        calloutRect:     `<polygon points="${pad},${pad} ${100-pad},${pad} ${100-pad},65 55,65 55,${100-pad} 45,65 ${pad},65" ${attrs}/>`,
+        calloutRound:    `<rect x="${pad}" y="${pad}" width="${100-sw}" height="58" rx="8" ${attrs}/><polygon points="50,58 45,${100-pad} 55,58" ${attrs}/>`,
+        calloutEllipse:  `<ellipse cx="50" cy="30" rx="${45-pad}" ry="25" ${attrs}/><polygon points="50,55 45,${100-pad} 55,55" ${attrs}/>`,
+        calloutCloud:    `<path d="M30,55 A20,20 0 0 1 30,30 A25,25 0 0 1 50,${pad} A25,25 0 0 1 70,30 A20,20 0 0 1 70,55 Z" ${attrs}/><polygon points="50,55 45,${100-pad} 55,55" ${attrs}/>`,
+        calloutLine1:    `<rect x="${pad}" y="${pad}" width="${100-sw}" height="50" rx="2" ${attrs}/><line x1="50" y1="50" x2="50" y2="${100-pad}" stroke="${s==='none'?f:s}" stroke-width="${sw}"/>`,
+        calloutLine2:    `<rect x="${pad}" y="${pad}" width="${100-sw}" height="50" rx="2" ${attrs}/><line x1="50" y1="50" x2="${100-pad}" y2="${100-pad}" stroke="${s==='none'?f:s}" stroke-width="${sw}"/>`,
+        calloutLine3:    `<rect x="${pad}" y="${pad}" width="${100-sw}" height="50" rx="8" ${attrs}/><line x1="50" y1="50" x2="50" y2="${100-pad}" stroke="${s==='none'?f:s}" stroke-width="${sw}"/>`,
+
+        // ─── Flowchart ───
+        fcProcess:       `<rect x="${pad}" y="${pad}" width="${100-sw}" height="${100-sw}" ${attrs}/>`,
+        fcDecision:      `<polygon points="50,${pad} ${100-pad},50 50,${100-pad} ${pad},50" ${attrs}/>`,
+        fcData:          `<polygon points="25,${pad} ${100-pad},${pad} ${100-pad-25},${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+        fcPredefined:    `<rect x="${pad}" y="${pad}" width="${100-sw}" height="${100-sw}" ${attrs}/><line x1="${pad+10}" y1="${pad}" x2="${pad+10}" y2="${100-pad}" stroke="${s==='none'?f:s}" stroke-width="2"/><line x1="${100-pad-10}" y1="${pad}" x2="${100-pad-10}" y2="${100-pad}" stroke="${s==='none'?f:s}" stroke-width="2"/>`,
+        fcInternal:      `<rect x="${pad}" y="${pad}" width="${100-sw}" height="${100-sw}" ${attrs}/><line x1="${pad}" y1="${pad}" x2="${100-pad}" y1="${pad}" stroke="${s==='none'?f:s}" stroke-width="2"/><line x1="${pad}" y1="${100-pad}" x2="${100-pad}" y1="${100-pad}" stroke="${s==='none'?f:s}" stroke-width="2"/>`,
+        fcDocument:      `<path d="M${pad},${pad} H${100-pad} V${100-pad-10} C75,${100-pad} 50,${100-pad-15} ${pad},${100-pad}" ${attrs}/>`,
+        fcMultiDoc:      `<path d="M${pad+8},${pad+5} H${100-pad-8} V${100-pad-10} C75,${100-pad-5} 50,${100-pad-15} ${pad+8},${100-pad-5}" ${attrs}/><path d="M${pad},${pad} H${100-pad} V${100-pad-10} C75,${100-pad} 50,${100-pad-15} ${pad},${100-pad}" ${attrs}/>`,
+        fcTerminator:    `<rect x="${pad}" y="${pad}" width="${100-sw}" height="${100-sw}" rx="25" ry="25" ${attrs}/>`,
+        fcPreparation:   `<polygon points="25,${pad} ${100-pad-25},${pad} ${100-pad},50 ${100-pad-25},${100-pad} 25,${100-pad} ${pad},50" ${attrs}/>`,
+        fcManualInput:   `<polygon points="${pad},${pad+8} 25,${pad} ${100-pad},${pad} ${100-pad},${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+        fcManualOp:      `<polygon points="25,${pad} ${100-pad-25},${pad} ${100-pad},${100-pad} ${pad},${100-pad}" ${attrs}/>`,
+        fcConnector:     `<circle cx="50" cy="50" r="${35-pad}" ${attrs}/>`,
+        fcOffPage:       `<polygon points="50,${pad} ${100-pad},50 50,${100-pad} ${pad},50" ${attrs}/><polygon points="50,${100-pad} ${100-pad},50" fill="${f}" stroke="none"/>`,
+        fcCard:          `<path d="M${pad},${pad} H${100-pad} V${100-pad-12} H${pad+12} V${100-pad} H${pad} Z" ${attrs}/>`,
+        fcPunchedTape:   `<path d="M${pad},${pad} H${100-pad} V${100-pad} C85,${100-pad} 75,${100-pad-8} 65,${100-pad} H${pad}" ${attrs}/>`,
+        fcDelay:         `<path d="M${pad},${pad} H60 V${100-pad} H${pad} A20,20 0 0 0 ${pad},${pad}" ${attrs}/>`,
+        fcDisplay:       `<polygon points="30,${pad} 70,${pad} ${100-pad},50 70,${100-pad} 30,${100-pad} ${pad},50" ${attrs}/>`,
+        fcSort:          `<polygon points="50,${pad} ${100-pad},35 ${pad},35" ${attrs}/><polygon points="50,65 ${pad},${100-pad} ${100-pad},65" ${attrs}/>`,
+        fcMerge:         `<polygon points="${pad},35 ${100-pad},35 50,${100-pad}" ${attrs}/><polygon points="50,${pad} ${pad},65 ${100-pad},65" ${attrs}/>`,
+        fcExtract:       `<polygon points="${pad},${pad} ${pad},${100-pad} 50,50" ${attrs}/><polygon points="50,50 ${100-pad},${pad} ${100-pad},${100-pad}" ${attrs}/>`,
+        fcStoredData:    `<path d="M${pad},50 C${pad},25 25,${pad} 50,${pad} C75,${pad} ${100-pad},25 ${100-pad},50 C${100-pad},75 75,${100-pad} 50,${100-pad} C25,${100-pad} ${pad},75 ${pad},50" ${attrs}/><line x1="${pad}" y1="50" x2="${100-pad}" y2="50" stroke="${s==='none'?f:s}" stroke-width="2"/>`,
+        fcCollate:       `<path d="M${pad},${pad} H${100-pad} V${100-pad} H${pad} Z" ${attrs}/><path d="M${pad+5},${pad+5} H${100-pad-5} V${100-pad-5} H${pad+5} Z" fill="none" ${attrs}/>`,
+        fcSumming:       `<circle cx="50" cy="50" r="${35-pad}" ${attrs}/><line x1="50" y1="${pad+15}" x2="50" y2="${100-pad-15}" stroke="${s==='none'?f:s}" stroke-width="2"/><line x1="${pad+15}" y1="50" x2="${100-pad-15}" y2="50" stroke="${s==='none'?f:s}" stroke-width="2"/>`,
+        fcOr:            `<circle cx="50" cy="50" r="${35-pad}" ${attrs}/><line x1="${pad+15}" y1="50" x2="${100-pad-15}" y2="50" stroke="${s==='none'?f:s}" stroke-width="2"/>`,
+
+        // ─── Lines ───
+        line:            `<line x1="${pad}" y1="50" x2="${100-pad}" y2="50" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 3)}" stroke-linecap="round"/>`,
+        lineArrow:       `<line x1="${pad}" y1="50" x2="${100-pad-10}" y2="50" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 3)}" stroke-linecap="round"/><polyline points="${100-pad-10},40 ${100-pad},50 ${100-pad-10},60" fill="none" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 2)}"/>`,
+        lineDouble:      `<line x1="${pad}" y1="50" x2="${100-pad-10}" y2="50" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 3)}" stroke-linecap="round"/><polyline points="${100-pad-10},40 ${100-pad},50 ${100-pad-10},60" fill="none" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 2)}"/><polyline points="${pad+10},40 ${pad},50 ${pad+10},60" fill="none" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 2)}"/>`,
+        lineElbow:       `<polyline points="${pad},25 50,25 50,${100-pad}" fill="none" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 3)}" stroke-linecap="round" stroke-linejoin="round"/>`,
+        lineCurve:       `<path d="M${pad},50 C30,10 70,90 ${100-pad},50" fill="none" stroke="${s === 'none' ? f : s}" stroke-width="${Math.max(sw, 3)}" stroke-linecap="round"/>`,
     };
 
     const inner = map[shape] || map.rect;
@@ -99,7 +237,7 @@ function makeSlide() {
 
 function makePresentation(title = 'Untitled Presentation') {
     return {
-        id: uid(),
+        id: 'pres_' + Date.now() + '_' + generateSecureId(9),
         title,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -135,6 +273,18 @@ class SlidesApp {
         this._activeTab = 'home';
         this._previousTab = null; // restored when a contextual tab (e.g. Shape Format) closes
         this._cropMode = false; // true when Shift-dragging on a handle to crop
+        this._activeTemplateIdx = 0; // currently selected template index
+        // Transition animation cleanup timer — tracked so a new
+        // transition (or slide nav) can cancel an in-flight cleanup
+        // from the previous one. Without this, the OLD timeout fires
+        // and removes the NEW transition's CSS class early, killing
+        // the new animation mid-flight (the "doesn't change, keeps
+        // the previous transition" bug).
+        this._trAnimTimer = null;
+        // Morph FLIP wrapper cleanup timer — same idea. Cleared on
+        // any new transition so orphan .morph-flip-wrapper divs don't
+        // linger in the new slide's DOM after a mid-morph navigation.
+        this._morphAnimTimer = null;
 
         // Storage key prefix
         this.PRES_INDEX_KEY = 'emeraldslides_index';
@@ -144,6 +294,7 @@ class SlidesApp {
     }
 
     async init() {
+        this.loadIconLibrary(); // fire-and-forget fetch of icons.emeraldcore
         await this.loadIndex();
         this.setupRibbon();
         this.setupRibbonTabs();
@@ -162,12 +313,21 @@ class SlidesApp {
         // cards on the welcome screen, so we no longer call it directly.
         this.showWelcomeScreen(true);
 
-        // Check URL for presentation id
+        // Set Normal view as default active mode
+        const viewNormalBtn = document.getElementById('viewNormalBtn');
+        if (viewNormalBtn) viewNormalBtn.classList.add('active');
+
+        // Check URL for ?owned=<presId> (mirrors notes.js ?owned=<noteId> pattern)
+        // Also support legacy ?pres=<rawId> URLs for backward compatibility.
         const params = new URLSearchParams(location.search);
-        const openId = params.get('pres');
+        const ownedId = params.get('owned');
+        const legacyPresId = params.get('pres');
+        const openId = ownedId || legacyPresId;
         if (openId) {
             const meta = this.presentations.find(p => p.id === openId);
             if (meta) { await this.openPresentation(openId); return; }
+            // Not found locally — clear stale URL (like notes.js does)
+            history.replaceState(null, '', location.pathname);
         }
         // Auto-open most recent if any
         if (this.presentations.length === 0) {
@@ -422,7 +582,7 @@ class SlidesApp {
     //   - hides the sidebar, editor-area, status bar, presenter notes
     //   - hides the ribbon (CSS body.no-active-note does this)
     //   - shows the welcome screen as the only visible surface
-    //   - clears ?pres=ID from the URL so a refresh reopens at the welcome screen
+    //   - clears ?owned=<presId> from the URL so a refresh reopens at the welcome screen
     //
     // body.no-active-note is the same class the page starts with on initial
     // load (see <body class="no-active-note"> in slides.html), so the visual
@@ -440,7 +600,7 @@ class SlidesApp {
         if (slidesList) slidesList.innerHTML = '';
         const slideCanvas = document.getElementById('slideCanvas');
         if (slideCanvas) slideCanvas.innerHTML = '';
-        // Clear ?pres=ID from the URL so refresh doesn't reopen the deck
+        // Clear ?owned=<presId> from the URL so refresh doesn't reopen the deck
         history.replaceState(null, '', location.pathname);
         // Add body.no-active-note — same class the page loads with on a
         // fresh refresh. CSS uses this class to hide the ribbon, sidebar,
@@ -474,6 +634,13 @@ class SlidesApp {
         // Restore the first slide's saved drawing onto the overlay
         // canvas so it's visible as soon as the deck opens.
         this._restoreDrawing();
+        // Sync the TIMING panel with the newly-loaded slide's
+        // transition settings (duration / advance trigger / after-sec).
+        this._syncTransitionTimingUI?.();
+        // Sync the Animations tab Timing panel with the first
+        // slide's animation settings (or defaults if none).
+        this._syncAnimationTimingUI?.();
+        this.renderAnimationPane();
         this.showWelcomeScreen(false);
         // If the user was on the File tab (welcome screen) when they clicked
         // a presentation card or "New", switch back to Home so the Home
@@ -486,10 +653,28 @@ class SlidesApp {
         const ribbonTabs = document.getElementById('mainRibbonTabs');
         if (ribbonTabs) { ribbonTabs.classList.add('entering'); setTimeout(() => ribbonTabs.classList.remove('entering'), 600); }
 
-        // Update URL
+        // Update URL — ?owned=<presId> (ID already has 'pres_' baked in, like notes.js)
         const url = new URL(location.href);
-        url.searchParams.set('pres', this.pres.id);
+        url.searchParams.set('owned', this.pres.id);
         history.replaceState(null, '', url);
+    }
+
+    /**
+     * Refresh the browser address bar to reflect the currently-open presentation.
+     * Mirrors notes.js updateOwnedLinkBar() — the URL auto-updates every time
+     * the user opens a different presentation.
+     *
+     * Behavior:
+     *   - Active presentation -> `?owned=<presId>` (ID has 'pres_' baked in)
+     *   - No active presentation (welcome screen) -> URL cleared
+     */
+    updateOwnedLinkBar() {
+        if (this.pres) {
+            const ownedUrl = `${window.location.origin}${window.location.pathname}?owned=${encodeURIComponent(this.pres.id)}`;
+            window.history.replaceState({}, document.title, ownedUrl);
+        } else if (window.location.search) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
     }
 
     async deletePresentation(id) {
@@ -521,6 +706,13 @@ class SlidesApp {
         this.renderSlideList();
         this.renderCanvas();
         this.updateStatusBar();
+        // Refresh the transition thumbnail highlight + TIMING panel so
+        // they reflect the newly-added (default) slide rather than the
+        // previous slide's settings.
+        this._refreshTransitionHighlight?.();
+        this._syncTransitionTimingUI?.();
+        this._syncAnimationTimingUI?.();
+        this.renderAnimationPane();
         this.scheduleSave();
     }
 
@@ -539,6 +731,12 @@ class SlidesApp {
         this.renderSlideList();
         this.renderCanvas();
         this.updateStatusBar();
+        // The duplicated slide inherits the source's transition, so the
+        // thumbnail highlight + TIMING panel need to re-sync.
+        this._refreshTransitionHighlight?.();
+        this._syncTransitionTimingUI?.();
+        this._syncAnimationTimingUI?.();
+        this.renderAnimationPane();
         this.scheduleSave();
     }
 
@@ -554,6 +752,13 @@ class SlidesApp {
         this.renderSlideList();
         this.renderCanvas();
         this.updateStatusBar();
+        // After deletion the active slide index may have shifted, so
+        // refresh the thumbnail highlight + TIMING panel to reflect
+        // whichever slide is now active.
+        this._refreshTransitionHighlight?.();
+        this._syncTransitionTimingUI?.();
+        this._syncAnimationTimingUI?.();
+        this.renderAnimationPane();
         this.scheduleSave();
         // No confirmation modal — slide deletion is undoable via Ctrl+Z / undo button.
         this.showToast('Slide deleted.');
@@ -581,6 +786,18 @@ class SlidesApp {
         document.querySelectorAll('.slide-thumb-item').forEach((el, i) => {
             el.classList.toggle('active', i === this.slideIdx);
         });
+        // Refresh the transition thumbnail highlight so it reflects
+        // the newly-selected slide's applied transition.
+        this._refreshTransitionHighlight?.();
+        // Sync the TIMING panel inputs (duration / advance trigger /
+        // after-seconds) so they reflect the newly-selected slide's
+        // settings rather than the previous slide's.
+        this._syncTransitionTimingUI?.();
+        // Sync the Animations tab Timing panel so it reflects the
+        // newly-selected slide's animation settings.
+        this._syncAnimationTimingUI?.();
+        // Re-render the Animation Pane for the new slide.
+        this.renderAnimationPane();
         // Scroll thumbnail into view
         const thumb = document.querySelectorAll('.slide-thumb-item')[this.slideIdx];
         if (thumb) thumb.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -961,7 +1178,38 @@ class SlidesApp {
         const FS_EXIT_SVG = '<svg viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>';
         fsBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (document.fullscreenElement || document.webkitFullscreenElement) {
+            // When in presentation mode, re-parent the player out of
+            // .present-slide (which has transform:scale creating a new
+            // containing block that traps position:fixed) into the
+            // #presentOverlay so it can truly fill the viewport.
+            if (this.isPresenting) {
+                const overlay = document.getElementById('presentOverlay');
+                if (!overlay) return;
+                if (this._expandedVideoPlayer === player) {
+                    // Collapse: move back to original parent
+                    if (player._origParent && player._origNextSibling !== undefined) {
+                        if (player._origNextSibling) {
+                            player._origParent.insertBefore(player, player._origNextSibling);
+                        } else {
+                            player._origParent.appendChild(player);
+                        }
+                    }
+                    player.classList.remove('vid-expanded');
+                    delete this._expandedVideoPlayer;
+                } else {
+                    // Expand: remember original position, then move to overlay
+                    player._origParent = player.parentElement;
+                    player._origNextSibling = player.nextElementSibling;
+                    player.classList.add('vid-expanded');
+                    overlay.appendChild(player);
+                    this._expandedVideoPlayer = player;
+                }
+                return;
+            }
+            // Editor mode: use native Fullscreen API as before
+            const isPlayerFs = document.fullscreenElement === player ||
+                               document.webkitFullscreenElement === player;
+            if (isPlayerFs) {
                 (document.exitFullscreen || document.webkitExitFullscreen).call(document);
             } else if (player.requestFullscreen) {
                 player.requestFullscreen();
@@ -971,9 +1219,12 @@ class SlidesApp {
         });
         // Update icon on fullscreen change
         const updateFsIcon = () => {
-            const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-            fsBtn.innerHTML = isFs ? FS_EXIT_SVG : FS_ENTER_SVG;
-            fsBtn.title = isFs ? 'Exit Fullscreen' : 'Fullscreen';
+            const isPlayerFs = document.fullscreenElement === player ||
+                               document.webkitFullscreenElement === player;
+            const isExpanded = player.classList.contains('vid-expanded');
+            const showExit = isPlayerFs || isExpanded;
+            fsBtn.innerHTML = showExit ? FS_EXIT_SVG : FS_ENTER_SVG;
+            fsBtn.title = showExit ? 'Exit Fullscreen' : 'Fullscreen';
         };
         document.addEventListener('fullscreenchange', updateFsIcon);
         document.addEventListener('webkitfullscreenchange', updateFsIcon);
@@ -1202,6 +1453,9 @@ class SlidesApp {
     renderCanvas() {
         const canvas = document.getElementById('slideCanvas');
         if (!canvas) return;
+        // After this render finishes, refresh ruler tick alignment (the canvas
+        // position may have shifted due to scrollbar or layout changes).
+        requestAnimationFrame(() => this.renderRulers());
 
         // Clear
         canvas.innerHTML = '';
@@ -1234,6 +1488,52 @@ class SlidesApp {
             canvas.appendChild(domEl);
         });
 
+
+        // Render link badges on canvas level (outside element divs so they never get clipped)
+        sorted.forEach(el => {
+            if (el.link) {
+                const badge = document.createElement('div');
+                badge.className = 'link-badge';
+                badge.dataset.elId = el.id;
+                badge.title = el.link;
+                badge.style.cssText = `position:absolute;left:${el.x + el.w - 9}px;top:${el.y - 9}px;z-index:${(el.z || 1) + 1};`;
+                badge.innerHTML = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+                canvas.appendChild(badge);
+            }
+        });
+
+        // Render comment markers
+        if (slide.comments && slide.comments.length) {
+            slide.comments.forEach((comment, ci) => {
+                // If comment is attached to an element, compute position from element's current location
+                let pinX = comment.x;
+                let pinY = comment.y;
+                if (comment.elementId) {
+                    const linkedEl = slide.elements.find(e => e.id === comment.elementId);
+                    if (linkedEl) {
+                        pinX = linkedEl.x + linkedEl.w + 10; // Stick to the element
+                        pinY = linkedEl.y;
+                    } else {
+                        // Element was deleted — remove orphaned comment too
+                        slide.comments.splice(ci, 1);
+                        this.scheduleSave();
+                        return; // skip this iteration
+                    }
+                }
+                const pin = document.createElement('div');
+                pin.className = 'comment-pin';
+                pin.dataset.commentIdx = ci;
+                pin.title = `${comment.author}: ${comment.text}`;
+                pin.style.cssText = `position:absolute;left:${pinX}px;top:${pinY}px;z-index:${999 + ci};`;
+                pin.innerHTML = `<div class="comment-pin-icon"><span>${comment.author.charAt(0)}</span></div>`;
+                // Click to show comment popup
+                pin.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showCommentPopup(comment, ci);
+                });
+                canvas.appendChild(pin);
+            });
+        }
         this.updateScalerSize();
         this.updateThumbnail(this.slideIdx);
     }
@@ -1266,6 +1566,7 @@ class SlidesApp {
             content.setAttribute('data-placeholder', 'Click to edit text');
             content.style.cssText = 'width:100%;height:100%;outline:none;word-break:break-word;white-space:pre-wrap;';
             content.innerHTML = el.html || '';
+            // Link is handled via click on the element (see mousedown handler)
             // Listen for input to save
             content.addEventListener('input', () => {
                 el.html = content.innerHTML;
@@ -1284,8 +1585,8 @@ class SlidesApp {
             content.addEventListener('blur', () => this.saveSelection());
             div.appendChild(content);
         } else if (el.type === 'shape') {
-            // Icon / chart shapes carry their own pre-rendered SVG markup
-            if (el.shape === 'icon' || el.shape === 'chart') {
+            // Icon shapes carry their own pre-rendered SVG markup
+            if (el.shape === 'icon') {
                 div.innerHTML = el.svg || '';
             } else {
                 div.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
@@ -1448,10 +1749,17 @@ class SlidesApp {
         div.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
             e.stopPropagation();
+            // If Ctrl is held and element has a link, don't select/edit — let click handler open the link
+            if ((e.ctrlKey || e.metaKey) && el.link) {
+                this._lastDragHadMoved = false;
+                return;
+            }
             // If already editing this text element, let the browser handle caret placement
             if (this.editingId === el.id && el.type === 'text') return;
             if (this.editingId && this.editingId !== el.id) this.exitTextEditing();
             const wasSelected = this.selectedId === el.id;
+            this._wasSelectedBeforeClick = wasSelected; // Track for link click handler
+            this._lastDragHadMoved = false; // Reset drag tracker for link click
             this.selectElement(el.id);
             // For text: if already selected, single click also enters edit mode (PowerPoint-like)
             if (el.type === 'text' && wasSelected) {
@@ -1467,6 +1775,22 @@ class SlidesApp {
                 e.stopPropagation();
                 this.enterTextEditing(el.id);
             });
+        }
+
+        // Ctrl+Click to open link — Ctrl + Left Click opens link in editor mode
+        if (el.link) {
+            div.addEventListener('click', (e) => {
+                // Don't open if in editing mode
+                if (this.editingId === el.id) return;
+                // Don't open if this was a drag action
+                if (this._lastDragHadMoved) return;
+                // Only open with Ctrl + Left Click
+                if (!e.ctrlKey && !e.metaKey) return;
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(el.link, '_blank', 'noopener');
+            });
+            div.classList.add('has-link');
         }
 
         // Selection indicator
@@ -1509,7 +1833,7 @@ class SlidesApp {
             const c = domEl.querySelector('.text-content');
             if (c && this.editingId !== id) c.innerHTML = el.html || '';
         } else if (el.type === 'shape') {
-            if (el.shape === 'icon' || el.shape === 'chart') {
+            if (el.shape === 'icon') {
                 domEl.innerHTML = el.svg || '';
             } else {
                 domEl.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
@@ -1547,6 +1871,7 @@ class SlidesApp {
         if (this.selectedId === id) {
             this.appendHandles(domEl, el);
         }
+  
     }
 
     appendHandles(domEl, el) {
@@ -1565,8 +1890,8 @@ class SlidesApp {
             wrapper.appendChild(h);
         });
 
-        // Rotate handle (skip for line shapes)
-        if (el.shape !== 'line') {
+        // Rotate handle (skip for line-type shapes)
+        if (el.shape !== 'line' && el.shape !== 'lineArrow' && el.shape !== 'lineDouble' && el.shape !== 'lineElbow' && el.shape !== 'lineCurve') {
             const rh = document.createElement('div');
             rh.className = 'el-rotate-handle';
             rh.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`;
@@ -1746,9 +2071,49 @@ class SlidesApp {
         }
 
         this.renderElementDOM(this.drag.id);
+        // Update linked comment pin positions during drag
+        this._updateLinkedCommentPins(this.drag.id);
+        // Update link badge position during drag (real-time)
+        this._updateLinkBadge(this.drag.id);
         this.updateThumbnail(this.slideIdx);
         this.updateStatusBar();
     };
+
+    _updateLinkBadge(elementId) {
+        const canvas = document.getElementById('slideCanvas');
+        if (!canvas) return;
+        const el = this.getElement(elementId);
+        if (!el) return;
+        const badge = canvas.querySelector(`.link-badge[data-el-id="${elementId}"]`);
+        if (badge) {
+            badge.style.left = (el.x + el.w - 9) + 'px';
+            badge.style.top = (el.y - 9) + 'px';
+        }
+    }
+
+    _updateLinkedCommentPins(elementId) {
+        const slide = this.currentSlide;
+        const canvas = document.getElementById('slideCanvas');
+        if (!slide || !canvas) return;
+        if (!slide.comments) return;
+        const el = this.getElement(elementId);
+        if (!el) return;
+        slide.comments.forEach((comment, ci) => {
+            if (comment.elementId === elementId) {
+                const pinEl = canvas.querySelector(`[data-comment-idx="${ci}"]`);
+                if (pinEl) {
+                    pinEl.style.left = (el.x + el.w + 10) + 'px'; // Stick to the element
+                    pinEl.style.top = el.y + 'px';
+                }
+                // Also update any open popup for this comment
+                const popupEl = canvas.querySelector('.comment-popup');
+                if (popupEl) {
+                    popupEl.style.left = (el.x + el.w + 40) + 'px'; // Next to the pin
+                    popupEl.style.top = (el.y - 6) + 'px';
+                }
+            }
+        });
+    }
 
     _onDragEnd = () => {
         document.removeEventListener('mousemove', this._onDragMove);
@@ -1768,7 +2133,10 @@ class SlidesApp {
                     setTimeout(() => player._resetDidDrag(), 50);
                 }
             }
+            // Track whether a drag occurred for link click detection
+            this._lastDragHadMoved = this.drag ? !!this.drag.hasMoved : false;
             this.scheduleSave();
+            this.renderCanvas(); // Re-render to update comment pins & link badges
             this.drag = null;
             this._cropMode = false;
         }
@@ -1810,6 +2178,23 @@ class SlidesApp {
         const ro = new ResizeObserver(() => this.updateScalerSize());
         ro.observe(wrapper);
         this.updateScalerSize();
+
+        // Scroll-to-zoom: Ctrl+wheel zooms the editor canvas
+        const editorContent = document.getElementById('editorContent');
+        if (editorContent) {
+            editorContent.addEventListener('wheel', (e) => {
+                // Only zoom when Ctrl is held (or Cmd on Mac)
+                if (!e.ctrlKey && !e.metaKey) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Determine zoom direction from deltaY
+                // Normalize delta (some mice use large delta values)
+                const delta = e.deltaY > 0 ? -1 : 1;
+                const factor = 1 + (delta * 0.08); // 8% zoom step
+                this.setZoom(this.scale * factor);
+            }, { passive: false });
+        }
     }
 
     // ── Slide Thumbnails ───────────────────────────────────────
@@ -1893,7 +2278,7 @@ class SlidesApp {
                 d.style.wordBreak = 'break-word';
                 d.innerHTML = el.html || '';
             } else if (el.type === 'shape') {
-                if (el.shape === 'icon' || el.shape === 'chart') {
+                if (el.shape === 'icon') {
                     d.innerHTML = el.svg || '';
                 } else {
                     d.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
@@ -1937,6 +2322,19 @@ class SlidesApp {
             }
             inner.appendChild(d);
         });
+        // Mini comment indicators in thumbnails
+        if (slide.comments && slide.comments.length) {
+            slide.comments.forEach(comment => {
+                let px = comment.x, py = comment.y;
+                if (comment.elementId) {
+                    const linkedEl = slide.elements.find(e => e.id === comment.elementId);
+                    if (linkedEl) { px = linkedEl.x + linkedEl.w; py = linkedEl.y; }
+                }
+                const pin = document.createElement('div');
+                pin.style.cssText = `position:absolute;left:${px}px;top:${py}px;width:6px;height:6px;background:#f97316;border-radius:50% 50% 50% 1px;z-index:999;transform:rotate(-45deg);`;
+                inner.appendChild(pin);
+            });
+        }
         // Render the saved drawing as an overlay so the thumbnail
         // shows the user's strokes along with the slide content.
         if (slide.drawingData) {
@@ -2187,7 +2585,13 @@ class SlidesApp {
             btn.addEventListener('click', () => {
                 if (!this.pres) return;
                 const shape = btn.dataset.shape;
-                const el = makeShapeEl(shape, 200, 150, shape === 'line' ? 300 : 200, shape === 'line' ? 4 : 140);
+                // Determine default size based on shape type
+                const isLine = shape === 'line' || shape === 'lineArrow' || shape === 'lineDouble' || shape === 'lineElbow' || shape === 'lineCurve';
+                const isArrow = shape.startsWith('arrow') && !shape.startsWith('arrowCallout');
+                const isCallout = shape.startsWith('callout') || shape.startsWith('arrowCallout');
+                const w = isLine ? 300 : (isCallout ? 200 : (isArrow ? 180 : 200));
+                const h = isLine ? 4 : (isCallout ? 140 : (shape === 'calloutCloud' ? 120 : 140));
+                const el = makeShapeEl(shape, 200, 150, w, h);
                 // Close dropdown
                 document.getElementById('shapeDropdown')?.classList.remove('active');
                 this.addElement(el);
@@ -2269,34 +2673,63 @@ class SlidesApp {
         document.getElementById('bulletListBtn')?.addEventListener('click', () => this.applyTextFormat('insertUnorderedList'));
         document.getElementById('numberListBtn')?.addEventListener('click', () => this.applyTextFormat('insertOrderedList'));
 
-        // Shape fill
-        document.querySelectorAll('#fillColorDropdown .color-dot').forEach(dot => {
-            dot.addEventListener('click', () => {
-                const color = dot.dataset.color;
-                document.getElementById('fillColorSwatch').style.background = color === 'none' ? 'transparent' : color;
+        // Shape fill — list-style dropdown items (ms-dropdown-item instead of color-dot)
+        document.querySelectorAll('#fillColorDropdown .ms-dropdown-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const color = item.dataset.value;
+                const swatch = document.getElementById('fillColorSwatch');
+                if (swatch) {
+                    if (color === 'none') {
+                        swatch.style.background = 'transparent';
+                        swatch.style.border = '2px dashed #999';
+                    } else {
+                        swatch.style.background = color;
+                        swatch.style.border = '1px solid rgba(0,0,0,0.15)';
+                    }
+                }
                 if (this.selectedId) this.updateElement(this.selectedId, { fill: color });
                 document.getElementById('fillColorDropdown')?.classList.remove('active');
+                const fillBtn = document.querySelector('#fillColorDropdown .ms-dropdown-btn');
+                if (fillBtn) fillBtn.setAttribute('aria-expanded', 'false');
             });
-        });
-        document.getElementById('fillColorCustom')?.addEventListener('input', (e) => {
-            document.getElementById('fillColorSwatch').style.background = e.target.value;
-            if (this.selectedId) this.updateElement(this.selectedId, { fill: e.target.value }, true);
         });
 
-        // Shape stroke
-        document.querySelectorAll('#strokeColorDropdown .color-dot').forEach(dot => {
-            dot.addEventListener('click', () => {
-                const color = dot.dataset.color;
+        // Shape stroke — list-style dropdown items
+        document.querySelectorAll('#strokeColorDropdown .ms-dropdown-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const color = item.dataset.value;
+                const swatch = document.getElementById('strokeColorSwatch');
+                if (swatch) {
+                    if (color === 'none') {
+                        swatch.style.background = 'transparent';
+                        swatch.style.border = '2px dashed #999';
+                    } else {
+                        swatch.style.background = color;
+                        swatch.style.border = '2px solid ' + color;
+                    }
+                }
                 if (this.selectedId) this.updateElement(this.selectedId, { stroke: color });
                 document.getElementById('strokeColorDropdown')?.classList.remove('active');
+                const strokeBtn = document.querySelector('#strokeColorDropdown .ms-dropdown-btn');
+                if (strokeBtn) strokeBtn.setAttribute('aria-expanded', 'false');
             });
         });
-        document.getElementById('strokeColorCustom')?.addEventListener('input', (e) => {
-            if (this.selectedId) this.updateElement(this.selectedId, { stroke: e.target.value }, true);
-        });
-        document.getElementById('strokeWidthInput')?.addEventListener('input', (e) => {
-            if (this.selectedId) this.updateElement(this.selectedId, { strokeWidth: parseInt(e.target.value) || 2 }, true);
-        });
+        // Stroke Width dropdown (replaces old number input)
+        const swDropdown = document.getElementById('strokeWidthDropdown');
+        if (swDropdown) {
+            swDropdown.querySelectorAll('.ms-dropdown-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const val = parseInt(item.dataset.value) || 2;
+                    const label = document.getElementById('strokeWidthLabel');
+                    if (label) label.textContent = item.dataset.label;
+                    if (this.selectedId) this.updateElement(this.selectedId, { strokeWidth: val }, true);
+                    // Close the dropdown
+                    swDropdown.classList.remove('active');
+                    const btn = swDropdown.querySelector('.ms-dropdown-btn');
+                    if (btn) btn.setAttribute('aria-expanded', 'false');
+                });
+            });
+        }
 
         // Arrange
         document.getElementById('bringFrontBtn')?.addEventListener('click', () => this.bringToFront());
@@ -2307,16 +2740,6 @@ class SlidesApp {
         // Presentation
         document.getElementById('presentFromStartBtn')?.addEventListener('click', () => this.startPresentation(0));
         document.getElementById('presentFromCurrentBtn')?.addEventListener('click', () => this.startPresentation(this.slideIdx));
-
-        // Export
-        document.getElementById('exportPptxBtn')?.addEventListener('click', () => this.exportPPTX());
-        document.getElementById('exportPdfBtn')?.addEventListener('click', () => this.exportPDF());
-        document.getElementById('importPptxBtn')?.addEventListener('click', () => document.getElementById('importPptxInput')?.click());
-        document.getElementById('importPptxInput')?.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) this.importPPTX(file);
-            e.target.value = '';
-        });
 
         // Slide actions (in editor header)
         document.getElementById('newSlideBtn')?.addEventListener('click', () => this.addSlide());
@@ -2337,6 +2760,10 @@ class SlidesApp {
                     // Focus the textarea for immediate editing
                     setTimeout(() => document.getElementById('presenterNotesInput')?.focus(), 50);
                 }
+                // Re-render rulers — the notes panel changes editor height,
+                // which shifts the canvas vertical position.
+                this._scheduleRulerRender();
+                setTimeout(() => this._scheduleRulerRender(), 260);
             });
         }
 
@@ -2359,15 +2786,12 @@ class SlidesApp {
         document.getElementById('bgPickerApply')?.addEventListener('click', () => this.applyBgPicker());
 
         // Background ribbon dropdown — applies immediately on click (no modal needed)
-        document.querySelectorAll('#bgDropdown .bg-color-btn').forEach(btn => {
+        document.querySelectorAll('#bgDropdown .bg-color-item').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!this.currentSlide) return;
                 const bgVal = btn.dataset.bg;
                 this.applyBackgroundImmediate(bgVal);
-                // Highlight active
-                document.querySelectorAll('#bgDropdown .bg-color-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                // Close dropdown
+                // Close dropdown (no active class — applies immediately like font/highlight)
                 document.getElementById('bgDropdown')?.classList.remove('active');
             });
         });
@@ -2375,7 +2799,6 @@ class SlidesApp {
         document.querySelector('#bgDropdown #bgColorCustom')?.addEventListener('input', (e) => {
             if (!this.currentSlide) return;
             this.applyBackgroundImmediate(e.target.value);
-            document.querySelectorAll('#bgDropdown .bg-color-btn').forEach(b => b.classList.remove('active'));
         });
 
         // Legacy modal color buttons (kept in case modal is opened)
@@ -2528,11 +2951,18 @@ class SlidesApp {
         // Without this, the browser batches both states and the indicator
         // just appears at the active tab with no slide animation.
         requestAnimationFrame(() => requestAnimationFrame(() => this._updateRibbonTabIndicator()));
-        window.addEventListener('resize', () => this._updateRibbonTabIndicator());
+        window.addEventListener('resize', () => {
+            this._updateRibbonTabIndicator();
+            // Re-render rulers on resize so tick marks stay aligned with the canvas.
+            this.renderRulers();
+        });
         // Re-align when fonts finish loading (tab widths can shift)
         if (document.fonts && document.fonts.ready) {
             document.fonts.ready.then(() => this._updateRibbonTabIndicator());
         }
+        // Observe editor layout changes so the ruler ticks follow the
+        // canvas when the sidebar collapses, notes panel opens, etc.
+        this._setupRulerObserver();
     }
 
     // Switch the active ribbon tab.
@@ -2649,78 +3079,127 @@ class SlidesApp {
     }
 
     // ── Transitions Tab ───────────────────────────────────────────
-    // 16 transition types ported from slides AI GENERATED.html
+    // 37 transition types organized into 3 categories (Subtle / Exciting / Dynamic Content),
+    // inspired by desktop presentation software.
     static TRANSITIONS = [
-        { value: 'none',       label: 'None',       preview: '#ffffff' },
-        { value: 'fade',       label: 'Fade',       preview: 'linear-gradient(90deg,#fff,#aaa)' },
-        { value: 'push',       label: 'Push',       preview: 'linear-gradient(90deg,#f97316 50%,#fff 50%)' },
-        { value: 'wipe',       label: 'Wipe',       preview: 'linear-gradient(90deg,#fff 30%,#f97316 30%)' },
-        { value: 'split',      label: 'Split',      preview: 'linear-gradient(135deg,#f97316 50%,#fff 50%)' },
-        { value: 'fade-black', label: 'Fade Black', preview: 'linear-gradient(90deg,#fff,#000)' },
-        { value: 'zoom',       label: 'Zoom',       preview: 'radial-gradient(circle,#f97316 30%,#fff)' },
-        { value: 'cube',       label: 'Cube',       preview: 'linear-gradient(135deg,#f97316,#c2410c)' },
-        { value: 'flip',       label: 'Flip',       preview: 'linear-gradient(90deg,#f97316,#fff)' },
-        { value: 'gallery',    label: 'Gallery',    preview: 'linear-gradient(180deg,#f97316 60%,#fff)' },
-        { value: 'cover',      label: 'Cover',      preview: 'radial-gradient(circle at center,#f97316 40%,#fff 41%)' },
-        { value: 'reveal',     label: 'Reveal',     preview: 'radial-gradient(circle at center,#fff 50%,#f97316 51%)' },
-        { value: 'cut',        label: 'Cut',        preview: 'repeating-linear-gradient(90deg,#fff 0 10px,#f97316 10px 11px)' },
-        { value: 'vortex',     label: 'Vortex',     preview: 'conic-gradient(from 0deg,#f97316,#fff,#f97316)' },
-        { value: 'newsflash',  label: 'Newsflash',  preview: 'linear-gradient(135deg,#fbbf24 0 50%,#fff 50%)' },
-        { value: 'honeycomb',  label: 'Honeycomb',  preview: 'radial-gradient(circle at 50% 50%,#f97316 20%,#fff 21%,#fff 40%,#f97316 41%)' },
-        { value: 'glitch',     label: 'Glitch',     preview: 'repeating-linear-gradient(0deg,#ff0000 0 2px,#00ff00 2px 4px,#0000ff 4px 6px)' },
+        // ── Subtle ───────────────────────────────────────────────
+        { value: 'none',         label: 'None',         category: 'Subtle',   preview: '#ffffff' },
+        { value: 'fade',         label: 'Fade',         category: 'Subtle',   preview: 'linear-gradient(90deg,#fff,#aaa)' },
+        { value: 'push',         label: 'Push',         category: 'Subtle',   preview: 'linear-gradient(90deg,#f97316 50%,#fff 50%)' },
+        { value: 'wipe',         label: 'Wipe',         category: 'Subtle',   preview: 'linear-gradient(90deg,#fff 30%,#f97316 30%)' },
+        { value: 'split',        label: 'Split',        category: 'Subtle',   preview: 'linear-gradient(135deg,#f97316 50%,#fff 50%)' },
+        { value: 'reveal',       label: 'Reveal',       category: 'Subtle',   preview: 'radial-gradient(circle at center,#fff 50%,#f97316 51%)' },
+        { value: 'cut',          label: 'Cut',          category: 'Subtle',   preview: 'repeating-linear-gradient(90deg,#fff 0 10px,#f97316 10px 11px)' },
+        { value: 'cover',        label: 'Cover',        category: 'Subtle',   preview: 'radial-gradient(circle at center,#f97316 40%,#fff 41%)' },
+        { value: 'uncover',      label: 'Uncover',      category: 'Subtle',   preview: 'linear-gradient(0deg,#f97316 30%,#fff 30%)' },
+        { value: 'random-bars',  label: 'Random Bars',  category: 'Subtle',   preview: 'repeating-linear-gradient(90deg,#f97316 0 6%,#fff 6% 12%)' },
+        { value: 'shape',        label: 'Shape',        category: 'Subtle',   preview: 'linear-gradient(45deg,#f97316 50%,#fff 50%)' },
+        { value: 'blinds',       label: 'Blinds',       category: 'Subtle',   preview: 'repeating-linear-gradient(0deg,#f97316 0 8%,#fff 8% 16%)' },
+
+        // ── Exciting ─────────────────────────────────────────────
+        { value: 'morph',        label: 'Morph',        category: 'Exciting', preview: 'radial-gradient(circle at 25% 30%,#f97316 0 18%,transparent 19%),radial-gradient(circle at 75% 70%,#fff 0 18%,#f97316 19%)' },
+        { value: 'fade-black',   label: 'Fade Black',   category: 'Exciting', preview: 'linear-gradient(90deg,#fff,#000)' },
+        { value: 'zoom',         label: 'Zoom',         category: 'Exciting', preview: 'radial-gradient(circle,#f97316 30%,#fff)' },
+        { value: 'cube',         label: 'Cube',         category: 'Exciting', preview: 'linear-gradient(135deg,#f97316,#c2410c)' },
+        { value: 'flip',         label: 'Flip',         category: 'Exciting', preview: 'linear-gradient(90deg,#f97316,#fff)' },
+        { value: 'gallery',      label: 'Gallery',      category: 'Exciting', preview: 'linear-gradient(180deg,#f97316 60%,#fff)' },
+        { value: 'vortex',       label: 'Vortex',       category: 'Exciting', preview: 'conic-gradient(from 0deg,#f97316,#fff,#f97316)' },
+        { value: 'newsflash',    label: 'Newsflash',    category: 'Exciting', preview: 'linear-gradient(135deg,#fbbf24 0 50%,#fff 50%)' },
+        { value: 'honeycomb',    label: 'Honeycomb',    category: 'Exciting', preview: 'radial-gradient(circle at 50% 50%,#f97316 20%,#fff 21%,#fff 40%,#f97316 41%)' },
+        { value: 'glitch',       label: 'Glitch',       category: 'Exciting', preview: 'repeating-linear-gradient(0deg,#ff0000 0 2px,#00ff00 2px 4px,#0000ff 4px 6px)' },
+        { value: 'dissolve',     label: 'Dissolve',     category: 'Exciting', preview: 'radial-gradient(circle at 30% 30%,#f97316 10%,#fff 11%,#fff 30%,#f97316 31%)' },
+        { value: 'checkerboard', label: 'Checkerboard', category: 'Exciting', preview: 'repeating-conic-gradient(#f97316 0% 25%,#fff 0% 50%)' },
+        { value: 'clock',        label: 'Clock',        category: 'Exciting', preview: 'conic-gradient(from 0deg,#f97316 0deg 90deg,#fff 90deg 360deg)' },
+        { value: 'ripple',       label: 'Ripple',       category: 'Exciting', preview: 'radial-gradient(circle,#fff 30%,#f97316 31%,#f97316 40%,#fff 41%)' },
+        { value: 'doors',        label: 'Doors',        category: 'Exciting', preview: 'linear-gradient(90deg,#fff 48%,#f97316 48% 52%,#fff 52%)' },
+        { value: 'switch',       label: 'Switch',       category: 'Exciting', preview: 'linear-gradient(180deg,#f97316 50%,#fff 50%)' },
+        { value: 'curtains',     label: 'Curtains',     category: 'Exciting', preview: 'linear-gradient(0deg,#fff 48%,#f97316 48% 52%,#fff 52%)' },
+        { value: 'fracture',     label: 'Fracture',     category: 'Exciting', preview: 'linear-gradient(45deg,#f97316 30%,#fff 30% 70%,#f97316 70%)' },
+        { value: 'peel-off',     label: 'Peel Off',     category: 'Exciting', preview: 'linear-gradient(135deg,#fff 30%,#f97316 30%)' },
+        { value: 'glitter',      label: 'Glitter',      category: 'Exciting', preview: 'radial-gradient(circle at 20% 30%,#fbbf24 8%,transparent 9%),radial-gradient(circle at 70% 60%,#fbbf24 8%,transparent 9%),#fff' },
+        { value: 'comb',         label: 'Comb',         category: 'Exciting', preview: 'repeating-linear-gradient(0deg,#f97316 0 4%,#fff 4% 8%)' },
+
+        // ── Dynamic Content ──────────────────────────────────────
+        { value: 'pan',          label: 'Pan',          category: 'Dynamic',  preview: 'linear-gradient(90deg,#f97316 30%,#fff 30%)' },
+        { value: 'rotate',       label: 'Rotate',       category: 'Dynamic',  preview: 'conic-gradient(from 45deg,#f97316 0 90deg,#fff 90deg)' },
+        { value: 'orbit',        label: 'Orbit',        category: 'Dynamic',  preview: 'radial-gradient(circle at 30% 30%,#f97316 30%,#fff 31%)' },
+        { value: 'fly-through',  label: 'Fly Through',  category: 'Dynamic',  preview: 'radial-gradient(circle,#fff 30%,#f97316 31%)' },
+        { value: 'conveyor',     label: 'Conveyor',     category: 'Dynamic',  preview: 'repeating-linear-gradient(90deg,#f97316 0 10px,#fff 10px 12px)' },
     ];
 
     setupTransitionsTab() {
-        const grid = document.getElementById('transitionGrid');
-        if (!grid) return;
-
-        // Populate transition grid
-        SlidesApp.TRANSITIONS.forEach(tr => {
-            const item = document.createElement('button');
-            item.className = 'transition-option';
-            item.dataset.value = tr.value;
-            item.title = tr.label;
-            item.innerHTML = `
-                <div class="tr-preview" style="background:${tr.preview};"></div>
-                <span class="tr-label">${tr.label}</span>
-            `;
-            item.addEventListener('click', () => {
-                this._closePortal(false);
-                this.applyTransition(tr.value);
-                grid.querySelectorAll('.transition-option').forEach(o => o.classList.toggle('active', o === item));
+        // ── Ribbon thumbnail row ─────────────────────────────────
+        // Show the first N most-used transitions as preview tiles
+        // directly on the ribbon (mirrors the Themes/Templates row on
+        // the Design tab). The order of TRANSITIONS already places
+        // the popular ones (None, Fade, Push, Wipe, Split, Reveal)
+        // first, so we just slice.
+        const row = document.getElementById('transitionThumbnailRow');
+        if (row) {
+            row.innerHTML = '';
+            const RIBBON_COUNT = 6;
+            const popular = SlidesApp.TRANSITIONS.slice(0, RIBBON_COUNT);
+            popular.forEach(tr => {
+                row.appendChild(this._buildTransitionThumb(tr));
             });
-            grid.appendChild(item);
-        });
+        }
 
-        // Duration input
-        const durInput = document.getElementById('transitionDuration');
-        durInput?.addEventListener('change', () => {
-            this.updateTransitionTiming({ duration: parseFloat(durInput.value) || 0.7 });
-        });
+        // ── "More" gallery dropdown ──────────────────────────────
+        // All transitions, grouped by category, in a wide 6-column
+        // grid. Same visual pattern as the Themes/Templates gallery.
+        const gallery = document.getElementById('transitionGalleryMenu');
+        if (gallery) {
+            gallery.innerHTML = '';
+            const categories = ['Subtle', 'Exciting', 'Dynamic'];
+            const catLabel = c => c === 'Dynamic' ? 'Dynamic Content' : c;
+            categories.forEach(cat => {
+                const items = SlidesApp.TRANSITIONS.filter(tr => tr.category === cat);
+                if (items.length === 0) return;
 
-        // On click checkbox
-        const onClickCb = document.getElementById('transitionOnClick');
-        onClickCb?.addEventListener('change', () => {
-            this.updateTransitionTiming({ onClick: onClickCb.checked });
-        });
+                const header = document.createElement('div');
+                header.className = 'transition-category-header';
+                header.textContent = catLabel(cat);
+                gallery.appendChild(header);
 
-        // Auto after checkbox
-        const afterCb = document.getElementById('transitionAutoAfter');
-        const afterSec = document.getElementById('transitionAfterSec');
-        afterCb?.addEventListener('change', () => {
-            afterSec.disabled = !afterCb.checked;
-            this.updateTransitionTiming({ autoAfter: afterCb.checked, afterSec: parseFloat(afterSec.value) || 5 });
-        });
-        afterSec?.addEventListener('change', () => {
-            this.updateTransitionTiming({ autoAfter: afterCb.checked, afterSec: parseFloat(afterSec.value) || 5 });
-        });
+                const grid = document.createElement('div');
+                grid.className = 'transition-gallery-grid';
+                items.forEach(tr => {
+                    grid.appendChild(this._buildTransitionThumb(tr));
+                });
+                gallery.appendChild(grid);
+            });
+        }
+
+        // Highlight the currently-applied transition in both the
+        // ribbon row and the More gallery.
+        this._refreshTransitionHighlight();
+
+        // ── Timing panel wiring ─────────────────────────────────
+        // The TIMING panel uses a unified design:
+        //   • A stepper-style number field for Duration
+        //     ( [−] [input] [+] [sec] ).
+        //   • A segmented pill toggle for the advance trigger
+        //     (On Click | After), and a second stepper field for
+        //     the "After X sec" value.
+        // Pills toggle aria-pressed; the After-field is disabled
+        // (visually faded) when the After pill is not pressed.
+        // The slide's transition object is the single source of
+        // truth — UI changes flow into it via updateTransitionTiming,
+        // and slide switches flow back into the UI via
+        // _syncTransitionTimingUI.
+        this._wireTransitionTimingPanel();
 
         // Apply to all
         document.getElementById('applyTransitionAllBtn')?.addEventListener('click', () => {
             if (!this.pres || this.pres.slides.length === 0) return;
-            const current = this.pres.slides[this.slideIdx]?.transition || { type: 'none', duration: 0.7, onClick: true };
+            const current = this.pres.slides[this.slideIdx]?.transition ||
+                { type: 'none', duration: 0.7, onClick: true, autoAfter: false, afterSec: 5 };
             this.pres.slides.forEach(s => { s.transition = { ...current }; });
             this.scheduleSave();
+            // After "Apply to All" the current slide's settings are
+            // unchanged, but the UI should re-sync in case any rounding
+            // or normalization happened.
+            this._syncTransitionTimingUI?.();
             this.showToast(`Applied "${current.type}" transition to all slides.`);
         });
 
@@ -2728,16 +3207,282 @@ class SlidesApp {
         document.getElementById('previewTransitionBtn')?.addEventListener('click', () => {
             this.previewTransition();
         });
+
+        // Sync the TIMING panel inputs with the current slide's
+        // transition settings (or defaults if no presentation is
+        // loaded yet). This runs once on init; subsequent syncs happen
+        // via selectSlide and applyTransition.
+        this._syncTransitionTimingUI();
+    }
+
+    // Wire up the duration stepper, trigger toggle pills, and
+    // after-seconds stepper. Idempotent — safe to call multiple times
+    // (it removes old listeners before re-adding). All state lives on
+    // the slide's `transition` object; the UI reads/writes through
+    // updateTransitionTiming and _syncTransitionTimingUI.
+    _wireTransitionTimingPanel() {
+        const durInput = document.getElementById('transitionDuration');
+        const afterSec = document.getElementById('transitionAfterSec');
+        const afterField = document.getElementById('transitionAfterField');
+        const toggle = document.getElementById('transitionTriggerToggle');
+
+        // ── Stepper buttons ( [−] / [+] ) ────────────────────────
+        // Each .tr-num-step has data-target (input id) and data-step
+        // (signed delta). Clicking adjusts the input value, clamps to
+        // min/max, fires a 'change' event so the existing change
+        // handler picks it up, and re-syncs the slide data.
+        document.querySelectorAll('.tr-num-step').forEach(btn => {
+            // Avoid double-binding if _wireTransitionTimingPanel runs twice.
+            if (btn.__trBound) return;
+            btn.__trBound = true;
+            btn.addEventListener('click', () => {
+                const target = document.getElementById(btn.dataset.target);
+                if (!target || target.disabled) return;
+                const step = parseFloat(btn.dataset.step) || 0;
+                const min = parseFloat(target.min);
+                const max = parseFloat(target.max);
+                let val = parseFloat(target.value) || 0;
+                val = val + step;
+                if (!Number.isNaN(min)) val = Math.max(min, val);
+                if (!Number.isNaN(max)) val = Math.min(max, val);
+                // Round to 1 decimal to avoid float dust like 0.7000000001
+                if (step % 1 !== 0) val = Math.round(val * 10) / 10;
+                target.value = val;
+                target.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        });
+
+        // ── Duration input ───────────────────────────────────────
+        if (durInput && !durInput.__trBound) {
+            durInput.__trBound = true;
+            durInput.addEventListener('change', () => {
+                let v = parseFloat(durInput.value);
+                if (!Number.isFinite(v) || v <= 0) v = 0.7;
+                v = Math.min(10, Math.max(0.1, Math.round(v * 10) / 10));
+                durInput.value = v;
+                this.updateTransitionTiming({ duration: v });
+            });
+        }
+
+        // ── After-seconds input ──────────────────────────────────
+        if (afterSec && !afterSec.__trBound) {
+            afterSec.__trBound = true;
+            afterSec.addEventListener('change', () => {
+                let v = parseFloat(afterSec.value);
+                if (!Number.isFinite(v) || v <= 0) v = 5;
+                v = Math.min(600, Math.max(1, Math.round(v)));
+                afterSec.value = v;
+                // Only persist if autoAfter is currently active —
+                // otherwise the value is just staged in the UI for
+                // when the user toggles After on.
+                const autoAfter = this._triggerPillState('autoAfter');
+                this.updateTransitionTiming({ autoAfter, afterSec: v });
+            });
+        }
+
+        // ── Trigger toggle pills ─────────────────────────────────
+        // Clicking a pill toggles its aria-pressed state. Both pills
+        // can be on (advance on whichever fires first — PowerPoint
+        // semantics) or both off (slide must be navigated with arrows).
+        if (toggle && !toggle.__trBound) {
+            toggle.__trBound = true;
+            toggle.querySelectorAll('.tr-trigger-pill').forEach(pill => {
+                pill.addEventListener('click', () => {
+                    const key = pill.dataset.trigger; // 'onClick' | 'autoAfter'
+                    const next = !(pill.getAttribute('aria-pressed') === 'true');
+                    pill.setAttribute('aria-pressed', String(next));
+                    // Enable/disable the after-seconds field based on
+                    // the After pill state.
+                    if (key === 'autoAfter') {
+                        if (afterSec) afterSec.disabled = !next;
+                        if (afterField) afterField.classList.toggle('disabled', !next);
+                    }
+                    this.updateTransitionTiming({ [key]: next });
+                });
+            });
+        }
+    }
+
+    // Read the current pressed state of a trigger pill by data-trigger.
+    _triggerPillState(key) {
+        const pill = document.querySelector(`.tr-trigger-pill[data-trigger="${key}"]`);
+        return pill ? pill.getAttribute('aria-pressed') === 'true' : false;
+    }
+
+    // Push the current slide's transition settings into the Timing
+    // panel UI. Called from setupTransitionsTab, selectSlide, and
+    // applyTransition so the controls always reflect whichever slide
+    // is active. Without this, the inputs would show stale values from
+    // the previously-selected slide — which was a real bug: set slide
+    // 1 to "After 3 sec", switch to slide 2 (default On Click), and
+    // the toggle still showed "After 3 sec" pressed.
+    _syncTransitionTimingUI() {
+        const slide = this.pres?.slides?.[this.slideIdx];
+        const t = slide?.transition || { type: 'none', duration: 0.7, onClick: true, autoAfter: false, afterSec: 5 };
+
+        const durInput = document.getElementById('transitionDuration');
+        if (durInput) durInput.value = Number.isFinite(t.duration) ? t.duration : 0.7;
+
+        const afterSec = document.getElementById('transitionAfterSec');
+        const afterField = document.getElementById('transitionAfterField');
+        if (afterSec) afterSec.value = Number.isFinite(t.afterSec) ? t.afterSec : 5;
+        const afterOn = !!t.autoAfter;
+        if (afterSec) afterSec.disabled = !afterOn;
+        if (afterField) afterField.classList.toggle('disabled', !afterOn);
+
+        const onClickPill = document.querySelector('.tr-trigger-pill[data-trigger="onClick"]');
+        const afterPill = document.querySelector('.tr-trigger-pill[data-trigger="autoAfter"]');
+        // Default to "On Click" enabled when the slide has no explicit
+        // setting — matches PowerPoint's default for new slides.
+        const onClickOn = t.onClick !== undefined ? !!t.onClick : true;
+        if (onClickPill) onClickPill.setAttribute('aria-pressed', String(onClickOn));
+        if (afterPill)   afterPill.setAttribute('aria-pressed', String(afterOn));
+    }
+
+    // Build a single transition thumbnail tile. Used both by the
+    // ribbon row and by the More gallery — same DOM structure means
+    // the .active highlight state can be refreshed uniformly via
+    // _refreshTransitionHighlight().
+    _buildTransitionThumb(tr) {
+        const btn = document.createElement('button');
+        btn.className = 'transition-thumb';
+        btn.dataset.value = tr.value;
+        btn.title = tr.label;
+        btn.innerHTML = `
+            <div class="tr-thumb-preview" style="background:${tr.preview};"></div>
+            <span class="tr-thumb-label">${tr.label}</span>
+        `;
+        btn.addEventListener('click', () => {
+            this._closePortal(false);
+            this.applyTransition(tr.value);
+            this._refreshTransitionHighlight();
+        });
+        return btn;
+    }
+
+    // Refresh the .active state on every .transition-thumb (both the
+    // ribbon row and the More gallery) to reflect the current slide's
+    // applied transition. Called from setupTransitionsTab,
+    // applyTransition, selectSlide, and updateRibbonState so the
+    // highlight stays in sync as the user moves between slides.
+    _refreshTransitionHighlight() {
+        const current = this.pres?.slides?.[this.slideIdx]?.transition?.type || 'none';
+        document.querySelectorAll('.transition-thumb').forEach(o => {
+            o.classList.toggle('active', o.dataset.value === current);
+        });
+        // Keep the hidden #transitionLabel span in sync for any
+        // legacy code that reads it.
+        const labelEl = document.getElementById('transitionLabel');
+        if (labelEl) {
+            labelEl.textContent = current === 'none' ? 'None' :
+                (SlidesApp.TRANSITIONS.find(t => t.value === current)?.label || current);
+        }
     }
 
     applyTransition(type) {
         if (!this.pres) return;
         const slide = this.pres.slides[this.slideIdx];
         if (!slide) return;
+        // Replace — NOT merge-and-keep — the type field. Previously
+        // this used { ...(slide.transition || {}), type } which is
+        // correct for the data model, but the visual bug users saw
+        // ("doesn't change, keeps the previous transition") came from
+        // the fact that no preview was triggered here. Industry
+        // convention (PowerPoint/Keynote/Slides): clicking a
+        // transition thumbnail immediately previews it. So we now
+        // also call previewTransition() after the data update.
         slide.transition = { ...(slide.transition || {}), type };
-        const labelEl = document.getElementById('transitionLabel');
-        if (labelEl) labelEl.textContent = type === 'none' ? 'None' : SlidesApp.TRANSITIONS.find(t => t.value === type)?.label || type;
+        // Keep the hidden #transitionLabel span in sync; the ribbon
+        // row + More gallery .active highlight is refreshed by
+        // _refreshTransitionHighlight (called by the click handler,
+        // but also called here in case applyTransition is invoked
+        // programmatically from elsewhere).
+        this._refreshTransitionHighlight?.();
+        // Keep the Timing panel in sync — applyTransition changes the
+        // transition type but keeps duration/trigger settings, so the
+        // UI shouldn't visibly change. Calling _syncTransitionTimingUI
+        // is a no-op visually but guarantees the inputs are showing
+        // the active slide's actual values (defensive — in case the
+        // caller came from a context where the slideIdx also changed).
+        this._syncTransitionTimingUI?.();
         this.scheduleSave();
+        // Auto-preview so the user sees the change immediately. This
+        // is what fixes the "doesn't change" half of the bug — the
+        // data WAS changing, but the user couldn't see it without
+        // clicking the Preview button. Skip auto-preview for 'none'
+        // (nothing to preview) and 'morph' (needs a previous slide;
+        // previewTransition already handles the empty case gracefully
+        // with a toast, but we don't want a toast on every click).
+        if (type && type !== 'none' && type !== 'morph') {
+            this.previewTransition();
+        }
+    }
+
+    // Centralized runner for slide transitions. Replaces the old
+    // pattern of `container.classList.add(cls); setTimeout(...)` that
+    // was duplicated in previewTransition and renderPresentSlide.
+    // Fixes:
+    //   1. Race condition — the previous transition's setTimeout
+    //      could fire during the new transition and remove the new
+    //      class early. We now clear this._trAnimTimer before
+    //      scheduling a new one.
+    //   2. Wrong duration — previewTransition used to hardcode 1200ms;
+    //      now uses the slide's configured duration.
+    //   3. animationend fallback — even if our timer is off, the
+    //      class is removed when the animation actually ends.
+    _runTransitionClass(container, cls, durationSec) {
+        if (!container) return;
+        // Clear any in-flight cleanup timer from the previous
+        // transition. This is THE fix for the "adds and keeps the
+        // previous transition" bug — without this, the old timer
+        // would fire and remove our new class mid-animation.
+        if (this._trAnimTimer) {
+            clearTimeout(this._trAnimTimer);
+            this._trAnimTimer = null;
+        }
+        // If a morph FLIP is in flight, cancel its unwrap timer.
+        // The orphan-wrapper cleanup at the top of
+        // _applyMorphTransition will unwrap any lingering wrappers
+        // on the next morph; for non-morph transitions the wrappers
+        // are harmless (the slide is about to be re-rendered anyway
+        // by renderPresentSlide, which clears container.innerHTML).
+        if (this._morphAnimTimer) {
+            clearTimeout(this._morphAnimTimer);
+            this._morphAnimTimer = null;
+        }
+        // Strip every transition-related class so we start clean.
+        // The filter catches tr-*-in, fade-in, slide-in-left/right.
+        const prevClasses = Array.from(container.classList).filter(c =>
+            c.startsWith('tr-') || c === 'fade-in' ||
+            c === 'slide-in-right' || c === 'slide-in-left'
+        );
+        prevClasses.forEach(c => container.classList.remove(c));
+        // Force reflow so the browser commits the class removal
+        // before we add the new class — otherwise the new animation
+        // doesn't restart (the browser batches the add+remove and
+        // the element never sees the class transition).
+        void container.offsetWidth;
+        container.classList.add(cls);
+        // Primary cleanup: use the actual configured duration.
+        const durMs = Math.ceil((durationSec || 0.7) * 1000) + 50;
+        // Fallback cleanup: when the animation actually ends. This
+        // catches cases where the CSS animation duration differs
+        // from the JS-configured duration (e.g. tr-cut-in uses 0.3s
+        // in CSS regardless of slide.transition.duration).
+        const onEnd = () => {
+            container.removeEventListener('animationend', onEnd);
+            container.classList.remove(cls);
+            if (this._trAnimTimer) {
+                clearTimeout(this._trAnimTimer);
+                this._trAnimTimer = null;
+            }
+        };
+        container.addEventListener('animationend', onEnd, { once: true });
+        this._trAnimTimer = setTimeout(() => {
+            container.removeEventListener('animationend', onEnd);
+            container.classList.remove(cls);
+            this._trAnimTimer = null;
+        }, durMs);
     }
 
     updateTransitionTiming(opts) {
@@ -2754,14 +3499,260 @@ class SlidesApp {
         if (!slide) return;
         const type = slide.transition?.type || 'none';
         if (type === 'none') { this.showToast('No transition selected.'); return; }
-        // Render the current slide with the transition animation
-        const container = document.getElementById('presentSlide') || document.getElementById('slideCanvas');
+
+        // Pick the VISIBLE container. Previously this used
+        // `document.getElementById('presentSlide') || document.getElementById('slideCanvas')`
+        // but presentSlide ALWAYS exists in the DOM (inside the hidden
+        // #presentOverlay with display:none), so the || short-circuit
+        // always picked it — meaning the transition class was added to
+        // a hidden element and the user saw nothing in editor mode.
+        // Now we pick based on isPresenting so editor preview actually
+        // animates the on-screen slideCanvas.
+        const container = this.isPresenting
+            ? document.getElementById('presentSlide')
+            : document.getElementById('slideCanvas');
         if (!container) return;
-        const cls = `tr-${type}-in`;
-        container.classList.remove(...Array.from(container.classList).filter(c => c.startsWith('tr-')));
-        void container.offsetWidth;
-        container.classList.add(cls);
-        setTimeout(() => container.classList.remove(cls), 1200);
+        const trDur = slide.transition?.duration || 0.7;
+        // Set the CSS custom property so the @keyframes animation uses
+        // the user's configured duration (the CSS rules use
+        // var(--tr-duration, 0.7s) — without setting it, every preview
+        // would fall back to 0.7s regardless of the Timing panel).
+        container.style.setProperty('--tr-duration', `${trDur}s`);
+
+        // Special case: Morph is an object-level FLIP transition. It needs
+        // a "previous slide" to morph from. In Present mode we run the full
+        // FLIP; in editor mode we fall back to the CSS fade preview because
+        // editor decorations (link badges, comment pins, selection box)
+        // would otherwise be left orphaned by the per-element wrapping.
+        if (type === 'morph') {
+            const idx = this.isPresenting ? this.presentIdx : this.slideIdx;
+            const prevIdx = idx > 0 ? idx - 1 : (this.pres.slides.length - 1);
+            const prevSlide = this.pres.slides[prevIdx];
+            if (!prevSlide || prevSlide === slide) {
+                this.showToast('Add another slide to preview Morph.');
+                return;
+            }
+            if (!this.isPresenting) {
+                this._runTransitionClass(container, 'tr-morph-in', trDur);
+                this.showToast('Morph is best previewed in Present mode (press F5).');
+                return;
+            }
+            this._applyMorphTransition(container, slide, prevSlide, trDur);
+            return;
+        }
+
+        // Render the current slide with the transition animation.
+        // Uses the centralized _runTransitionClass helper so the
+        // cleanup timer is properly tracked across rapid clicks
+        // (fixes the "keeps the previous transition" bug) and the
+        // duration is the user's configured one (was hardcoded 1200ms).
+        this._runTransitionClass(container, `tr-${type}-in`, trDur);
+    }
+
+    // ── Morph transition (object-level FLIP) ──────────────────────
+    // Matches elements between prevSlide and newSlide by a content
+    // signature (text html / image src / shape+fill+stroke / video src /
+    // audio src). For each matched pair with a different position or
+    // size, wraps the new element in a .morph-flip-wrapper that starts
+    // transformed to look like the previous element (translate + scale,
+    // origin 0 0) and animates to identity. Unmatched incoming elements
+    // cross-fade. The slide container also gets a subtle tr-morph-in
+    // backdrop fade. Rotation on the child element is preserved because
+    // the child keeps its own transform: rotate(...) with origin center,
+    // and the wrapper's translate/scale composes around it cleanly.
+    _applyMorphTransition(container, newSlide, prevSlide, trDur) {
+        // BUGFIX: Clean up any orphan .morph-flip-wrapper divs left
+        // behind by a previous morph that got interrupted mid-flight
+        // (e.g. user navigated to another slide before the unwrap
+        // setTimeout fired). Without this, the wrappers — and the
+        // doubly-nested children inside them — accumulate in the
+        // container and break element selection, dragging, and
+        // rendering on subsequent renders.
+        if (container) {
+            container.querySelectorAll('.morph-flip-wrapper').forEach(w => {
+                const inner = w.firstChild;
+                if (inner && w.parentNode) {
+                    // Restore the inner element's position before
+                    // unwrapping, matching what the original
+                    // setTimeout cleanup would have done.
+                    if (inner.style) {
+                        inner.style.left = '';
+                        inner.style.top = '';
+                    }
+                    w.parentNode.replaceChild(inner, w);
+                } else {
+                    w.remove();
+                }
+            });
+        }
+
+        // Clear any in-flight morph cleanup timer from a previous
+        // morph — same race-condition fix as _runTransitionClass.
+        if (this._morphAnimTimer) {
+            clearTimeout(this._morphAnimTimer);
+            this._morphAnimTimer = null;
+        }
+
+        if (!container || !newSlide || !prevSlide || prevSlide === newSlide) {
+            // No valid previous slide — fall back to fade.
+            // Use _runTransitionClass so the cleanup timer is tracked
+            // (was an ad-hoc setTimeout that could race with a new
+            // transition's cleanup).
+            this._runTransitionClass(container, 'tr-fade-in', trDur || 0.7);
+            return;
+        }
+
+        const dur = trDur || 0.7;
+        const animMs = Math.ceil(dur * 1000) + 50;
+
+        // Signature function — content-based, so identical text / image /
+        // shape on two slides will pair up and morph.
+        const sigOf = (el) => {
+            if (!el) return '?::';
+            if (el.type === 'text')  return `t::${(el.html || '').slice(0, 200)}`;
+            if (el.type === 'image') return `i::${el.src}`;
+            if (el.type === 'shape') return `s::${el.shape}::${el.fill || ''}::${el.stroke || ''}`;
+            if (el.type === 'video') return `v::${el.src}`;
+            if (el.type === 'audio') return `a::${el.src}`;
+            return `?::${el.type}`;
+        };
+
+        // Build signature → queue of prev elements (FIFO so duplicates pair
+        // in order).
+        const prevMap = new Map();
+        prevSlide.elements.forEach(el => {
+            const sig = sigOf(el);
+            if (!prevMap.has(sig)) prevMap.set(sig, []);
+            prevMap.get(sig).push(el);
+        });
+
+        // The slide's elements are rendered into the container in z-sorted
+        // order, followed by the drawing overlay (if any). Slice to the
+        // element count to skip the drawing overlay and any other
+        // decorations appended after.
+        const sorted = [...newSlide.elements].sort((a, b) => (a.z || 1) - (b.z || 1));
+        const numElements = sorted.length;
+        const childEls = Array.from(container.children).slice(0, numElements);
+
+        // NOTE: we intentionally do NOT apply a slide-level opacity fade
+        // here. The container holds the slide's background, so animating
+        // its opacity to 0 (e.g. via tr-morph-in) would make the whole
+        // slide transparent for a frame and reveal the dark presenter
+        // backdrop behind it — perceived as a "black flash" before the
+        // morph catches up. The per-element FLIP below provides all the
+        // visual transition we need while keeping the slide background
+        // fully opaque throughout.
+
+        // Collect per-element unwrap callbacks so they all run under
+        // a single tracked timer (this._morphAnimTimer). If a new
+        // transition interrupts this morph, _applyMorphTransition
+        // (or _runTransitionClass) will clear this timer AND the
+        // orphan-wrapper cleanup at the top of this method will
+        // unwrap any wrappers that didn't get their callback.
+        const unwrapCallbacks = [];
+
+        childEls.forEach((child, i) => {
+            const newEl = sorted[i];
+            if (!newEl) return;
+
+            const sig = sigOf(newEl);
+            const queue = prevMap.get(sig);
+            const prevEl = queue && queue.length > 0 ? queue.shift() : null;
+
+            const posChanged = prevEl && (
+                prevEl.x !== newEl.x || prevEl.y !== newEl.y ||
+                prevEl.w !== newEl.w || prevEl.h !== newEl.h
+            );
+
+            if (prevEl && posChanged) {
+                // ── Morph via wrapper-div FLIP ──────────────────────
+                const dx = prevEl.x - newEl.x;
+                const dy = prevEl.y - newEl.y;
+                const sx = (newEl.w > 0) ? (prevEl.w / newEl.w) : 1;
+                const sy = (newEl.h > 0) ? (prevEl.h / newEl.h) : 1;
+
+                // Bail out on bad scale (e.g., zero-sized new element) —
+                // fall through to the cross-fade path below.
+                if (!isFinite(sx) || !isFinite(sy) || sx <= 0 || sy <= 0) {
+                    child.style.transition = `opacity ${dur}s ease-out`;
+                    child.style.opacity = '0';
+                    void child.offsetWidth;
+                    child.style.opacity = '1';
+                    unwrapCallbacks.push(() => { child.style.transition = ''; child.style.opacity = ''; });
+                    return;
+                }
+
+                // Build wrapper at the new element's slide-local position.
+                // The wrapper only animates `transform` (translate + scale)
+                // — opacity is left at 1 throughout so matched elements
+                // never dim during the morph (a dim would read as a flash
+                // when many elements morph simultaneously).
+                const wrapper = document.createElement('div');
+                wrapper.className = 'morph-flip-wrapper';
+                wrapper.style.cssText =
+                    `position:absolute;left:${newEl.x}px;top:${newEl.y}px;` +
+                    `width:${newEl.w}px;height:${newEl.h}px;` +
+                    `z-index:${newEl.z || 1};` +
+                    `transform:translate(${dx}px, ${dy}px) scale(${sx}, ${sy});` +
+                    `transition:transform ${dur}s cubic-bezier(0.4, 0, 0.2, 1);`;
+
+                // Move the existing child into the wrapper, resetting its
+                // own absolute position to 0 (the wrapper handles layout
+                // position; the child keeps its size + rotation transform).
+                container.replaceChild(wrapper, child);
+                wrapper.appendChild(child);
+                child.style.left = '0';
+                child.style.top = '0';
+
+                // Force reflow so the start state is committed before we
+                // animate to the end state.
+                void wrapper.offsetWidth;
+
+                // Animate to identity.
+                wrapper.style.transform = 'none';
+
+                // After the animation, unwrap: restore the child's
+                // position and replace the wrapper in the container.
+                // Collected into unwrapCallbacks so it runs under the
+                // tracked this._morphAnimTimer below.
+                unwrapCallbacks.push(() => {
+                    child.style.left = newEl.x + 'px';
+                    child.style.top = newEl.y + 'px';
+                    if (wrapper.parentNode === container) {
+                        container.replaceChild(child, wrapper);
+                    }
+                });
+            } else if (prevEl) {
+                // Matched and already in the right position/size — no
+                // animation needed. The element is already correctly
+                // placed, so we leave it at full opacity to avoid any
+                // flicker. (Previously this dimmed to 0.85 then back to
+                // 1, which read as a subtle flash when many static
+                // elements shared a slide.)
+            } else {
+                // No match in the previous slide — cross-fade from 0.
+                child.style.transition = `opacity ${dur}s ease-out`;
+                child.style.opacity = '0';
+                void child.offsetWidth;
+                child.style.opacity = '1';
+                unwrapCallbacks.push(() => { child.style.transition = ''; child.style.opacity = ''; });
+            }
+        });
+
+        // Single tracked timer that runs ALL collected unwrap/cleanup
+        // callbacks. If a new transition interrupts this morph, the
+        // next _applyMorphTransition call (or _runTransitionClass)
+        // clears this._morphAnimTimer — and the orphan-wrapper
+        // cleanup at the top of this method unwraps any wrappers
+        // whose callbacks never ran. Replaces the per-element
+        // setTimeout calls that previously littered the forEach
+        // above (each with its own untracked timer).
+        this._morphAnimTimer = setTimeout(() => {
+            this._morphAnimTimer = null;
+            unwrapCallbacks.forEach(cb => {
+                try { cb(); } catch (_) { /* element may have been re-rendered away */ }
+            });
+        }, animMs);
     }
 
     // ── Animations Tab ────────────────────────────────────────────
@@ -2790,27 +3781,78 @@ class SlidesApp {
             list.appendChild(item);
         });
 
-        // Animation pane toggle
+        // Animation pane toggle (ribbon button)
         document.getElementById('animationPaneBtn')?.addEventListener('click', () => this.toggleAnimationPane());
         document.getElementById('apCloseBtn')?.addEventListener('click', () => this.toggleAnimationPane(false));
 
-        // Animation start dropdown
-        const startDd = document.getElementById('animStartDropdown');
-        startDd?.querySelectorAll('.ms-dropdown-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const v = item.dataset.value;
-                const valSpan = startDd.querySelector('.dropdown-value');
-                if (valSpan) valSpan.textContent = { click: 'On Click', with: 'With Previous', after: 'After Previous' }[v] || 'On Click';
-                this._closePortal(false);
-                this.updateAnimationTiming({ start: v });
-            });
+        // Animation pane toolbar buttons (Add + Preview inside the pane)
+        document.getElementById('apAddBtn')?.addEventListener('click', () => {
+            // If not on the animations tab, switch to it first before opening the dropdown
+            if (this._activeTab !== 'animations') {
+                this._switchTab('animations');
+                // Wait for the tab transition to finish, then open the dropdown
+                setTimeout(() => {
+                    const dd = document.getElementById('animationDropdown');
+                    const ddBtn = dd?.querySelector('.ms-dropdown-btn');
+                    if (ddBtn) ddBtn.click();
+                }, 250);
+            } else {
+                // Already on animations tab — open dropdown directly
+                const dd = document.getElementById('animationDropdown');
+                const ddBtn = dd?.querySelector('.ms-dropdown-btn');
+                if (ddBtn) ddBtn.click();
+            }
         });
+        document.getElementById('apPreviewBtn')?.addEventListener('click', () => this.previewAnimations());
 
-        // Animation duration
+        // ── Animation Start trigger pills ───────────────────────────
+        // Single-select segmented toggle: clicking a pill sets it as
+        // the active start mode (only one can be aria-pressed=true
+        // at a time, unlike the Transition toggle which allows both).
+        const startToggle = document.getElementById('animStartToggle');
+        if (startToggle) {
+            startToggle.querySelectorAll('.anim-start-pill').forEach(pill => {
+                pill.addEventListener('click', () => {
+                    // Deactivate all siblings, activate this one
+                    startToggle.querySelectorAll('.anim-start-pill').forEach(p => p.setAttribute('aria-pressed', 'false'));
+                    pill.setAttribute('aria-pressed', 'true');
+                    const v = pill.dataset.start; // 'click' | 'with' | 'after'
+                    this.updateAnimationTiming({ start: v });
+                });
+            });
+        }
+
+        // ── Animation Duration stepper ──────────────────────────────
         const durInput = document.getElementById('animDuration');
         durInput?.addEventListener('change', () => {
-            this.updateAnimationTiming({ duration: parseFloat(durInput.value) || 0.5 });
+            let v = parseFloat(durInput.value);
+            if (!Number.isFinite(v) || v <= 0) v = 0.5;
+            v = Math.min(10, Math.max(0.1, Math.round(v * 10) / 10));
+            durInput.value = v;
+            this.updateAnimationTiming({ duration: v });
         });
+
+        // ── Animation Delay stepper ─────────────────────────────────
+        const delayInput = document.getElementById('animDelay');
+        delayInput?.addEventListener('change', () => {
+            let v = parseFloat(delayInput.value);
+            if (!Number.isFinite(v) || v < 0) v = 0;
+            v = Math.min(60, Math.max(0, Math.round(v * 10) / 10));
+            delayInput.value = v;
+            this.updateAnimationTiming({ delay: v });
+        });
+
+        // ── Animation stepper [−]/[+] buttons ───────────────────────
+        // These use the .tr-num-step class, so they are already wired
+        // by _wireTransitionTimingPanel() which handles ALL .tr-num-step
+        // buttons globally (both transitions and animations). No separate
+        // binding needed here — the stepper just adjusts the input value
+        // and fires 'change', which triggers the animDuration/animDelay
+        // change handlers bound above.
+
+        // Initial sync — set the Timing panel controls to the
+        // current slide's last animation values (or defaults).
+        this._syncAnimationTimingUI?.();
     }
 
     applyAnimation(type) {
@@ -2828,6 +3870,7 @@ class SlidesApp {
         });
         this.scheduleSave();
         this.renderAnimationPane();
+        this._syncAnimationTimingUI?.();
         this.showToast(`Added "${type}" animation.`);
     }
 
@@ -2838,14 +3881,66 @@ class SlidesApp {
         Object.assign(slide.animations[slide.animations.length - 1], opts);
         this.scheduleSave();
         this.renderAnimationPane();
+        this._syncAnimationTimingUI?.();
+    }
+
+    // Push the current slide's last animation's timing settings
+    // into the Animations tab Timing panel UI (Start / Duration /
+    // Delay). Called from setupAnimationsTab, selectSlide,
+    // applyAnimation, and updateAnimationTiming so the controls
+    // always reflect whichever animation is the active one.
+    // Without this, switching slides leaves stale values from the
+    // previous slide's animation on the controls.
+    _syncAnimationTimingUI() {
+        const slide = this.pres?.slides?.[this.slideIdx];
+        const anim = slide?.animations?.[slide.animations.length - 1] || null;
+
+        const startToggle = document.getElementById('animStartToggle');
+        const durInput = document.getElementById('animDuration');
+        const delayInput = document.getElementById('animDelay');
+
+        if (!anim) {
+            // No animations on this slide — reset to defaults
+            if (startToggle) {
+                startToggle.querySelectorAll('.anim-start-pill').forEach(p => p.setAttribute('aria-pressed', 'false'));
+                const defaultPill = startToggle.querySelector('.anim-start-pill[data-start="click"]');
+                if (defaultPill) defaultPill.setAttribute('aria-pressed', 'true');
+            }
+            if (durInput) durInput.value = 0.5;
+            if (delayInput) delayInput.value = 0;
+            return;
+        }
+
+        // Start pill toggle — single-select, so only one pill is pressed
+        const start = anim.start || 'click';
+        if (startToggle) {
+            startToggle.querySelectorAll('.anim-start-pill').forEach(p => {
+                p.setAttribute('aria-pressed', String(p.dataset.start === start));
+            });
+        }
+
+        // Duration input
+        const dur = Number.isFinite(anim.duration) ? anim.duration : 0.5;
+        if (durInput) durInput.value = dur;
+
+        // Delay input
+        const delay = Number.isFinite(anim.delay) ? anim.delay : 0;
+        if (delayInput) delayInput.value = delay;
     }
 
     toggleAnimationPane(force) {
         const pane = document.getElementById('animationPane');
         if (!pane) return;
-        const show = force === undefined ? pane.style.display === 'none' : force;
-        pane.style.display = show ? 'flex' : 'none';
+        const show = force === undefined ? !pane.classList.contains('visible') : force;
+        pane.classList.toggle('visible', show);
+        // Toggle the "active" visual state on the Animation Pane ribbon
+        // button so the user can see whether the pane is open.
+        const btn = document.getElementById('animationPaneBtn');
+        btn?.classList.toggle('active', show);
         if (show) this.renderAnimationPane();
+        // Re-render rulers — the animation pane shifts the canvas horizontally.
+        this._scheduleRulerRender();
+        setTimeout(() => this._scheduleRulerRender(), 260);
     }
 
     renderAnimationPane() {
@@ -2861,21 +3956,39 @@ class SlidesApp {
             const el = this.getElement(a.elementId);
             const elLabel = el ? `${el.type} #${i+1}` : `Element #${i+1}`;
             const animLabel = SlidesApp.ANIMATIONS.find(x => x.value === a.type)?.label || a.type;
+            const isSelected = this.selectedId === a.elementId;
             const item = document.createElement('div');
-            item.className = 'ap-item';
+            item.className = 'ap-item' + (isSelected ? ' selected' : '');
+            // Build a timeline-style index indicator
+            const startBadge = a.start === 'with' ? 'W' : a.start === 'after' ? 'A' : '1';
             item.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:${isSelected ? 'rgba(249,115,22,0.15)' : 'rgba(0,0,0,0.04)'};color:${isSelected ? 'var(--ui-accent,#f97316)' : 'rgba(44,62,80,0.6)'};font-size:11px;font-weight:700;flex-shrink:0;">${i + 1}</div>
                 <div class="ap-item-info">
                     <div class="ap-item-name">${elLabel}</div>
-                    <div class="ap-item-anim">${animLabel} • ${a.start || 'click'} • ${(a.duration || 0.5).toFixed(1)}s</div>
+                    <div class="ap-item-anim">
+                        <span class="anim-badge">${animLabel}</span>
+                        <span>${a.start === 'with' ? 'With Prev' : a.start === 'after' ? 'After Prev' : 'On Click'}</span>
+                        <span>${(a.duration || 0.5).toFixed(1)}s</span>
+                    </div>
                 </div>
                 <button class="ap-item-remove" title="Remove">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
                 </button>
             `;
-            item.querySelector('.ap-item-remove').addEventListener('click', () => {
+            // Click item to select that element and highlight this animation
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.ap-item-remove')) return; // don't select when removing
+                this.selectedId = a.elementId;
+                this.selectElement?.(a.elementId);
+                this.renderAnimationPane();
+                this._syncAnimationTimingUI?.();
+            });
+            item.querySelector('.ap-item-remove').addEventListener('click', (e) => {
+                e.stopPropagation();
                 slide.animations.splice(i, 1);
                 this.scheduleSave();
                 this.renderAnimationPane();
+                this._syncAnimationTimingUI?.();
             });
             body.appendChild(item);
         });
@@ -2889,22 +4002,43 @@ class SlidesApp {
         document.getElementById('zoomFitBtn')?.addEventListener('click', () => this.fitZoom());
         document.getElementById('zoom100Btn')?.addEventListener('click', () => this.setZoom(1));
 
-        // View modes (toggle body classes that CSS can target)
+        // View modes — Normal and Sorter are mutually exclusive (radio-style:
+        // one is always active). Notes Page is independent (toggle panel).
         document.getElementById('viewNormalBtn')?.addEventListener('click', () => {
+            // Fade back in editor and notes
+            const editorArea = document.getElementById('editorArea');
+            const notesPanel = document.getElementById('presenterNotesPanel');
+            if (editorArea) { editorArea.style.opacity = ''; editorArea.style.visibility = ''; }
+            if (notesPanel) { notesPanel.style.opacity = ''; notesPanel.style.visibility = ''; }
+
             document.body.classList.remove('view-sorter', 'view-notes');
             this.showToast('Normal view.');
-            // Mark this button as active in the group
+            // Normal on, Sorter off, Notes/Reader off
             ['viewSorterBtn', 'viewNotesBtn', 'immersiveReaderBtn', 'viewNormalBtn'].forEach(id => {
                 document.getElementById(id)?.classList.toggle('active', id === 'viewNormalBtn');
             });
+            // Re-fit zoom after returning to normal view
+            setTimeout(() => this.fitZoom(), 400);
         });
         document.getElementById('viewSorterBtn')?.addEventListener('click', () => {
-            document.body.classList.toggle('view-sorter');
-            document.body.classList.remove('view-notes');
-            const on = document.body.classList.contains('view-sorter');
-            this.showToast(on ? 'Slide sorter view.' : 'Normal view.');
+            // Fade out editor and notes before adding sorter class
+            const editorArea = document.getElementById('editorArea');
+            const notesPanel = document.getElementById('presenterNotesPanel');
+            if (editorArea) { editorArea.style.opacity = '0'; }
+            if (notesPanel) { notesPanel.style.opacity = '0'; }
+
+            // Small delay to let the fade-out start, then add sorter
+            setTimeout(() => {
+                document.body.classList.add('view-sorter');
+                document.body.classList.remove('view-notes');
+                if (editorArea) { editorArea.style.visibility = 'hidden'; }
+                if (notesPanel) { notesPanel.style.visibility = 'hidden'; }
+                this.showToast('Slide sorter view.');
+            }, 50);
+
+            // Sorter on, Normal off, Notes/Reader off
             ['viewSorterBtn', 'viewNotesBtn', 'immersiveReaderBtn', 'viewNormalBtn'].forEach(id => {
-                document.getElementById(id)?.classList.toggle('active', id === 'viewSorterBtn' && on);
+                document.getElementById(id)?.classList.toggle('active', id === 'viewSorterBtn');
             });
         });
         document.getElementById('viewNotesBtn')?.addEventListener('click', () => {
@@ -2913,11 +4047,12 @@ class SlidesApp {
             if (panel) {
                 const willShow = !panel.classList.contains('visible');
                 panel.classList.toggle('visible', willShow);
-                panel.classList.toggle('expanded', willShow);
                 btn?.classList.toggle('active', willShow);
                 if (btn) btn.title = willShow ? 'Hide Presenter Notes' : 'Show Presenter Notes';
-                this.showToast(willShow ? 'Notes panel opened.' : 'Notes panel closed.');
                 if (willShow) setTimeout(() => document.getElementById('presenterNotesInput')?.focus(), 50);
+                // Re-render rulers after the layout change settles.
+                this._scheduleRulerRender();
+                setTimeout(() => this._scheduleRulerRender(), 260);
             }
         });
 
@@ -2925,6 +4060,7 @@ class SlidesApp {
         document.getElementById('toggleRulersBtn')?.addEventListener('click', (e) => {
             document.body.classList.toggle('show-rulers');
             e.currentTarget.classList.toggle('active');
+            this.renderRulers();
         });
         document.getElementById('toggleGridBtn')?.addEventListener('click', (e) => {
             document.body.classList.toggle('show-grid');
@@ -2941,10 +4077,6 @@ class SlidesApp {
 
         // Immersive reader (opens a simplified read-only overlay of the current slide text)
         document.getElementById('immersiveReaderBtn')?.addEventListener('click', () => this.openImmersiveReader());
-        // Notes toggle in View tab (same as status-bar Notes button)
-        document.getElementById('viewNotesToggleBtn')?.addEventListener('click', () => {
-            document.getElementById('viewNotesBtn')?.click();
-        });
     }
 
     // ── File / Draw / Slide Show / Review Tab Wiring ─────
@@ -3005,6 +4137,24 @@ class SlidesApp {
         document.getElementById('fileExportSvgBtn')?.addEventListener('click', () => {
             this.closeFileModal();
             this.exportSVGs();
+        });
+        // Import (Welcome screen — supports PPTX & PDF)
+        const triggerImport = () => {
+            document.getElementById('fileImportInput')?.click();
+        };
+        document.getElementById('welcomeImportBtn')?.addEventListener('click', triggerImport);
+        document.getElementById('fileImportInput')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const ext = file.name.toLowerCase().split('.').pop();
+            if (ext === 'pptx') {
+                this.importPPTX(file);
+            } else if (ext === 'pdf') {
+                this.importPDF(file);
+            } else {
+                this.showToast('Unsupported file type. Please use .pptx or .pdf.', 4000);
+            }
+            e.target.value = '';
         });
         // Name input: save on Enter, live-update title
         document.getElementById('fileModalNameInput')?.addEventListener('keydown', (e) => {
@@ -3096,64 +4246,27 @@ class SlidesApp {
         // by toggleDrawMode so it only intercepts mouse events when active).
         this._initDrawingCanvas();
 
-        // ── SLIDE SHOW TAB ──
-        document.getElementById('slideshowStartBtn')?.addEventListener('click', () => this.startPresentation(0));
-        document.getElementById('slideshowCurrentBtn')?.addEventListener('click', () => this.startPresentation(this.slideIdx));
-        this._slideshowLoop = false;
-        document.getElementById('slideshowLoopBtn')?.addEventListener('click', (e) => {
-            this._slideshowLoop = !this._slideshowLoop;
-            e.currentTarget.classList.toggle('active', this._slideshowLoop);
-            this.showToast(this._slideshowLoop ? 'Loop enabled.' : 'Loop disabled.');
-        });
-        document.getElementById('slideshowRehearseBtn')?.addEventListener('click', () => {
-            this.showToast('Rehearse mode: presenting with a timer — press Esc to stop.');
-            this.startPresentation(this.slideIdx);
-        });
-        document.getElementById('slideshowFullscreenBtn')?.addEventListener('click', () => {
-            this.startPresentation(this.slideIdx);
-            setTimeout(() => {
-                const el = document.documentElement;
-                if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-            }, 100);
-        });
-
-        // ── REVIEW TAB ──
-        document.getElementById('spellCheckBtn')?.addEventListener('click', () => this.spellCheck());
-        document.getElementById('wordCountBtn')?.addEventListener('click', () => this.showWordCount());
-        document.getElementById('checkAccessibilityBtn')?.addEventListener('click', () => this.checkAccessibility());
-        document.getElementById('altTextBtn')?.addEventListener('click', () => this.editAltText());
-        document.getElementById('translateBtn')?.addEventListener('click', () => this.translateSelection());
-        document.getElementById('languageBtn')?.addEventListener('click', () => this.setLanguage());
-
-        // ── DESIGN TAB: Themes & Variants ──
+        // ── DESIGN TAB: Themes ──
         this.renderThemes();
-        this.renderVariants();
-        document.getElementById('moreThemesBtn')?.addEventListener('click', () => {
-            this._themeIdx = (this._themeIdx ?? 0) + 6;
-            this.renderThemes();
-        });
+        // 'More' themes dropdown is wired up automatically by setupDropdownMenus()
+        this.renderThemeGallery();  // populate the gallery menu once
+
+        // ── DESIGN TAB: Templates ──
+        this.renderTemplates();
+        this.renderTemplateGallery();
 
         // ── DESIGN TAB: Customize buttons ──
-        document.getElementById('slideLayoutBtn')?.addEventListener('click', () => this.showLayoutPicker());
-        document.getElementById('slideSizeBtn')?.addEventListener('click', () => this.cycleSlideSize());
         document.getElementById('designerBtn')?.addEventListener('click', () => this.openDesigner());
 
-        // ── ANIMATIONS TAB: Preview + Reorder + Delay ──
+        // ── ANIMATIONS TAB: Preview + Reorder ──
         document.getElementById('previewAnimBtn')?.addEventListener('click', () => this.previewAnimations());
         document.getElementById('animMoveEarlierBtn')?.addEventListener('click', () => this.moveAnimation(-1));
         document.getElementById('animMoveLaterBtn')?.addEventListener('click', () => this.moveAnimation(1));
-        document.getElementById('animDelay')?.addEventListener('input', (e) => {
-            const slide = this.pres?.slides?.[this.slideIdx];
-            const el = this.selectedId ? this.getElement(this.selectedId) : null;
-            const anim = el?.animations?.find(a => a.slideIdx === this.slideIdx);
-            if (anim) {
-                anim.delay = parseFloat(e.target.value) || 0;
-                this.scheduleSave();
-                this.renderAnimationPane();
-            }
-        });
+        // animDelay change handler is wired in setupAnimationsTab()
+        // (alongside animDuration) so both inputs go through the same
+        // updateAnimationTiming path.
 
-        // ── INSERT TAB: New Slide + Video + Audio + Icon + Chart + Link + Comment + Symbol ──
+        // ── INSERT TAB: New Slide + Video + Audio + Icon + Link + Comment + Symbol ──
         document.getElementById('insertNewSlideBtn')?.addEventListener('click', () => this.addSlide());
         document.getElementById('insertVideoBtn')?.addEventListener('click', () => document.getElementById('insertVideoInput')?.click());
         document.getElementById('insertVideoInput')?.addEventListener('change', (e) => {
@@ -3210,8 +4323,7 @@ class SlidesApp {
             e.target.value = '';
         });
         document.getElementById('insertIconBtn')?.addEventListener('click', () => this.openIconPicker());
-        document.getElementById('insertChartBtn')?.addEventListener('click', () => this.insertChart());
-        document.getElementById('insertLinkBtn')?.addEventListener('click', () => this.openLinkModal());
+                document.getElementById('insertLinkBtn')?.addEventListener('click', () => this.openLinkModal());
         document.getElementById('insertCommentBtn')?.addEventListener('click', () => this.insertComment());
         document.getElementById('insertSymbolBtn')?.addEventListener('click', () => this.openSymbolPicker());
     }
@@ -3283,6 +4395,8 @@ class SlidesApp {
             // previously saved drawing (if any).
             this.deselectElement();
             this.exitTextEditing?.();
+            document.getElementById('symbolToolbar')?.classList.remove('visible');
+            document.getElementById('insertSymbolBtn')?.classList.remove('active');
             if (canvas) {
                 canvas.style.pointerEvents = 'all';
                 canvas.style.display = 'block';
@@ -3445,28 +4559,631 @@ class SlidesApp {
 
     // ── THEMES & VARIANTS ──
     static THEMES = [
+        // Light, professional, single-accent
         { name: 'Accent Box', bg: '#ffffff', title: '#1a1a1a', sub: '#f97316' },
         { name: 'Wisp',       bg: '#f5f3ff', title: '#4c1d95', sub: '#7c3aed' },
-        { name: '-gallery',   bg: '#fef2f2', title: '#7f1d1d', sub: '#ef4444' },
-        { name: 'Slice',      bg: '#0f172a', title: '#f8fafc', sub: '#38bdf8' },
-        { name: 'Integral',   bg: '#1e293b', title: '#f1f5f9', sub: '#f97316' },
-        { name: 'Office',     bg: '#ffffff', title: '#1a1a1a', sub: '#2b579a' },
-        { name: 'Couture',    bg: '#fdf4ff', title: '#581c87', sub: '#a21caf' },
+        { name: 'Gallery',    bg: '#fef2f2', title: '#7f1d1d', sub: '#ef4444' },
         { name: 'Mesh',       bg: '#ecfeff', title: '#164e63', sub: '#06b6d4' },
         { name: 'Organic',    bg: '#f0fdf4', title: '#14532d', sub: '#22c55e' },
+        { name: 'Office',     bg: '#ffffff', title: '#1a1a1a', sub: '#2b579a' },
+
+        // Dark premium
+        { name: 'Slice',      bg: '#0f172a', title: '#f8fafc', sub: '#38bdf8' },
+        { name: 'Integral',   bg: '#1e293b', title: '#f1f5f9', sub: '#f97316' },
         { name: 'Parallax',   bg: '#1a1a1a', title: '#fafafa', sub: '#fbbf24' },
+        { name: 'Obsidian',   bg: '#111827', title: '#f9fafb', sub: '#a78bfa' },
+
+        // Warm tones
+        { name: 'Couture',    bg: '#fdf4ff', title: '#581c87', sub: '#a21caf' },
         { name: 'Vapor',      bg: '#fdf2f8', title: '#831843', sub: '#ec4899' },
         { name: 'Frame',      bg: '#fffbeb', title: '#78350f', sub: '#f59e0b' },
+        { name: 'Terra',      bg: '#fff7ed', title: '#7c2d12', sub: '#ea580c' },
+
+        // Cool tones
+        { name: 'Lagoon',     bg: '#ecfeff', title: '#155e75', sub: '#0891b2' },
+        { name: 'Indigo',     bg: '#eef2ff', title: '#312e81', sub: '#4f46e5' },
+        { name: 'Forest',     bg: '#f0fdf4', title: '#14532d', sub: '#16a34a' },
+        { name: 'Mist',       bg: '#f8fafc', title: '#334155', sub: '#64748b' },
+
+        // Vibrant gradients — colorful & professional
+        { name: 'Aurora',     bg: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)', title: '#ffffff', sub: '#fbbf24', isGradient: true },
+        { name: 'Sunset',     bg: 'linear-gradient(135deg,#f97316 0%,#ef4444 100%)', title: '#ffffff', sub: '#fde68a', isGradient: true },
+        { name: 'Ocean',      bg: 'linear-gradient(135deg,#06b6d4 0%,#3b82f6 100%)', title: '#ffffff', sub: '#fef08a', isGradient: true },
+        { name: 'Emerald',    bg: 'linear-gradient(135deg,#10b981 0%,#059669 100%)', title: '#ffffff', sub: '#fef3c7', isGradient: true },
+        { name: 'Royal',      bg: 'linear-gradient(135deg,#7c3aed 0%,#2563eb 100%)', title: '#ffffff', sub: '#fde68a', isGradient: true },
+        { name: 'Cotton Candy', bg: 'linear-gradient(135deg,#ec4899 0%,#8b5cf6 100%)', title: '#ffffff', sub: '#fef3c7', isGradient: true },
+        { name: 'Midnight',   bg: 'linear-gradient(135deg,#1e3a8a 0%,#0f172a 100%)', title: '#f1f5f9', sub: '#38bdf8', isGradient: true },
+        { name: 'Coral Reef', bg: 'linear-gradient(135deg,#f43f5e 0%,#fb923c 100%)', title: '#ffffff', sub: '#fef3c7', isGradient: true },
+        { name: 'Tropical',   bg: 'linear-gradient(135deg,#14b8a6 0%,#22c55e 100%)', title: '#ffffff', sub: '#fef3c7', isGradient: true },
+        { name: 'Berry',      bg: 'linear-gradient(135deg,#db2777 0%,#7c3aed 100%)', title: '#ffffff', sub: '#fde68a', isGradient: true },
+        { name: 'Citrus',     bg: 'linear-gradient(135deg,#eab308 0%,#f97316 100%)', title: '#1f2937', sub: '#ffffff', isGradient: true },
+        { name: 'Cyber',      bg: 'linear-gradient(135deg,#6366f1 0%,#ec4899 100%)', title: '#ffffff', sub: '#fde68a', isGradient: true },
     ];
 
-    static VARIANTS = [
-        { name: 'Light',      bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316' },
-        { name: 'Gray',       bg: '#f1f5f9', fg: '#0f172a', accent: '#f97316' },
-        { name: 'Dark',       bg: '#1a1a1a', fg: '#fafafa', accent: '#f97316' },
-        { name: 'Warm',       bg: '#fff7ed', fg: '#7c2d12', accent: '#ea580c' },
-        { name: 'Cool',       bg: '#eff6ff', fg: '#1e3a8a', accent: '#2563eb' },
-        { name: 'Mono',       bg: '#1e293b', fg: '#e2e8f0', accent: '#94a3b8' },
+    // ── TEMPLATES ── Each template defines a slide layout structure
+    // with its own set of color variants (per-template color schemes).
+    static TEMPLATES = [
+        // ── Business ──
+        {
+            name: 'Executive Title',
+            category: 'business',
+            layout: 'title-only',
+            description: 'Bold centered title slide for executive presentations',
+            bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316',
+            elements: [
+                { type: 'text', x: 15, y: 25, w: 70, h: 15, text: 'Title', fontSize: 44, fontWeight: 'bold', color: '#1a1a1a' },
+                { type: 'text', x: 15, y: 45, w: 70, h: 8, text: 'Subtitle', fontSize: 20, color: '#6b7280' },
+                { type: 'shape', x: 0, y: 85, w: 100, h: 5, shape: 'rect', fill: '#f97316', stroke: 'none' },
+            ],
+            variants: [
+                { name: 'Light',   bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316' },
+                { name: 'Dark',    bg: '#1a1a1a', fg: '#fafafa', accent: '#fb923c' },
+                { name: 'Navy',    bg: '#1e3a8a', fg: '#ffffff', accent: '#fbbf24' },
+                { name: 'Warm',    bg: '#fff7ed', fg: '#7c2d12', accent: '#ea580c' },
+                { name: 'Cool',    bg: '#eff6ff', fg: '#1e3a8a', accent: '#2563eb' },
+            ],
+        },
+        {
+            name: 'Corporate Content',
+            category: 'business',
+            layout: 'title-content',
+            description: 'Title bar with body content area below',
+            bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316',
+            elements: [
+                { type: 'shape', x: 0, y: 0, w: 100, h: 12, shape: 'rect', fill: '#f97316', stroke: 'none' },
+                { type: 'text', x: 5, y: 2, w: 90, h: 9, text: 'Slide Title', fontSize: 28, fontWeight: 'bold', color: '#ffffff' },
+                { type: 'text', x: 8, y: 16, w: 84, h: 70, text: 'Content body text goes here', fontSize: 16, color: '#374151' },
+            ],
+            variants: [
+                { name: 'Orange',  bg: '#ffffff', fg: '#374151', accent: '#f97316' },
+                { name: 'Blue',    bg: '#ffffff', fg: '#374151', accent: '#2563eb' },
+                { name: 'Dark',    bg: '#1e293b', fg: '#e2e8f0', accent: '#38bdf8' },
+                { name: 'Green',   bg: '#ffffff', fg: '#374151', accent: '#16a34a' },
+                { name: 'Red',     bg: '#ffffff', fg: '#374151', accent: '#dc2626' },
+            ],
+        },
+        {
+            name: 'Two Column Report',
+            category: 'business',
+            layout: 'two-column',
+            description: 'Side-by-side content columns with header',
+            bg: '#f8fafc', fg: '#1e293b', accent: '#f97316',
+            elements: [
+                { type: 'text', x: 5, y: 3, w: 90, h: 10, text: 'Report Title', fontSize: 32, fontWeight: 'bold', color: '#1e293b' },
+                { type: 'shape', x: 0, y: 13, w: 100, h: 2, shape: 'rect', fill: '#f97316', stroke: 'none' },
+                { type: 'text', x: 5, y: 18, w: 43, h: 70, text: 'Left Column', fontSize: 14, color: '#374151' },
+                { type: 'text', x: 52, y: 18, w: 43, h: 70, text: 'Right Column', fontSize: 14, color: '#374151' },
+            ],
+            variants: [
+                { name: 'Light',   bg: '#f8fafc', fg: '#1e293b', accent: '#f97316' },
+                { name: 'Dark',    bg: '#1e293b', fg: '#f1f5f9', accent: '#38bdf8' },
+                { name: 'Warm',    bg: '#fff7ed', fg: '#7c2d12', accent: '#ea580c' },
+                { name: 'Teal',    bg: '#f0fdfa', fg: '#134e4a', accent: '#14b8a6' },
+            ],
+        },
+        // ── Education ──
+        {
+            name: 'Lecture Slide',
+            category: 'education',
+            layout: 'title-content',
+            description: 'Clean layout for lecture and teaching slides',
+            bg: '#ffffff', fg: '#1a1a1a', accent: '#2563eb',
+            elements: [
+                { type: 'shape', x: 0, y: 0, w: 100, h: 3, shape: 'rect', fill: '#2563eb', stroke: 'none' },
+                { type: 'text', x: 5, y: 5, w: 90, h: 10, text: 'Lecture Title', fontSize: 36, fontWeight: 'bold', color: '#1a1a1a' },
+                { type: 'text', x: 8, y: 18, w: 84, h: 68, text: 'Key points and explanations', fontSize: 18, color: '#374151' },
+                { type: 'shape', x: 0, y: 88, w: 100, h: 3, shape: 'rect', fill: '#2563eb', stroke: 'none' },
+            ],
+            variants: [
+                { name: 'Blue',    bg: '#ffffff', fg: '#1a1a1a', accent: '#2563eb' },
+                { name: 'Green',   bg: '#ffffff', fg: '#1a1a1a', accent: '#16a34a' },
+                { name: 'Dark',    bg: '#1a1a1a', fg: '#f1f5f9', accent: '#38bdf8' },
+                { name: 'Warm',    bg: '#fffbeb', fg: '#78350f', accent: '#f59e0b' },
+            ],
+        },
+        {
+            name: 'Quiz & Answer',
+            category: 'education',
+            layout: 'title-content',
+            description: 'Interactive quiz-style slide layout',
+            bg: '#eff6ff', fg: '#1e3a8a', accent: '#2563eb',
+            elements: [
+                { type: 'shape', x: 0, y: 0, w: 100, h: 18, shape: 'rect', fill: '#2563eb', stroke: 'none' },
+                { type: 'text', x: 5, y: 3, w: 90, h: 14, text: 'Question?', fontSize: 28, fontWeight: 'bold', color: '#ffffff' },
+                { type: 'text', x: 10, y: 22, w: 80, h: 65, text: 'Answer choices or explanation', fontSize: 18, color: '#1e3a8a' },
+            ],
+            variants: [
+                { name: 'Blue',    bg: '#eff6ff', fg: '#1e3a8a', accent: '#2563eb' },
+                { name: 'Green',   bg: '#f0fdf4', fg: '#14532d', accent: '#16a34a' },
+                { name: 'Dark',    bg: '#1a1a1a', fg: '#f1f5f9', accent: '#38bdf8' },
+                { name: 'Purple',  bg: '#f5f3ff', fg: '#4c1d95', accent: '#7c3aed' },
+            ],
+        },
+        // ── Creative ──
+        {
+            name: 'Hero Splash',
+            category: 'creative',
+            layout: 'title-only',
+            description: 'Bold full-screen hero with dramatic typography',
+            bg: 'linear-gradient(135deg,#1e3a8a 0%,#0f172a 100%)', fg: '#f1f5f9', accent: '#38bdf8', isGradient: true,
+            elements: [
+                { type: 'text', x: 10, y: 30, w: 80, h: 20, text: 'HERO TITLE', fontSize: 56, fontWeight: 'bold', color: '#f1f5f9' },
+                { type: 'text', x: 10, y: 55, w: 80, h: 10, text: 'Tagline or description', fontSize: 22, color: '#94a3b8' },
+                { type: 'shape', x: 10, y: 68, w: 25, h: 5, shape: 'rect', fill: '#38bdf8', stroke: 'none' },
+            ],
+            variants: [
+                { name: 'Midnight',  bg: '#0f172a', fg: '#f1f5f9', accent: '#38bdf8' },
+                { name: 'Aurora',    bg: '#1e3a8a', fg: '#ffffff', accent: '#fbbf24' },
+                { name: 'Ember',     bg: '#1a1a1a', fg: '#fafafa', accent: '#f97316' },
+                { name: 'Neon',      bg: '#111827', fg: '#f9fafb', accent: '#a78bfa' },
+                { name: 'Coral',     bg: '#ffffff', fg: '#1a1a1a', accent: '#f43f5e' },
+            ],
+        },
+        {
+            name: 'Photo Overlay',
+            category: 'creative',
+            layout: 'title-only',
+            description: 'Text overlay layout for photo backgrounds',
+            bg: '#1a1a1a', fg: '#ffffff', accent: '#f97316',
+            elements: [
+                { type: 'shape', x: 0, y: 50, w: 100, h: 50, shape: 'rect', fill: 'rgba(0,0,0,0.6)', stroke: 'none' },
+                { type: 'text', x: 5, y: 55, w: 90, h: 15, text: 'Overlay Title', fontSize: 36, fontWeight: 'bold', color: '#ffffff' },
+                { type: 'text', x: 5, y: 72, w: 90, h: 10, text: 'Descriptive text', fontSize: 16, color: '#d1d5db' },
+                { type: 'shape', x: 5, y: 85, w: 20, h: 3, shape: 'rect', fill: '#f97316', stroke: 'none' },
+            ],
+            variants: [
+                { name: 'Orange',  bg: '#1a1a1a', fg: '#ffffff', accent: '#f97316' },
+                { name: 'Cyan',    bg: '#0f172a', fg: '#f1f5f9', accent: '#06b6d4' },
+                { name: 'Gold',    bg: '#111827', fg: '#f9fafb', accent: '#fbbf24' },
+                { name: 'Rose',    bg: '#1a1a1a', fg: '#ffffff', accent: '#f43f5e' },
+            ],
+        },
+        {
+            name: 'Minimal Quote',
+            category: 'creative',
+            layout: 'title-only',
+            description: 'Elegant minimal slide for quotes or statements',
+            bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316',
+            elements: [
+                { type: 'shape', x: 5, y: 10, w: 3, h: 70, shape: 'rect', fill: '#f97316', stroke: 'none' },
+                { type: 'text', x: 12, y: 20, w: 83, h: 35, text: '"Inspirational quote goes here"', fontSize: 32, color: '#1a1a1a' },
+                { type: 'text', x: 12, y: 58, w: 83, h: 8, text: '— Author Name', fontSize: 16, color: '#6b7280' },
+            ],
+            variants: [
+                { name: 'Orange',  bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316' },
+                { name: 'Dark',    bg: '#1a1a1a', fg: '#fafafa', accent: '#fbbf24' },
+                { name: 'Blue',    bg: '#f8fafc', fg: '#0f172a', accent: '#2563eb' },
+                { name: 'Rose',    bg: '#fff1f2', fg: '#881337', accent: '#e11d48' },
+            ],
+        },
+        // ── Data ──
+        {
+            name: 'Chart Slide',
+            category: 'data',
+            layout: 'title-content',
+            description: 'Layout optimized for data charts and graphs',
+            bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316',
+            elements: [
+                { type: 'text', x: 5, y: 3, w: 90, h: 10, text: 'Data Visualization Title', fontSize: 28, fontWeight: 'bold', color: '#1a1a1a' },
+                { type: 'shape', x: 0, y: 13, w: 100, h: 2, shape: 'rect', fill: '#f97316', stroke: 'none' },
+                { type: 'shape', x: 10, y: 18, w: 80, h: 55, shape: 'rect', fill: '#f9fafb', stroke: '#e5e7eb' },
+                { type: 'text', x: 10, y: 76, w: 80, h: 15, text: 'Data source and key insights', fontSize: 14, color: '#6b7280' },
+            ],
+            variants: [
+                { name: 'Orange',  bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316' },
+                { name: 'Blue',    bg: '#ffffff', fg: '#1a1a1a', accent: '#2563eb' },
+                { name: 'Dark',    bg: '#1e293b', fg: '#e2e8f0', accent: '#38bdf8' },
+                { name: 'Green',   bg: '#ffffff', fg: '#1a1a1a', accent: '#16a34a' },
+            ],
+        },
+        {
+            name: 'Dashboard Metrics',
+            category: 'data',
+            layout: 'title-content',
+            description: 'KPI dashboard layout with metric cards',
+            bg: '#f8fafc', fg: '#0f172a', accent: '#f97316',
+            elements: [
+                { type: 'text', x: 5, y: 3, w: 90, h: 8, text: 'Dashboard Title', fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
+                { type: 'shape', x: 5, y: 14, w: 28, h: 25, shape: 'rect', fill: '#ffffff', stroke: '#e5e7eb' },
+                { type: 'text', x: 7, y: 16, w: 26, h: 6, text: 'Metric 1', fontSize: 20, fontWeight: 'bold', color: '#f97316' },
+                { type: 'shape', x: 36, y: 14, w: 28, h: 25, shape: 'rect', fill: '#ffffff', stroke: '#e5e7eb' },
+                { type: 'text', x: 38, y: 16, w: 26, h: 6, text: 'Metric 2', fontSize: 20, fontWeight: 'bold', color: '#2563eb' },
+                { type: 'shape', x: 67, y: 14, w: 28, h: 25, shape: 'rect', fill: '#ffffff', stroke: '#e5e7eb' },
+                { type: 'text', x: 69, y: 16, w: 26, h: 6, text: 'Metric 3', fontSize: 20, fontWeight: 'bold', color: '#16a34a' },
+                { type: 'text', x: 5, y: 45, w: 90, h: 50, text: 'Detailed analysis content area', fontSize: 14, color: '#374151' },
+            ],
+            variants: [
+                { name: 'Light',   bg: '#f8fafc', fg: '#0f172a', accent: '#f97316' },
+                { name: 'Dark',    bg: '#1e293b', fg: '#e2e8f0', accent: '#38bdf8' },
+                { name: 'Warm',    bg: '#fff7ed', fg: '#7c2d12', accent: '#ea580c' },
+            ],
+        },
+        // ── Photo ──
+        {
+            name: 'Photo Gallery',
+            category: 'photo',
+            layout: 'blank',
+            description: 'Grid layout for showcasing photos',
+            bg: '#1a1a1a', fg: '#ffffff', accent: '#f97316',
+            elements: [
+                { type: 'shape', x: 3, y: 3, w: 46, h: 45, shape: 'rect', fill: '#374151', stroke: '#4b5563' },
+                { type: 'shape', x: 51, y: 3, w: 46, h: 45, shape: 'rect', fill: '#374151', stroke: '#4b5563' },
+                { type: 'shape', x: 3, y: 52, w: 46, h: 45, shape: 'rect', fill: '#374151', stroke: '#4b5563' },
+                { type: 'shape', x: 51, y: 52, w: 46, h: 45, shape: 'rect', fill: '#374151', stroke: '#4b5563' },
+            ],
+            variants: [
+                { name: 'Dark',    bg: '#1a1a1a', fg: '#ffffff', accent: '#f97316' },
+                { name: 'Light',   bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316' },
+                { name: 'Slate',   bg: '#334155', fg: '#f1f5f9', accent: '#38bdf8' },
+            ],
+        },
+        {
+            name: 'Photo with Caption',
+            category: 'photo',
+            layout: 'title-content',
+            description: 'Large photo area with caption strip below',
+            bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316',
+            elements: [
+                { type: 'shape', x: 5, y: 5, w: 90, h: 70, shape: 'rect', fill: '#f3f4f6', stroke: '#d1d5db' },
+                { type: 'text', x: 5, y: 78, w: 90, h: 8, text: 'Photo Caption', fontSize: 18, fontWeight: 'bold', color: '#1a1a1a' },
+                { type: 'text', x: 5, y: 88, w: 90, h: 8, text: 'Description or credits', fontSize: 12, color: '#6b7280' },
+            ],
+            variants: [
+                { name: 'Light',   bg: '#ffffff', fg: '#1a1a1a', accent: '#f97316' },
+                { name: 'Dark',    bg: '#1a1a1a', fg: '#fafafa', accent: '#fb923c' },
+                { name: 'Warm',    bg: '#fff7ed', fg: '#7c2d12', accent: '#ea580c' },
+            ],
+        },
     ];
+
+    // ── TEMPLATE RENDERING ────────────────────────────────────────
+
+    // Render template thumbnails in the ribbon row
+    renderTemplates() {
+        const row = document.getElementById('templateThumbnailRow');
+        if (!row) return;
+        const templates = SlidesApp.TEMPLATES;
+        // Show up to 6 in the inline ribbon row
+        const slice = templates.slice(0, 6);
+        row.innerHTML = '';
+        slice.forEach((t, i) => {
+            const realIdx = SlidesApp.TEMPLATES.indexOf(t);
+            const isGradient = t.isGradient || /^\s*(linear|radial|conic)-gradient\(/i.test(String(t.bg || ''));
+
+            const btn = document.createElement('button');
+            btn.className = `template-thumb${realIdx === this._activeTemplateIdx ? ' active' : ''}`;
+            btn.dataset.idx = String(realIdx);
+            btn.title = `${t.name} — ${t.description}`;
+            btn.style.background = t.bg;
+
+            // Render real template elements inside the thumb
+            this._renderTemplateRealPreview(btn, t);
+
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.idx, 10);
+                this.selectTemplate(idx);
+                row.querySelectorAll('.template-thumb').forEach(x => x.classList.remove('active'));
+                btn.classList.add('active');
+            });
+            row.appendChild(btn);
+        });
+    }
+
+    // Render real template elements as mini-preview inside a container
+    _renderTemplateRealPreview(container, template) {
+        const v = template.variants[0];
+        template.elements.forEach(el => {
+            const div = document.createElement('div');
+            div.className = 'tpl-preview-el';
+            div.style.position = 'absolute';
+            div.style.left = el.x + '%';
+            div.style.top = el.y + '%';
+            div.style.width = el.w + '%';
+            div.style.height = el.h + '%';
+            if (el.type === 'text') {
+                div.style.fontSize = Math.max(4, el.fontSize * 0.18) + 'px';
+                div.style.fontWeight = el.fontWeight || 'normal';
+                div.style.color = el.color || v.fg;
+                div.style.fontFamily = '"DM Sans", sans-serif';
+                div.style.overflow = 'hidden';
+                div.style.lineHeight = '1.2';
+                div.textContent = el.text;
+                // Scale font size further for tiny inline thumbs
+                if (container.classList.contains('template-thumb') && !container.closest('.template-gallery-card')) {
+                    div.style.fontSize = Math.max(3, el.fontSize * 0.09) + 'px';
+                }
+            }
+            if (el.type === 'shape') {
+                const fillVal = el.fill;
+                if (fillVal && fillVal.startsWith('rgba')) {
+                    div.style.background = fillVal;
+                } else if (fillVal === template.accent) {
+                    div.style.background = v.accent;
+                } else {
+                    div.style.background = fillVal || v.accent;
+                }
+                if (el.stroke && el.stroke !== 'none') {
+                    div.style.border = `1px solid ${el.stroke}`;
+                }
+                div.style.borderRadius = el.shape === 'circle' ? '50%' : '2px';
+            }
+            container.appendChild(div);
+        });
+    }
+
+    // Render the full template gallery in the More dropdown
+    renderTemplateGallery() {
+        const menu = document.getElementById('templateGalleryMenu');
+        if (!menu) return;
+        menu.innerHTML = '';
+        // Header
+        const header = document.createElement('div');
+        header.className = 'theme-gallery-header';
+        header.textContent = 'All Templates';
+        menu.appendChild(header);
+        // Grid
+        this._renderTemplateGalleryGrid(menu);
+    }
+
+    _renderTemplateGalleryGrid(menu) {
+        // Remove existing grid if present
+        const existing = menu.querySelector('.template-gallery-grid');
+        if (existing) existing.remove();
+        const grid = document.createElement('div');
+        grid.className = 'template-gallery-grid';
+        const templates = SlidesApp.TEMPLATES;
+        templates.forEach((t) => {
+            const realIdx = SlidesApp.TEMPLATES.indexOf(t);
+
+            const card = document.createElement('button');
+            card.className = 'template-gallery-card';
+            card.dataset.idx = String(realIdx);
+            card.title = `${t.name} — ${t.description}`;
+
+            const thumb = document.createElement('div');
+            thumb.className = 'template-thumb';
+            thumb.style.background = t.bg;
+
+            // Render real template elements inside the gallery thumb
+            this._renderTemplateRealPreview(thumb, t);
+
+            const label = document.createElement('div');
+            label.className = 'theme-gallery-label';
+            label.textContent = t.name;
+
+            card.appendChild(thumb);
+            card.appendChild(label);
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectTemplate(realIdx);
+                // Close the dropdown
+                this._closePortal();
+            });
+            grid.appendChild(card);
+        });
+        menu.appendChild(grid);
+    }
+
+    // Select a template: apply its layout
+    selectTemplate(idx) {
+        this._activeTemplateIdx = idx;
+        const template = SlidesApp.TEMPLATES[idx];
+        if (!template) return;
+        // Apply the template's default variant
+        this.applyTemplate(template, template.variants[0]);
+        // Re-render template thumbs to mark active
+        this.renderTemplates();
+    }
+
+    // Apply a template with a specific variant to the current slide
+    applyTemplate(template, variant) {
+        if (!this.pres) return;
+        const slide = this.pres.slides[this.slideIdx];
+        if (!slide) return;
+
+        const v = variant || template.variants[0];
+        const isGradient = v.isGradient || /^\s*(linear|radial|conic)-gradient\(/i.test(String(v.bg || ''));
+
+        // Set slide background
+        slide.background = { type: isGradient ? 'gradient' : 'color', value: v.bg };
+
+        // Clear existing elements and replace with template layout
+        // scaled to actual slide dimensions
+        slide.elements = template.elements.map(el => {
+            const newEl = {
+                id: uid(),
+                type: el.type,
+                // Convert percentage-based positions to pixel values
+                // using standard 960×540 slide dimensions
+                x: Math.round(el.x * 9.6),
+                y: Math.round(el.y * 5.4),
+                w: Math.round(el.w * 9.6),
+                h: Math.round(el.h * 5.4),
+            };
+            if (el.type === 'text') {
+                newEl.content = el.text;
+                newEl.fontSize = el.fontSize || 16;
+                newEl.fontWeight = el.fontWeight || 'normal';
+                newEl.color = el.color || v.fg;
+            }
+            if (el.type === 'shape') {
+                newEl.shape = el.shape || 'rect';
+                // Apply variant accent to shape fills (unless they use rgba)
+                const fillVal = el.fill;
+                if (fillVal && fillVal !== 'none' && !fillVal.startsWith('rgba')) {
+                    // Template default fill — replace with variant accent if it matches template accent
+                    if (fillVal === template.accent) {
+                        newEl.fill = v.accent;
+                    } else {
+                        newEl.fill = fillVal;
+                    }
+                } else {
+                    newEl.fill = fillVal || v.accent;
+                }
+                newEl.stroke = el.stroke || 'none';
+                newEl.strokeWidth = el.strokeWidth || (el.stroke === 'none' ? 0 : 2);
+            }
+            return newEl;
+        });
+
+        this.pushHistory();
+        this.renderCanvas();
+        this.renderSlideList();
+        this.scheduleSave();
+        this.showToast(`Template "${template.name}" with variant "${v.name}" applied.`);
+    }
+
+    // Insert a new slide using the selected template
+    insertTemplateSlide() {
+        if (!this.pres) return;
+        const template = SlidesApp.TEMPLATES[this._activeTemplateIdx];
+        if (!template) {
+            this.showToast('Select a template first.');
+            return;
+        }
+        const v = template.variants[0];
+        const isGradient = v.isGradient || /^\s*(linear|radial|conic)-gradient\(/i.test(String(v.bg || ''));
+
+        const newSlide = {
+            id: uid(),
+            background: { type: isGradient ? 'gradient' : 'color', value: v.bg },
+            elements: template.elements.map(el => {
+                const newEl = {
+                    id: uid(),
+                    type: el.type,
+                    x: Math.round(el.x * 9.6),
+                    y: Math.round(el.y * 5.4),
+                    w: Math.round(el.w * 9.6),
+                    h: Math.round(el.h * 5.4),
+                };
+                if (el.type === 'text') {
+                    newEl.content = el.text;
+                    newEl.fontSize = el.fontSize || 16;
+                    newEl.fontWeight = el.fontWeight || 'normal';
+                    newEl.color = el.color || v.fg;
+                }
+                if (el.type === 'shape') {
+                    newEl.shape = el.shape || 'rect';
+                    const fillVal = el.fill;
+                    if (fillVal && fillVal !== 'none' && !fillVal.startsWith('rgba')) {
+                        if (fillVal === template.accent) {
+                            newEl.fill = v.accent;
+                        } else {
+                            newEl.fill = fillVal;
+                        }
+                    } else {
+                        newEl.fill = fillVal || v.accent;
+                    }
+                    newEl.stroke = el.stroke || 'none';
+                    newEl.strokeWidth = el.strokeWidth || (el.stroke === 'none' ? 0 : 2);
+                }
+                return newEl;
+            }),
+            transitions: [],
+        };
+        // Insert after current slide
+        const insertIdx = this.slideIdx + 1;
+        this.pres.slides.splice(insertIdx, 0, newSlide);
+        this.slideIdx = insertIdx;
+        this.pushHistory();
+        this.renderCanvas();
+        this.renderSlideList();
+        this.scheduleSave();
+        this.showToast(`New slide from template "${template.name}" inserted.`);
+    }
+
+    // Preview template in a modal (show a larger mockup)
+    previewTemplate() {
+        const template = SlidesApp.TEMPLATES[this._activeTemplateIdx];
+        if (!template) {
+            this.showToast('Select a template first.');
+            return;
+        }
+        const v = template.variants[0];
+        const isGradient = v.isGradient || /^\s*(linear|radial|conic)-gradient\(/i.test(String(v.bg || ''));
+
+        // Build a preview modal
+        const overlay = document.createElement('div');
+        overlay.className = 'template-preview-overlay';
+        overlay.addEventListener('click', () => overlay.remove());
+
+        const modal = document.createElement('div');
+        modal.className = 'template-preview-modal';
+        modal.addEventListener('click', e => e.stopPropagation());
+
+        // 16:9 preview box
+        const previewBox = document.createElement('div');
+        previewBox.className = 'template-preview-box';
+        previewBox.style.background = v.bg;
+
+        // Render elements as simplified HTML inside preview
+        template.elements.forEach(el => {
+            const div = document.createElement('div');
+            div.style.position = 'absolute';
+            div.style.left = el.x + '%';
+            div.style.top = el.y + '%';
+            div.style.width = el.w + '%';
+            div.style.height = el.h + '%';
+            if (el.type === 'text') {
+                div.style.fontSize = Math.max(8, el.fontSize * 0.35) + 'px';
+                div.style.fontWeight = el.fontWeight || 'normal';
+                div.style.color = el.color || v.fg;
+                div.style.fontFamily = '"DM Sans", sans-serif';
+                div.textContent = el.text;
+                div.style.overflow = 'hidden';
+            }
+            if (el.type === 'shape') {
+                const fillVal = el.fill;
+                if (fillVal && fillVal.startsWith('rgba')) {
+                    div.style.background = fillVal;
+                } else if (fillVal === template.accent) {
+                    div.style.background = v.accent;
+                } else {
+                    div.style.background = fillVal || v.accent;
+                }
+                div.style.borderRadius = el.shape === 'rect' ? '2px' : '50%';
+            }
+            previewBox.appendChild(div);
+        });
+
+        const info = document.createElement('div');
+        info.className = 'template-preview-info';
+        info.innerHTML = `<strong>${template.name}</strong><br><span style="color:#6b7280">${template.description}</span><br><span style="color:#9ca3af;font-size:12px">Category: ${template.category} | Layout: ${template.layout}</span>`;
+
+        const actions = document.createElement('div');
+        actions.className = 'template-preview-actions';
+
+        const applyBtn = document.createElement('button');
+        applyBtn.className = 'template-preview-action-btn primary';
+        applyBtn.textContent = 'Apply to Current Slide';
+        applyBtn.addEventListener('click', () => {
+            this.applyTemplate(template, v);
+            overlay.remove();
+        });
+
+        const insertBtn = document.createElement('button');
+        insertBtn.className = 'template-preview-action-btn';
+        insertBtn.textContent = 'Insert New Slide';
+        insertBtn.addEventListener('click', () => {
+            this.insertTemplateSlide();
+            overlay.remove();
+        });
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'template-preview-action-btn';
+        closeBtn.textContent = 'Close';
+        closeBtn.addEventListener('click', () => overlay.remove());
+
+        actions.appendChild(applyBtn);
+        actions.appendChild(insertBtn);
+        actions.appendChild(closeBtn);
+
+        modal.appendChild(previewBox);
+        modal.appendChild(info);
+        modal.appendChild(actions);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+    }
 
     renderThemes() {
         const row = document.getElementById('themeThumbnailRow');
@@ -3474,9 +5191,16 @@ class SlidesApp {
         const start = (this._themeIdx ?? 0);
         const slice = SlidesApp.THEMES.slice(start, start + 6);
         row.innerHTML = slice.map((t, i) => `
-            <button class="theme-thumb" data-idx="${start + i}" title="${t.name}" style="background:${t.bg};color:${t.title};">
-                <span class="theme-thumb-title">Aa</span>
-                <span class="theme-thumb-sub" style="color:${t.sub};">${t.name}</span>
+            <button class="theme-thumb" data-idx="${start + i}" title="${t.name}" style="background:${t.bg};--tt-title:${t.title};--tt-accent:${t.sub};">
+                <div class="tt-preview">
+                    <div class="tt-title-bar"></div>
+                    <div class="tt-body">
+                        <div class="tt-line tt-line-1"></div>
+                        <div class="tt-line tt-line-2"></div>
+                        <div class="tt-line tt-line-3"></div>
+                    </div>
+                    <div class="tt-accent-box"></div>
+                </div>
             </button>
         `).join('');
         row.querySelectorAll('.theme-thumb').forEach(th => {
@@ -3489,29 +5213,81 @@ class SlidesApp {
         });
     }
 
-    renderVariants() {
-        const row = document.getElementById('variantThumbnailRow');
-        if (!row) return;
-        row.innerHTML = SlidesApp.VARIANTS.map((v, i) => `
-            <button class="variant-thumb" data-idx="${i}" title="${v.name}" style="background:${v.bg};color:${v.fg};border-color:${v.accent};">
-                Aa
-            </button>
-        `).join('');
-        row.querySelectorAll('.variant-thumb').forEach(th => {
-            th.addEventListener('click', () => {
-                const idx = parseInt(th.dataset.idx, 10);
-                this.applyVariant(SlidesApp.VARIANTS[idx]);
-                row.querySelectorAll('.variant-thumb').forEach(x => x.classList.remove('active'));
-                th.classList.add('active');
+    renderThemeGallery() {
+        const menu = document.getElementById('themeGalleryMenu');
+        if (!menu) return;
+        // Header
+        const header = document.createElement('div');
+        header.className = 'theme-gallery-header';
+        header.textContent = 'All Themes';
+        menu.appendChild(header);
+        // Grid
+        const grid = document.createElement('div');
+        grid.className = 'theme-gallery-grid';
+        SlidesApp.THEMES.forEach((t, i) => {
+            // Each dropdown card is a wrapper containing a 16:9 mini slide
+            // preview (same .theme-thumb / .tt-preview markup as the inline
+            // ribbon thumbs) plus a name label below.
+            const card = document.createElement('button');
+            card.className = 'theme-gallery-card';
+            card.dataset.idx = String(i);
+            card.title = t.name;
+
+            const thumb = document.createElement('div');
+            thumb.className = 'theme-thumb';
+            thumb.style.background = t.bg;
+            thumb.style.setProperty('--tt-title', t.title);
+            thumb.style.setProperty('--tt-accent', t.sub);
+
+            const preview = document.createElement('div');
+            preview.className = 'tt-preview';
+            const tBar = document.createElement('div');
+            tBar.className = 'tt-title-bar';
+            const body = document.createElement('div');
+            body.className = 'tt-body';
+            ['tt-line-1', 'tt-line-2', 'tt-line-3'].forEach(cls => {
+                const line = document.createElement('div');
+                line.className = 'tt-line ' + cls;
+                body.appendChild(line);
             });
+            const accent = document.createElement('div');
+            accent.className = 'tt-accent-box';
+            preview.appendChild(tBar);
+            preview.appendChild(body);
+            preview.appendChild(accent);
+            thumb.appendChild(preview);
+
+            const label = document.createElement('div');
+            label.className = 'theme-gallery-label';
+            label.textContent = t.name;
+
+            card.appendChild(thumb);
+            card.appendChild(label);
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.applyTheme(SlidesApp.THEMES[i]);
+                // Also mark the matching ribbon thumb (if visible) as active
+                const row = document.getElementById('themeThumbnailRow');
+                if (row) {
+                    row.querySelectorAll('.theme-thumb').forEach(x => x.classList.remove('active'));
+                    const match = row.querySelector(`.theme-thumb[data-idx="${i}"]`);
+                    if (match) match.classList.add('active');
+                }
+                // Close the dropdown
+                this._closePortal();
+            });
+            grid.appendChild(card);
         });
+        menu.appendChild(grid);
     }
 
     applyTheme(theme) {
         if (!this.pres) return;
+        // Detect gradient backgrounds (linear-gradient / radial-gradient)
+        const isGradient = theme.isGradient || /^\s*(linear|radial|conic)-gradient\(/i.test(String(theme.bg || ''));
         this.pres.slides.forEach(s => {
             if (!s.background) s.background = { type: 'color', value: '#ffffff' };
-            s.background = { type: 'color', value: theme.bg };
+            s.background = { type: isGradient ? 'gradient' : 'color', value: theme.bg };
             // Update first text element to title color
             const titleEl = s.elements.find(e => e.type === 'text');
             if (titleEl) titleEl.color = theme.title;
@@ -3524,40 +5300,6 @@ class SlidesApp {
         this.renderSlideList();
         this.scheduleSave();
         this.showToast(`Theme "${theme.name}" applied.`);
-    }
-
-    applyVariant(v) {
-        if (!this.pres) return;
-        this.pres.slides.forEach(s => {
-            if (!s.background) s.background = { type: 'color', value: '#ffffff' };
-            s.background = { type: 'color', value: v.bg };
-            s.elements.forEach(el => {
-                if (el.type === 'text') el.color = v.fg;
-                if (el.type === 'shape' && el.fill && el.fill !== 'none') el.fill = v.accent;
-            });
-        });
-        this.pushHistory();
-        this.renderCanvas();
-        this.renderSlideList();
-        this.scheduleSave();
-        this.showToast(`Variant "${v.name}" applied.`);
-    }
-
-    showLayoutPicker() {
-        const layouts = [
-            { name: 'Title Slide',     desc: 'Centered title + subtitle' },
-            { name: 'Title and Content', desc: 'Title on top, body below' },
-            { name: 'Section Header',  desc: 'Large centered title' },
-            { name: 'Two Content',     desc: 'Title + two columns' },
-            { name: 'Comparison',      desc: 'Title + side-by-side compare' },
-            { name: 'Title Only',      desc: 'Just a title placeholder' },
-            { name: 'Blank',           desc: 'Empty slide' },
-            { name: 'Content with Caption', desc: 'Caption + content' },
-        ];
-        const choice = prompt('Choose a layout (1-' + layouts.length + '):\n' + layouts.map((l, i) => `${i + 1}. ${l.name} — ${l.desc}`).join('\n'), '2');
-        const idx = parseInt(choice, 10) - 1;
-        if (isNaN(idx) || idx < 0 || idx >= layouts.length) return;
-        this.applyLayout(layouts[idx]);
     }
 
     applyLayout(layout) {
@@ -3599,69 +5341,271 @@ class SlidesApp {
         this.showToast(`Layout "${layout.name}" applied.`);
     }
 
-    cycleSlideSize() {
-        const sizes = [
-            { name: 'Widescreen 16:9', w: 960, h: 540 },
-            { name: 'Standard 4:3',    w: 720, h: 540 },
-            { name: 'Widescreen 16:10', w: 960, h: 600 },
+    openDesigner() {
+        // Layout definitions
+        const layouts = [
+            { name: 'Title Slide',          desc: 'Centered title + subtitle',        icon: 'title' },
+            { name: 'Title and Content',     desc: 'Title on top, body below',         icon: 'title-content' },
+            { name: 'Section Header',        desc: 'Large centered title',             icon: 'section' },
+            { name: 'Two Content',           desc: 'Title + two columns',              icon: 'two-col' },
+            { name: 'Comparison',            desc: 'Title + side-by-side compare',     icon: 'compare' },
+            { name: 'Title Only',            desc: 'Just a title placeholder',         icon: 'title-only' },
+            { name: 'Blank',                 desc: 'Empty slide',                      icon: 'blank' },
+            { name: 'Content with Caption',  desc: 'Caption + content',                icon: 'caption' },
         ];
-        const cur = (this._slideSizeIdx ?? 0);
-        const next = (cur + 1) % sizes.length;
-        this._slideSizeIdx = next;
-        const sz = sizes[next];
-        this._slideW = sz.w;
-        this._slideH = sz.h;
-        const canvas = document.getElementById('slideCanvas');
-        if (canvas) { canvas.style.width = sz.w + 'px'; canvas.style.height = sz.h + 'px'; }
-        this.fitZoom();
-        this.showToast(`Slide size: ${sz.name} (${sz.w}×${sz.h}).`);
+
+        const modal = document.getElementById('designerModal');
+        const grid = document.getElementById('designerLayoutGrid');
+        if (!modal || !grid) return;
+
+        // Close function with closing animation (matches other modals)
+        const closeDesigner = () => {
+            modal.classList.add('closing');
+            setTimeout(() => { modal.classList.remove('show'); modal.classList.remove('closing'); }, 230);
+        };
+
+        // Close on overlay click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeDesigner();
+        });
+
+        // Close on X button click
+        const closeBtn = document.getElementById('designerModalCloseBtn');
+        if (closeBtn) closeBtn.addEventListener('click', closeDesigner);
+
+        // Clear and populate layout grid
+        grid.innerHTML = '';
+        layouts.forEach((layout) => {
+            const card = document.createElement('button');
+            card.className = 'designer-layout-card';
+            card.title = `${layout.name} — ${layout.desc}`;
+
+            const preview = document.createElement('div');
+            preview.className = 'designer-layout-preview';
+            this._renderLayoutPreviewIcon(preview, layout.icon);
+
+            const name = document.createElement('div');
+            name.className = 'designer-layout-name';
+            name.textContent = layout.name;
+
+            const desc = document.createElement('div');
+            desc.className = 'designer-layout-desc';
+            desc.textContent = layout.desc;
+
+            card.appendChild(preview);
+            card.appendChild(name);
+            card.appendChild(desc);
+
+            card.addEventListener('click', () => {
+                this.applyLayout(layout);
+                closeDesigner();
+            });
+            grid.appendChild(card);
+        });
+
+        // Show modal using the standard .show pattern (like other modals)
+        modal.classList.add('show');
     }
 
-    openDesigner() {
-        // Pick from a set of auto-layout suggestions
-        const designs = [
-            { name: 'Hero Title',        apply: () => this.applyLayout({ name: 'Title Slide' }) },
-            { name: 'Section Break',     apply: () => this.applyLayout({ name: 'Section Header' }) },
-            { name: 'Two-Column Compare',apply: () => this.applyLayout({ name: 'Comparison' }) },
-            { name: 'Bullet List',       apply: () => this.applyLayout({ name: 'Title and Content' }) },
-        ];
-        const choice = prompt('Designer suggestions:\n' + designs.map((d, i) => `${i + 1}. ${d.name}`).join('\n'), '1');
-        const idx = parseInt(choice, 10) - 1;
-        if (isNaN(idx) || idx < 0 || idx >= designs.length) return;
-        designs[idx].apply();
-        this.showToast(`Designer applied: ${designs[idx].name}`);
+    // Render a mini layout preview icon inside a container
+    _renderLayoutPreviewIcon(container, iconType) {
+        // Each layout type gets a simplified visual preview
+        // using absolutely positioned divs inside the container
+        const c = container;
+        c.style.position = 'relative';
+        c.style.background = '#ffffff';
+        c.style.border = '1px solid rgba(0,0,0,0.06)';
+        c.style.borderRadius = '4px';
+
+        const accent = 'var(--ui-accent, #f97316)';
+        const titleColor = '#1a1a1a';
+        const textColor = '#9ca3af';
+
+        const addRect = (x, y, w, h, bg, br = '2px') => {
+            const d = document.createElement('div');
+            d.style.cssText = `position:absolute;left:${x}%;top:${y}%;width:${w}%;height:${h}%;background:${bg};border-radius:${br};pointer-events:none;`;
+            c.appendChild(d);
+            return d;
+        };
+
+        switch (iconType) {
+            case 'title': // Title Slide: centered title bar + subtitle line
+                addRect(15, 28, 70, 14, titleColor);
+                addRect(25, 50, 50, 6, textColor);
+                break;
+            case 'title-content': // Title on top, body below
+                addRect(5, 4, 90, 12, accent);
+                addRect(8, 22, 84, 65, '#f3f4f6');
+                break;
+            case 'section': // Large centered title
+                addRect(15, 32, 70, 22, titleColor, '3px');
+                break;
+            case 'two-col': // Title + two columns
+                addRect(5, 4, 90, 10, titleColor);
+                addRect(5, 18, 43, 72, '#f3f4f6');
+                addRect(52, 18, 43, 72, '#f3f4f6');
+                break;
+            case 'compare': // Side-by-side compare
+                addRect(5, 4, 90, 10, titleColor);
+                addRect(5, 18, 43, 18, accent, '3px');
+                addRect(5, 40, 43, 50, '#f3f4f6');
+                addRect(52, 18, 43, 18, '#2563eb', '3px');
+                addRect(52, 40, 43, 50, '#f3f4f6');
+                break;
+            case 'title-only': // Just a title
+                addRect(5, 20, 90, 12, titleColor);
+                break;
+            case 'blank': // Empty
+                break;
+            case 'caption': // Caption + content
+                addRect(5, 4, 90, 6, textColor);
+                addRect(5, 14, 90, 10, titleColor);
+                addRect(5, 28, 90, 62, '#f3f4f6');
+                break;
+        }
     }
 
     // ── ANIMATION PREVIEW / REORDER ──
+    // Plays back the current slide's animations on the editor canvas
+    // so the user can see what they configured without entering
+    // Present mode. Previously this just flashed the canvas opacity
+    // (useless). Now it walks slide.animations in order, applying
+    // each animation's class to its target element with the
+    // configured duration and delay, and sequences them according
+    // to the `start` field:
+    //   • 'click' → wait for the previous 'click' animation to finish
+    //              (in preview we auto-advance after a short gap so
+    //              the user doesn't have to click)
+    //   • 'with'  → start at the same time as the previous animation
+    //   • 'after' → start when the previous animation ends
+    // The animation classes (anim-playing-*) and the
+    // --anim-duration / --anim-delay custom properties are defined
+    // in slides.css.
     previewAnimations() {
         const slide = this.pres?.slides?.[this.slideIdx];
         if (!slide || !slide.animations || slide.animations.length === 0) {
             this.showToast('No animations on this slide to preview.');
             return;
         }
-        this.showToast('Previewing animations…');
-        // Briefly re-trigger the slide render so animations replay
-        const canvas = document.getElementById('slideCanvas');
-        if (canvas) {
-            canvas.style.opacity = '0.3';
-            setTimeout(() => { canvas.style.opacity = '1'; this.renderCanvas(); }, 250);
+        const container = this.isPresenting
+            ? document.getElementById('presentSlide')
+            : document.getElementById('slideCanvas');
+        if (!container) return;
+
+        // Clear any in-flight preview timers from a previous click
+        // so rapid Preview presses don't overlap and leave classes
+        // stuck on elements.
+        if (this._animPreviewTimers) {
+            this._animPreviewTimers.forEach(t => clearTimeout(t));
         }
+        this._animPreviewTimers = [];
+        // Also strip any leftover anim-playing-* classes from a
+        // previous preview that got interrupted.
+        container.querySelectorAll('[class*="anim-playing-"]').forEach(el => {
+            Array.from(el.classList).forEach(c => {
+                if (c.startsWith('anim-playing-')) el.classList.remove(c);
+            });
+            el.style.removeProperty('--anim-duration');
+            el.style.removeProperty('--anim-delay');
+        });
+
+        this.showToast('Previewing animations…');
+
+        // Walk the animations in order, scheduling each one's
+        // start time relative to the previous one based on `start`.
+        let cursor = 0; // ms — running timestamp of "now" in preview time
+        let lastEndTime = 0; // ms — when the previous animation finishes
+        slide.animations.forEach((anim, i) => {
+            const dur = Number.isFinite(anim.duration) ? anim.duration : 0.5;
+            const delay = Number.isFinite(anim.delay) ? anim.delay : 0;
+            const start = anim.start || 'click';
+
+            // Compute this animation's start time.
+            let startMs;
+            if (start === 'with' && i > 0) {
+                // Start simultaneously with the previous animation.
+                startMs = cursor;
+            } else if (start === 'after' && i > 0) {
+                // Start when the previous animation ends.
+                startMs = lastEndTime;
+            } else {
+                // 'click' (or first animation) — chain after the
+                // previous animation ends with a small visual gap
+                // so the user can see distinct steps.
+                startMs = i === 0 ? 0 : lastEndTime + 150;
+            }
+
+            const endMs = startMs + delay * 1000 + dur * 1000;
+            lastEndTime = endMs;
+            // Advance the cursor only for click/after — 'with'
+            // doesn't advance time because the next animation
+            // overlaps this one.
+            if (start !== 'with') {
+                cursor = endMs;
+            }
+
+            // Schedule the class application.
+            const applyTimer = setTimeout(() => {
+                // Element DOM nodes use id="el-<elementId>" (see
+                // renderCanvas). Try the id selector first (fast,
+                // unique), then fall back to data-id for safety.
+                const target = anim.elementId
+                    ? (document.getElementById(`el-${anim.elementId}`) ||
+                       container.querySelector(`[data-id="${anim.elementId}"]`))
+                    : null;
+                if (!target) return;
+                // Set the CSS custom properties so the keyframes
+                // use the user's configured duration and delay.
+                // (Delay is baked into the startMs scheduling, so
+                // we set --anim-delay to 0 here to avoid double-
+                // counting.)
+                target.style.setProperty('--anim-duration', `${dur}s`);
+                target.style.setProperty('--anim-delay', `0s`);
+                // Force reflow so a re-trigger on the same element
+                // (rapid previews) actually restarts the animation.
+                void target.offsetWidth;
+                target.classList.add(`anim-playing-${anim.type}`);
+            }, startMs + delay * 1000);
+            this._animPreviewTimers.push(applyTimer);
+
+            // Schedule cleanup.
+            const cleanupTimer = setTimeout(() => {
+                const target = anim.elementId
+                    ? (document.getElementById(`el-${anim.elementId}`) ||
+                       container.querySelector(`[data-id="${anim.elementId}"]`))
+                    : null;
+                if (target) {
+                    target.classList.remove(`anim-playing-${anim.type}`);
+                    target.style.removeProperty('--anim-duration');
+                    target.style.removeProperty('--anim-delay');
+                }
+            }, endMs + 100);
+            this._animPreviewTimers.push(cleanupTimer);
+        });
     }
 
     moveAnimation(delta) {
         const slide = this.pres?.slides?.[this.slideIdx];
-        if (!slide || !slide.animations) return;
-        const el = this.selectedId ? this.getElement(this.selectedId) : null;
-        if (!el || !el.animations) { this.showToast('Select an animated element first.'); return; }
-        const animIdx = el.animations.findIndex(a => a.slideIdx === this.slideIdx);
-        if (animIdx < 0) return;
-        // Move within the element's animations list (re-order)
-        const arr = el.animations;
+        if (!slide || !slide.animations || slide.animations.length === 0) return;
+        // Find the index of the animation for the currently-selected element
+        // (or the last animation if nothing is selected).
+        let animIdx = -1;
+        if (this.selectedId) {
+            animIdx = slide.animations.findIndex(a => a.elementId === this.selectedId);
+        }
+        if (animIdx < 0) {
+            // No animation found for the selected element — fall back to the
+            // last animation on the slide so the buttons still work even when
+            // the user hasn't explicitly clicked an item in the pane.
+            animIdx = slide.animations.length - 1;
+        }
         const target = animIdx + delta;
-        if (target < 0 || target >= arr.length) return;
-        [arr[animIdx], arr[target]] = [arr[target], arr[animIdx]];
+        if (target < 0 || target >= slide.animations.length) return;
+        // Swap within the slide's animation list
+        [slide.animations[animIdx], slide.animations[target]] = [slide.animations[target], slide.animations[animIdx]];
         this.scheduleSave();
         this.renderAnimationPane();
+        this._syncAnimationTimingUI?.();
         this.showToast(delta < 0 ? 'Moved earlier.' : 'Moved later.');
     }
 
@@ -3701,267 +5645,432 @@ class SlidesApp {
         document.addEventListener('keydown', escHandler);
     }
 
-    // ── REVIEW FEATURES ──
-    spellCheck() {
-        const slide = this.pres?.slides?.[this.slideIdx];
-        if (!slide) return;
-        // Naive spell-check: very common typos (placeholder until a real dictionary is loaded)
-        const dict = { teh: 'the', recieve: 'receive', occured: 'occurred', seperate: 'separate', definately: 'definitely', tommorow: 'tomorrow', wich: 'which', thier: 'their' };
-        let count = 0;
-        slide.elements.forEach(el => {
-            if (el.type !== 'text' || !el.html) return;
-            let html = el.html;
-            Object.entries(dict).forEach(([bad, good]) => {
-                const re = new RegExp(`\\b${bad}\\b`, 'gi');
-                if (re.test(html)) { html = html.replace(re, good); count++; }
+    // ── Load icon library from icons.emeraldcore ──
+    loadIconLibrary() {
+        fetch('/assets/data/icons.emeraldcore')
+            .then(r => r.text())
+            .then(text => {
+                const data = JSON.parse(stripComments(text));
+                window.ICON_DB  = data.icons;
+                window.ICON_CATS = data.categories;
+            })
+            .catch(err => {
+                console.warn('Failed to load icons.emeraldcore:', err);
+                window.ICON_DB  = [];  
+                window.ICON_CATS = ['All'];
             });
-            el.html = html;
-        });
-        if (count > 0) { this.pushHistory(); this.renderCanvas(); this.scheduleSave(); this.showToast(`Fixed ${count} spelling issue(s).`); }
-        else this.showToast('No spelling issues found.');
     }
 
-    showWordCount() {
-        const slide = this.pres?.slides?.[this.slideIdx];
-        if (!slide) { this.showToast('No slide selected.'); return; }
-        let words = 0, chars = 0, paras = 0;
-        slide.elements.forEach(el => {
-            if (el.type === 'text' && el.html) {
-                const text = el.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-                if (text) {
-                    words += text.split(' ').length;
-                    chars += text.length;
-                    paras += text.split(/\n+/).length;
-                }
-            }
-        });
-        this.showHelpModal('Word Count', [
-            `Slides: ${this.pres.slides.length}`,
-            `Words on this slide: ${words}`,
-            `Characters: ${chars}`,
-            `Paragraphs: ${paras}`,
-        ]);
-    }
-
-    checkAccessibility() {
-        const slide = this.pres?.slides?.[this.slideIdx];
-        if (!slide) return;
-        const issues = [];
-        slide.elements.forEach(el => {
-            if (el.type === 'image' && !el.alt) issues.push(`Image at (${Math.round(el.x)}, ${Math.round(el.y)}) is missing alt text.`);
-            if (el.type === 'text' && el.html) {
-                const txt = el.html.replace(/<[^>]+>/g, '');
-                if (txt.length > 200) issues.push(`Long text block (${txt.length} chars) — consider breaking up.`);
-                if (el.fontSize && el.fontSize < 14) issues.push(`Small font (${el.fontSize}px) may be hard to read.`);
-            }
-        });
-        if (issues.length === 0) this.showToast('No accessibility issues detected.');
-        else this.showHelpModal('Accessibility Issues', issues);
-    }
-
-    editAltText() {
-        const el = this.selectedId ? this.getElement(this.selectedId) : null;
-        if (!el || el.type !== 'image') { this.showToast('Select an image to add alt text.'); return; }
-        const cur = el.alt || '';
-        const v = prompt('Alt text for this image:', cur);
-        if (v !== null) { el.alt = v.trim(); this.pushHistory(); this.scheduleSave(); this.showToast(v.trim() ? 'Alt text saved.' : 'Alt text cleared.'); }
-    }
-
-    translateSelection() {
-        const el = this.selectedId ? this.getElement(this.selectedId) : null;
-        if (!el || el.type !== 'text' || !el.html) { this.showToast('Select a text element to translate.'); return; }
-        const langs = ['Spanish', 'French', 'German', 'Indonesian', 'Japanese', 'Chinese'];
-        const choice = prompt('Translate to:\n' + langs.map((l, i) => `${i + 1}. ${l}`).join('\n'), '4');
-        const idx = parseInt(choice, 10) - 1;
-        if (isNaN(idx) || idx < 0 || idx >= langs.length) return;
-        const lang = langs[idx];
-        const codes = { Spanish: 'es', French: 'fr', German: 'de', Indonesian: 'id', Japanese: 'ja', Chinese: 'zh' };
-        const text = el.html.replace(/<[^>]+>/g, '');
-        const url = `https://translate.google.com/?sl=auto&tl=${codes[lang]}&text=${encodeURIComponent(text)}&op=translate`;
-        window.open(url, '_blank');
-        this.showToast(`Opening ${lang} translation in a new tab…`);
-    }
-
-    setLanguage() {
-        const langs = ['English (US)', 'English (UK)', 'Indonesian', 'Spanish', 'French', 'German', 'Japanese', 'Chinese (Simplified)'];
-        const choice = prompt('Set proofing language:\n' + langs.map((l, i) => `${i + 1}. ${l}`).join('\n'), '1');
-        const idx = parseInt(choice, 10) - 1;
-        if (isNaN(idx) || idx < 0 || idx >= langs.length) return;
-        this._proofLang = langs[idx];
-        this.showToast(`Proofing language: ${langs[idx]}`);
-    }
-
-    // ── HELP MODAL ──
-    showHelpModal(title, lines) {
-        const overlay = document.createElement('div');
-        overlay.className = 'delete-modal';
-        const list = Array.isArray(lines) ? lines : [lines];
-        const items = list.map(l => Array.isArray(l)
-            ? `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:14px;font-family:'DM Sans',sans-serif;"><strong style="color:rgba(44,62,80,0.9);">${l[0]}</strong><span style="color:rgba(44,62,80,0.7);">${l[1]}</span></div>`
-            : `<div style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:14px;color:rgba(44,62,80,0.7);font-family:'DM Sans',sans-serif;">${l}</div>`
-        ).join('');
-        overlay.innerHTML = `
-            <div class="delete-modal-content" style="max-width:520px;">
-                <div class="delete-modal-header">
-                    <div class="delete-modal-icon" style="background:#f97316;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                    </div>
-                    <h3 class="delete-modal-title">${title}</h3>
-                </div>
-                <div class="delete-modal-body">
-                    ${items}
-                </div>
-                <div class="delete-modal-actions">
-                    <button class="delete-modal-btn delete-modal-btn-cancel close-btn" style="min-width:120px;">Close</button>
-                </div>
-            </div>`;
-        document.body.appendChild(overlay);
-        const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
-        requestAnimationFrame(() => overlay.classList.add('show'));
-        overlay.querySelector('.close-btn').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-    }
-
-    // ── INSERT: Icon / Chart / Link / Comment / Symbol ──
+    // ── INSERT: Icon / Link / Comment / Symbol ──
     openIconPicker() {
-        const icons = [
-            { name: 'Check',     svg: '<polyline points="20 6 9 17 4 12"/>' },
-            { name: 'Star',      svg: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>' },
-            { name: 'Heart',     svg: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>' },
-            { name: 'Bell',      svg: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>' },
-            { name: 'Home',      svg: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>' },
-            { name: 'Mail',      svg: '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/>' },
-            { name: 'Calendar',  svg: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>' },
-            { name: 'User',      svg: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
-            { name: 'Settings',  svg: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
-            { name: 'Search',    svg: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' },
-            { name: 'Cloud',     svg: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>' },
-            { name: 'Lock',      svg: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>' },
-        ];
+        if (!window.ICON_DB || !window.ICON_DB.length) {
+            this.showToast('Icon library not loaded.');
+            return;
+        }
+        const self = this;
+        const allIcons = window.ICON_DB;
+        const categories = window.ICON_CATS || ['All'];
+        const BATCH = 120;
+        const svgWrap = (inner) =>
+            `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+
         const overlay = document.createElement('div');
         overlay.className = 'delete-modal';
         overlay.innerHTML = `
-            <div class="delete-modal-content" style="max-width:480px;">
+            <div class="delete-modal-content icon-picker-content">
                 <button class="modal-close-btn">&times;</button>
-                <div class="delete-modal-header">
+                <div class="icons-modal-header">
                     <div class="delete-modal-icon" style="background:#f97316;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="4"/>
-                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
-                        </svg>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>
                     </div>
                     <h3 class="delete-modal-title">Insert Icon</h3>
+                    <p class="icons-modal-message icon-picker-count">${allIcons.length} icons available</p>
                 </div>
-                <div class="delete-modal-body">
-                    <div class="picker-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">
-                        ${icons.map((ic, i) => `
-                            <button class="icon-pick" data-idx="${i}" title="${ic.name}">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic.svg}</svg>
-                            </button>
-                        `).join('')}
+                <div class="delete-modal-body icon-picker-body">
+                    <div class="icon-picker-search-row">
+                        <input type="text" id="iconSearchInput" placeholder="Search icons… e.g. arrow, mail, star" autocomplete="off" />
+                    </div>
+                    <div class="icon-picker-cats">
+                        ${categories.map(c => `<button class="icon-cat-btn${c==='All'?' active':''}" data-cat="${c}">${c}</button>`).join('')}
+                    </div>
+                    <div class="icon-picker-grid-scroll" id="iconGridScroll">
+                        <div class="icon-picker-grid" id="iconGrid"></div>
                     </div>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
         requestAnimationFrame(() => overlay.classList.add('show'));
+
         const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
         overlay.querySelector('.modal-close-btn').addEventListener('click', close);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-        overlay.querySelectorAll('.icon-pick').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.dataset.idx, 10);
-                const ic = icons[idx];
-                const svgStr = `<svg viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">${ic.svg}</svg>`;
-                const el = { id: uid(), type: 'shape', x: 380, y: 220, w: 80, h: 80, r: 0, z: 1, shape: 'icon', svg: svgStr, fill: 'none', stroke: '#374151', strokeWidth: 2, opacity: 1 };
-                this.addElement(el);
-                this.showToast(`Inserted "${ic.name}" icon.`);
-                close();
+
+        // State
+        let currentCat = 'All';
+        let currentSearch = '';
+        let filtered = allIcons;
+        let renderedCount = 0;
+
+        function filterIcons() {
+            const q = currentSearch.toLowerCase().trim();
+            if (currentCat === 'All') {
+                filtered = q ? allIcons.filter(ic => {
+                    const haystack = (ic.name + ' ' + ic.tags).toLowerCase();
+                    return haystack.includes(q);
+                }) : allIcons;
+            } else {
+                filtered = allIcons.filter(ic => ic.category === currentCat);
+                if (q) {
+                    filtered = filtered.filter(ic => {
+                        const haystack = (ic.name + ' ' + ic.tags).toLowerCase();
+                        return haystack.includes(q);
+                    });
+                }
+            }
+            renderedCount = 0;
+            renderBatch(true);
+        }
+
+        function renderBatch(reset) {
+            const grid = overlay.querySelector('#iconGrid');
+            if (reset) grid.innerHTML = '';
+            const end = Math.min(renderedCount + BATCH, filtered.length);
+            for (let i = renderedCount; i < end; i++) {
+                const ic = filtered[i];
+                const btn = document.createElement('button');
+                btn.className = 'icon-pick';
+                btn.dataset.idx = String(i);
+                btn.title = ic.name;
+                btn.innerHTML = svgWrap(ic.svg);
+                btn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    const svgStr = `<svg viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block;">${ic.svg}</svg>`;
+                    const el = { id: uid(), type: 'shape', x: 380, y: 220, w: 80, h: 80, r: 0, z: 1, shape: 'icon', svg: svgStr, fill: 'none', stroke: '#374151', strokeWidth: 2, opacity: 1 };
+                    self.addElement(el);
+                    self.showToast(`Inserted "${ic.name}" icon.`);
+                    close();
+                });
+                grid.appendChild(btn);
+            }
+            renderedCount = end;
+
+            // Update count label
+            const countLabel = overlay.querySelector('.icon-picker-count');
+            countLabel.textContent = `${filtered.length} icons available`;
+        }
+
+        // Infinite scroll: auto-load more when scrolling near bottom
+        const scrollContainer = overlay.querySelector('#iconGridScroll');
+        scrollContainer.addEventListener('scroll', () => {
+            const threshold = 60;
+            if (scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - threshold) {
+                if (renderedCount < filtered.length) {
+                    renderBatch(false);
+                }
+            }
+        });
+
+        // Search input
+        const searchInput = overlay.querySelector('#iconSearchInput');
+        let searchTimer = null;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                currentSearch = searchInput.value;
+                filterIcons();
+            }, 150);
+        });
+        searchInput.focus();
+
+        // Category tabs
+        overlay.querySelectorAll('.icon-cat-btn').forEach(btn => {
+            btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                overlay.querySelectorAll('.icon-cat-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentCat = btn.dataset.cat;
+                filterIcons();
             });
         });
+
+        // Initial render
+        filterIcons();
     }
 
-    insertChart() {
-        const types = [
-            { name: 'Bar Chart',        svg: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 17V10M12 17V7M17 17v-4"/>' },
-            { name: 'Line Chart',       svg: '<polyline points="3 17 9 11 13 15 21 7"/><rect x="3" y="3" width="18" height="18" rx="2"/>' },
-            { name: 'Pie Chart',        svg: '<path d="M21 12a9 9 0 1 1-9-9v9z"/><circle cx="12" cy="12" r="9"/>' },
-            { name: 'Donut Chart',      svg: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>' },
-        ];
-        const choice = prompt('Choose chart type:\n' + types.map((t, i) => `${i + 1}. ${t.name}`).join('\n'), '1');
-        const idx = parseInt(choice, 10) - 1;
-        if (isNaN(idx) || idx < 0 || idx >= types.length) return;
-        const type = types[idx];
-        // Insert a chart as an SVG image element
-        const w = 480, h = 280;
-        const svgStr = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
-            <rect width="${w}" height="${h}" fill="#fff" stroke="#e5e7eb" rx="8"/>
-            <text x="${w/2}" y="30" text-anchor="middle" font-family="DM Sans" font-size="16" font-weight="700" fill="#1a1a1a">${type.name}</text>
-            ${type.svg.replace(/<(rect|polyline|path|circle)([^>]*)>/g, (m, tag, attrs) => `<${tag}${attrs} transform="translate(40, 50) scale(0.85)"/>`)}
-        </svg>`;
-        const el = { id: uid(), type: 'shape', x: 240, y: 130, w, h, r: 0, z: 1, shape: 'chart', svg: svgStr, fill: 'none', stroke: 'none', strokeWidth: 0, opacity: 1 };
-        this.addElement(el);
-        this.showToast(`${type.name} inserted. (Demo placeholder)`);
-    }
 
     openLinkModal() {
         const el = this.selectedId ? this.getElement(this.selectedId) : null;
-        if (!el || el.type !== 'text') { this.showToast('Select a text element to add a link.'); return; }
-        const url = prompt('Link URL:', 'https://');
-        if (!url || !url.trim()) return;
-        el.link = url.trim();
-        this.pushHistory();
-        this.scheduleSave();
-        this.showToast(`Linked to ${url.trim()}.`);
+        if (!el) { this.showToast('Select an element to add a link.'); return; }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'delete-modal';
+        overlay.innerHTML = `
+            <div class="delete-modal-content">
+                <div class="delete-modal-header">
+                    <div class="delete-modal-icon" style="background:#2563eb;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                    </div>
+                    <h3 class="delete-modal-title">Insert Hyperlink</h3>
+                </div>
+                <div class="delete-modal-body" style="padding-top:0;">
+                    <label style="display:block;font-size:0.82rem;color:#666;margin-bottom:6px;font-weight:500;">Link URL</label>
+                    <input type="url" id="linkUrlInput" value="${el.link || 'https://'}" placeholder="https://example.com" />
+                </div>
+                <div class="delete-modal-actions" style="${el.link ? 'justify-content:flex-start;' : ''}">
+                    ${el.link ? '<button class="delete-modal-btn" id="removeLinkBtn" style="background:rgba(217,48,37,.08);color:#d93025;border:1px solid rgba(217,48,37,.2);">Remove Link</button>' : ''}
+                    <button class="delete-modal-btn delete-modal-btn-cancel" id="linkCancelBtn">Cancel</button>
+                    <button class="delete-modal-btn" id="linkSaveBtn" style="background:#2563eb;color:#fff;border:1px solid rgba(37,99,235,.3);">Save Link</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('show'));
+
+        const input = overlay.querySelector('#linkUrlInput');
+        input.focus();
+        input.select();
+
+        const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
+
+        overlay.querySelector('#linkCancelBtn').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+        overlay.querySelector('#linkSaveBtn').addEventListener('click', () => {
+            const url = input.value.trim();
+            if (!url) return;
+            el.link = url;
+            this.pushHistory();
+            this.scheduleSave();
+            this.renderCanvas();
+            this.showToast(`Linked to ${url}.`);
+            close();
+        });
+
+        const removeBtn = overlay.querySelector('#removeLinkBtn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => {
+                delete el.link;
+                this.pushHistory();
+                this.scheduleSave();
+                this.renderCanvas();
+                this.showToast('Link removed.');
+                close();
+            });
+        }
     }
 
     insertComment() {
         if (!this.pres) return;
         const slide = this.pres.slides[this.slideIdx];
-        const text = prompt('Comment:');
-        if (!text || !text.trim()) return;
-        if (!slide.comments) slide.comments = [];
-        slide.comments.push({ id: uid(), text: text.trim(), author: 'You', ts: Date.now(), x: 100, y: 100 });
-        this.scheduleSave();
-        this.showToast('Comment added.');
-    }
+        const el = this.selectedId ? this.getElement(this.selectedId) : null;
 
-    openSymbolPicker() {
-        const symbols = ['★','☆','✓','✗','♥','♦','♣','♠','→','←','↑','↓','↔','↕','⇒','⇐','⇑','⇓','∞','∴','∵','≈','≠','≤','≥','±','×','÷','∑','∏','∫','∂','∇','√','∝','∠','⊥','∼','≡','∈','∉','⊂','⊃','∪','∩','∀','∃','ƒ','ℵ','π','ε','μ','Ω','α','β','γ','δ','λ','σ','φ','ψ','ω','Σ','Π','Δ','Γ','Θ','Λ','Φ','Ψ','Ω','①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','●','○','■','□','▲','△','▼','▽','◆','◇','✔','✘','✚','✦','✧','✩','✪','✫','✬','✭','✮','✯','✰','✱','✲','✳','✴','✵','✶','✷','✸','✹','✺','✻','✼','✽','✾','✿','❀','❁','❂','❃','❄','❅','❆','❇','❈','❉','❊','❋'];
         const overlay = document.createElement('div');
         overlay.className = 'delete-modal';
         overlay.innerHTML = `
-            <div class="delete-modal-content" style="max-width:520px;">
-                <button class="modal-close-btn">&times;</button>
+            <div class="delete-modal-content">
                 <div class="delete-modal-header">
                     <div class="delete-modal-icon" style="background:#f97316;">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
                         </svg>
                     </div>
-                    <h3 class="delete-modal-title">Insert Symbol</h3>
+                    <h3 class="delete-modal-title">New Comment</h3>
                 </div>
-                <div class="delete-modal-body" style="margin-bottom:16px;max-height:50vh;overflow-y:auto;">
-                    <div class="picker-grid" style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;">
-                        ${symbols.map((s, i) => `<button class="sym-pick" data-s="${s}">${s}</button>`).join('')}
-                    </div>
+                <div class="delete-modal-body" style="padding-top:0;">
+                    <textarea id="commentInput" rows="3" placeholder="Write a comment..."></textarea>
+                </div>
+                <div class="delete-modal-actions">
+                    <button class="delete-modal-btn delete-modal-btn-cancel" id="commentCancelBtn">Cancel</button>
+                    <button class="delete-modal-btn" id="commentSaveBtn" style="background:#f97316;color:#fff;border:1px solid rgba(249,115,22,.3);">Add Comment</button>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
         requestAnimationFrame(() => overlay.classList.add('show'));
+
+        const textarea = overlay.querySelector('#commentInput');
+        textarea.focus();
+
         const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
-        overlay.querySelector('.modal-close-btn').addEventListener('click', close);
+
+        overlay.querySelector('#commentCancelBtn').addEventListener('click', close);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-        overlay.querySelectorAll('.sym-pick').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const s = btn.dataset.s;
-                const el = makeTextEl(380, 220, 80, 80);
-                el.html = s; el.fontSize = 48; el.textAlign = 'center';
-                this.addElement(el);
-                this.showToast(`Inserted "${s}".`);
-                close();
+
+        overlay.querySelector('#commentSaveBtn').addEventListener('click', () => {
+            const text = textarea.value.trim();
+            if (!text) return;
+            if (!slide.comments) slide.comments = [];
+            // If an element is selected, stick the comment pin to the element
+            // Otherwise, place it outside the slide boundary (top-right, beyond right edge)
+            const cx = el ? el.x + el.w + 10 : 970;
+            const cy = el ? el.y : 10;
+            slide.comments.push({ id: uid(), text, author: 'You', ts: Date.now(), x: cx, y: cy, elementId: el ? el.id : null });
+            this.scheduleSave();
+            this.renderCanvas();
+            this.showToast('Comment added.');
+            close();
+        });
+    }
+
+    showCommentPopup(comment, ci) {
+        // Remove any existing popup
+        const existing = document.querySelector('.comment-popup');
+        if (existing) existing.remove();
+
+        // Compute popup position — stick to element if linked, use stored coords otherwise
+        const slide = this.pres.slides[this.slideIdx];
+        let pinX = comment.x;
+        let pinY = comment.y;
+        if (comment.elementId) {
+            const linkedEl = slide.elements.find(e => e.id === comment.elementId);
+            if (linkedEl) {
+                pinX = linkedEl.x + linkedEl.w + 10; // Stick to the element
+                pinY = linkedEl.y;
+            }
+        }
+
+        const popup = document.createElement('div');
+        popup.className = 'comment-popup';
+        popup.style.cssText = `position:absolute;left:${pinX + 24}px;top:${pinY - 4}px;`;
+        popup.innerHTML = `
+            <div class="comment-popup-header">
+                <div class="comment-popup-avatar">${comment.author.charAt(0)}</div>
+                <span class="comment-popup-author">${comment.author}</span>
+                <span class="comment-popup-time">${formatDate(comment.ts)}</span>
+                <button class="comment-popup-close">&times;</button>
+            </div>
+            <div class="comment-popup-body">${comment.text}</div>
+            <div class="comment-popup-actions">
+                <button class="comment-reply-btn">Reply</button>
+                <button class="comment-delete-btn">Delete</button>
+            </div>`;
+        const canvas = document.getElementById('slideCanvas');
+        if (canvas) canvas.appendChild(popup);
+
+        popup.querySelector('.comment-popup-close').addEventListener('click', () => popup.remove());
+        popup.querySelector('.comment-reply-btn').addEventListener('click', () => {
+            const reply = prompt('Reply:');
+            if (!reply || !reply.trim()) return;
+            if (!comment.replies) comment.replies = [];
+            comment.replies.push({ id: uid(), text: reply.trim(), author: 'You', ts: Date.now() });
+            this.scheduleSave();
+            popup.remove();
+            this.renderCanvas();
+        });
+        popup.querySelector('.comment-delete-btn').addEventListener('click', () => {
+            const slide = this.pres.slides[this.slideIdx];
+            slide.comments.splice(ci, 1);
+            this.scheduleSave();
+            popup.remove();
+            this.renderCanvas();
+            this.showToast('Comment deleted.');
+        });
+    }
+
+    openSymbolPicker() {
+        const toolbar = document.getElementById('symbolToolbar');
+        const symBtn = document.getElementById('insertSymbolBtn');
+        if (!toolbar) return;
+        // If already visible, hide it
+        if (toolbar.classList.contains('visible')) {
+            toolbar.classList.remove('visible');
+            if (symBtn) symBtn.classList.remove('active');
+            return;
+        }
+        // Hide draw toolbar if open
+        document.getElementById('drawToolbar')?.classList.remove('visible');
+        toolbar.classList.add('visible');
+        if (symBtn) symBtn.classList.add('active');
+
+        // Symbol insertion: insert into current text editing, or create new text
+        toolbar.querySelectorAll('.sym-bar-btn').forEach(btn => {
+            // Remove old listeners by cloning (avoid duplicates)
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', () => {
+                const sym = newBtn.dataset.s;
+
+                // If currently editing a text, insert symbol directly at cursor
+                if (this.editingId) {
+                    const domEl = document.getElementById(`el-${this.editingId}`);
+                    const content = domEl?.querySelector('.text-content');
+                    if (content) {
+                        // Focus the contentEditable and insert symbol at cursor
+                        content.focus();
+                        const sel = window.getSelection();
+                        if (sel.rangeCount > 0) {
+                            const range = sel.getRangeAt(0);
+                            range.deleteContents();
+                            const textNode = document.createTextNode(sym);
+                            range.insertNode(textNode);
+                            // Move cursor after the inserted symbol
+                            range.setStartAfter(textNode);
+                            range.setEndAfter(textNode);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        } else {
+                            // No selection range, just append
+                            content.textContent += sym;
+                        }
+                        // Save the updated HTML back to the element data
+                        const el = this.getElement(this.editingId);
+                        if (el) {
+                            el.html = content.innerHTML;
+                            this.scheduleSave();
+                        }
+                        this.showToast(`Inserted "${sym}"`);
+                        return;
+                    }
+                }
+
+                // If a text element is selected but not in edit mode, enter edit mode and insert
+                if (this.selectedId) {
+                    const el = this.getElement(this.selectedId);
+                    if (el && el.type === 'text') {
+                        this.enterTextEditing(el.id);
+                        // After entering edit mode, insert the symbol
+                        setTimeout(() => {
+                            const domEl = document.getElementById(`el-${el.id}`);
+                            const content = domEl?.querySelector('.text-content');
+                            if (content) {
+                                content.focus();
+                                const sel = window.getSelection();
+                                if (sel.rangeCount > 0) {
+                                    const range = sel.getRangeAt(0);
+                                    range.deleteContents();
+                                    const textNode = document.createTextNode(sym);
+                                    range.insertNode(textNode);
+                                    range.setStartAfter(textNode);
+                                    range.setEndAfter(textNode);
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                } else {
+                                    content.textContent += sym;
+                                }
+                                el.html = content.innerHTML;
+                                this.scheduleSave();
+                            }
+                            this.showToast(`Inserted "${sym}"`);
+                        }, 60);
+                        return;
+                    }
+                }
+
+                // No text element active — create a new text element
+                const newEl = makeTextEl(380, 220, 80, 80);
+                newEl.html = sym;
+                newEl.fontSize = 48;
+                newEl.textAlign = 'center';
+                this.addElement(newEl);
+                this.showToast(`Inserted "${sym}"`);
             });
+        });
+
+        // Done button
+        document.getElementById('symbolDoneBtn')?.addEventListener('click', () => {
+            toolbar.classList.remove('visible');
+            document.getElementById('insertSymbolBtn')?.classList.remove('active');
         });
     }
 
@@ -3971,6 +6080,111 @@ class SlidesApp {
         if (scaler) scaler.style.transform = `scale(${this.scale})`;
         const zs = document.getElementById('zoomStatus');
         if (zs) zs.textContent = Math.round(this.scale * 100) + '%';
+        this.renderRulers();
+    }
+
+    renderRulers() {
+        // Render tick marks on the top & left rulers based on canvas size + zoom.
+        // The rulers live inside #editorContent and span its full width/height,
+        // so tick positions are expressed in editor-content coordinates.
+        const top = document.getElementById('rulerTop');
+        const left = document.getElementById('rulerLeft');
+        if (!top || !left) return;
+        const editor = document.getElementById('editorContent');
+        const canvas = document.getElementById('slideCanvas');
+        if (!editor || !canvas) return;
+        const editorRect = editor.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        // Offset of the canvas top-left corner inside the editor-content (screen px).
+        const offsetX = canvasRect.left - editorRect.left;
+        const offsetY = canvasRect.top - editorRect.top;
+        const scale = this.scale || 1;
+        const visW = canvasRect.width;  // visible canvas width (already scaled)
+        const visH = canvasRect.height; // visible canvas height (already scaled)
+
+        // Zoom-aware tick spacing. At higher zoom, more detail is shown.
+        // We pick a minor step (small ticks) and a major step (labeled ticks).
+        // The on-screen minor spacing is kept between ~8px and ~30px so ticks
+        // never feel crowded or too sparse, regardless of zoom level.
+        let minorStep, majorStep;
+        if (scale < 0.4)      { minorStep = 100; majorStep = 200; }
+        else if (scale < 0.8) { minorStep = 50;  majorStep = 100; }
+        else if (scale < 1.6) { minorStep = 25;  majorStep = 100; }
+        else if (scale < 3.0) { minorStep = 10;  majorStep = 50;  }
+        else                  { minorStep = 5;   majorStep = 25;  }
+
+        // Build the top ruler ticks (vertical lines + numeric labels).
+        // Three visual tiers: major (long, labeled), mid (medium), minor (short).
+        let topHtml = '';
+        for (let x = 0; x <= 960; x += minorStep) {
+            const px = offsetX + x * scale;
+            // Skip ticks that fall outside the editor's visible range.
+            if (px < -2 || px > editorRect.width + 2) continue;
+            const isMajor = (x % majorStep === 0);
+            const isMid = !isMajor && (majorStep % (minorStep * 2) === 0) && (x % (minorStep * 2) === 0);
+            const h = isMajor ? 11 : (isMid ? 7 : 4);
+            topHtml += `<div class="ruler-tick ruler-tick-x" style="left:${px}px;height:${h}px;"></div>`;
+            if (isMajor && x > 0) {
+                topHtml += `<span class="ruler-label ruler-label-x" style="left:${px + 2}px;">${x}</span>`;
+            }
+        }
+        top.innerHTML = topHtml;
+        // Build the left ruler ticks (horizontal lines + numeric labels).
+        let leftHtml = '';
+        for (let y = 0; y <= 540; y += minorStep) {
+            const px = offsetY + y * scale;
+            if (px < -2 || px > editorRect.height + 2) continue;
+            const isMajor = (y % majorStep === 0);
+            const isMid = !isMajor && (majorStep % (minorStep * 2) === 0) && (y % (minorStep * 2) === 0);
+            const w = isMajor ? 11 : (isMid ? 7 : 4);
+            leftHtml += `<div class="ruler-tick ruler-tick-y" style="top:${px}px;width:${w}px;"></div>`;
+            if (isMajor && y > 0) {
+                leftHtml += `<span class="ruler-label ruler-label-y" style="top:${px + 2}px;">${y}</span>`;
+            }
+        }
+        left.innerHTML = leftHtml;
+    }
+
+    // Re-render rulers when the editor layout changes (sidebar collapse,
+    // notes panel open/close, animation pane open/close, statusbar changes,
+    // window resize, etc.). Uses a ResizeObserver on #editorContent plus a
+    // rAF-throttled fallback so the tick marks follow the canvas smoothly
+    // during CSS transitions.
+    _rulerRafPending = false;
+    _rulerObserver = null;
+    _scheduleRulerRender() {
+        if (this._rulerRafPending) return;
+        this._rulerRafPending = true;
+        requestAnimationFrame(() => {
+            this._rulerRafPending = false;
+            this.renderRulers();
+        });
+    }
+
+    _setupRulerObserver() {
+        if (this._rulerObserver) return;
+        const editor = document.getElementById('editorContent');
+        if (!editor || typeof ResizeObserver === 'undefined') return;
+        this._rulerObserver = new ResizeObserver(() => {
+            this._scheduleRulerRender();
+        });
+        this._rulerObserver.observe(editor);
+        // Also observe the canvas wrapper — when its size changes the canvas
+        // re-centers inside it, so the ruler offsets change even if editorContent
+        // itself did not resize.
+        const wrapper = document.getElementById('slideCanvasWrapper');
+        if (wrapper) this._rulerObserver.observe(wrapper);
+        // Final pass after any layout transition ends (sidebar width, notes
+        // panel height, etc.) so the ruler snaps to the final position.
+        const watch = (el) => {
+            if (!el) return;
+            el.addEventListener('transitionend', () => this._scheduleRulerRender());
+        };
+        watch(document.getElementById('slidesSidebar'));
+        watch(document.getElementById('editorColumn'));
+        watch(document.getElementById('editorArea'));
+        watch(document.getElementById('presenterNotesPanel'));
+        watch(document.getElementById('animationPane'));
     }
 
     fitZoom() {
@@ -4009,6 +6223,11 @@ class SlidesApp {
                 }
             } else {
                 sidebar.classList.toggle('collapsed');
+                // Re-render rulers during and after the sidebar width
+                // transition (400ms) so ticks track the canvas position.
+                this._scheduleRulerRender();
+                setTimeout(() => this._scheduleRulerRender(), 260);
+                setTimeout(() => this._scheduleRulerRender(), 460);
             }
         });
     }
@@ -4071,13 +6290,6 @@ class SlidesApp {
         if (bgGroup) {
             bgGroup.style.opacity = this.currentSlide ? '1' : '0.45';
             bgGroup.style.pointerEvents = this.currentSlide ? 'auto' : 'none';
-        }
-
-        // Slide Show group — dim when no presentation is open
-        const ssGroup = document.getElementById('slideShowGroup');
-        if (ssGroup) {
-            ssGroup.style.opacity = this.pres ? '1' : '0.45';
-            ssGroup.style.pointerEvents = this.pres ? 'auto' : 'none';
         }
 
         // Export group — dim when no presentation is open
@@ -4153,9 +6365,33 @@ class SlidesApp {
 
         if (isShape) {
             const fillSwatch = document.getElementById('fillColorSwatch');
-            if (fillSwatch) fillSwatch.style.background = el.fill === 'none' ? 'transparent' : el.fill;
-            const swInput = document.getElementById('strokeWidthInput');
-            if (swInput) swInput.value = el.strokeWidth || 2;
+            if (fillSwatch) {
+                if (el.fill === 'none') {
+                    fillSwatch.style.background = 'transparent';
+                    fillSwatch.style.border = '2px dashed #999';
+                } else {
+                    fillSwatch.style.background = el.fill;
+                    fillSwatch.style.border = '1px solid rgba(0,0,0,0.15)';
+                }
+            }
+            // Update stroke color swatch
+            const strokeSwatch = document.getElementById('strokeColorSwatch');
+            if (strokeSwatch) {
+                if (el.stroke === 'none' || !el.stroke) {
+                    strokeSwatch.style.background = 'transparent';
+                    strokeSwatch.style.border = '2px dashed #999';
+                } else {
+                    strokeSwatch.style.background = el.stroke;
+                    strokeSwatch.style.border = '2px solid ' + el.stroke;
+                }
+            }
+            // Update stroke width dropdown label
+            const swLabel = document.getElementById('strokeWidthLabel');
+            if (swLabel) {
+                const w = el.strokeWidth || 2;
+                if (w === 0) swLabel.textContent = 'None';
+                else swLabel.textContent = w + ' pt';
+            }
         }
     }
 
@@ -4239,12 +6475,13 @@ class SlidesApp {
                     svgContent += `<text x="${x}" y="${el.y + fontSize}" font-size="${fontSize}" font-family="${fontFamily}" fill="${fill}" text-anchor="${anchor}">${el.html.replace(/<[^>]*>/g, '')}</text>`;
                 } else if (el.type === 'shape' && el.svg) {
                     svgContent += `<g transform="translate(${el.x},${el.y})"><svg width="${el.w}" height="${el.h}" viewBox="0 0 ${el.w} ${el.h}">${el.svg}</svg></g>`;
-                } else if (el.type === 'shape' && el.shape === 'rect') {
-                    svgContent += `<rect x="${el.x}" y="${el.y}" width="${el.w}" height="${el.h}" rx="${el.r || 0}" fill="${el.fill || '#e5e7eb'}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" opacity="${el.opacity || 1}"/>`;
-                } else if (el.type === 'shape' && el.shape === 'ellipse') {
-                    svgContent += `<ellipse cx="${el.x + el.w/2}" cy="${el.y + el.h/2}" rx="${el.w/2}" ry="${el.h/2}" fill="${el.fill || '#e5e7eb'}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" opacity="${el.opacity || 1}"/>`;
-                } else if (el.type === 'shape' && el.shape === 'line') {
-                    svgContent += `<line x1="${el.x}" y1="${el.y}" x2="${el.x + el.w}" y2="${el.y + el.h}" stroke="${el.stroke || '#1a1a1a'}" stroke-width="${el.strokeWidth || 2}" opacity="${el.opacity || 1}"/>`;
+                } else if (el.type === 'shape') {
+                    // Use shapeSVG function for all shapes
+                    const shapeFill = el.fill || '#e5e7eb';
+                    const shapeStroke = el.stroke || 'none';
+                    const shapeStrokeW = el.strokeWidth || 0;
+                    const shapeSvgContent = shapeSVG(el.shape, shapeFill, shapeStroke, shapeStrokeW);
+                    svgContent += `<g transform="translate(${el.x},${el.y}) scale(${el.w/100},${el.h/100})" opacity="${el.opacity || 1}">${shapeSvgContent.replace(/<svg[^>]*>/, '').replace(/<\/svg>/, '')}</g>`;
                 } else if (el.type === 'image' && el.src) {
                     svgContent += `<image x="${el.x}" y="${el.y}" width="${el.w}" height="${el.h}" href="${el.src}" opacity="${el.opacity || 1}"/>`;
                 }
@@ -4465,22 +6702,61 @@ class SlidesApp {
 
         const overlay = document.getElementById('presentOverlay');
         if (!overlay) return;
+
+        // Pre-sync the overlay's background to the first slide's
+        // background BEFORE showing it, so the overlay's fade-in
+        // (opacity 0 → 1 over 0.3s) doesn't briefly show the previous
+        // presentation's leftover background color. renderPresentSlide()
+        // will keep it in sync on every subsequent slide change.
+        const firstSlide = this.pres.slides[this.presentIdx];
+        const firstBg = firstSlide?.background;
+        if (firstBg) {
+            overlay.style.background = (firstBg.type === 'color' || firstBg.type === 'gradient')
+                ? firstBg.value : '#ffffff';
+        }
+
         overlay.style.display = 'block';
         requestAnimationFrame(() => { overlay.style.opacity = '1'; });
 
         this.renderPresentSlide();
-        this.buildPresentDots();
         this.updatePresentCounter();
 
-        document.addEventListener('keydown', this._presentKeyHandler);
-        document.getElementById('presentPrevBtn')?.addEventListener('click', () => this.presentPrev());
-        document.getElementById('presentNextBtn')?.addEventListener('click', () => this.presentNext());
-        document.getElementById('presentExitBtn')?.addEventListener('click', () => this.endPresentation());
+        // ── Present-mode listeners ────────────────────────────────
+        // Store each handler on `this` so endPresentation() can remove
+        // them. Previously these were anonymous arrow functions bound
+        // fresh on every startPresentation() call and never removed —
+        // so the second time you entered presentation mode, each button
+        // click fired the handler TWICE (once per accumulated listener),
+        // making the slide counter jump 1 → 3 → 5 … on every click.
+        // Using stored bound functions fixes the jump-skip bug.
 
-        // Try fullscreen – re-render slide once the viewport actually resizes
+        // Keydown — also guard against e.repeat so holding an arrow key
+        // doesn't auto-fire presentNext/Prev multiple times per keypress.
+        document.addEventListener('keydown', this._presentKeyHandler);
+
+        this._presentPrevClick = () => this.presentPrev();
+        this._presentNextClick = () => this.presentNext();
+        this._presentExitClick = () => this.endPresentation();
+        document.getElementById('presentPrevBtn')?.addEventListener('click', this._presentPrevClick);
+        document.getElementById('presentNextBtn')?.addEventListener('click', this._presentNextClick);
+        document.getElementById('presentExitBtn')?.addEventListener('click', this._presentExitClick);
+
+        // Click-to-advance: clicking anywhere on the slide area that
+        // ISN'T an interactive element (links, video/audio players,
+        // buttons, inputs, etc.) advances to the next slide. We attach
+        // the handler to the slide container (not the overlay) so
+        // clicks on the empty backdrop around the slide don't advance.
+        this._presentSlideClick = (e) => this._handlePresentSlideClick(e);
+        document.getElementById('presentSlide')?.addEventListener('click', this._presentSlideClick);
+
         this._presentFullscreenHandler = () => {
-            // If fullscreen was exited while presenting (e.g. user pressed native F11), end the presentation entirely
-            if (!document.fullscreenElement && !document.webkitFullscreenElement && this.isPresenting) {
+            // Video player fullscreen now uses CSS overlay (.vid-expanded)
+            // instead of the Fullscreen API, so we only track document fullscreen.
+            if (!this.isPresenting) return;
+            const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+
+            if (!fsEl) {
+                // Document fullscreen exited — end presentation
                 this.endPresentation();
                 return;
             }
@@ -4494,11 +6770,109 @@ class SlidesApp {
         try { document.documentElement.requestFullscreen?.(); } catch (_) {}
     }
 
+    // ── Click-to-advance handler ─────────────────────────────────
+    // Attached to #presentSlide during presentation. Advances to the
+    // next slide on a plain click of the slide background, but bails
+    // out (so the original click goes through unchanged) when the
+    // click target is inside an interactive element:
+    //   • elements with a link (cursor:pointer + own click handler)
+    //   • video / audio players and any of their descendants
+    //   • <button>, <input>, <select>, <textarea>, <a> tags
+    //   • anything with [contenteditable=true]
+    //   • anything with role="button" / role="link"
+    // We walk up from the click target to the slide root and check
+    // each ancestor. This survives nested controls (e.g., clicking the
+    // progress bar inside a video player, which is wrapped in several
+    // divs) without us needing an exhaustive list of selectors.
+    _handlePresentSlideClick(e) {
+        if (!this.isPresenting) return;
+
+        const slide = document.getElementById('presentSlide');
+        if (!slide) return;
+
+        // Walk from the click target up to (but not including) the
+        // slide container. If any ancestor is interactive, bail.
+        let node = e.target;
+        while (node && node !== slide) {
+            if (node.nodeType !== 1) { node = node.parentNode; continue; }
+            const tag = node.tagName;
+            if (tag === 'BUTTON' || tag === 'INPUT' ||
+                tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'A' ||
+                tag === 'VIDEO' || tag === 'AUDIO') {
+                return; // let the native control handle it
+            }
+            if (typeof node.matches === 'function' && node.matches(
+                '[contenteditable="true"], [contenteditable=""], ' +
+                '[role="button"], [role="link"], ' +
+                '.slide-video-player, .slide-video-player *, ' +
+                '.slide-audio-player, .slide-audio-player *, ' +
+                '.vid-big-play, .vid-big-play *, ' +
+                '.vid-controls, .vid-controls *, ' +
+                '.aud-controls, .aud-controls *'
+            )) {
+                return; // interactive — don't advance
+            }
+            // Slide elements with a link get an inline cursor:pointer
+            // set in renderPresentSlide and their own click handler that
+            // opens the URL. Detect via inline style (not computed —
+            // computed would also catch buttons-styled-as-pointer that
+            // we already handled via the tag check above) so we can bail
+            // out and let the link's own handler run.
+            if (tag === 'DIV' && node.style && node.style.cursor === 'pointer') {
+                return;
+            }
+            node = node.parentNode;
+        }
+
+        // Plain background click — advance to the next slide. Don't
+        // preventDefault so the user still gets normal selection/
+        // pointer feedback; we just trigger the nav.
+        // Ignore right-click and any click with a modifier key so
+        // users can still ctrl/cmd-click etc. without advancing.
+        if (e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+
+        // Respect the current slide's "On Click" transition setting.
+        // If the user disabled On Click in the TIMING panel, plain
+        // clicks on the slide should NOT advance — the slide is
+        // either auto-advancing (After X sec) or is meant to be
+        // navigated only with arrow keys. Arrow-key navigation is
+        // always allowed (it's an explicit user action, not a "click
+        // to advance" gesture) and handled separately in
+        // _presentKeyHandler.
+        // Note: `slide` here is the DOM container declared above; we
+        // use a different name (`slideData`) for the slide's data
+        // object to avoid redeclaring the identifier.
+        const slideData = this.pres?.slides?.[this.presentIdx];
+        const onClickEnabled = slideData?.transition?.onClick !== false;
+        if (!onClickEnabled) return;
+
+        this.presentNext();
+    }
+
     endPresentation() {
+        this._collapseExpandedVideo();
         this.isPresenting = false;
+        // Cancel any pending auto-advance timer so it can't fire after
+        // we exit present mode (would otherwise call presentNext on a
+        // presentation that's no longer active — harmless due to the
+        // isPresenting guard in the timer callback, but cleaner to
+        // explicitly cancel).
+        this._clearPresentAutoTimer();
         const overlay = document.getElementById('presentOverlay');
         if (overlay) overlay.style.display = 'none';
         document.removeEventListener('keydown', this._presentKeyHandler);
+        // Remove the present-mode button + slide click listeners that
+        // were stored on `this` so they don't accumulate across
+        // multiple start/end cycles (which was the cause of the
+        // counter jumping 1 → 3 → 5 on each click).
+        if (this._presentPrevClick)  document.getElementById('presentPrevBtn')?.removeEventListener('click', this._presentPrevClick);
+        if (this._presentNextClick)  document.getElementById('presentNextBtn')?.removeEventListener('click', this._presentNextClick);
+        if (this._presentExitClick)  document.getElementById('presentExitBtn')?.removeEventListener('click', this._presentExitClick);
+        if (this._presentSlideClick) document.getElementById('presentSlide')?.removeEventListener('click', this._presentSlideClick);
+        this._presentPrevClick = null;
+        this._presentNextClick = null;
+        this._presentExitClick = null;
+        this._presentSlideClick = null;
         if (this._presentFullscreenHandler) document.removeEventListener('fullscreenchange', this._presentFullscreenHandler);
         if (this._presentResizeHandler) window.removeEventListener('resize', this._presentResizeHandler);
         this._presentFullscreenHandler = null;
@@ -4506,15 +6880,66 @@ class SlidesApp {
         try { document.exitFullscreen?.(); } catch (_) {}
     }
 
+    _collapseExpandedVideo() {
+        if (!this._expandedVideoPlayer) return;
+        const p = this._expandedVideoPlayer;
+        p.classList.remove('vid-expanded');
+        if (p._origParent && p._origNextSibling !== undefined) {
+            if (p._origNextSibling) {
+                p._origParent.insertBefore(p, p._origNextSibling);
+            } else {
+                p._origParent.appendChild(p);
+            }
+        }
+        delete this._expandedVideoPlayer;
+    }
+
     _presentKeyHandler = (e) => {
         if (!this.isPresenting) return;
-        if (e.key === 'Escape' || e.key === 'F11') { e.preventDefault(); this.endPresentation(); return; }
+        // Ignore auto-repeat keydown events (fired while a key is held)
+        // so holding ArrowRight/Space/ArrowDown doesn't rapidly advance
+        // through multiple slides — one keypress = one slide.
+        if (e.repeat) {
+            // Still prevent default for the keys we own, so e.g. Space
+            // doesn't scroll the page while held.
+            if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'ArrowDown' ||
+                e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+            }
+            return;
+        }
+        // Escape: let the browser handle fullscreen exit natively;
+        // the fullscreenchange handler manages the rest (restore present vs end).
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            if (this._expandedVideoPlayer) {
+                this._collapseExpandedVideo();
+                return;
+            }
+            // (the fullscreenchange handler manages the rest)
+            return;
+        }
+        // F11: if a video/audio player is fullscreen, exit that first;
+        // second press will exit presentation fullscreen normally.
+        if (e.key === 'F11') {
+            e.preventDefault();
+            if (this._expandedVideoPlayer) {
+                this._collapseExpandedVideo();
+                return;
+            }
+            this.endPresentation();
+            return;
+        }
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); this.presentNext(); }
         if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); this.presentPrev(); }
     };
 
     presentNext() {
         if (this.presentIdx >= this.pres.slides.length - 1) return;
+        // Clear any pending auto-advance timer — the user (or another
+        // call path) is explicitly advancing, so a stale timer firing
+        // later would skip an extra slide.
+        this._clearPresentAutoTimer();
         this.presentIdx++;
         this.renderPresentSlide('right');
         this.updatePresentCounter();
@@ -4522,12 +6947,16 @@ class SlidesApp {
 
     presentPrev() {
         if (this.presentIdx <= 0) return;
+        // Same as presentNext — clear the auto-timer so it can't fire
+        // and re-advance after the user explicitly went backwards.
+        this._clearPresentAutoTimer();
         this.presentIdx--;
         this.renderPresentSlide('left');
         this.updatePresentCounter();
     }
 
     renderPresentSlide(direction = null) {
+        this._collapseExpandedVideo();
         const container = document.getElementById('presentSlide');
         if (!container || !this.pres) return;
 
@@ -4549,6 +6978,28 @@ class SlidesApp {
         const bg = slide.background;
         container.style.background = bg.type !== 'image' ? bg.value : '#fff';
 
+        // ── Anti-flash: sync the present overlay's background to match
+        // the slide's background. Most transitions (and the default
+        // fade-in) animate opacity:0 → 1 on the slide container itself,
+        // which means at the start of every transition the slide is
+        // fully transparent and the overlay behind shows through. The
+        // overlay's CSS default is black, so without this sync the user
+        // sees a brief black flash on every slide change — even with
+        // "no transition" set, because the default no-transition path
+        // still applies the .fade-in class. Matching the overlay's
+        // background to the slide's background means the user sees the
+        // same color behind the fading slide, eliminating the flash.
+        const overlay = document.getElementById('presentOverlay');
+        if (overlay) {
+            if (bg.type === 'color' || bg.type === 'gradient') {
+                overlay.style.background = bg.value;
+            } else {
+                // Image backgrounds: the slide canvas itself falls back
+                // to white underneath the image, so we match that.
+                overlay.style.background = '#ffffff';
+            }
+        }
+
         // Elements
         container.innerHTML = '';
         const sorted = [...slide.elements].sort((a, b) => (a.z || 1) - (b.z || 1));
@@ -4568,8 +7019,14 @@ class SlidesApp {
                 d.style.wordBreak = 'break-word';
                 d.style.whiteSpace = 'pre-wrap';
                 d.innerHTML = el.html || '';
+                // Show link styling in present mode
+                if (el.link) {
+                    d.style.color = '#2563eb';
+                    d.style.textDecoration = 'underline';
+                    d.style.cursor = 'pointer';
+                }
             } else if (el.type === 'shape') {
-                if (el.shape === 'icon' || el.shape === 'chart') {
+                if (el.shape === 'icon') {
                     d.innerHTML = el.svg || '';
                 } else {
                     d.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
@@ -4705,8 +7162,18 @@ class SlidesApp {
                 d.appendChild(player);
                 this._wireAudioPlayer(player, aud, { playBtn, timeEl, progWrap, progBar, volBtn, volSlider });
             }
+            // In present mode, simple click opens the link (no Ctrl needed)
+            if (el.link) {
+                d.style.cursor = 'pointer';
+                d.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.open(el.link, '_blank', 'noopener');
+                });
+            }
             container.appendChild(d);
         });
+
+        // Comments are NOT shown in presentation mode
 
         // Render the saved drawing overlay on top of all elements.
         // The drawing was created in the editor as a 960x540 PNG; we
@@ -4724,43 +7191,100 @@ class SlidesApp {
         // otherwise fall back to the default fade/slide.
         // All animations are opacity-only or clip-path based to preserve
         // the inline transform:scale(...) that fits the slide to viewport.
+        //
+        // BUGFIX: Previously this block used ad-hoc `setTimeout` calls
+        // to clean up transition classes. The timers were NOT tracked,
+        // so when the user navigated to the next slide before the
+        // previous transition's timer fired, the old timer would
+        // remove the NEW transition's class early — killing the new
+        // animation mid-flight. Now we route everything through
+        // _runTransitionClass, which tracks this._trAnimTimer and
+        // clears it before scheduling a new cleanup.
         const trType = slide.transition?.type || null;
         const trDur = slide.transition?.duration || 0.7;
         container.style.setProperty('--tr-duration', trDur + 's');
 
-        // Remove previous transition classes
-        const prevClasses = Array.from(container.classList).filter(c => c.startsWith('tr-') || c === 'fade-in' || c === 'slide-in-right' || c === 'slide-in-left');
-        prevClasses.forEach(c => container.classList.remove(c));
-        void container.offsetWidth; // Force reflow to restart animation
-
         if (trType && trType !== 'none') {
-            // Use the configured transition
-            container.classList.add(`tr-${trType}-in`);
-            setTimeout(() => container.classList.remove(`tr-${trType}-in`), Math.ceil(trDur * 1000) + 50);
+            if (trType === 'morph') {
+                // Object-level FLIP transition. Determine the previous
+                // slide based on navigation direction so we morph from
+                // the right source when going forward vs. backward.
+                let prevIdx;
+                if (direction === 'left')  prevIdx = this.presentIdx + 1;
+                else if (direction === 'right') prevIdx = this.presentIdx - 1;
+                else prevIdx = this.presentIdx - 1;
+                const prevSlide = this.pres.slides[prevIdx];
+                this._applyMorphTransition(container, slide, prevSlide, trDur);
+            } else {
+                // Use the configured transition. _runTransitionClass
+                // handles clearing any in-flight timer from the
+                // previous slide's transition, removing old classes,
+                // forcing a reflow, and scheduling a tracked cleanup.
+                this._runTransitionClass(container, `tr-${trType}-in`, trDur);
+            }
         } else if (direction) {
-            container.classList.add(direction === 'right' ? 'slide-in-right' : 'slide-in-left');
-            setTimeout(() => container.classList.remove('slide-in-right', 'slide-in-left'), 450);
+            this._runTransitionClass(container, direction === 'right' ? 'slide-in-right' : 'slide-in-left', 0.45);
         } else {
-            container.classList.add('fade-in');
-            setTimeout(() => container.classList.remove('fade-in'), 450);
+            this._runTransitionClass(container, 'fade-in', 0.45);
         }
 
-        // Update dots
-        document.querySelectorAll('.present-dot').forEach((dot, i) => {
-            dot.classList.toggle('active', i === this.presentIdx);
-        });
+        // ── Auto-advance ("After X sec") ───────────────────────────
+        // If the current slide's transition has autoAfter=true, schedule
+        // a one-shot timer that advances to the next slide after the
+        // configured number of seconds. This is the half of the TIMING
+        // panel that was previously stored-but-never-used: users could
+        // check "After 5 sec" in the UI, but presenting the deck would
+        // just sit on the slide forever.
+        //
+        // PowerPoint semantics:
+        //   • If both On Click and After are on, whichever fires first
+        //     wins (we clear the auto-timer in presentNext/Prev so a
+        //     manual click cancels the pending auto-advance).
+        //   • If only After is on, the slide auto-advances.
+        //   • If only On Click is on, the slide waits for a click.
+        //   • If neither is on, the slide waits for arrow-key nav.
+        //   • We do NOT auto-advance from the last slide — there's
+        //     nothing to advance to, and a stray timer firing after
+        //     endPresentation would be a bug.
+        this._schedulePresentAutoTimer();
     }
 
-    buildPresentDots() {
-        const dotsEl = document.getElementById('presentDots');
-        if (!dotsEl || !this.pres) return;
-        dotsEl.innerHTML = '';
-        const maxDots = Math.min(this.pres.slides.length, 20);
-        for (let i = 0; i < maxDots; i++) {
-            const dot = document.createElement('button');
-            dot.className = `present-dot${i === this.presentIdx ? ' active' : ''}`;
-            dot.addEventListener('click', () => { this.presentIdx = i; this.renderPresentSlide(); this.updatePresentCounter(); });
-            dotsEl.appendChild(dot);
+    // Schedule (or reschedule) the auto-advance timer based on the
+    // current slide's transition settings. Always clears any existing
+    // timer first, so this is safe to call from any slide-render path.
+    _schedulePresentAutoTimer() {
+        this._clearPresentAutoTimer();
+        if (!this.isPresenting || !this.pres) return;
+        const slide = this.pres.slides[this.presentIdx];
+        if (!slide?.transition?.autoAfter) return;
+        if (this.presentIdx >= this.pres.slides.length - 1) return;
+        const sec = Number.isFinite(slide.transition.afterSec) ? slide.transition.afterSec : 5;
+        // Guard against absurd values — clamp to [1, 600].
+        const clamped = Math.min(600, Math.max(1, sec));
+        // Add the slide's transition duration so the auto-advance
+        // fires AFTER the in- animation finishes, not during it.
+        // Without this, a 0.7s fade-in would be interrupted at 5s
+        // mark by the next slide, but a 0.7s fade-in would be cut
+        // short if afterSec was 0.5 (rare but possible if the user
+        // typed it directly).
+        const trDur = Number.isFinite(slide.transition?.duration) ? slide.transition.duration : 0.7;
+        const delayMs = Math.ceil((clamped + trDur) * 1000);
+        this._presentAutoTimer = setTimeout(() => {
+            this._presentAutoTimer = null;
+            // The user may have exited present mode while the timer
+            // was pending — bail out instead of trying to advance.
+            if (!this.isPresenting) return;
+            this.presentNext();
+        }, delayMs);
+    }
+
+    // Clear the pending auto-advance timer if any. Called from
+    // presentNext, presentPrev, endPresentation, and at the start of
+    // _schedulePresentAutoTimer (so a re-render doesn't double-up).
+    _clearPresentAutoTimer() {
+        if (this._presentAutoTimer) {
+            clearTimeout(this._presentAutoTimer);
+            this._presentAutoTimer = null;
         }
     }
 
@@ -4815,15 +7339,97 @@ class SlidesApp {
                         });
                     } else if (el.type === 'shape') {
                         const shapeMap = {
+                            // Rectangles
                             rect: pptx.ShapeType.rect,
                             rounded: pptx.ShapeType.roundRect,
+                            // Basic shapes
                             ellipse: pptx.ShapeType.ellipse,
                             triangle: pptx.ShapeType.triangle,
+                            rightTriangle: pptx.ShapeType.rightTriangle,
                             diamond: pptx.ShapeType.diamond,
-                            arrow: pptx.ShapeType.rightArrow,
-                            star: pptx.ShapeType.star5,
+                            pentagon: pptx.ShapeType.pentagon,
                             hexagon: pptx.ShapeType.hexagon,
+                            octagon: pptx.ShapeType.octagon,
+                            parallelogram: pptx.ShapeType.parallelogram,
+                            trapezoid: pptx.ShapeType.trapezoid,
+                            cross: pptx.ShapeType.cross,
+                            donut: pptx.ShapeType.donut,
+                            teardrop: pptx.ShapeType.teardrop,
+                            heart: pptx.ShapeType.heart,
+                            lightning: pptx.ShapeType.lightningBolt,
+                            sun: pptx.ShapeType.sun,
+                            moon: pptx.ShapeType.moon,
+                            cloud: pptx.ShapeType.cloud,
+                            noSymbol: pptx.ShapeType.noSymbol,
+                            smile: pptx.ShapeType.smile,
+                            cube: pptx.ShapeType.cube,
+                            can: pptx.ShapeType.can,
+                            wave: pptx.ShapeType.wave,
+                            blockArc: pptx.ShapeType.blockArc,
+                            pie: pptx.ShapeType.pie,
+                            scroll: pptx.ShapeType.scroll,
+                            plaque: pptx.ShapeType.plaque,
+                            chamfer: pptx.ShapeType.chamfer,
+                            foldCorner: pptx.ShapeType.foldCorner,
+                            // Stars
+                            star: pptx.ShapeType.star5,
+                            star4: pptx.ShapeType.star4,
+                            star6: pptx.ShapeType.star6,
+                            star8: pptx.ShapeType.star8,
+                            star10: pptx.ShapeType.star10,
+                            star12: pptx.ShapeType.star12,
+                            star16: pptx.ShapeType.star16,
+                            star24: pptx.ShapeType.star24,
+                            star32: pptx.ShapeType.star32,
+                            seal1: pptx.ShapeType.seal1,
+                            seal2: pptx.ShapeType.seal2,
+                            // Block arrows
+                            arrow: pptx.ShapeType.rightArrow,
+                            arrowLeft: pptx.ShapeType.leftArrow,
+                            arrowUp: pptx.ShapeType.upArrow,
+                            arrowDown: pptx.ShapeType.downArrow,
+                            arrowLR: pptx.ShapeType.leftRightArrow,
+                            arrowUD: pptx.ShapeType.upDownArrow,
+                            arrowQuad: pptx.ShapeType.quadArrow,
+                            arrowNotched: pptx.ShapeType.notchedRightArrow,
+                            arrowChevron: pptx.ShapeType.chevron,
+                            arrowBent: pptx.ShapeType.bentArrow,
+                            arrowUturn: pptx.ShapeType.uturnArrow,
+                            arrowStriped: pptx.ShapeType.stripedRightArrow,
+                            arrowPentagon: pptx.ShapeType.pentagonArrow,
+                            arrowCalloutR: pptx.ShapeType.rightArrowCallout,
+                            arrowCalloutL: pptx.ShapeType.leftArrowCallout,
+                            arrowCalloutU: pptx.ShapeType.upArrowCallout,
+                            arrowCalloutD: pptx.ShapeType.downArrowCallout,
+                            arrowCircular: pptx.ShapeType.circularArrow,
+                            // Callouts
+                            calloutRect: pptx.ShapeType.rectCallout,
+                            calloutRound: pptx.ShapeType.roundRectCallout,
+                            calloutEllipse: pptx.ShapeType.ellipseCallout,
+                            calloutCloud: pptx.ShapeType.cloudCallout,
+                            // Flowchart
+                            fcProcess: pptx.ShapeType.flowchartProcess,
+                            fcDecision: pptx.ShapeType.flowchartDecision,
+                            fcData: pptx.ShapeType.flowchartData,
+                            fcDocument: pptx.ShapeType.flowchartDocument,
+                            fcTerminator: pptx.ShapeType.flowchartTerminator,
+                            fcPreparation: pptx.ShapeType.flowchartPreparation,
+                            fcConnector: pptx.ShapeType.flowchartConnector,
+                            fcDelay: pptx.ShapeType.flowchartDelay,
+                            fcDisplay: pptx.ShapeType.flowchartDisplay,
+                            fcManualOp: pptx.ShapeType.flowchartManualOperation,
+                            // Lines
                             line: pptx.ShapeType.line,
+                            lineArrow: pptx.ShapeType.lineWithArrow,
+                            lineDouble: pptx.ShapeType.lineWithDoubleArrow,
+                            lineElbow: pptx.ShapeType.elbowConnector,
+                            lineCurve: pptx.ShapeType.curvedConnector,
+                            // Brackets & braces
+                            bracketL: pptx.ShapeType.leftBracket,
+                            bracketR: pptx.ShapeType.rightBracket,
+                            braceL: pptx.ShapeType.leftBrace,
+                            braceR: pptx.ShapeType.rightBrace,
+                            frameRect: pptx.ShapeType.frame,
                         };
                         const pptxShape = shapeMap[el.shape] || pptx.ShapeType.rect;
                         const fillColor = (el.fill && el.fill !== 'none') ? el.fill.replace('#', '') : null;
@@ -5006,10 +7612,94 @@ class SlidesApp {
             await this.saveIndex();
             await this.savePresData(pres);
             await this.openPresentation(pres.id);
-            this.showToast(`✓ Imported ${pres.slides.length} slides from PPTX.`);
+            this.showToast(`Imported ${pres.slides.length} slides from PPTX.`);
         } catch (err) {
             console.error('PPTX import error:', err);
             this.showToast('Import failed: ' + err.message, 5000);
+        }
+    }
+
+    // ── Import PDF ────────────────────────────────────────────────
+    // Renders each PDF page as an image element on a slide.
+    async importPDF(file) {
+        const pdfjsLib = window.pdfjsLib;
+        if (!pdfjsLib) {
+            this.showToast('PDF library not loaded. Import unavailable.', 5000);
+            return;
+        }
+        // Set worker source
+        if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        this.showToast('Importing PDF…', 10000);
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const numPages = pdf.numPages;
+
+            const pres = makePresentation(file.name.replace(/\.pdf$/i, ''));
+            pres.slides = [];
+
+            const SCALE = 2;
+            const SLIDE_W = 960;
+            const SLIDE_H = 540;
+
+            for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: SCALE });
+
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                const dataUrl = canvas.toDataURL('image/png');
+
+                // Fit image to slide while maintaining aspect ratio, centered
+                const pageAspect = viewport.width / viewport.height;
+                const slideAspect = SLIDE_W / SLIDE_H;
+                let elW, elH;
+                if (pageAspect > slideAspect) {
+                    elW = SLIDE_W;
+                    elH = SLIDE_W / pageAspect;
+                } else {
+                    elH = SLIDE_H;
+                    elW = SLIDE_H * pageAspect;
+                }
+                const elX = (SLIDE_W - elW) / 2;
+                const elY = (SLIDE_H - elH) / 2;
+
+                const slide = makeSlide();
+                const el = {
+                    id: uid(),
+                    type: 'image',
+                    x: Math.round(elX),
+                    y: Math.round(elY),
+                    w: Math.round(elW),
+                    h: Math.round(elH),
+                    r: 0,
+                    z: 1,
+                    opacity: 1,
+                    src: dataUrl,
+                    crop: null
+                };
+                slide.elements.push(el);
+                pres.slides.push(slide);
+            }
+
+            if (pres.slides.length === 0) pres.slides = [makeSlide()];
+
+            this.presentations.unshift({ id: pres.id, title: pres.title, updatedAt: pres.updatedAt, slideCount: pres.slides.length });
+            await this.saveIndex();
+            await this.savePresData(pres);
+            await this.openPresentation(pres.id);
+            this.showToast(`Imported ${pres.slides.length} pages from PDF.`);
+        } catch (err) {
+            console.error('PDF import error:', err);
+            this.showToast('PDF import failed: ' + err.message, 5000);
         }
     }
 }

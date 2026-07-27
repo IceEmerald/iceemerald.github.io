@@ -41,8 +41,6 @@
             <button class="ribbon-tab" data-tab="design">Design</button>
             <button class="ribbon-tab" data-tab="transitions">Transitions</button>
             <button class="ribbon-tab" data-tab="animations">Animations</button>
-            <button class="ribbon-tab" data-tab="slideshow">Slide Show</button>
-            <button class="ribbon-tab" data-tab="review">Review</button>
             <button class="ribbon-tab" data-tab="view">View</button>
             <button class="ribbon-tab ribbon-tab-contextual" data-tab="shape-format" id="shapeFormatTab" hidden>Shape Format</button>
             <span class="ribbon-tab-indicator" id="ribbonTabIndicator" aria-hidden="true"></span>
@@ -299,87 +297,90 @@
             <!-- SHAPE FORMAT TAB (contextual — shown only when a shape is selected) -->
             <div class="ribbon-panel" data-panel="shape-format">
 
-                <!-- SHAPE FILL -->
+                <!-- SHAPE FILL — list-style dropdown matching Font Color design -->
                 <div class="ribbon-group" id="shapeFormatGroup">
                     <div class="group-label">Shape Fill</div>
                     <div class="ribbon-controls">
                         <div class="ms-dropdown" id="fillColorDropdown">
                             <button class="ms-dropdown-btn" type="button" style="min-width:80px;">
-                                <span id="fillColorSwatch" style="background:#f97316;width:14px;height:14px;border-radius:2px;display:inline-block;margin-right:5px;border:1px solid rgba(0,0,0,0.15);"></span>
+                                <span id="fillColorSwatch" class="color-preview" style="background:#f97316;"></span>
                                 <span class="dropdown-value">Fill</span>
                             </button>
-                            <div class="ms-dropdown-menu color-grid-menu">
-                                <div class="color-grid">
-                                    <button class="color-dot" data-color="none" style="background:linear-gradient(to bottom right,#fff 45%,#f00 45%,#f00 55%,#fff 55%);border:1px solid #ccc;" title="No Fill"></button>
-                                    <button class="color-dot" data-color="#ffffff" style="background:#ffffff;border:1px solid #ccc;" title="White"></button>
-                                    <button class="color-dot" data-color="#1a1a1a" style="background:#1a1a1a;" title="Black"></button>
-                                    <button class="color-dot" data-color="#6b7280" style="background:#6b7280;" title="Gray"></button>
-                                    <button class="color-dot" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
-                                    <button class="color-dot" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
-                                    <button class="color-dot" data-color="#eab308" style="background:#eab308;" title="Yellow"></button>
-                                    <button class="color-dot" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
-                                    <button class="color-dot" data-color="#239a4d" style="background:#239a4d;" title="Emerald"></button>
-                                    <button class="color-dot" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
-                                    <button class="color-dot" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
-                                    <button class="color-dot" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
-                                    <button class="color-dot" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
-                                    <button class="color-dot" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
-                                    <button class="color-dot" data-color="#fbbf24" style="background:#fbbf24;" title="Amber"></button>
-                                    <button class="color-dot" data-color="#a3e635" style="background:#a3e635;" title="Lime"></button>
-                                </div>
-                                <div style="padding:6px 8px 2px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:6px;">
-                                    <label style="font-size:11px;color:#666;white-space:nowrap;">Custom:</label>
-                                    <input type="color" id="fillColorCustom" value="#f97316" style="width:32px;height:20px;border:none;padding:0;cursor:pointer;border-radius:3px;">
-                                </div>
+                            <div class="ms-dropdown-menu color-list-menu">
+                                <div class="ms-dropdown-item" data-value="none" data-label="No Fill"><span class="color-preview" style="background:linear-gradient(to bottom right,#fff 45%,#f00 45%,#f00 55%,#fff 55%);border:1px solid #ccc;"></span>No Fill</div>
+                                <div class="ms-dropdown-item" data-value="#ffffff" data-label="White"><span class="color-preview" style="background:#ffffff;border:1px solid #ccc;"></span>White</div>
+                                <div class="ms-dropdown-item" data-value="#1a1a1a" data-label="Black"><span class="color-preview" style="background:#1a1a1a;"></span>Black</div>
+                                <div class="ms-dropdown-item" data-value="#6b7280" data-label="Gray"><span class="color-preview" style="background:#6b7280;"></span>Gray</div>
+                                <div class="ms-dropdown-item" data-value="#ef4444" data-label="Red"><span class="color-preview" style="background:#ef4444;"></span>Red</div>
+                                <div class="ms-dropdown-item" data-value="#f97316" data-label="Orange"><span class="color-preview" style="background:#f97316;"></span>Orange</div>
+                                <div class="ms-dropdown-item" data-value="#eab308" data-label="Yellow"><span class="color-preview" style="background:#eab308;"></span>Yellow</div>
+                                <div class="ms-dropdown-item" data-value="#22c55e" data-label="Green"><span class="color-preview" style="background:#22c55e;"></span>Green</div>
+                                <div class="ms-dropdown-item" data-value="#239a4d" data-label="Emerald"><span class="color-preview" style="background:#239a4d;"></span>Emerald</div>
+                                <div class="ms-dropdown-item" data-value="#06b6d4" data-label="Cyan"><span class="color-preview" style="background:#06b6d4;"></span>Cyan</div>
+                                <div class="ms-dropdown-item" data-value="#3b82f6" data-label="Blue"><span class="color-preview" style="background:#3b82f6;"></span>Blue</div>
+                                <div class="ms-dropdown-item" data-value="#8b5cf6" data-label="Violet"><span class="color-preview" style="background:#8b5cf6;"></span>Violet</div>
+                                <div class="ms-dropdown-item" data-value="#ec4899" data-label="Pink"><span class="color-preview" style="background:#ec4899;"></span>Pink</div>
+                                <div class="ms-dropdown-item" data-value="#f43f5e" data-label="Rose"><span class="color-preview" style="background:#f43f5e;"></span>Rose</div>
+                                <div class="ms-dropdown-item" data-value="#fbbf24" data-label="Amber"><span class="color-preview" style="background:#fbbf24;"></span>Amber</div>
+                                <div class="ms-dropdown-item" data-value="#a3e635" data-label="Lime"><span class="color-preview" style="background:#a3e635;"></span>Lime</div>
                             </div>
                         </div>
+                        <!-- STROKE — same list-style dropdown as Font Color -->
                         <div class="ms-dropdown" id="strokeColorDropdown">
                             <button class="ms-dropdown-btn" type="button" style="min-width:82px;">
-                                <span id="strokeColorSwatch" style="background:none;width:14px;height:14px;border-radius:2px;display:inline-block;margin-right:5px;border:2px solid #666;"></span>
+                                <span id="strokeColorSwatch" class="color-preview" style="background:transparent;border:2px solid #666;"></span>
                                 <span class="dropdown-value">Stroke</span>
                             </button>
-                            <div class="ms-dropdown-menu color-grid-menu">
-                                <div class="color-grid">
-                                    <button class="color-dot" data-color="none" style="background:linear-gradient(to bottom right,#fff 45%,#f00 45%,#f00 55%,#fff 55%);border:1px solid #ccc;" title="No Stroke"></button>
-                                    <button class="color-dot" data-color="#1a1a1a" style="background:#1a1a1a;" title="Black"></button>
-                                    <button class="color-dot" data-color="#ffffff" style="background:#ffffff;border:1px solid #ccc;" title="White"></button>
-                                    <button class="color-dot" data-color="#6b7280" style="background:#6b7280;" title="Gray"></button>
-                                    <button class="color-dot" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
-                                    <button class="color-dot" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
-                                    <button class="color-dot" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
-                                    <button class="color-dot" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
-                                    <button class="color-dot" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
-                                </div>
-                                <div style="padding:6px 8px 2px;border-top:1px solid #f0f0f0;display:flex;align-items:center;gap:6px;">
-                                    <label style="font-size:11px;color:#666;white-space:nowrap;">Custom:</label>
-                                    <input type="color" id="strokeColorCustom" value="#1a1a1a" style="width:32px;height:20px;border:none;padding:0;cursor:pointer;border-radius:3px;">
-                                </div>
+                            <div class="ms-dropdown-menu color-list-menu">
+                                <div class="ms-dropdown-item" data-value="none" data-label="No Stroke"><span class="color-preview" style="background:linear-gradient(to bottom right,#fff 45%,#f00 45%,#f00 55%,#fff 55%);border:1px solid #ccc;"></span>No Stroke</div>
+                                <div class="ms-dropdown-item" data-value="#1a1a1a" data-label="Black"><span class="color-preview" style="background:#1a1a1a;"></span>Black</div>
+                                <div class="ms-dropdown-item" data-value="#ffffff" data-label="White"><span class="color-preview" style="background:#ffffff;border:1px solid #ccc;"></span>White</div>
+                                <div class="ms-dropdown-item" data-value="#6b7280" data-label="Gray"><span class="color-preview" style="background:#6b7280;"></span>Gray</div>
+                                <div class="ms-dropdown-item" data-value="#ef4444" data-label="Red"><span class="color-preview" style="background:#ef4444;"></span>Red</div>
+                                <div class="ms-dropdown-item" data-value="#f97316" data-label="Orange"><span class="color-preview" style="background:#f97316;"></span>Orange</div>
+                                <div class="ms-dropdown-item" data-value="#3b82f6" data-label="Blue"><span class="color-preview" style="background:#3b82f6;"></span>Blue</div>
+                                <div class="ms-dropdown-item" data-value="#22c55e" data-label="Green"><span class="color-preview" style="background:#22c55e;"></span>Green</div>
+                                <div class="ms-dropdown-item" data-value="#8b5cf6" data-label="Violet"><span class="color-preview" style="background:#8b5cf6;"></span>Violet</div>
                             </div>
                         </div>
-                        <div style="display:flex;flex-direction:column;gap:2px;">
-                            <span style="font-size:9px;color:#9ca3af;text-align:center;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Stroke W</span>
-                            <input type="number" id="strokeWidthInput" min="0" max="20" value="2" style="width:48px;padding:4px 6px;border:1px solid rgba(0,0,0,0.1);border-radius:6px;font-size:12px;text-align:center;background:rgba(255,255,255,0.8);">
+                        <!-- Stroke Width — dropdown-style matching ms-dropdown-btn -->
+                        <div class="ms-dropdown" id="strokeWidthDropdown">
+                            <button class="ms-dropdown-btn" type="button" style="min-width:62px;">
+                                <span class="dropdown-value" id="strokeWidthLabel">2 pt</span>
+                            </button>
+                            <div class="ms-dropdown-menu">
+                                <div class="ms-dropdown-item" data-value="0" data-label="None">None</div>
+                                <div class="ms-dropdown-item" data-value="1" data-label="1 pt">1 pt</div>
+                                <div class="ms-dropdown-item" data-value="2" data-label="2 pt">2 pt</div>
+                                <div class="ms-dropdown-item" data-value="3" data-label="3 pt">3 pt</div>
+                                <div class="ms-dropdown-item" data-value="4" data-label="4 pt">4 pt</div>
+                                <div class="ms-dropdown-item" data-value="5" data-label="5 pt">5 pt</div>
+                                <div class="ms-dropdown-item" data-value="6" data-label="6 pt">6 pt</div>
+                                <div class="ms-dropdown-item" data-value="8" data-label="8 pt">8 pt</div>
+                                <div class="ms-dropdown-item" data-value="10" data-label="10 pt">10 pt</div>
+                                <div class="ms-dropdown-item" data-value="12" data-label="12 pt">12 pt</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ARRANGE -->
+                <!-- ARRANGE — clean monochrome icons -->
                 <div class="ribbon-group" id="arrangeGroup">
                     <div class="group-label">Arrange</div>
                     <div class="ribbon-controls">
                         <button class="ribbon-btn" id="bringFrontBtn" title="Bring to Front">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="6" y="6" width="14" height="14" rx="1.5" fill="rgba(249,115,22,0.18)" stroke="currentColor" stroke-width="1.5"/>
-                                <rect x="3" y="3" width="10" height="10" rx="1" fill="rgba(255,255,255,0.95)" stroke="rgba(0,0,0,0.45)" stroke-width="1.5"/>
-                                <path d="M16 4l3 3M19 4h-3v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="7" y="7" width="14" height="14" rx="1.5"/>
+                                <rect x="3" y="3" width="10" height="10" rx="1"/>
+                                <path d="M16 4l3 3M19 4h-3v3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                             <span>Front</span>
                         </button>
                         <button class="ribbon-btn" id="sendBackBtn" title="Send to Back">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="4" y="4" width="14" height="14" rx="1.5" fill="rgba(249,115,22,0.18)" stroke="currentColor" stroke-width="1.5"/>
-                                <rect x="11" y="11" width="10" height="10" rx="1" fill="rgba(255,255,255,0.95)" stroke="rgba(0,0,0,0.45)" stroke-width="1.5"/>
-                                <path d="M8 20l-3 -3M5 20h3v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="14" height="14" rx="1.5"/>
+                                <rect x="11" y="11" width="10" height="10" rx="1"/>
+                                <path d="M8 20l-3 -3M5 20h3v-3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                             <span>Back</span>
                         </button>
@@ -469,42 +470,334 @@
                                 <span>Shapes</span>
                             </button>
                             <div class="ms-dropdown-menu shape-dropdown-menu">
+                                <!-- Rectangles -->
+                                <div class="shape-cat-label">Rectangles</div>
                                 <div class="shape-grid">
                                     <button class="shape-option" data-shape="rect" title="Rectangle">
-                                        <svg viewBox="0 0 40 28"><rect x="2" y="2" width="36" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                                        <span>Rect</span>
+                                        <svg viewBox="0 0 40 28"><rect x="2" y="2" width="36" height="24" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Rectangle</span>
                                     </button>
                                     <button class="shape-option" data-shape="rounded" title="Rounded Rectangle">
-                                        <svg viewBox="0 0 40 28"><rect x="2" y="2" width="36" height="24" rx="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                                        <span>Round</span>
+                                        <svg viewBox="0 0 40 28"><rect x="2" y="2" width="36" height="24" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Rounded</span>
                                     </button>
+                                    <button class="shape-option" data-shape="snipSame" title="Snip Same Side Corner">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,5 5,2 38,2 38,26 2,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Snip Same</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="snipDiagonal" title="Snip Diagonal Corner">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,26 8,2 38,2 38,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Snip Diag</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="plaque" title="Plaque">
+                                        <svg viewBox="0 0 40 28"><path d="M6,2 Q2,2 2,6 Q2,12 6,14 Q2,16 2,22 Q2,26 6,26 Q12,26 14,26 Q16,26 22,26 Q26,26 26,22 Q26,16 26,14 Q26,12 26,6 Q26,2 22,2 Q16,2 14,2 Q12,2 6,2 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Plaque</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="chamfer" title="Chamfered Rectangle">
+                                        <svg viewBox="0 0 40 28"><polygon points="6,2 34,2 38,6 38,22 34,26 6,26 2,22 2,6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Chamfer</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="frameRect" title="Frame">
+                                        <svg viewBox="0 0 40 28"><rect x="2" y="2" width="36" height="24" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="6" y="6" width="28" height="16" rx="1" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+                                        <span>Frame</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="foldCorner" title="Folded Corner">
+                                        <svg viewBox="0 0 40 28"><path d="M2,2 H32 V20 H2 Z M38,26 L32,20 V26 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Fold Corner</span>
+                                    </button>
+                                </div>
+
+                                <!-- Basic Shapes -->
+                                <div class="shape-cat-label">Basic Shapes</div>
+                                <div class="shape-grid">
                                     <button class="shape-option" data-shape="ellipse" title="Ellipse">
-                                        <svg viewBox="0 0 40 28"><ellipse cx="20" cy="14" rx="18" ry="12" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                                        <svg viewBox="0 0 40 28"><ellipse cx="20" cy="14" rx="18" ry="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
                                         <span>Ellipse</span>
                                     </button>
                                     <button class="shape-option" data-shape="triangle" title="Triangle">
-                                        <svg viewBox="0 0 40 28"><polygon points="20,2 38,26 2,26" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 38,26 2,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
                                         <span>Triangle</span>
                                     </button>
+                                    <button class="shape-option" data-shape="rightTriangle" title="Right Triangle">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,2 38,26 2,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Rt Triangle</span>
+                                    </button>
                                     <button class="shape-option" data-shape="diamond" title="Diamond">
-                                        <svg viewBox="0 0 40 28"><polygon points="20,2 38,14 20,26 2,14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 38,14 20,26 2,14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
                                         <span>Diamond</span>
                                     </button>
-                                    <button class="shape-option" data-shape="star" title="Star">
-                                        <svg viewBox="0 0 40 28"><polygon points="20,2 23,11 33,11 25,17 28,26 20,21 12,26 15,17 7,11 17,11" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                                        <span>Star</span>
-                                    </button>
-                                    <button class="shape-option" data-shape="arrow" title="Arrow">
-                                        <svg viewBox="0 0 40 28"><polygon points="2,9 26,9 26,2 38,14 26,26 26,19 2,19" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                                        <span>Arrow</span>
+                                    <button class="shape-option" data-shape="pentagon" title="Pentagon">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 37,10 33,26 7,26 3,10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Pentagon</span>
                                     </button>
                                     <button class="shape-option" data-shape="hexagon" title="Hexagon">
-                                        <svg viewBox="0 0 40 28"><polygon points="10,2 30,2 38,14 30,26 10,26 2,14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                                        <span>Hex</span>
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 34,8 34,20 20,26 6,20 6,8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Hexagon</span>
                                     </button>
+                                    <button class="shape-option" data-shape="octagon" title="Octagon">
+                                        <svg viewBox="0 0 40 28"><polygon points="14,2 26,2 38,8 38,20 26,26 14,26 2,20 2,8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Octagon</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="parallelogram" title="Parallelogram">
+                                        <svg viewBox="0 0 40 28"><polygon points="10,2 38,2 30,26 2,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Parallel</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="trapezoid" title="Trapezoid">
+                                        <svg viewBox="0 0 40 28"><polygon points="10,2 30,2 38,26 2,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Trapezoid</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="cross" title="Cross">
+                                        <svg viewBox="0 0 40 28"><polygon points="14,2 26,2 26,8 38,8 38,20 26,20 26,26 14,26 14,20 2,20 2,8 14,8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Cross</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="plus" title="Plus">
+                                        <svg viewBox="0 0 40 28"><polygon points="16,2 24,2 24,10 38,10 38,18 24,18 24,26 16,26 16,18 2,18 2,10 16,10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Plus</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="donut" title="Donut">
+                                        <svg viewBox="0 0 40 28"><circle cx="20" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="20" cy="14" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Donut</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="teardrop" title="Teardrop">
+                                        <svg viewBox="0 0 40 28"><path d="M20,2 C32,2 38,8 38,14 C38,22 28,26 20,26 C12,26 2,22 2,14 C2,8 8,2 20,2 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Teardrop</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="heart" title="Heart">
+                                        <svg viewBox="0 0 40 28"><path d="M20,26 C12,18 2,12 2,8 C2,4 6,2 10,2 C14,2 18,4 20,8 C22,4 26,2 30,2 C34,2 38,4 38,8 C38,12 28,18 20,26 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Heart</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="lightning" title="Lightning Bolt">
+                                        <svg viewBox="0 0 40 28"><polygon points="22,2 14,12 18,12 10,26 22,16 18,16 26,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Lightning</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="sun" title="Sun">
+                                        <svg viewBox="0 0 40 28"><circle cx="20" cy="14" r="5" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="20" y1="2" x2="20" y2="7" stroke="currentColor" stroke-width="1.2"/><line x1="20" y1="21" x2="20" y2="26" stroke="currentColor" stroke-width="1.2"/><line x1="6" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.2"/><line x1="29" y1="14" x2="34" y2="14" stroke="currentColor" stroke-width="1.2"/></svg>
+                                        <span>Sun</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="moon" title="Moon">
+                                        <svg viewBox="0 0 40 28"><path d="M16,2 A14,14 0 1 0 16,26 A10,10 0 0 1 16,2 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Moon</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="cloud" title="Cloud">
+                                        <svg viewBox="0 0 40 28"><path d="M10,22 A6,6 0 0 1 10,16 A8,8 0 0 1 20,2 A8,8 0 0 1 30,10 A6,6 0 0 1 38,16 A5,5 0 0 1 34,22 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Cloud</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="noSymbol" title="No Symbol">
+                                        <svg viewBox="0 0 40 28"><circle cx="20" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="6" x2="30" y2="22" stroke="currentColor" stroke-width="2"/></svg>
+                                        <span>No Symbol</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="smile" title="Smile Face">
+                                        <svg viewBox="0 0 40 28"><circle cx="20" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="15" cy="11" r="1.5" fill="currentColor"/><circle cx="25" cy="11" r="1.5" fill="currentColor"/><path d="M14,18 Q20,24 26,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Smile</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="cube" title="Cube">
+                                        <svg viewBox="0 0 40 28"><polygon points="14,4 28,2 38,8 38,20 26,26 4,22" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="14" y1="4" x2="14" y2="14" stroke="currentColor" stroke-width="1"/><line x1="14" y1="14" x2="4" y2="22" stroke="currentColor" stroke-width="1"/><line x1="14" y1="14" x2="26" y2="26" stroke="currentColor" stroke-width="1"/></svg>
+                                        <span>Cube</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="can" title="Can (Cylinder)">
+                                        <svg viewBox="0 0 40 28"><ellipse cx="20" cy="5" rx="14" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="6" y1="5" x2="6" y2="23" stroke="currentColor" stroke-width="1.5"/><line x1="34" y1="5" x2="34" y2="23" stroke="currentColor" stroke-width="1.5"/><ellipse cx="20" cy="23" rx="14" ry="3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Can</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="wave" title="Wave">
+                                        <svg viewBox="0 0 40 28"><path d="M2,14 C10,4 16,4 20,14 C24,24 30,24 38,14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Wave</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="blockArc" title="Block Arc">
+                                        <svg viewBox="0 0 40 28"><path d="M8,14 A12,12 0 0 1 32,14 A12,12 0 0 0 8,14 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Block Arc</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="pie" title="Pie">
+                                        <svg viewBox="0 0 40 28"><path d="M20,14 L20,2 A12,12 0 0 1 32,14 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Pie</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="bracketL" title="Left Bracket">
+                                        <svg viewBox="0 0 40 28"><path d="M38,2 H12 C2,2 2,6 2,10 V18 C2,22 2,26 12,26 H38" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Bracket L</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="bracketR" title="Right Bracket">
+                                        <svg viewBox="0 0 40 28"><path d="M2,2 H28 C38,2 38,6 38,10 V18 C38,22 38,26 28,26 H2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Bracket R</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="braceL" title="Left Brace">
+                                        <svg viewBox="0 0 40 28"><path d="M38,2 H14 Q2,2 2,8 Q2,14 8,14 Q2,14 2,20 Q2,26 14,26 H38" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Brace L</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="braceR" title="Right Brace">
+                                        <svg viewBox="0 0 40 28"><path d="M2,2 H26 Q38,2 38,8 Q38,14 32,14 Q38,14 38,20 Q38,26 26,26 H2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Brace R</span>
+                                    </button>
+                                </div>
+
+                                <!-- Block Arrows -->
+                                <div class="shape-cat-label">Block Arrows</div>
+                                <div class="shape-grid">
+                                    <button class="shape-option" data-shape="arrow" title="Right Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,10 24,10 24,4 38,14 24,24 24,18 2,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Arrow Right</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowLeft" title="Left Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="38,10 16,10 16,4 2,14 16,24 16,18 38,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Arrow Left</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowUp" title="Up Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="10,24 10,8 4,8 20,2 36,8 30,8 30,24" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Arrow Up</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowDown" title="Down Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="10,2 10,18 4,18 20,26 36,18 30,18 30,2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Arrow Down</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowLR" title="Left-Right Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,14 8,4 8,10 32,10 32,4 38,14 32,24 32,18 8,18 8,24" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Arrow L-R</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowUD" title="Up-Down Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 30,8 24,8 24,20 30,20 20,26 10,20 16,20 16,8 10,8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Arrow U-D</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowNotched" title="Notched Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,10 12,10 12,4 38,14 12,24 12,18 2,18 8,14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Notched</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowChevron" title="Chevron Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,14 16,2 16,10 38,14 16,18 16,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Chevron</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowBent" title="Bent Arrow">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,26 2,10 20,10 20,4 38,14 20,24 20,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Bent Arrow</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowUturn" title="U-Turn Arrow">
+                                        <svg viewBox="0 0 40 28"><path d="M2,14 A8,8 0 0 1 18,14 A8,8 0 0 0 34,14 L38,10 L34,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>U-Turn</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowCalloutR" title="Right Arrow Callout">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,2 24,2 24,10 38,14 24,18 24,26 2,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Callout R</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="arrowCircular" title="Circular Arrow">
+                                        <svg viewBox="0 0 40 28"><path d="M20,2 A14,14 0 1 1 2,14 L6,10 L2,14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Circular</span>
+                                    </button>
+                                </div>
+
+                                <!-- Stars & Banners -->
+                                <div class="shape-cat-label">Stars & Banners</div>
+                                <div class="shape-grid">
+                                    <button class="shape-option" data-shape="star" title="5-Point Star">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 23,11 33,11 25,17 28,26 20,21 12,26 15,17 7,11 17,11" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Star 5</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="star4" title="4-Point Star">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 24,12 38,14 24,16 20,26 16,16 2,14 16,12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Star 4</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="star6" title="6-Point Star">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 23,10 30,8 27,14 30,22 23,20 20,26 17,20 10,22 13,14 10,8 17,10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Star 6</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="star8" title="8-Point Star">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 22,8 28,4 24,12 36,8 26,14 38,14 26,16 36,20 24,18 28,24 22,20 20,26 18,20 12,24 16,18 4,20 14,16 2,14 14,14 4,8 16,12 12,4 18,8" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Star 8</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="seal1" title="Irregular Seal 1">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 22,10 28,8 26,14 32,12 24,16 28,22 20,18 16,22 18,16 10,12 16,14 12,8 18,10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Seal 1</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="seal2" title="Irregular Seal 2">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 26,4 32,2 28,8 38,6 30,12 36,14 26,16 32,22 24,20 20,26 16,20 8,22 14,16 4,14 10,12 2,6 12,8 8,2 14,4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Seal 2</span>
+                                    </button>
+                                </div>
+
+                                <!-- Callouts -->
+                                <div class="shape-cat-label">Callouts</div>
+                                <div class="shape-grid">
+                                    <button class="shape-option" data-shape="calloutRect" title="Rectangular Callout">
+                                        <svg viewBox="0 0 40 28"><polygon points="2,2 38,2 38,18 22,18 16,26 20,18 2,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Rect Callout</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="calloutRound" title="Rounded Callout">
+                                        <svg viewBox="0 0 40 28"><rect x="2" y="2" width="36" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="20,18 18,26 22,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Round Callout</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="calloutEllipse" title="Oval Callout">
+                                        <svg viewBox="0 0 40 28"><ellipse cx="20" cy="10" rx="18" ry="8" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="20,18 16,26 24,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Oval Callout</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="calloutCloud" title="Cloud Callout">
+                                        <svg viewBox="0 0 40 28"><path d="M12,18 A6,6 0 0 1 12,12 A8,8 0 0 1 20,2 A8,8 0 0 1 30,8 A6,6 0 0 1 38,12 A4,4 0 0 1 34,18 Z" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="20,18 16,26 24,18" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Cloud Callout</span>
+                                    </button>
+                                </div>
+
+                                <!-- Flowchart -->
+                                <div class="shape-cat-label">Flowchart</div>
+                                <div class="shape-grid">
+                                    <button class="shape-option" data-shape="fcProcess" title="Process">
+                                        <svg viewBox="0 0 40 28"><rect x="2" y="2" width="36" height="24" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Process</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcDecision" title="Decision">
+                                        <svg viewBox="0 0 40 28"><polygon points="20,2 38,14 20,26 2,14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Decision</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcData" title="Data">
+                                        <svg viewBox="0 0 40 28"><polygon points="8,2 38,2 32,26 2,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Data</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcDocument" title="Document">
+                                        <svg viewBox="0 0 40 28"><path d="M2,2 H38 V22 C30,26 20,22 2,26 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Document</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcTerminator" title="Terminator">
+                                        <svg viewBox="0 0 40 28"><rect x="2" y="2" width="36" height="24" rx="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Terminator</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcPreparation" title="Preparation">
+                                        <svg viewBox="0 0 40 28"><polygon points="10,2 30,2 38,14 30,26 10,26 2,14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Preparation</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcConnector" title="Connector">
+                                        <svg viewBox="0 0 40 28"><circle cx="20" cy="14" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Connector</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcDelay" title="Delay">
+                                        <svg viewBox="0 0 40 28"><path d="M2,2 H24 V26 H2 A6,6 0 0 1 2,2 Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Delay</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcDisplay" title="Display">
+                                        <svg viewBox="0 0 40 28"><polygon points="12,2 28,2 38,14 28,26 12,26 2,14" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Display</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="fcManualOp" title="Manual Operation">
+                                        <svg viewBox="0 0 40 28"><polygon points="8,2 32,2 38,26 2,26" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                                        <span>Manual Op</span>
+                                    </button>
+                                </div>
+
+                                <!-- Lines -->
+                                <div class="shape-cat-label">Lines</div>
+                                <div class="shape-grid">
                                     <button class="shape-option" data-shape="line" title="Line">
                                         <svg viewBox="0 0 40 28"><line x1="2" y1="14" x2="38" y2="14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                                         <span>Line</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="lineArrow" title="Arrow Line">
+                                        <svg viewBox="0 0 40 28"><line x1="2" y1="14" x2="32" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="30,8 38,14 30,20" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                                        <span>Arrow Line</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="lineDouble" title="Double Arrow">
+                                        <svg viewBox="0 0 40 28"><line x1="8" y1="14" x2="32" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="30,8 38,14 30,20" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="10,8 2,14 10,20" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                                        <span>Dbl Arrow</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="lineElbow" title="Elbow Connector">
+                                        <svg viewBox="0 0 40 28"><polyline points="2,8 20,8 20,26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        <span>Elbow</span>
+                                    </button>
+                                    <button class="shape-option" data-shape="lineCurve" title="Curved Line">
+                                        <svg viewBox="0 0 40 28"><path d="M2,14 C12,2 28,26 38,14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                        <span>Curve</span>
                                     </button>
                                 </div>
                             </div>
@@ -515,13 +808,6 @@
                                 <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>
                             </svg>
                             <span>Icons</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="insertChartBtn" title="Insert Chart">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                <path d="M7 17V10M12 17V7M17 17v-4"/>
-                            </svg>
-                            <span>Chart</span>
                         </button>
                     </div>
                 </div>
@@ -586,21 +872,47 @@
                         <div class="theme-thumbnail-row" id="themeThumbnailRow">
                             <!-- Theme thumbnails populated by JS -->
                         </div>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="moreThemesBtn" title="More Themes">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
-                            </svg>
-                            <span>More</span>
-                        </button>
+                        <div class="ms-dropdown" id="moreThemesDropdown">
+                                                        <button class="more-thumb ms-dropdown-btn" type="button" id="moreThemesBtn" title="Browse all themes" aria-label="More themes">
+                                <div class="more-thumb-preview">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                                    </svg>
+                                </div>
+                                <span class="more-thumb-label">More</span>
+                            </button>
+                            <div class="ms-dropdown-menu theme-gallery-menu" id="themeGalleryMenu">
+                                <!-- All themes populated by JS -->
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- VARIANTS -->
-                <div class="ribbon-group" id="variantsGroup">
-                    <div class="group-label">Variants</div>
+                <!-- TEMPLATES (replaces Variants) -->
+                <div class="ribbon-group" id="templatesGroup">
+                    <div class="group-label">Templates</div>
                     <div class="ribbon-controls">
-                        <div class="variant-thumbnail-row" id="variantThumbnailRow">
-                            <!-- Variant thumbnails populated by JS -->
+                        <div class="template-thumbnail-row" id="templateThumbnailRow">
+                            <!-- Template thumbnails populated by JS -->
+                        </div>
+                        <div class="ms-dropdown" id="moreTemplatesDropdown">
+                                                        <button class="more-thumb ms-dropdown-btn" type="button" id="moreTemplatesBtn" title="Browse all templates" aria-label="More templates">
+                                <div class="more-thumb-preview">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                                    </svg>
+                                </div>
+                                <span class="more-thumb-label">More</span>
+                            </button>
+                            <div class="ms-dropdown-menu template-gallery-menu" id="templateGalleryMenu">
+                                <!-- All templates populated by JS -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -617,51 +929,57 @@
                                 </svg>
                                 <span>Background</span>
                             </button>
-                            <div class="ms-dropdown-menu bg-ribbon-menu">
-                                <div style="padding:6px 10px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Solid Color</div>
-                                <div class="bg-color-grid" id="bgSolidColors">
-                                    <button class="bg-color-btn" data-bg="#ffffff" style="background:#ffffff;border:1.5px solid #ccc;" title="White"></button>
-                                    <button class="bg-color-btn" data-bg="#f8fafc" style="background:#f8fafc;border:1.5px solid #e2e8f0;" title="Slate 50"></button>
-                                    <button class="bg-color-btn" data-bg="#1e293b" style="background:#1e293b;" title="Slate 800"></button>
-                                    <button class="bg-color-btn" data-bg="#0f172a" style="background:#0f172a;" title="Slate 900"></button>
-                                    <button class="bg-color-btn" data-bg="#fef2f2" style="background:#fef2f2;" title="Red 50"></button>
-                                    <button class="bg-color-btn" data-bg="#fff7ed" style="background:#fff7ed;" title="Orange 50"></button>
-                                    <button class="bg-color-btn" data-bg="#fefce8" style="background:#fefce8;" title="Yellow 50"></button>
-                                    <button class="bg-color-btn" data-bg="#f0fdf4" style="background:#f0fdf4;" title="Green 50"></button>
-                                    <button class="bg-color-btn" data-bg="#eff6ff" style="background:#eff6ff;" title="Blue 50"></button>
-                                    <button class="bg-color-btn" data-bg="#f5f3ff" style="background:#f5f3ff;" title="Violet 50"></button>
-                                    <button class="bg-color-btn" data-bg="#fdf4ff" style="background:#fdf4ff;" title="Fuchsia 50"></button>
-                                </div>
-                                <div style="padding:6px 10px;display:flex;align-items:center;gap:6px;border-top:1px solid #f0f0f0;">
-                                    <label style="font-size:11px;color:#666;white-space:nowrap;">Custom:</label>
-                                    <input type="color" id="bgColorCustom" value="#ffffff" style="height:24px;border:none;cursor:pointer;border-radius:4px;">
-                                </div>
-                                <div style="padding:6px 10px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;border-top:1px solid #f0f0f0;">Gradient</div>
-                                <div class="bg-color-grid" id="bgGradientColors">
-                                    <button class="bg-color-btn" data-bg="linear-gradient(135deg,#667eea,#764ba2)" style="background:linear-gradient(135deg,#667eea,#764ba2);" title="Purple Dream"></button>
-                                    <button class="bg-color-btn" data-bg="linear-gradient(135deg,#f97316,#ef4444)" style="background:linear-gradient(135deg,#f97316,#ef4444);" title="Sunset"></button>
-                                    <button class="bg-color-btn" data-bg="linear-gradient(135deg,#22c55e,#06b6d4)" style="background:linear-gradient(135deg,#22c55e,#06b6d4);" title="Ocean"></button>
-                                    <button class="bg-color-btn" data-bg="linear-gradient(135deg,#1e293b,#334155)" style="background:linear-gradient(135deg,#1e293b,#334155);" title="Dark Slate"></button>
-                                    <button class="bg-color-btn" data-bg="linear-gradient(135deg,#fbbf24,#f59e0b)" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);" title="Gold"></button>
-                                    <button class="bg-color-btn" data-bg="linear-gradient(135deg,#ec4899,#8b5cf6)" style="background:linear-gradient(135deg,#ec4899,#8b5cf6);" title="Cotton Candy"></button>
-                                </div>
+                                                        <div class="ms-dropdown-menu color-list-menu bg-color-list-menu">
+                                <div class="ms-dropdown-section-label">Solid Color</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#ffffff" data-label="White"><span class="color-preview" style="background:#ffffff;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #ccc"></span>White</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#f8fafc" data-label="Cloud White"><span class="color-preview" style="background:#f8fafc;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #e2e8f0"></span>Cloud White</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#e2e8f0" data-label="Silver"><span class="color-preview" style="background:#e2e8f0;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Silver</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#64748b" data-label="Steel Gray"><span class="color-preview" style="background:#64748b;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Steel Gray</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#1e293b" data-label="Charcoal"><span class="color-preview" style="background:#1e293b;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Charcoal</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#0f172a" data-label="Midnight"><span class="color-preview" style="background:#0f172a;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Midnight</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fef2f2" data-label="Blush"><span class="color-preview" style="background:#fef2f2;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #fecaca"></span>Blush</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fee2e2" data-label="Rose"><span class="color-preview" style="background:#fee2e2;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Rose</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fca5a5" data-label="Salmon"><span class="color-preview" style="background:#fca5a5;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Salmon</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#dc2626" data-label="Crimson"><span class="color-preview" style="background:#dc2626;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Crimson</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fff7ed" data-label="Peach Cream"><span class="color-preview" style="background:#fff7ed;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #fed7aa"></span>Peach Cream</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fed7aa" data-label="Apricot"><span class="color-preview" style="background:#fed7aa;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Apricot</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fdba74" data-label="Tangerine"><span class="color-preview" style="background:#fdba74;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Tangerine</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#f97316" data-label="Orange"><span class="color-preview" style="background:#f97316;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Orange</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fefce8" data-label="Buttermilk"><span class="color-preview" style="background:#fefce8;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #fef08a"></span>Buttermilk</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fde047" data-label="Sunflower"><span class="color-preview" style="background:#fde047;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Sunflower</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#facc15" data-label="Amber"><span class="color-preview" style="background:#facc15;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Amber</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#eab308" data-label="Gold"><span class="color-preview" style="background:#eab308;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Gold</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#f0fdf4" data-label="Mint Cream"><span class="color-preview" style="background:#f0fdf4;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #bbf7d0"></span>Mint Cream</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#bbf7d0" data-label="Seafoam"><span class="color-preview" style="background:#bbf7d0;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Seafoam</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#4ade80" data-label="Spring Green"><span class="color-preview" style="background:#4ade80;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Spring Green</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#16a34a" data-label="Emerald"><span class="color-preview" style="background:#16a34a;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Emerald</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#eff6ff" data-label="Ice Blue"><span class="color-preview" style="background:#eff6ff;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #bfdbfe"></span>Ice Blue</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#bfdbfe" data-label="Baby Blue"><span class="color-preview" style="background:#bfdbfe;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Baby Blue</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#60a5fa" data-label="Sky Blue"><span class="color-preview" style="background:#60a5fa;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Sky Blue</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#2563eb" data-label="Royal Blue"><span class="color-preview" style="background:#2563eb;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Royal Blue</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#f5f3ff" data-label="Lavender Mist"><span class="color-preview" style="background:#f5f3ff;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #ddd6fe"></span>Lavender Mist</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#c4b5fd" data-label="Periwinkle"><span class="color-preview" style="background:#c4b5fd;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Periwinkle</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#7c3aed" data-label="Violet"><span class="color-preview" style="background:#7c3aed;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Violet</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#6d28d9" data-label="Deep Violet"><span class="color-preview" style="background:#6d28d9;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Deep Violet</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#fdf4ff" data-label="Magnolia"><span class="color-preview" style="background:#fdf4ff;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;border:1px solid #f5d0fe"></span>Magnolia</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#e879f9" data-label="Orchid"><span class="color-preview" style="background:#e879f9;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Orchid</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#d946ef" data-label="Fuchsia"><span class="color-preview" style="background:#d946ef;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Fuchsia</div>
+                                <div class="ms-dropdown-item bg-color-item" data-bg="#c026d3" data-label="Magenta"><span class="color-preview" style="background:#c026d3;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Magenta</div>
+                                <div class="ms-dropdown-section-label">Gradient</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#667eea,#764ba2)" data-label="Purple Dream"><span class="color-preview" style="background:linear-gradient(135deg,#667eea,#764ba2);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Purple Dream</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#f97316,#ef4444)" data-label="Sunset"><span class="color-preview" style="background:linear-gradient(135deg,#f97316,#ef4444);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Sunset</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#22c55e,#06b6d4)" data-label="Ocean"><span class="color-preview" style="background:linear-gradient(135deg,#22c55e,#06b6d4);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Ocean</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#1e293b,#334155)" data-label="Dark Slate"><span class="color-preview" style="background:linear-gradient(135deg,#1e293b,#334155);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Dark Slate</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#fbbf24,#f59e0b)" data-label="Golden Hour"><span class="color-preview" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Golden Hour</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#ec4899,#8b5cf6)" data-label="Cotton Candy"><span class="color-preview" style="background:linear-gradient(135deg,#ec4899,#8b5cf6);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Cotton Candy</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#0f172a,#38bdf8)" data-label="Midnight Sky"><span class="color-preview" style="background:linear-gradient(135deg,#0f172a,#38bdf8);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Midnight Sky</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#f1f5f9,#cbd5e1)" data-label="Silver Mist"><span class="color-preview" style="background:linear-gradient(135deg,#f1f5f9,#cbd5e1);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Silver Mist</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#dc2626,#fbbf24)" data-label="Fire"><span class="color-preview" style="background:linear-gradient(135deg,#dc2626,#fbbf24);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Fire</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#16a34a,#dc2626)" data-label="Christmas"><span class="color-preview" style="background:linear-gradient(135deg,#16a34a,#dc2626);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Christmas</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#fefce8,#f97316)" data-label="Warm Glow"><span class="color-preview" style="background:linear-gradient(135deg,#fefce8,#f97316);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Warm Glow</div>
+                                <div class="ms-dropdown-item bg-color-item bg-gradient-item" data-bg="linear-gradient(135deg,#7c3aed,#2563eb)" data-label="Deep Ocean"><span class="color-preview" style="background:linear-gradient(135deg,#7c3aed,#2563eb);width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Deep Ocean</div>
                             </div>
                         </div>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="slideLayoutBtn" title="Slide Layout">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="1"/>
-                                <line x1="3" y1="9" x2="21" y2="9"/>
-                                <line x1="9" y1="21" x2="9" y2="9"/>
-                            </svg>
-                            <span>Slide Layout</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="slideSizeBtn" title="Slide Size">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="6" width="18" height="12" rx="1"/>
-                                <path d="M9 9v6M15 9v6"/>
-                            </svg>
-                            <span>Slide Size</span>
-                        </button>
                         <button class="ribbon-btn ribbon-btn-vertical" id="designerBtn" title="Open Designer">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/>
@@ -675,58 +993,86 @@
 
             <!-- TRANSITIONS TAB -->
             <div class="ribbon-panel" data-panel="transitions">
-                <div class="ribbon-group">
-                    <div class="group-label">Transition to This Slide</div>
+                <div class="ribbon-group" id="transitionsGroup">
+                    <div class="group-label">Transition</div>
                     <div class="ribbon-controls">
-                        <div class="ms-dropdown" id="transitionDropdown">
-                            <button class="ms-dropdown-btn ribbon-btn" type="button" title="Select Transition" style="flex-direction:column;gap:4px;min-width:80px;padding:8px 12px;border-radius:6px;font-size:10px;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="2" y="4" width="13" height="16" rx="1"/>
-                                    <path d="M16 8h6M16 12h6M16 16h6"/>
-                                </svg>
-                                <span id="transitionLabel">None</span>
-                            </button>
-                            <div class="ms-dropdown-menu transition-grid-menu" style="min-width:340px;">
-                                <div class="transition-grid" id="transitionGrid">
-                                    <!-- Transition options populated by JS -->
+                        <!-- Ribbon row: a horizontally-scrolling strip of preview
+                             thumbnails for the most-used transitions (None,
+                             Fade, Push, Wipe, Split, Reveal). Mirrors the
+                             Themes/Templates pattern on the Design tab. -->
+                        <div class="transition-thumbnail-row" id="transitionThumbnailRow">
+                            <!-- Top transitions populated by JS -->
+                        </div>
+                        <!-- More button: opens a categorized gallery with ALL
+                             transitions (Subtle / Exciting / Dynamic Content),
+                             same visual pattern as the Themes "More" gallery. -->
+                        <div class="ms-dropdown" id="moreTransitionsDropdown">
+                                                        <button class="more-thumb ms-dropdown-btn" type="button" id="moreTransitionsBtn" title="Browse all transitions" aria-label="More transitions">
+                                <div class="more-thumb-preview">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                                    </svg>
                                 </div>
+                                <span class="more-thumb-label">More</span>
+                            </button>
+                            <div class="ms-dropdown-menu transition-gallery-menu" id="transitionGalleryMenu">
+                                <!-- All transitions, categorized, populated by JS -->
+                            </div>
+                        </div>
+                        <!-- Hidden label span kept for backwards-compat with
+                             any code that still reads #transitionLabel. -->
+                        <span id="transitionLabel" style="display:none;">None</span>
+                    </div>
+                </div>
+                <div class="ribbon-group tr-timing-group">
+                    <div class="group-label">Timing</div>
+                    <div class="tr-timing-panel">
+                        <div class="tr-timing-row">
+                            <label class="tr-timing-label" for="transitionDuration">Duration</label>
+                            <div class="tr-num-field">
+                                <button type="button" class="tr-num-step" data-target="transitionDuration" data-step="-0.1" aria-label="Decrease duration">−</button>
+                                <input type="number" id="transitionDuration" class="tr-num-input" min="0.1" max="10" step="0.1" value="0.7">
+                                <button type="button" class="tr-num-step" data-target="transitionDuration" data-step="0.1" aria-label="Increase duration">+</button>
+                                <span class="tr-num-unit">sec</span>
+                            </div>
+                        </div>
+                        <div class="tr-timing-row">
+                            <span class="tr-timing-label">Advance</span>
+                            <div class="tr-trigger-toggle" id="transitionTriggerToggle" role="group" aria-label="Advance trigger">
+                                <button type="button" class="tr-trigger-pill" data-trigger="onClick" aria-pressed="true">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"/></svg>
+                                    <span>On Click</span>
+                                </button>
+                                <button type="button" class="tr-trigger-pill" data-trigger="autoAfter" aria-pressed="false">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                                    <span>After</span>
+                                </button>
+                            </div>
+                            <div class="tr-num-field tr-after-field" id="transitionAfterField">
+                                <button type="button" class="tr-num-step" data-target="transitionAfterSec" data-step="-1" aria-label="Decrease seconds">−</button>
+                                <input type="number" id="transitionAfterSec" class="tr-num-input" min="1" max="600" step="1" value="5" disabled>
+                                <button type="button" class="tr-num-step" data-target="transitionAfterSec" data-step="1" aria-label="Increase seconds">+</button>
+                                <span class="tr-num-unit">sec</span>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="ribbon-group">
-                    <div class="group-label">Timing</div>
-                    <div class="ribbon-controls" style="flex-direction:column;align-items:flex-start;gap:6px;">
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <label style="font-size:11px;color:#666;white-space:nowrap;">Duration:</label>
-                            <input type="number" id="transitionDuration" min="0.1" max="10" step="0.1" value="0.7" style="width:56px;padding:4px 6px;border:1px solid rgba(0,0,0,0.1);border-radius:6px;font-size:12px;text-align:center;background:rgba(255,255,255,0.8);">
-                            <span style="font-size:11px;color:#666;">sec</span>
-                        </div>
-                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#444;cursor:pointer;">
-                            <input type="checkbox" id="transitionOnClick" checked>
-                            <span>On Click</span>
-                        </label>
-                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#444;cursor:pointer;">
-                            <input type="checkbox" id="transitionAutoAfter">
-                            <span>After</span>
-                            <input type="number" id="transitionAfterSec" min="1" max="600" value="5" style="width:48px;padding:4px 6px;border:1px solid rgba(0,0,0,0.1);border-radius:6px;font-size:12px;text-align:center;background:rgba(255,255,255,0.8);" disabled>
-                            <span style="font-size:11px;color:#666;">sec</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="ribbon-group">
                     <div class="group-label">Apply</div>
                     <div class="ribbon-controls">
-                        <button class="ribbon-btn" id="applyTransitionAllBtn" title="Apply transition to all slides">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="1"/>
-                                <path d="M9 9l3 3 6-6"/>
+                        <button class="ribbon-btn ribbon-btn-vertical" id="applyTransitionAllBtn" title="Apply transition to all slides">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <path d="M9 11l3 3 6-6"/>
                             </svg>
                             <span>Apply to All</span>
                         </button>
-                        <button class="ribbon-btn" id="previewTransitionBtn" title="Preview transition">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="5 3 19 12 5 21 5 3" fill="var(--ui-accent)" stroke="var(--ui-accent)"/>
+                        <button class="ribbon-btn ribbon-btn-vertical" id="previewTransitionBtn" title="Preview transition">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
                             <span>Preview</span>
                         </button>
@@ -736,22 +1082,16 @@
 
             <!-- ANIMATIONS TAB -->
             <div class="ribbon-panel" data-panel="animations">
-                <!-- PREVIEW -->
-                <div class="ribbon-group">
-                    <div class="group-label">Preview</div>
-                    <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="previewAnimBtn" title="Preview Animation">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="5 3 19 12 5 21 5 3" fill="var(--ui-accent)" stroke="var(--ui-accent)"/>
-                            </svg>
-                            <span>Preview</span>
-                        </button>
-                    </div>
-                </div>
                 <!-- ANIMATION -->
                 <div class="ribbon-group">
                     <div class="group-label">Animation</div>
                     <div class="ribbon-controls">
+                        <button class="ribbon-btn ribbon-btn-vertical" id="previewAnimBtn" title="Preview Animation">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            <span>Preview</span>
+                        </button>
                         <div class="ms-dropdown" id="animationDropdown">
                             <button class="ms-dropdown-btn ribbon-btn ribbon-btn-vertical" type="button" title="Add Animation">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -766,40 +1106,51 @@
                     </div>
                 </div>
                 <!-- TIMING -->
-                <div class="ribbon-group">
+                <div class="ribbon-group anim-timing-group">
                     <div class="group-label">Timing</div>
-                    <div class="ribbon-controls" style="flex-direction:column;align-items:flex-start;gap:8px;padding:4px 0;">
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <label style="font-size:11px;color:#666;white-space:nowrap;width:50px;">Start:</label>
-                            <div class="ms-dropdown" id="animStartDropdown" style="display:inline-block;">
-                                <button class="ms-dropdown-btn" type="button" style="min-width:120px;padding:5px 24px 5px 10px;font-size:12px;">
-                                    <span class="dropdown-value">On Click</span>
+                    <div class="tr-timing-panel anim-timing-panel">
+                        <div class="tr-timing-row">
+                            <span class="tr-timing-label">Start</span>
+                            <div class="tr-trigger-toggle anim-start-toggle" id="animStartToggle" role="group" aria-label="Animation start trigger">
+                                <button type="button" class="tr-trigger-pill anim-start-pill" data-start="click" aria-pressed="true">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11"/></svg>
+                                    <span>On Click</span>
                                 </button>
-                                <div class="ms-dropdown-menu">
-                                    <div class="ms-dropdown-item" data-value="click">On Click</div>
-                                    <div class="ms-dropdown-item" data-value="with">With Previous</div>
-                                    <div class="ms-dropdown-item" data-value="after">After Previous</div>
-                                </div>
+                                <button type="button" class="tr-trigger-pill anim-start-pill" data-start="with" aria-pressed="false">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 11H7M7 11l4-4M7 11l4 4"/></svg>
+                                    <span>With Previous</span>
+                                </button>
+                                <button type="button" class="tr-trigger-pill anim-start-pill" data-start="after" aria-pressed="false">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18M11 3l8 8-8 8"/></svg>
+                                    <span>After Previous</span>
+                                </button>
                             </div>
                         </div>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <label style="font-size:11px;color:#666;white-space:nowrap;width:50px;">Duration:</label>
-                            <input type="number" id="animDuration" min="0.1" max="10" step="0.1" value="0.5" style="width:64px;padding:4px 6px;border:1px solid rgba(0,0,0,0.1);border-radius:6px;font-size:12px;text-align:center;background:rgba(255,255,255,0.8);">
-                            <span style="font-size:11px;color:#666;">sec</span>
+                        <div class="tr-timing-row">
+                            <label class="tr-timing-label" for="animDuration">Duration</label>
+                            <div class="tr-num-field">
+                                <button type="button" class="tr-num-step" data-target="animDuration" data-step="-0.1" aria-label="Decrease duration">−</button>
+                                <input type="number" id="animDuration" class="tr-num-input" min="0.1" max="10" step="0.1" value="0.5">
+                                <button type="button" class="tr-num-step" data-target="animDuration" data-step="0.1" aria-label="Increase duration">+</button>
+                                <span class="tr-num-unit">sec</span>
+                            </div>
                         </div>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <label style="font-size:11px;color:#666;white-space:nowrap;width:50px;">Delay:</label>
-                            <input type="number" id="animDelay" min="0" max="60" step="0.1" value="0" style="width:64px;padding:4px 6px;border:1px solid rgba(0,0,0,0.1);border-radius:6px;font-size:12px;text-align:center;background:rgba(255,255,255,0.8);">
-                            <span style="font-size:11px;color:#666;">sec</span>
+                        <div class="tr-timing-row">
+                            <label class="tr-timing-label" for="animDelay">Delay</label>
+                            <div class="tr-num-field">
+                                <button type="button" class="tr-num-step" data-target="animDelay" data-step="-0.1" aria-label="Decrease delay">−</button>
+                                <input type="number" id="animDelay" class="tr-num-input" min="0" max="60" step="0.1" value="0">
+                                <button type="button" class="tr-num-step" data-target="animDelay" data-step="0.1" aria-label="Increase delay">+</button>
+                                <span class="tr-num-unit">sec</span>
+                            </div>
                         </div>
-                        <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+                        <div class="tr-timing-row anim-reorder-row">
                             <button class="ribbon-btn ribbon-btn-icon" id="animMoveEarlierBtn" title="Move Earlier">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
                             </button>
                             <button class="ribbon-btn ribbon-btn-icon" id="animMoveLaterBtn" title="Move Later">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                             </button>
-                            <span style="font-size:10px;color:#999;">Reorder</span>
                         </div>
                     </div>
                 </div>
@@ -824,13 +1175,6 @@
                 <div class="ribbon-group">
                     <div class="group-label">Show</div>
                     <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="viewNotesToggleBtn" title="Toggle Notes Panel">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="12"/>
-                                <rect x="3" y="17" width="18" height="4"/>
-                            </svg>
-                            <span>Notes</span>
-                        </button>
                         <button class="ribbon-btn ribbon-btn-vertical" id="toggleRulersBtn" title="Toggle Rulers">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="3" y="4" width="18" height="2"/>
@@ -922,37 +1266,6 @@
                         </button>
                     </div>
                 </div>
-                <!-- EXPORT -->
-                <div class="ribbon-group">
-                    <div class="group-label">Export</div>
-                    <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="exportPptxBtn" title="Export as PowerPoint (.pptx)">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                                <path d="M8 13h4m-2-2v4" stroke="#c0392b"/>
-                            </svg>
-                            <span>PPTX</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="exportPdfBtn" title="Export as PDF">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                                <path d="M9 15h1a1 1 0 1 0 0-2H9v4m4-4h1.5a1.5 1.5 0 0 1 0 3H13m4-3v4" stroke="#e74c3c"/>
-                            </svg>
-                            <span>PDF</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="importPptxBtn" title="Import PowerPoint (.pptx)">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="7 10 12 15 17 10"/>
-                                <line x1="12" y1="15" x2="12" y2="3"/>
-                            </svg>
-                            <span>Import</span>
-                        </button>
-                        <input type="file" id="importPptxInput" accept=".pptx" style="display:none;">
-                    </div>
-                </div>
             </div><!-- end VIEW panel -->
 
             <!-- FILE TAB -->
@@ -982,120 +1295,6 @@
                     </div>
                 </div>
             </div><!-- end FILE panel -->
-<!-- SLIDE SHOW TAB -->
-            <div class="ribbon-panel" data-panel="slideshow">
-                <div class="ribbon-group">
-                    <div class="group-label">Start Slide Show</div>
-                    <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="slideshowStartBtn" title="Present from Beginning (F11)">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3" fill="var(--ui-accent)" stroke="var(--ui-accent)"/></svg>
-                            <span>From Beginning</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="slideshowCurrentBtn" title="Present from Current Slide">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/><line x1="5" y1="3" x2="5" y2="21"/></svg>
-                            <span>From Current</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="ribbon-group">
-                    <div class="group-label">Set Up</div>
-                    <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="slideshowLoopBtn" title="Loop Continuously">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="17 1 21 5 17 9"/>
-                                <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                                <polyline points="7 23 3 19 7 15"/>
-                                <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                            </svg>
-                            <span>Loop</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="slideshowRehearseBtn" title="Rehearse Timings">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12 6 12 12 16 14"/>
-                            </svg>
-                            <span>Rehearse</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="ribbon-group">
-                    <div class="group-label">Monitors</div>
-                    <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="slideshowFullscreenBtn" title="Full Screen">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>
-                            </svg>
-                            <span>Fullscreen</span>
-                        </button>
-                    </div>
-                </div>
-            </div><!-- end SLIDE SHOW panel -->
-
-            <!-- REVIEW TAB -->
-            <div class="ribbon-panel" data-panel="review">
-                <div class="ribbon-group">
-                    <div class="group-label">Proofing</div>
-                    <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="spellCheckBtn" title="Spelling & Grammar">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                                <path d="M9 7h6M9 11h6"/>
-                            </svg>
-                            <span>Spelling</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="wordCountBtn" title="Word Count">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                                <path d="M8 13h8M8 17h5"/>
-                            </svg>
-                            <span>Word Count</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="ribbon-group">
-                    <div class="group-label">Accessibility</div>
-                    <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="checkAccessibilityBtn" title="Check Accessibility">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <circle cx="12" cy="6" r="1.5"/>
-                                <path d="M5 12h14M9 17l3-5 3 5"/>
-                            </svg>
-                            <span>Accessibility</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="altTextBtn" title="Alt Text">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                <path d="M7 17V8M7 8l3 5 3-5M13 17v-7M16 13h-3M16 13v4"/>
-                            </svg>
-                            <span>Alt Text</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="ribbon-group">
-                    <div class="group-label">Language</div>
-                    <div class="ribbon-controls">
-                        <button class="ribbon-btn ribbon-btn-vertical" id="translateBtn" title="Translate">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 5h7M9 3v2c0 4.418-2.239 8-5 8"/>
-                                <path d="M5 9c0 2.144 2.952 3.908 6.7 4"/>
-                                <path d="M12 20l4-9 4 9M14.5 16h5"/>
-                            </svg>
-                            <span>Translate</span>
-                        </button>
-                        <button class="ribbon-btn ribbon-btn-vertical" id="languageBtn" title="Set Language">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                            </svg>
-                            <span>Language</span>
-                        </button>
-                    </div>
-                </div>
-            </div><!-- end REVIEW panel -->
-
         </div><!-- end ribbon-content -->
     </div><!-- end ribbon -->
 
@@ -1123,6 +1322,12 @@
 
             <!-- SLIDE CANVAS AREA -->
             <div class="editor-content" id="editorContent">
+                <!-- Rulers (top + left + corner) - visible when body.show-rulers is set -->
+                <div class="editor-rulers" id="editorRulers" aria-hidden="true">
+                    <div class="ruler-corner"></div>
+                    <div class="ruler-top" id="rulerTop"></div>
+                    <div class="ruler-left" id="rulerLeft"></div>
+                </div>
                 <div class="slide-canvas-wrapper" id="slideCanvasWrapper">
                     <div class="slide-canvas-scaler" id="slideCanvasScaler">
                         <div class="slide-canvas" id="slideCanvas">
@@ -1147,10 +1352,17 @@
                         </div>
                         <div class="section-title">
                             <h3>Your presentations</h3>
-                            <button class="create-note-btn" id="welcomeNewBtn">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                Create New Presentation
-                            </button>
+                            <div style="display:flex;gap:10px;align-items:center;">
+                                <button class="create-note-btn" id="welcomeNewBtn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    Create New Presentation
+                                </button>
+                                <button class="create-note-btn welcome-import-btn" id="welcomeImportBtn" style="background:rgba(255,255,255,0.9);color:#374151;border:1px solid rgba(0,0,0,0.1);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    Import File
+                                </button>
+                            </div>
+                            <input type="file" id="fileImportInput" accept=".pptx,.pdf" style="display:none;">
                         </div>
                     </div>
                     <div class="notes-section">
@@ -1167,7 +1379,33 @@
 
         </main><!-- end editor-area -->
 
-        <!-- PRESENTER NOTES (sibling of editor-area, so it has its own border radius) -->
+        </div><!-- end editor-column -->
+
+        <!-- ANIMATION PANE (right sidebar, shown when toggled) -->
+        <aside id="animationPane" class="animation-pane">
+            <div class="ap-header">
+                <span>Animation Pane</span>
+                <button id="apCloseBtn" title="Close">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+            <div class="ap-toolbar">
+                <button class="ap-toolbar-btn" id="apAddBtn" title="Add Animation">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span>Add</span>
+                </button>
+                <button class="ap-toolbar-btn" id="apPreviewBtn" title="Preview Animations">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span>Preview</span>
+                </button>
+            </div>
+            <div class="ap-body" id="apBody">
+                <div class="ap-empty">No animations on this slide.</div>
+            </div>
+        </aside>
+
+    </div><!-- end main-content -->
+    <!-- PRESENTER NOTES (sibling of editor-area, so it has its own border radius) -->
         <div class="presenter-notes-panel" id="presenterNotesPanel">
             <div class="pnotes-header">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1189,25 +1427,28 @@
                 <span>Notes</span>
             </button>
         </div>
-
-        </div><!-- end editor-column -->
-
-        <!-- ANIMATION PANE -->
-        <div id="animationPane" class="animation-pane" style="display:none;">
-            <div class="ap-header">
-                <span>Animation Pane</span>
-                <button id="apCloseBtn" title="Close">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
-                </button>
-            </div>
-            <div class="ap-body" id="apBody">
-                <div class="ap-empty">No animations on this slide.</div>
-            </div>
-        </div>
-    </div><!-- end main-content -->
 </div><!-- end notes-app -->
 
 <!-- ===== MODALS ===== -->
+
+<!-- Slide Designer Modal -->
+<div class="link-modal" id="designerModal">
+    <div class="link-modal-content" style="max-width:640px;">
+        <button class="link-modal-close-btn" id="designerModalCloseBtn" title="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div class="designer-modal-header">
+            <div class="link-modal-icon" style="background:var(--ui-accent);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg>
+            </div>
+            <h3 class="link-modal-title">Slide Designer</h3>
+        </div>
+        <p class="link-modal-body" style="text-align:center;color:rgba(44,62,80,0.7);font-size:14px;margin-bottom:20px;font-family:'DM Sans',sans-serif;">Choose a layout for your slide</p>
+        <div class="designer-layout-grid" id="designerLayoutGrid">
+            <!-- Layout cards populated by JS -->
+        </div>
+    </div>
+</div>
 
 <!-- Delete Presentation/Slide Modal -->
 <div class="delete-modal" id="deleteModal">
@@ -1386,6 +1627,198 @@
     <button class="draw-tool-btn draw-done-btn" id="drawDoneBtn" title="Done">&check; Done</button>
 </div>
 
+<!-- ===== SYMBOL BAR ===== -->
+<div class="symbol-toolbar" id="symbolToolbar">
+    <div class="symbol-bar-scroll" id="symbolBarScroll">
+        <!-- Stars & Misc -->
+        <div class="symbol-toolbar-divider"></div>
+        <div class="symbol-group">
+            <span class="symbol-section-label">Stars</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="★">★</button>
+                <button class="sym-bar-btn" data-s="☆">☆</button>
+                <button class="sym-bar-btn" data-s="✦">✦</button>
+                <button class="sym-bar-btn" data-s="✧">✧</button>
+                <button class="sym-bar-btn" data-s="✩">✩</button>
+                <button class="sym-bar-btn" data-s="✪">✪</button>
+                <button class="sym-bar-btn" data-s="✫">✫</button>
+                <button class="sym-bar-btn" data-s="✬">✬</button>
+                <button class="sym-bar-btn" data-s="✭">✭</button>
+                <button class="sym-bar-btn" data-s="✮">✮</button>
+                <button class="sym-bar-btn" data-s="✯">✯</button>
+                <button class="sym-bar-btn" data-s="✰">✰</button>
+                <button class="sym-bar-btn" data-s="✱">✱</button>
+                <button class="sym-bar-btn" data-s="✲">✲</button>
+                <button class="sym-bar-btn" data-s="✳">✳</button>
+                <button class="sym-bar-btn" data-s="✴">✴</button>
+                <button class="sym-bar-btn" data-s="✹">✹</button>
+                <button class="sym-bar-btn" data-s="❂">❂</button>
+                <button class="sym-bar-btn" data-s="❃">❃</button>
+                <button class="sym-bar-btn" data-s="❊">❊</button>
+                <button class="sym-bar-btn" data-s="❋">❋</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Checkmarks & Hearts -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Marks</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="✓">✓</button>
+                <button class="sym-bar-btn" data-s="✔">✔</button>
+                <button class="sym-bar-btn" data-s="✗">✗</button>
+                <button class="sym-bar-btn" data-s="✘">✘</button>
+                <button class="sym-bar-btn" data-s="✚">✚</button>
+                <button class="sym-bar-btn" data-s="♥">♥</button>
+                <button class="sym-bar-btn" data-s="♦">♦</button>
+                <button class="sym-bar-btn" data-s="♣">♣</button>
+                <button class="sym-bar-btn" data-s="♠">♠</button>
+                <button class="sym-bar-btn" data-s="●">●</button>
+                <button class="sym-bar-btn" data-s="○">○</button>
+                <button class="sym-bar-btn" data-s="■">■</button>
+                <button class="sym-bar-btn" data-s="□">□</button>
+                <button class="sym-bar-btn" data-s="▲">▲</button>
+                <button class="sym-bar-btn" data-s="△">△</button>
+                <button class="sym-bar-btn" data-s="▼">▼</button>
+                <button class="sym-bar-btn" data-s="▽">▽</button>
+                <button class="sym-bar-btn" data-s="◆">◆</button>
+                <button class="sym-bar-btn" data-s="◇">◇</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Arrows -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Arrows</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="→">→</button>
+                <button class="sym-bar-btn" data-s="←">←</button>
+                <button class="sym-bar-btn" data-s="↑">↑</button>
+                <button class="sym-bar-btn" data-s="↓">↓</button>
+                <button class="sym-bar-btn" data-s="↔">↔</button>
+                <button class="sym-bar-btn" data-s="↕">↕</button>
+                <button class="sym-bar-btn" data-s="⇒">⇒</button>
+                <button class="sym-bar-btn" data-s="⇐">⇐</button>
+                <button class="sym-bar-btn" data-s="⇑">⇑</button>
+                <button class="sym-bar-btn" data-s="⇓">⇓</button>
+                <button class="sym-bar-btn" data-s="↗">↗</button>
+                <button class="sym-bar-btn" data-s="↘">↘</button>
+                <button class="sym-bar-btn" data-s="↙">↙</button>
+                <button class="sym-bar-btn" data-s="↖">↖</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Math -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Math</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="∞">∞</button>
+                <button class="sym-bar-btn" data-s="≈">≈</button>
+                <button class="sym-bar-btn" data-s="≠">≠</button>
+                <button class="sym-bar-btn" data-s="≤">≤</button>
+                <button class="sym-bar-btn" data-s="≥">≥</button>
+                <button class="sym-bar-btn" data-s="±">±</button>
+                <button class="sym-bar-btn" data-s="×">×</button>
+                <button class="sym-bar-btn" data-s="÷">÷</button>
+                <button class="sym-bar-btn" data-s="∑">∑</button>
+                <button class="sym-bar-btn" data-s="∏">∏</button>
+                <button class="sym-bar-btn" data-s="∫">∫</button>
+                <button class="sym-bar-btn" data-s="∂">∂</button>
+                <button class="sym-bar-btn" data-s="∇">∇</button>
+                <button class="sym-bar-btn" data-s="√">√</button>
+                <button class="sym-bar-btn" data-s="∝">∝</button>
+                <button class="sym-bar-btn" data-s="∠">∠</button>
+                <button class="sym-bar-btn" data-s="⊥">⊥</button>
+                <button class="sym-bar-btn" data-s="≡">≡</button>
+                <button class="sym-bar-btn" data-s="∈">∈</button>
+                <button class="sym-bar-btn" data-s="∉">∉</button>
+                <button class="sym-bar-btn" data-s="⊂">⊂</button>
+                <button class="sym-bar-btn" data-s="⊃">⊃</button>
+                <button class="sym-bar-btn" data-s="∪">∪</button>
+                <button class="sym-bar-btn" data-s="∩">∩</button>
+                <button class="sym-bar-btn" data-s="∀">∀</button>
+                <button class="sym-bar-btn" data-s="∃">∃</button>
+                <button class="sym-bar-btn" data-s="∴">∴</button>
+                <button class="sym-bar-btn" data-s="∵">∵</button>
+                <button class="sym-bar-btn" data-s="∼">∼</button>
+                <button class="sym-bar-btn" data-s="ƒ">ƒ</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Greek -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Greek</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="α">α</button>
+                <button class="sym-bar-btn" data-s="β">β</button>
+                <button class="sym-bar-btn" data-s="γ">γ</button>
+                <button class="sym-bar-btn" data-s="δ">δ</button>
+                <button class="sym-bar-btn" data-s="ε">ε</button>
+                <button class="sym-bar-btn" data-s="μ">μ</button>
+                <button class="sym-bar-btn" data-s="λ">λ</button>
+                <button class="sym-bar-btn" data-s="σ">σ</button>
+                <button class="sym-bar-btn" data-s="φ">φ</button>
+                <button class="sym-bar-btn" data-s="ψ">ψ</button>
+                <button class="sym-bar-btn" data-s="ω">ω</button>
+                <button class="sym-bar-btn" data-s="π">π</button>
+                <button class="sym-bar-btn" data-s="Ω">Ω</button>
+                <button class="sym-bar-btn" data-s="Σ">Σ</button>
+                <button class="sym-bar-btn" data-s="Π">Π</button>
+                <button class="sym-bar-btn" data-s="Δ">Δ</button>
+                <button class="sym-bar-btn" data-s="Γ">Γ</button>
+                <button class="sym-bar-btn" data-s="Θ">Θ</button>
+                <button class="sym-bar-btn" data-s="Λ">Λ</button>
+                <button class="sym-bar-btn" data-s="Φ">Φ</button>
+                <button class="sym-bar-btn" data-s="Ψ">Ψ</button>
+                <button class="sym-bar-btn" data-s="ℵ">ℵ</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Numbers & Bullets -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Numbers</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="①">①</button>
+                <button class="sym-bar-btn" data-s="②">②</button>
+                <button class="sym-bar-btn" data-s="③">③</button>
+                <button class="sym-bar-btn" data-s="④">④</button>
+                <button class="sym-bar-btn" data-s="⑤">⑤</button>
+                <button class="sym-bar-btn" data-s="⑥">⑥</button>
+                <button class="sym-bar-btn" data-s="⑦">⑦</button>
+                <button class="sym-bar-btn" data-s="⑧">⑧</button>
+                <button class="sym-bar-btn" data-s="⑨">⑨</button>
+                <button class="sym-bar-btn" data-s="⑩">⑩</button>
+                <button class="sym-bar-btn" data-s="•">•</button>
+                <button class="sym-bar-btn" data-s="◦">◦</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Floral & Special -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Special</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="✿">✿</button>
+                <button class="sym-bar-btn" data-s="❀">❀</button>
+                <button class="sym-bar-btn" data-s="❁">❁</button>
+                <button class="sym-bar-btn" data-s="✽">✽</button>
+                <button class="sym-bar-btn" data-s="❄">❄</button>
+                <button class="sym-bar-btn" data-s="❅">❅</button>
+                <button class="sym-bar-btn" data-s="❆">❆</button>
+                <button class="sym-bar-btn" data-s="❇">❇</button>
+                <button class="sym-bar-btn" data-s="❈">❈</button>
+                <button class="sym-bar-btn" data-s="❉">❉</button>
+                <button class="sym-bar-btn" data-s="✶">✶</button>
+                <button class="sym-bar-btn" data-s="✷">✷</button>
+                <button class="sym-bar-btn" data-s="✸">✸</button>
+                <button class="sym-bar-btn" data-s="✺">✺</button>
+                <button class="sym-bar-btn" data-s="✻">✻</button>
+                <button class="sym-bar-btn" data-s="✼">✼</button>
+                <button class="sym-bar-btn" data-s="✾">✾</button>
+            </div>
+        </div>
+    </div>
+    <div class="symbol-toolbar-divider"></div>
+    <button class="draw-tool-btn draw-done-btn" id="symbolDoneBtn" title="Done">&check; Done</button>
+</div>
+
 <!-- ===== PRESENTATION OVERLAY ===== -->
 <div id="presentOverlay" class="present-overlay" style="display:none;">
     <div class="present-slide-container" id="presentSlideContainer">
@@ -1393,23 +1826,19 @@
             <!-- Slide content rendered here -->
         </div>
     </div>
-    <!-- Navigation -->
-    <button class="present-nav-btn present-prev" id="presentPrevBtn" title="Previous Slide (←)">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <button class="present-nav-btn present-next" id="presentNextBtn" title="Next Slide (→)">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>
-    <!-- HUD -->
-    <div class="present-hud">
-        <span id="presentCounter">1 / 1</span>
-        <button id="presentExitBtn" title="Exit (Esc)">
+    <!-- Bottom toolbar -->
+    <div class="present-toolbar" id="presentToolbar">
+        <button class="present-toolbar-btn" id="presentPrevBtn" title="Previous Slide (←)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="present-counter" id="presentCounter">1 / 1</span>
+        <button class="present-toolbar-btn" id="presentNextBtn" title="Next Slide (→)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button class="present-toolbar-btn present-exit-btn" id="presentExitBtn" title="Exit (Esc)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Exit
         </button>
     </div>
-    <!-- Progress dots -->
-    <div class="present-dots" id="presentDots"></div>
 </div>
 
 <!-- ===== SCRIPTS ===== -->
@@ -1417,6 +1846,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
 <script src="/assets/scripts/idb-storage.js"></script>
 <script src="/assets/scripts/slides.js"></script>
 </body>

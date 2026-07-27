@@ -244,16 +244,15 @@ body {
 .hover-img:hover {
     filter: blur(0); 
 }
-    main, .aboutice {
-       opacity: 1;
-     }
-     .aboutice {
-       display: none;
-       opacity: 0;
-     }
-::-webkit-scrollbar {
-  width: 10px; 
+main, .aboutice {
+    opacity: 1;
 }
+
+.aboutice {
+    display: none;
+    opacity: 0;
+}
+
 ::-webkit-scrollbar-track {
   background: #f1f1f1;
 }
@@ -264,6 +263,12 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
 :root {
     --background: #ffffff; 
     --foreground: #383838; 
