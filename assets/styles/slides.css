@@ -7373,9 +7373,7 @@ body.view-notes .editor-area {
     justify-content: center;
 }
 
-.icon-picker-cats::-webkit-scrollbar {
-    display: none;
-}
+
 
 .icon-cat-btn {
     padding: 5px 14px;
@@ -7411,18 +7409,7 @@ body.view-notes .editor-area {
     overflow-y: auto;
     min-height: 200px;
     max-height: 400px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(108, 117, 125, 0.2) transparent;
     padding: 2px 0px;
-}
-
-.icon-picker-grid-scroll::-webkit-scrollbar {
-    width: 5px;
-}
-
-.icon-picker-grid-scroll::-webkit-scrollbar-thumb {
-    background: rgba(108, 117, 125, 0.2);
-    border-radius: 3px;
 }
 
 .icon-picker-grid {
