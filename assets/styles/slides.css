@@ -685,8 +685,6 @@ body.no-active-note .ribbon, body.no-active-note .ribbon-tabs {
     box-shadow: 0 0 0 2px var(--ui-accent-soft);
 }
 
-.template-thumb .tt-preview {
-}
 
 .tpl-preview-el {
     pointer-events: none;
@@ -851,8 +849,6 @@ body.no-active-note .ribbon, body.no-active-note .ribbon-tabs {
     transition: transform 0.18s;
 }
 
-.theme-gallery-card:hover {
-}
 
 .theme-gallery-card:hover .theme-thumb {
     border-color: var(--ui-accent-border);
@@ -1164,6 +1160,7 @@ body.no-active-note .sidebar {
     line-height: 1.5;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-family: "DM Sans", sans-serif;
@@ -1973,6 +1970,7 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     font-family: "DM Sans", sans-serif;
@@ -2705,7 +2703,6 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
     color: rgba(44, 62, 80, 0.6);
     transition: transform 0.2s;
     font-family: "Segoe UI Symbol", "Arial Unicode MS", "DejaVu Sans", sans-serif;
-    speak: none;
 }
 
 .ms-dropdown-btn:hover {
@@ -5403,8 +5400,6 @@ body.no-active-note .editor-header, body.no-active-note .editor-content, body.no
     }
 }
 
-.ribbon-content .ms-dropdown.active .ms-dropdown-menu {
-}
 
 .ribbon-tabs-legacy-removed {
     display: none;
@@ -5515,7 +5510,6 @@ body.no-active-note .editor-header, body.no-active-note .editor-content, body.no
     pointer-events: none;
     transition: transform 0.2s;
     font-family: "Segoe UI Symbol", "Arial Unicode MS", "DejaVu Sans", sans-serif;
-    speak: none;
 }
 
 .more-thumb.ms-dropdown-btn[aria-expanded="true"]::after, .ms-dropdown.active .more-thumb.ms-dropdown-btn::after {
@@ -5820,11 +5814,6 @@ body.no-active-note .editor-header, body.no-active-note .editor-content, body.no
     gap: 10px;
 }
 
-.anim-start-toggle {
-}
-
-.anim-start-pill {
-}
 
 .anim-reorder-row {
     gap: 4px;
