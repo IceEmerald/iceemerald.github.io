@@ -7,7 +7,24 @@
 
 // ── Utility ────────────────────────────────────────────────────
 function uid() {
-    return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    const arr = new Uint8Array(6);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, b => b.toString(36).padStart(2, '0')).join('').slice(0, 8) + Date.now().toString(36);
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function stripHtmlToText(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
 }
 
 function generateSecureId(length = 9) {
@@ -530,7 +547,16 @@ class SlidesApp {
         const toast = document.getElementById('custom-toast');
         if (!toast) return;
         const { icon, msg: cleanMsg } = this._toastIcon(msg);
-        toast.innerHTML = `<span style="display:flex;align-items:center;gap:10px;"><span style="display:inline-flex;flex-shrink:0;">${icon}</span><span>${cleanMsg}</span></span>`;
+        const outer = document.createElement('span');
+        outer.style.cssText = 'display:flex;align-items:center;gap:10px;';
+        const iconSpan = document.createElement('span');
+        iconSpan.style.cssText = 'display:inline-flex;flex-shrink:0;';
+        iconSpan.innerHTML = icon;
+        const msgSpan = document.createElement('span');
+        msgSpan.textContent = cleanMsg;
+        outer.appendChild(iconSpan);
+        outer.appendChild(msgSpan);
+        toast.replaceChildren(outer);
         toast.classList.add('show');
         clearTimeout(this._toastTimer);
         this._toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
@@ -5627,16 +5653,27 @@ class SlidesApp {
         const overlay = document.createElement('div');
         overlay.id = 'immersiveReaderOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:#fffdf7;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;font-family:"DM Sans",sans-serif;color:#1a1a1a;';
-        overlay.innerHTML = `
-            <div style="max-width:720px;font-size:24px;line-height:1.7;text-align:center;">${text}</div>
-            <div style="margin-top:32px;display:flex;gap:12px;">
-                <button id="irClose" style="padding:10px 20px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">Close (Esc)</button>
-                <button id="irRead" style="padding:10px 20px;background:#fff;color:#1a1a1a;border:1px solid #ddd;border-radius:6px;font-size:14px;cursor:pointer;">Read Aloud</button>
-            </div>`;
+        const irTextDiv = document.createElement('div');
+        irTextDiv.style.cssText = 'max-width:720px;font-size:24px;line-height:1.7;text-align:center;';
+        irTextDiv.textContent = text;
+        const irClose = document.createElement('button');
+        irClose.id = 'irClose';
+        irClose.style.cssText = 'padding:10px 20px;background:#f97316;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;';
+        irClose.textContent = 'Close (Esc)';
+        const irRead = document.createElement('button');
+        irRead.id = 'irRead';
+        irRead.style.cssText = 'padding:10px 20px;background:#fff;color:#1a1a1a;border:1px solid #ddd;border-radius:6px;font-size:14px;cursor:pointer;';
+        irRead.textContent = 'Read Aloud';
+        const irBtns = document.createElement('div');
+        irBtns.style.cssText = 'margin-top:32px;display:flex;gap:12px;';
+        irBtns.appendChild(irClose);
+        irBtns.appendChild(irRead);
+        overlay.appendChild(irTextDiv);
+        overlay.appendChild(irBtns);
         document.body.appendChild(overlay);
         const close = () => { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 230); };
-        overlay.querySelector('#irClose').addEventListener('click', close);
-        overlay.querySelector('#irRead').addEventListener('click', () => {
+        irClose.addEventListener('click', close);
+        irRead.addEventListener('click', () => {
             if ('speechSynthesis' in window) {
                 const u = new SpeechSynthesisUtterance(text);
                 speechSynthesis.cancel();
@@ -6480,7 +6517,7 @@ class SlidesApp {
                     const fill = el.fill || '#1a1a1a';
                     const anchor = el.textAlign === 'center' ? 'middle' : (el.textAlign === 'right' ? 'end' : 'start');
                     const x = el.textAlign === 'center' ? el.x + el.w / 2 : (el.textAlign === 'right' ? el.x + el.w : el.x + 4);
-                    svgContent += `<text x="${x}" y="${el.y + fontSize}" font-size="${fontSize}" font-family="${fontFamily}" fill="${fill}" text-anchor="${anchor}">${el.html.replace(/<[^>]*>/g, '')}</text>`;
+                    svgContent += `<text x="${x}" y="${el.y + fontSize}" font-size="${fontSize}" font-family="${fontFamily}" fill="${fill}" text-anchor="${anchor}">${escapeHtml(stripHtmlToText(el.html))}</text>`;
                 } else if (el.type === 'shape' && el.svg) {
                     svgContent += `<g transform="translate(${el.x},${el.y})"><svg width="${el.w}" height="${el.h}" viewBox="0 0 ${el.w} ${el.h}">${el.svg}</svg></g>`;
                 } else if (el.type === 'shape') {
