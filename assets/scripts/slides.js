@@ -294,7 +294,7 @@ class SlidesApp {
     }
 
     async init() {
-        this.loadIconLibrary(); // fire-and-forget fetch of icons.emeraldcore
+        await this.loadIconLibrary();
         await this.loadIndex();
         this.setupRibbon();
         this.setupRibbonTabs();
@@ -5646,25 +5646,29 @@ class SlidesApp {
     }
 
     // ── Load icon library from icons.emeraldcore ──
-    loadIconLibrary() {
-        fetch('/assets/data/icons.emeraldcore')
-            .then(r => r.text())
-            .then(text => {
-                const data = JSON.parse(stripComments(text));
-                window.ICON_DB  = data.icons;
-                window.ICON_CATS = data.categories;
-            })
-            .catch(err => {
-                console.warn('Failed to load icons.emeraldcore:', err);
-                window.ICON_DB  = [];  
-                window.ICON_CATS = ['All'];
-            });
+    async loadIconLibrary() {
+        try {
+            const r = await fetch('/assets/data/icons.emeraldcore');
+            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+            const text = await r.text();
+            const data = JSON.parse(stripComments(text));
+            window.ICON_DB  = data.icons;
+            window.ICON_CATS = data.categories;
+            console.log(`Icon library loaded: ${data.icons.length} icons, ${data.categories.length} categories`);
+        } catch (err) {
+            console.error('Failed to load icons.emeraldcore:', err);
+            window.ICON_DB  = [];
+            window.ICON_CATS = ['All'];
+        }
     }
 
     // ── INSERT: Icon / Link / Comment / Symbol ──
     openIconPicker() {
         if (!window.ICON_DB || !window.ICON_DB.length) {
-            this.showToast('Icon library not loaded.');
+            const reason = window.ICON_DB && window.ICON_DB.length === 0
+                ? 'Icon library failed to load — check console for details.'
+                : 'Icon library not loaded.';
+            this.showToast(reason);
             return;
         }
         const self = this;
