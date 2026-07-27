@@ -29,8 +29,12 @@ function formatDate(ts) {
 }
 
 // Strip // comment lines from .emeraldcore files before JSON.parse()
+// Normalizes line endings (\r\n → \n), then removes entire comment lines.
 function stripComments(text) {
-    return text.split('\n').map(line => line.replace(/^\s*\/\/.*$/, '')).join('\n');
+    return text.replace(/\r\n?/g, '\n')
+               .split('\n')
+               .filter(line => !/^\s*\/\//.test(line))
+               .join('\n');
 }
 
 // Shape SVG generator — PowerPoint-style comprehensive shape set
