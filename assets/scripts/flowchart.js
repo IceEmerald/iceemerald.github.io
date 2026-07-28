@@ -1,0 +1,1974 @@
+// ============================================================
+// FlowCode — EmeraldStudio
+// Visual flowchart programming environment.
+// All original logic preserved; UI updated to match the
+// EmeraldNetwork / EmeraldSuite design system.
+//
+// Updates in this revision:
+//  • Double-click on a shape opens its property dialog (single-click only selects)
+//  • Terminal dialog uses Start/End selectable buttons (no typing)
+//  • Flowgorithm strict-mode: variables MUST be Declared before Assign/Input
+//  • Branching shapes (If/While/For/Do): TRUE exits LEFT, FALSE exits RIGHT
+//  • New "Code" panel at bottom-left shows generated pseudo-code
+//  • Panel restack logic updated for the new bottom-right layout
+//  • SVG-based shape outlines for decision / loop / for / do /
+//    breakpoint — borders are no longer clipped by clip-path
+// ============================================================
+
+// ============================================================
+// STATE
+// ============================================================
+const State = {
+  shapes: new Map(),
+  selectedId: null,
+  nextId: 1,
+  connecting: null,
+  execution: null,
+  running: false,
+  paused: false,
+  speed: 30,
+  variables: new Map(),
+  changedVars: new Set(),
+};
+
+const VALID_TYPES = ['Integer', 'Real', 'String', 'Boolean'];
+
+const DIALOG_INFO = {
+  terminal:  { title: 'Terminal Properties',  desc: 'A Terminal Statement marks the start or end of the program.' },
+  declare:   { title: 'Declare Properties',   desc: 'A Declare Statement creates a new variable and defines its data type.' },
+  process:   { title: 'Assignment Properties', desc: 'An Assignment Statement calculates an expression and stores the result in a variable.' },
+  input:     { title: 'Input Properties',     desc: 'An Input Statement reads a value from the user and stores it in a variable.' },
+  output:    { title: 'Output Properties',    desc: 'An Output Statement displays an expression to the console.' },
+  decision:  { title: 'If Properties',        desc: 'An If Statement evaluates a boolean expression. If true, the True branch executes. If false, the False branch executes.' },
+  loop:      { title: 'While Properties',     desc: 'A While Loop repeats while a boolean expression is true. The condition is checked before each iteration.' },
+  for:       { title: 'For Properties',       desc: 'A For Loop increments or decrements a variable through a range of values. This is a common replacement for a While Loop.' },
+  do:        { title: 'Do Properties',        desc: 'A Do Loop executes the body first, then repeats while the condition is true (post-test loop).' },
+  call:      { title: 'Call Properties',      desc: 'A Call Statement executes a subroutine or function.' },
+  comment:   { title: 'Comment Properties',   desc: 'A Comment is a note that is not executed. Use it to document your program.' },
+  breakpoint:{ title: 'Breakpoint Properties', desc: 'A Breakpoint pauses execution when reached. Use it for debugging.' },
+};
+
+// ============================================================
+// UTILITY
+// ============================================================
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+function uid() { return 's' + (State.nextId++); }
+function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function toast(msg, type = '') {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = '', 2200);
+}
+
+// ============================================================
+// SHAPE MANAGEMENT
+// ============================================================
+function createShape(type, x, y) {
+  const id = uid();
+  const shape = { id, type, x: x || 200, y: y || 100, text: '', data: null, next: null, alt: null };
+  shape.data = defaultDataForType(type);
+  shape.text = getDisplayText(shape);
+  State.shapes.set(id, shape);
+  return shape;
+}
+
+function defaultDataForType(type) {
+  switch (type) {
+    case 'terminal':   return { text: 'Start' };
+    case 'declare':    return { name: 'x', dataType: 'Integer', isArray: false, arraySize: 10 };
+    case 'process':    return { variable: 'x', expression: '0' };
+    case 'input':      return { variable: 'x', prompt: '' };
+    case 'output':     return { expression: '"Hello"', newline: true };
+    case 'decision':   return { expression: 'x > 0' };
+    case 'loop':       return { expression: 'x < 10' };
+    case 'for':        return { variable: 'i', start: '1', end: '10', direction: 'increasing', step: '1' };
+    case 'do':         return { expression: 'x < 10' };
+    case 'call':       return { function: 'MyFunction', parameters: '' };
+    case 'comment':    return { text: 'This is a comment' };
+    case 'breakpoint': return {};
+    default: return {};
+  }
+}
+
+function getDisplayText(shape) {
+  const d = shape.data;
+  if (!d) return shape.text || '';
+  switch (shape.type) {
+    case 'terminal':   return d.text || 'Start';
+    case 'declare':    return d.isArray ? d.name + '[' + d.arraySize + '] : ' + d.dataType : d.name + ' : ' + d.dataType;
+    case 'process':    return d.variable + ' = ' + d.expression;
+    case 'input':      return d.prompt ? '"' + d.prompt + '" -> ' + d.variable : d.variable;
+    case 'output':     return d.expression;
+    case 'decision':   return d.expression;
+    case 'loop':       return d.expression;
+    case 'for':        { const dir = d.direction === 'decreasing' ? ' downto ' : ' to '; const step = d.step && d.step !== '1' ? ' step ' + d.step : ''; return d.variable + ' = ' + d.start + dir + d.end + step; }
+    case 'do':         return d.expression;
+    case 'call':       return d.function + '(' + (d.parameters || '') + ')';
+    case 'comment':    return d.text || '';
+    case 'breakpoint': return 'Break';
+    default: return '';
+  }
+}
+
+function migrateShape(shape) {
+  if (shape.data) return;
+  const text = shape.text || '';
+  switch (shape.type) {
+    case 'terminal': shape.data = { text }; break;
+    case 'declare': {
+      const m = text.match(/^([a-zA-Z_]\w*)\s*(?:\[(\d+)\])?\s*(?:as|:)\s*(\w+)/i);
+      if (m) shape.data = { name: m[1], dataType: capitalize(m[3].toLowerCase()), isArray: !!m[2], arraySize: m[2] ? parseInt(m[2],10) : 10 };
+      else shape.data = defaultDataForType('declare');
+      break;
+    }
+    case 'process': {
+      const m = text.match(/^([a-zA-Z_]\w*(?:\[[^\]]+\])?)\s*=\s*(.+)$/);
+      if (m) shape.data = { variable: m[1], expression: m[2].trim() };
+      else shape.data = { variable: 'x', expression: text };
+      break;
+    }
+    case 'input': shape.data = { variable: text.trim(), prompt: '' }; break;
+    case 'output': shape.data = { expression: text, newline: true }; break;
+    case 'decision': shape.data = { expression: text }; break;
+    case 'loop': shape.data = { expression: text }; break;
+    case 'for': shape.data = defaultDataForType('for'); break;
+    case 'do': shape.data = { expression: text }; break;
+    case 'call': { const m = text.match(/^([a-zA-Z_]\w*)\s*\((.*)\)$/); shape.data = { function: m ? m[1] : text, parameters: m ? m[2] : '' }; break; }
+    case 'comment': shape.data = { text }; break;
+    case 'breakpoint': shape.data = {}; break;
+    default: shape.data = {};
+  }
+}
+
+function deleteShape(id) {
+  const shape = State.shapes.get(id);
+  if (!shape) return;
+  State.shapes.forEach(s => { if (s.next === id) s.next = null; if (s.alt === id) s.alt = null; });
+  State.shapes.delete(id);
+  if (State.selectedId === id) State.selectedId = null;
+  renderAll();
+}
+
+function getShape(id) { return State.shapes.get(id); }
+
+function findStartShape() {
+  for (const s of State.shapes.values()) {
+    if (s.type === 'terminal' && /^start/i.test((s.data && s.data.text) || s.text || '')) return s;
+  }
+  for (const s of State.shapes.values()) { if (s.type === 'terminal') return s; }
+  return null;
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderAll() {
+  renderShapes();
+  renderConnections();
+  renderVariables();
+}
+
+// Shape types that use SVG for their outline (because CSS clip-path
+// clips the border, leaving the outline cut off).
+const SVG_SHAPE_TYPES = ['decision', 'loop', 'for', 'do', 'breakpoint'];
+
+function renderShapes() {
+  const layer = $('#shapes-layer');
+  layer.innerHTML = '';
+  State.shapes.forEach(shape => {
+    if (!shape.data) migrateShape(shape);
+    const el = document.createElement('div');
+    el.className = 'shape ' + shape.type;
+    el.dataset.id = shape.id;
+    el.style.left = shape.x + 'px';
+    el.style.top = shape.y + 'px';
+    if (shape.id === State.selectedId) el.classList.add('selected');
+    if (State.execution && State.execution.currentId === shape.id) el.classList.add('executing');
+
+    const sz = getShapeSize(shape);
+
+    if (SVG_SHAPE_TYPES.includes(shape.type)) {
+      // Set explicit dimensions and render an SVG outline so the
+      // border follows the shape's polygon (not clipped like clip-path).
+      el.style.width = sz.w + 'px';
+      el.style.height = sz.h + 'px';
+      el.appendChild(buildShapeSvg(shape, sz));
+
+      const textEl = document.createElement('div');
+      textEl.className = 'shape-text';
+      textEl.textContent = getDisplayText(shape);
+      // Allow text to wrap nicely for narrower shapes
+      if (shape.type === 'decision') { textEl.style.padding = '0 28px'; }
+      else if (shape.type === 'loop' || shape.type === 'for' || shape.type === 'do') { textEl.style.padding = '0 18px'; }
+      else if (shape.type === 'breakpoint') { textEl.style.padding = '0 6px'; textEl.style.fontSize = '10px'; textEl.style.fontWeight = '700'; }
+      el.appendChild(textEl);
+    } else {
+      const body = document.createElement('div');
+      body.className = 'shape-body';
+      body.textContent = getDisplayText(shape);
+      el.appendChild(body);
+    }
+
+    if (shape.type !== 'terminal' && shape.type !== 'comment' && shape.type !== 'breakpoint') {
+      if (['decision','loop','for','do'].includes(shape.type)) {
+        // Branching shapes: TRUE exits LEFT, FALSE exits RIGHT.
+        // (User-requested layout — both labels on left/right, not
+        // bottom/right. Matches a horizontal-branch flowchart style.)
+        const hl = document.createElement('div'); hl.className = 'shape-handle handle-left'; hl.dataset.port = 'next'; el.appendChild(hl);
+        const lblT = document.createElement('div'); lblT.className = 'label'; lblT.textContent = 'T'; hl.appendChild(lblT);
+        const hr = document.createElement('div'); hr.className = 'shape-handle handle-right'; hr.dataset.port = 'alt'; el.appendChild(hr);
+        const lbl = document.createElement('div'); lbl.className = 'label'; lbl.textContent = 'F'; hr.appendChild(lbl);
+      } else {
+        // Non-branching shapes: single downward (bottom) exit.
+        const hb = document.createElement('div'); hb.className = 'shape-handle handle-bottom'; hb.dataset.port = 'next'; el.appendChild(hb);
+      }
+    } else if (shape.type === 'terminal') {
+      const isStart = /^start/i.test((shape.data && shape.data.text) || shape.text || '');
+      if (isStart) { const hb = document.createElement('div'); hb.className = 'shape-handle handle-bottom'; hb.dataset.port = 'next'; el.appendChild(hb); }
+    }
+    layer.appendChild(el);
+  });
+}
+
+// Build the SVG outline for a clip-path-based shape.
+// Returns an <svg> element with a polygon path.
+function buildShapeSvg(shape, sz) {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'shape-svg');
+  svg.setAttribute('width', sz.w);
+  svg.setAttribute('height', sz.h);
+  svg.setAttribute('viewBox', '0 0 ' + sz.w + ' ' + sz.h);
+
+  // Inset by 1px so the stroke is not clipped by the SVG viewport
+  const inset = 1.5;
+  let points = '';
+  let fill = '';
+  let stroke = '';
+  let strokeWidth = 2;
+
+  switch (shape.type) {
+    case 'decision':
+      // Diamond
+      points = (sz.w/2) + ',' + inset + ' ' +
+               (sz.w - inset) + ',' + (sz.h/2) + ' ' +
+               (sz.w/2) + ',' + (sz.h - inset) + ' ' +
+               inset + ',' + (sz.h/2);
+      fill = 'var(--shape-decision-bg)';
+      stroke = 'var(--shape-decision-bd)';
+      break;
+    case 'loop':
+    case 'for':
+    case 'do':
+      // Hexagon (pointed left/right)
+      points = (sz.w * 0.12) + ',' + inset + ' ' +
+               (sz.w * 0.88) + ',' + inset + ' ' +
+               (sz.w - inset) + ',' + (sz.h/2) + ' ' +
+               (sz.w * 0.88) + ',' + (sz.h - inset) + ' ' +
+               (sz.w * 0.12) + ',' + (sz.h - inset) + ' ' +
+               inset + ',' + (sz.h/2);
+      fill = 'var(--shape-loop-bg)';
+      stroke = 'var(--shape-loop-bd)';
+      break;
+    case 'breakpoint':
+      // Octagon
+      points = (sz.w * 0.3) + ',' + inset + ' ' +
+               (sz.w * 0.7) + ',' + inset + ' ' +
+               (sz.w - inset) + ',' + (sz.h * 0.3) + ' ' +
+               (sz.w - inset) + ',' + (sz.h * 0.7) + ' ' +
+               (sz.w * 0.7) + ',' + (sz.h - inset) + ' ' +
+               (sz.w * 0.3) + ',' + (sz.h - inset) + ' ' +
+               inset + ',' + (sz.h * 0.7) + ' ' +
+               inset + ',' + (sz.h * 0.3);
+      fill = 'var(--shape-breakpoint-bg)';
+      stroke = 'var(--shape-breakpoint-bd)';
+      break;
+  }
+
+  if (points) {
+    const poly = document.createElementNS(svgNS, 'polygon');
+    poly.setAttribute('points', points);
+    poly.setAttribute('fill', fill);
+    poly.setAttribute('stroke', stroke);
+    poly.setAttribute('stroke-width', strokeWidth);
+    poly.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(poly);
+  }
+  return svg;
+}
+
+function renderConnections() {
+  const svg = $('#connections');
+  svg.innerHTML = '';
+  ensureArrowhead(svg);
+  State.shapes.forEach(shape => {
+    if (shape.next) drawConnection(svg, shape, 'next', shape.next, 'T');
+    if (shape.alt) drawConnection(svg, shape, 'alt', shape.alt, 'F');
+  });
+  if (State.connecting) {
+    const from = getShape(State.connecting.fromId);
+    if (from) {
+      const start = getPortPos(from, State.connecting.fromPort);
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', makePath(start.x, start.y, State.connecting.mouseX, State.connecting.mouseY));
+      p.setAttribute('stroke', '#239a4d');
+      p.setAttribute('stroke-width', '2');
+      p.setAttribute('stroke-dasharray', '5 4');
+      p.setAttribute('fill', 'none');
+      p.setAttribute('pointer-events', 'none');
+      svg.appendChild(p);
+    }
+  }
+}
+
+function getShapeSize(shape) {
+  switch (shape.type) {
+    case 'terminal': return { w: 130, h: 44 };
+    case 'declare': case 'process': return { w: 140, h: 44 };
+    case 'input': case 'output': return { w: 150, h: 44 };
+    case 'decision': return { w: 160, h: 80 };
+    case 'loop': case 'for': case 'do': return { w: 160, h: 64 };
+    case 'call': return { w: 150, h: 44 };
+    case 'comment': return { w: 180, h: 36 };
+    case 'breakpoint': return { w: 60, h: 50 };
+    default: return { w: 130, h: 44 };
+  }
+}
+
+function getPortPos(shape, port) {
+  const sz = getShapeSize(shape);
+  const x = shape.x, y = shape.y;
+  const isBranching = ['decision','loop','for','do'].includes(shape.type);
+  switch (port) {
+    case 'in':   return { x: x + sz.w/2, y: y };
+    case 'next': return isBranching ? { x: x, y: y + sz.h/2 } : { x: x + sz.w/2, y: y + sz.h };
+    case 'alt':  return { x: x + sz.w, y: y + sz.h/2 };
+    default:     return { x: x + sz.w/2, y: y + sz.h/2 };
+  }
+}
+
+function makePath(x1, y1, x2, y2) {
+  // Smart L-shape router. Picks the dominant axis (the one with the
+  // larger absolute delta) and routes the line as a vertical-then-
+  // horizontal (or horizontal-then-vertical) L with a single rounded
+  // corner. Falls back to a straight line when one axis is ~0.
+  const dx = x2 - x1, dy = y2 - y1;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+
+  // Pure vertical or near-vertical: straight line.
+  if (adx < 3) return 'M ' + x1 + ' ' + y1 + ' L ' + x2 + ' ' + y2;
+  // Pure horizontal or near-horizontal: straight line.
+  if (ady < 3) return 'M ' + x1 + ' ' + y1 + ' L ' + x2 + ' ' + y2;
+
+  const r = Math.min(8, adx / 2, ady / 2, 12);
+
+  if (ady >= adx) {
+    // Vertical-dominant: go down/up first, then turn horizontally.
+    const midY = y1 + dy / 2;
+    const sy = dy > 0 ? 1 : -1;
+    const sx = dx > 0 ? 1 : -1;
+    return 'M ' + x1 + ' ' + y1 +
+      ' L ' + x1 + ' ' + (midY - sy * r) +
+      ' Q ' + x1 + ' ' + midY + ' ' + (x1 + sx * r) + ' ' + midY +
+      ' L ' + (x2 - sx * r) + ' ' + midY +
+      ' Q ' + x2 + ' ' + midY + ' ' + x2 + ' ' + (midY + sy * r) +
+      ' L ' + x2 + ' ' + y2;
+  } else {
+    // Horizontal-dominant: go left/right first, then turn vertically.
+    // This is the path used by the True branch exiting the LEFT side
+    // of a decision diamond and connecting to a shape below-right.
+    const midX = x1 + dx / 2;
+    const sx = dx > 0 ? 1 : -1;
+    const sy = dy > 0 ? 1 : -1;
+    return 'M ' + x1 + ' ' + y1 +
+      ' L ' + (midX - sx * r) + ' ' + y1 +
+      ' Q ' + midX + ' ' + y1 + ' ' + midX + ' ' + (y1 + sy * r) +
+      ' L ' + midX + ' ' + (y2 - sy * r) +
+      ' Q ' + midX + ' ' + y2 + ' ' + (midX + sx * r) + ' ' + y2 +
+      ' L ' + x2 + ' ' + y2;
+  }
+}
+
+function drawConnection(svg, fromShape, portName, toId, label) {
+  const to = getShape(toId);
+  if (!to) return;
+  const start = getPortPos(fromShape, portName);
+  const end = getPortPos(to, 'in');
+  const d = makePath(start.x, start.y, end.x, end.y);
+  const isActive = State.execution && State.execution.lastEdge && State.execution.lastEdge.from === fromShape.id && State.execution.lastEdge.port === portName;
+
+  const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  hit.setAttribute('d', d);
+  hit.setAttribute('class', 'conn-hit');
+  hit.dataset.from = fromShape.id;
+  hit.dataset.port = portName;
+  hit.dataset.to = toId;
+  hit.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showInsertMenu(e.clientX, e.clientY, fromShape.id, portName, toId);
+  });
+  svg.appendChild(hit);
+
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('class', 'conn-line' + (isActive ? ' active' : ''));
+  path.setAttribute('marker-end', isActive ? 'url(#arrowhead-active)' : 'url(#arrowhead)');
+  svg.appendChild(path);
+
+  if (['decision','loop','for','do'].includes(fromShape.type) && label) {
+    // Place the label 25% along the line, near the diamond's exit
+    // point, so it doesn't drift to the middle of a long L-shape.
+    const tPos = 0.25;
+    const lblX = start.x + (end.x - start.x) * tPos;
+    const lblY = start.y + (end.y - start.y) * tPos;
+    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.setAttribute('x', lblX - 7); bg.setAttribute('y', lblY - 8);
+    bg.setAttribute('width', 14); bg.setAttribute('height', 14);
+    bg.setAttribute('class', 'conn-label-bg'); bg.setAttribute('rx', '3');
+    svg.appendChild(bg);
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', lblX); t.setAttribute('y', lblY + 3);
+    t.setAttribute('text-anchor', 'middle'); t.setAttribute('class', 'conn-label');
+    t.textContent = label;
+    svg.appendChild(t);
+  }
+}
+
+function ensureArrowhead(svg) {
+  if (svg.querySelector('defs')) return;
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  marker.setAttribute('id', 'arrowhead');
+  marker.setAttribute('viewBox', '0 0 10 10');
+  marker.setAttribute('refX', '8'); marker.setAttribute('refY', '5');
+  marker.setAttribute('markerWidth', '7'); marker.setAttribute('markerHeight', '7');
+  marker.setAttribute('orient', 'auto');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+  path.setAttribute('fill', 'rgba(44,62,80,0.55)');
+  marker.appendChild(path);
+  defs.appendChild(marker);
+  const markerA = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  markerA.setAttribute('id', 'arrowhead-active');
+  markerA.setAttribute('viewBox', '0 0 10 10');
+  markerA.setAttribute('refX', '8'); markerA.setAttribute('refY', '5');
+  markerA.setAttribute('markerWidth', '7'); markerA.setAttribute('markerHeight', '7');
+  markerA.setAttribute('orient', 'auto');
+  const pathA = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  pathA.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+  pathA.setAttribute('fill', '#239a4d');
+  markerA.appendChild(pathA);
+  defs.appendChild(markerA);
+  svg.appendChild(defs);
+}
+
+function renderVariables() {
+  const panel = $('#variables-panel');
+  $('#var-count').textContent = State.variables.size;
+  if (State.variables.size === 0) { panel.innerHTML = '<div class="var-empty">No variables yet. Run the program to see them.</div>'; return; }
+  let html = '';
+  State.variables.forEach((v, name) => {
+    const changed = State.changedVars.has(name) ? ' changed' : '';
+    let displayVal;
+    if (Array.isArray(v.value)) displayVal = '[' + v.value.map(x => typeof x === 'string' ? '"' + x + '"' : x).join(', ') + ']';
+    else if (v.type === 'String') displayVal = '"' + v.value + '"';
+    else displayVal = String(v.value);
+    const typeLabel = Array.isArray(v.value) ? v.type + '[]' : v.type;
+    html += '<div class="var-item"><div class="var-name">' + escapeHtml(name) + '</div><div class="var-type ' + (Array.isArray(v.value) ? 'Array' : v.type) + '">' + escapeHtml(typeLabel) + '</div><div class="var-value' + changed + '">' + escapeHtml(displayVal) + '</div></div>';
+  });
+  panel.innerHTML = html;
+  State.changedVars.clear();
+}
+
+// ============================================================
+// CANVAS INTERACTION
+// ============================================================
+let dragInfo = null;
+let panInfo = null;
+State.pan = { x: 0, y: 0 };
+State.spaceHeld = false;
+
+function applyPan() {
+  $('#canvas-content').style.transform = 'translate(' + State.pan.x + 'px, ' + State.pan.y + 'px)';
+  $('#canvas-wrap').style.backgroundPosition = State.pan.x + 'px ' + State.pan.y + 'px';
+}
+
+$('#canvas-wrap').addEventListener('mousedown', (e) => {
+  // Ignore clicks on floating UI panels
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  if (State.spaceHeld || e.button === 1) {
+    panInfo = { startX: e.clientX, startY: e.clientY, panX: State.pan.x, panY: State.pan.y };
+    $('#canvas-wrap').classList.add('panning');
+    e.preventDefault();
+    return;
+  }
+  const target = e.target.closest('.shape');
+  if (target) {
+    const handle = e.target.closest('.shape-handle');
+    if (handle) {
+      const fromId = target.dataset.id;
+      const fromPort = handle.dataset.port;
+      if (fromPort === 'in') return;
+      const rect = $('#canvas-wrap').getBoundingClientRect();
+      State.connecting = { fromId, fromPort, mouseX: e.clientX - rect.left - State.pan.x, mouseY: e.clientY - rect.top - State.pan.y };
+      document.body.classList.add('connecting-mode');
+      e.preventDefault();
+      return;
+    }
+    const id = target.dataset.id;
+    const wasSelected = State.selectedId === id;
+    State.selectedId = id;
+    const shape = getShape(id);
+    const rect = $('#canvas-wrap').getBoundingClientRect();
+    dragInfo = {
+      id,
+      offsetX: e.clientX - rect.left - State.pan.x - shape.x,
+      offsetY: e.clientY - rect.top - State.pan.y - shape.y,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+    };
+    // CRITICAL: only rebuild the shapes layer when the selection
+    // actually changed. If we rebuild on every mousedown, the second
+    // click of a double-click lands on a brand-new DOM element and
+    // the browser never fires a `dblclick` event — so the Edit
+    // Properties modal would never open. Skipping renderShapes() here
+    // when the shape was already selected lets the browser recognize
+    // the two clicks as a single dblclick on the same element.
+    if (!wasSelected) renderShapes();
+  } else {
+    if (State.selectedId) { State.selectedId = null; renderShapes(); }
+  }
+});
+
+document.addEventListener('mousemove', (e) => {
+  const rect = $('#canvas-wrap').getBoundingClientRect();
+  if (panInfo) {
+    State.pan.x = panInfo.panX + (e.clientX - panInfo.startX);
+    State.pan.y = panInfo.panY + (e.clientY - panInfo.startY);
+    applyPan();
+    return;
+  }
+  if (dragInfo) {
+    // Detect drag — if movement exceeds a small threshold, mark as moved
+    if (Math.abs(e.clientX - dragInfo.startX) > 4 || Math.abs(e.clientY - dragInfo.startY) > 4) {
+      dragInfo.moved = true;
+    }
+    const shape = getShape(dragInfo.id);
+    if (shape) {
+      shape.x = e.clientX - rect.left - State.pan.x - dragInfo.offsetX;
+      shape.y = e.clientY - rect.top - State.pan.y - dragInfo.offsetY;
+      const el = document.querySelector('.shape[data-id="' + dragInfo.id + '"]');
+      if (el) { el.style.left = shape.x + 'px'; el.style.top = shape.y + 'px'; }
+      renderConnections();
+    }
+  }
+  if (State.connecting) {
+    State.connecting.mouseX = e.clientX - rect.left - State.pan.x;
+    State.connecting.mouseY = e.clientY - rect.top - State.pan.y;
+    renderConnections();
+  }
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (panInfo) {
+    panInfo = null;
+    $('#canvas-wrap').classList.remove('panning');
+    return;
+  }
+  if (State.connecting) {
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const targetShape = target ? target.closest('.shape') : null;
+    if (targetShape) {
+      const toId = targetShape.dataset.id;
+      const fromShape = getShape(State.connecting.fromId);
+      if (fromShape && fromShape.id !== toId) {
+        const toShape = getShape(toId);
+        const isStart = toShape.type === 'terminal' && /^start/i.test((toShape.data && toShape.data.text) || toShape.text || '');
+        if (!isStart && toShape.type !== 'comment' && toShape.type !== 'breakpoint') {
+          if (State.connecting.fromPort === 'next') fromShape.next = toId;
+          else if (State.connecting.fromPort === 'alt') fromShape.alt = toId;
+        }
+      }
+    }
+    State.connecting = null;
+    document.body.classList.remove('connecting-mode');
+    renderConnections();
+  }
+  dragInfo = null;
+});
+
+// Double-click opens the Edit Properties dialog — exactly the same
+// flow as right-click → "Edit Properties". Single-click only selects
+// the shape (mousedown handler above) so its connection handles remain
+// available. This matches Flowgorithm, where one click selects a block
+// and a double-click (or Enter) is required to edit it.
+$('#canvas-wrap').addEventListener('dblclick', (e) => {
+  // Ignore double-clicks that originate on floating UI panels.
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  // Ignore double-clicks on connection handles — those are for dragging
+  // connections, not for opening properties.
+  if (e.target.closest('.shape-handle')) return;
+  const target = e.target.closest('.shape');
+  if (!target) return;
+  // Mirror the right-click → Edit Properties flow exactly:
+  //   1. Select the shape (so the green selection ring shows)
+  //   2. Re-render so the selection is visible
+  //   3. Open the property dialog
+  // This is the same sequence performed by handleContextAction('edit', id).
+  e.preventDefault();
+  State.selectedId = target.dataset.id;
+  renderShapes();
+  openPropertyDialog(target.dataset.id);
+});
+
+// Safety net: prevent ANY single-click path from opening the property
+// dialog. The dblclick listener above is the ONLY sanctioned entry point
+// for opening a property modal via the mouse. (Keyboard Enter on a
+// selected shape still works — see the keydown handler.)
+
+// Right-click context menu (kept for power-user actions like Duplicate,
+// Disconnect, Delete — Edit Properties is also still there).
+$('#canvas-wrap').addEventListener('contextmenu', (e) => {
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  const target = e.target.closest('.shape');
+  if (target) {
+    e.preventDefault();
+    State.selectedId = target.dataset.id;
+    renderShapes();
+    showContextMenu(e.clientX, e.clientY, target.dataset.id);
+  }
+});
+
+// ============================================================
+// INSERT SHAPE ON LINE CLICK
+// ============================================================
+function showInsertMenu(x, y, fromId, port, toId) {
+  const fromShape = getShape(fromId);
+  const toShape = getShape(toId);
+  if (!fromShape || !toShape) return;
+  const fromPos = getPortPos(fromShape, port);
+  const toPos = getPortPos(toShape, 'in');
+  const midX = (fromPos.x + toPos.x) / 2 - 70;
+  const midY = (fromPos.y + toPos.y) / 2 - 22;
+
+  const menu = $('#context-menu');
+  const options = [
+    { type: 'process', label: 'Assign' },
+    { type: 'declare', label: 'Declare' },
+    { type: 'input', label: 'Input' },
+    { type: 'output', label: 'Output' },
+    { type: 'decision', label: 'If' },
+    { type: 'call', label: 'Call' },
+    { type: 'comment', label: 'Comment' },
+  ];
+  menu.innerHTML = '<div class="ctx-title">Insert Shape Here</div><div class="ctx-sep"></div>' +
+    options.map(o => '<div class="ctx-item" data-type="' + o.type + '">' + o.label + '</div>').join('');
+  menu.style.display = 'block';
+  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  menu.querySelectorAll('.ctx-item[data-type]').forEach(el => {
+    el.onclick = () => {
+      const newShape = createShape(el.dataset.type, midX, midY);
+      if (port === 'next') fromShape.next = newShape.id;
+      else fromShape.alt = newShape.id;
+      newShape.next = toId;
+      State.selectedId = newShape.id;
+      renderAll();
+      hideContextMenu();
+      setTimeout(() => openPropertyDialog(newShape.id), 100);
+    };
+  });
+}
+
+// Palette
+$$('.palette-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const type = item.dataset.type;
+    const rect = $('#canvas-wrap').getBoundingClientRect();
+    const x = rect.width / 2 - 70 + (Math.random() * 40 - 20) - State.pan.x;
+    const y = 60 + State.shapes.size * 6 - State.pan.y;
+    const shape = createShape(type, x, y);
+    State.selectedId = shape.id;
+    renderAll();
+  });
+  item.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('shape-type', item.dataset.type);
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+});
+
+// ============================================================
+// BOTTOM-RIGHT PANEL DOCK — minimize / maximize toggle
+// The dock order and layout are controlled by CSS; JavaScript only
+// toggles the state class and never changes panel geometry or position.
+// ============================================================
+$$('.panel-toggle').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const target = btn.dataset.target;
+    const panel = document.getElementById('panel-' + target);
+    if (!panel) return;
+    panel.classList.toggle('minimized');
+  });
+});
+
+// Don't allow palette drops onto any floating panel
+$('#canvas-wrap').addEventListener('dragover', (e) => {
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+$('#canvas-wrap').addEventListener('drop', (e) => {
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  e.preventDefault();
+  const type = e.dataTransfer.getData('shape-type');
+  if (!type) return;
+  const rect = $('#canvas-wrap').getBoundingClientRect();
+  const shape = createShape(type, e.clientX - rect.left - State.pan.x - 65, e.clientY - rect.top - State.pan.y - 22);
+  State.selectedId = shape.id;
+  renderAll();
+});
+
+// Keyboard
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (!State.spaceHeld) {
+      State.spaceHeld = true;
+      $('#canvas-wrap').classList.add('space-mode');
+    }
+    return;
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (State.selectedId) { deleteShape(State.selectedId); toast('Shape deleted'); } }
+  else if (e.key === 'Enter') { if (State.selectedId && !$('.modal-overlay')) openPropertyDialog(State.selectedId); }
+  else if (e.key === 'Escape') {
+    if (State.connecting) { State.connecting = null; document.body.classList.remove('connecting-mode'); renderConnections(); }
+    hideContextMenu();
+  }
+  else if (e.key === 'F5' || (e.ctrlKey && e.key === 'Enter')) { e.preventDefault(); runProgram(); }
+  else if (e.key === 'F10') { e.preventDefault(); stepProgram(); }
+  else if (e.ctrlKey && e.key === 's') { e.preventDefault(); saveProgram(); }
+  else if (e.ctrlKey && e.key === 'o') { e.preventDefault(); loadProgram(); }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') {
+    State.spaceHeld = false;
+    $('#canvas-wrap').classList.remove('space-mode');
+    $('#canvas-wrap').classList.remove('panning');
+    panInfo = null;
+  }
+});
+
+window.addEventListener('blur', () => {
+  State.spaceHeld = false;
+  $('#canvas-wrap').classList.remove('space-mode');
+  $('#canvas-wrap').classList.remove('panning');
+  panInfo = null;
+});
+
+// ============================================================
+// CONTEXT MENU
+// ============================================================
+function showContextMenu(x, y, shapeId) {
+  const menu = $('#context-menu');
+  const shape = getShape(shapeId);
+  menu.innerHTML =
+    '<div class="ctx-item" data-action="edit">Edit Properties<span class="ctx-shortcut">Dbl-click</span></div>' +
+    '<div class="ctx-sep"></div>' +
+    '<div class="ctx-item" data-action="duplicate">Duplicate</div>' +
+    (shape.type !== 'terminal' && shape.type !== 'comment' && shape.type !== 'breakpoint' ? (
+      (shape.next ? '<div class="ctx-item" data-action="disconnect-next">Disconnect True</div>' : '') +
+      (['decision','loop','for','do'].includes(shape.type) ? (shape.alt ? '<div class="ctx-item" data-action="disconnect-alt">Disconnect False</div>' : '') : '')
+    ) : '') +
+    '<div class="ctx-sep"></div>' +
+    '<div class="ctx-item danger" data-action="delete">Delete<span class="ctx-shortcut">Del</span></div>';
+  menu.style.display = 'block';
+  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  menu.querySelectorAll('.ctx-item').forEach(it => {
+    it.addEventListener('click', () => { handleContextAction(it.dataset.action, shapeId); hideContextMenu(); });
+  });
+}
+function hideContextMenu() { $('#context-menu').style.display = 'none'; }
+document.addEventListener('click', hideContextMenu);
+function handleContextAction(action, id) {
+  const shape = getShape(id);
+  if (!shape) return;
+  switch (action) {
+    case 'edit': openPropertyDialog(id); break;
+    case 'duplicate': { const copy = createShape(shape.type, shape.x + 30, shape.y + 30); copy.data = JSON.parse(JSON.stringify(shape.data)); copy.text = getDisplayText(copy); State.selectedId = copy.id; renderAll(); toast('Duplicated'); break; }
+    case 'delete': deleteShape(id); toast('Deleted'); break;
+    case 'disconnect-next': shape.next = null; renderConnections(); break;
+    case 'disconnect-alt': shape.alt = null; renderConnections(); break;
+  }
+}
+
+// ============================================================
+// PROPERTY DIALOGS
+// ============================================================
+function renderShapeIcon(type) {
+  const icons = {
+    terminal: '<div class="icon-shape" style="background:#fff8db;border:2px solid #d4a017;border-radius:20px;">Start</div>',
+    declare: '<div class="icon-shape" style="background:#fff8db;border:2px solid #d4a017;">Declare</div>',
+    process: '<div class="icon-shape" style="background:#fff8db;border:2px solid #d4a017;">Assign</div>',
+    input: '<div class="icon-shape" style="background:#d6ecf5;border:2px solid #3b7a99;transform:skewX(-15deg);">Input</div>',
+    output: '<div class="icon-shape" style="background:#d7f0d7;border:2px solid #2a8a44;transform:skewX(-15deg);">Output</div>',
+    decision: '<div class="icon-shape" style="background:#fbdfe4;border:2px solid #c93b53;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);width:40px;height:40px;">If</div>',
+    loop: '<div class="icon-shape" style="background:#ffe6cc;border:2px solid #c97a3a;clip-path:polygon(12% 0,88% 0,100% 50%,88% 100%,12% 100%,0 50%);">While</div>',
+    for: '<div class="icon-shape" style="background:#ffe6cc;border:2px solid #c97a3a;clip-path:polygon(12% 0,88% 0,100% 50%,88% 100%,12% 100%,0 50%);">For</div>',
+    do: '<div class="icon-shape" style="background:#ffe6cc;border:2px solid #c97a3a;clip-path:polygon(12% 0,88% 0,100% 50%,88% 100%,12% 100%,0 50%);">Do</div>',
+    call: '<div class="icon-shape" style="background:#ece4f7;border:2px solid #7c5cb8;border-left:4px double #7c5cb8;border-right:4px double #7c5cb8;">Call</div>',
+    comment: '<div class="icon-shape" style="background:#fff;border:1px dashed rgba(0,0,0,0.3);font-style:italic;">Comment</div>',
+    breakpoint: '<div class="icon-shape" style="background:#ff6b6b;border:2px solid #c92a2a;clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%);width:30px;height:30px;color:#fff;">B</div>',
+  };
+  return icons[type] || '';
+}
+
+function createDialogShell(shape) {
+  const info = DIALOG_INFO[shape.type] || { title: 'Properties', desc: '' };
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML =
+    '<div class="prop-dialog">' +
+      '<div class="prop-header">' +
+        '<div class="prop-shape-icon">' + renderShapeIcon(shape.type) + '</div>' +
+        '<div class="prop-description">' + escapeHtml(info.desc) + '</div>' +
+      '</div>' +
+      '<div class="prop-body"></div>' +
+      '<div class="prop-footer">' +
+        '<button class="prop-btn cancel">Cancel</button>' +
+        '<button class="prop-btn primary ok">OK</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  return {
+    overlay,
+    body: overlay.querySelector('.prop-body'),
+    okBtn: overlay.querySelector('.ok'),
+    cancelBtn: overlay.querySelector('.cancel'),
+    close: () => overlay.remove(),
+  };
+}
+
+function openPropertyDialog(shapeId) {
+  const shape = getShape(shapeId);
+  if (!shape) return;
+  if (!shape.data) migrateShape(shape);
+  switch (shape.type) {
+    case 'terminal': openTerminalDialog(shape); break;
+    case 'declare': openDeclareDialog(shape); break;
+    case 'process': openAssignDialog(shape); break;
+    case 'input': openInputDialog(shape); break;
+    case 'output': openOutputDialog(shape); break;
+    case 'decision': openIfDialog(shape); break;
+    case 'loop': openWhileDialog(shape); break;
+    case 'for': openForDialog(shape); break;
+    case 'do': openDoDialog(shape); break;
+    case 'call': openCallDialog(shape); break;
+    case 'comment': openCommentDialog(shape); break;
+    case 'breakpoint': openBreakpointDialog(shape); break;
+  }
+}
+
+// Terminal dialog — Start/End selectable buttons (no typing required)
+function openTerminalDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  const current = (d.text || 'Start').toLowerCase();
+  const isStart = current !== 'end';
+  dlg.body.innerHTML =
+    '<div class="prop-field"><label>Terminal Type</label>' +
+    '<div class="terminal-type-buttons">' +
+      '<button type="button" class="terminal-type-btn' + (isStart ? ' active' : '') + '" data-value="Start">' +
+        '<span class="terminal-type-icon">▶</span>' +
+        '<span>Start</span>' +
+      '</button>' +
+      '<button type="button" class="terminal-type-btn' + (!isStart ? ' active' : '') + '" data-value="End">' +
+        '<span class="terminal-type-icon">■</span>' +
+        '<span>End</span>' +
+      '</button>' +
+    '</div></div>';
+  let selectedValue = isStart ? 'Start' : 'End';
+  dlg.body.querySelectorAll('.terminal-type-btn').forEach(btn => {
+    btn.onclick = () => {
+      dlg.body.querySelectorAll('.terminal-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedValue = btn.dataset.value;
+    };
+  });
+  // Allow double-click to confirm
+  dlg.body.querySelectorAll('.terminal-type-btn').forEach(btn => {
+    btn.ondblclick = () => {
+      selectedValue = btn.dataset.value;
+      d.text = selectedValue;
+      shape.text = getDisplayText(shape);
+      renderAll();
+      dlg.close();
+    };
+  });
+  dlg.okBtn.onclick = () => { d.text = selectedValue; shape.text = getDisplayText(shape); renderAll(); dlg.close(); };
+  dlg.cancelBtn.onclick = dlg.close;
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openDeclareDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML =
+    '<div class="prop-field"><label>Name</label>' +
+    '<input type="text" id="f-name" value="' + escapeHtml(d.name || '') + '" placeholder="variable name"></div>' +
+    '<div class="prop-field"><label>Data Type</label>' +
+    '<select id="f-type">' +
+      '<option value="Integer">Integer</option>' +
+      '<option value="Real">Real</option>' +
+      '<option value="String">String</option>' +
+      '<option value="Boolean">Boolean</option>' +
+    '</select></div>' +
+    '<div class="prop-field"><label class="prop-checkbox"><input type="checkbox" id="f-array"> Array?</label></div>' +
+    '<div class="prop-field" id="f-size-field" style="display:none;"><label>Array Size (number of elements)</label>' +
+    '<input type="number" id="f-size" value="' + (d.arraySize || 10) + '" min="1" max="10000"></div>';
+  dlg.body.querySelector('#f-type').value = d.dataType || 'Integer';
+  const arrayCheck = dlg.body.querySelector('#f-array');
+  arrayCheck.checked = d.isArray || false;
+  const sizeField = dlg.body.querySelector('#f-size-field');
+  sizeField.style.display = arrayCheck.checked ? '' : 'none';
+  arrayCheck.onchange = () => { sizeField.style.display = arrayCheck.checked ? '' : 'none'; };
+  const nameInput = dlg.body.querySelector('#f-name');
+  nameInput.focus(); nameInput.select();
+  dlg.okBtn.onclick = () => {
+    const name = nameInput.value.trim();
+    if (!name) { toast('Please enter a variable name', 'error'); return; }
+    if (!/^[a-zA-Z_]\w*$/.test(name)) { toast('Invalid variable name', 'error'); return; }
+    d.name = name;
+    d.dataType = dlg.body.querySelector('#f-type').value;
+    d.isArray = arrayCheck.checked;
+    d.arraySize = parseInt(dlg.body.querySelector('#f-size').value, 10) || 1;
+    shape.text = getDisplayText(shape);
+    renderAll(); dlg.close();
+  };
+  dlg.cancelBtn.onclick = dlg.close;
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') dlg.okBtn.click(); if (e.key === 'Escape') dlg.close(); });
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openAssignDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML =
+    '<div class="prop-field"><div class="prop-assign-row">' +
+    '<input type="text" id="f-var" value="' + escapeHtml(d.variable || '') + '" placeholder="variable">' +
+    '<span class="equals">=</span>' +
+    '<textarea id="f-expr" placeholder="expression">' + escapeHtml(d.expression || '') + '</textarea>' +
+    '</div></div>';
+  const varInput = dlg.body.querySelector('#f-var');
+  const exprInput = dlg.body.querySelector('#f-expr');
+  varInput.focus(); varInput.select();
+  dlg.okBtn.onclick = () => {
+    const v = varInput.value.trim();
+    if (!v) { toast('Please enter a variable name', 'error'); return; }
+    d.variable = v;
+    d.expression = exprInput.value.trim();
+    if (!d.expression) { toast('Please enter an expression', 'error'); return; }
+    shape.text = getDisplayText(shape);
+    renderAll(); dlg.close();
+  };
+  dlg.cancelBtn.onclick = dlg.close;
+  [varInput, exprInput].forEach(el => {
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && el === varInput) { e.preventDefault(); exprInput.focus(); } if (e.key === 'Escape') dlg.close(); });
+  });
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openInputDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML =
+    '<div class="prop-field"><label>Prompt</label>' +
+    '<input type="text" id="f-prompt" value="' + escapeHtml(d.prompt || '') + '" placeholder="e.g. Enter your age"></div>' +
+    '<div class="prop-field"><label>Variable</label>' +
+    '<input type="text" id="f-var" value="' + escapeHtml(d.variable || '') + '" placeholder="variable name"></div>';
+  const varInput = dlg.body.querySelector('#f-var');
+  varInput.focus(); varInput.select();
+  dlg.okBtn.onclick = () => {
+    d.prompt = dlg.body.querySelector('#f-prompt').value.trim();
+    d.variable = varInput.value.trim();
+    if (!d.variable) { toast('Please enter a variable name', 'error'); return; }
+    shape.text = getDisplayText(shape);
+    renderAll(); dlg.close();
+  };
+  dlg.cancelBtn.onclick = dlg.close;
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openOutputDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML =
+    '<div class="prop-field"><label>Expression</label>' +
+    '<textarea id="f-expr" placeholder="e.g. &quot;Hello&quot; or x + y">' + escapeHtml(d.expression || '') + '</textarea></div>' +
+    '<div class="prop-field"><label class="prop-checkbox"><input type="checkbox" id="f-nl" ' + (d.newline !== false ? 'checked' : '') + '> Output a newline after</label></div>';
+  const exprInput = dlg.body.querySelector('#f-expr');
+  exprInput.focus(); exprInput.select();
+  dlg.okBtn.onclick = () => {
+    d.expression = exprInput.value.trim();
+    if (!d.expression) { toast('Please enter an expression', 'error'); return; }
+    d.newline = dlg.body.querySelector('#f-nl').checked;
+    shape.text = getDisplayText(shape);
+    renderAll(); dlg.close();
+  };
+  dlg.cancelBtn.onclick = dlg.close;
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openIfDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML =
+    '<div class="prop-field"><label>Boolean Expression (True branch goes down, False branch goes right)</label>' +
+    '<textarea id="f-expr" placeholder="e.g. x > 5">' + escapeHtml(d.expression || '') + '</textarea></div>';
+  const exprInput = dlg.body.querySelector('#f-expr');
+  exprInput.focus(); exprInput.select();
+  dlg.okBtn.onclick = () => {
+    d.expression = exprInput.value.trim();
+    if (!d.expression) { toast('Please enter an expression', 'error'); return; }
+    shape.text = getDisplayText(shape);
+    renderAll(); dlg.close();
+  };
+  dlg.cancelBtn.onclick = dlg.close;
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openWhileDialog(shape) { openIfDialog(shape); }
+function openDoDialog(shape) { openIfDialog(shape); }
+
+function openForDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML =
+    '<div class="prop-field"><label>Variable</label>' +
+    '<input type="text" id="f-var" value="' + escapeHtml(d.variable || '') + '"></div>' +
+    '<div class="prop-inline">' +
+    '<div class="prop-field" style="flex:1;"><label>Start Value</label><input type="text" id="f-start" value="' + escapeHtml(d.start || '') + '"></div>' +
+    '<div class="prop-field" style="flex:1;"><label>End Value</label><input type="text" id="f-end" value="' + escapeHtml(d.end || '') + '"></div>' +
+    '</div>' +
+    '<div class="prop-inline">' +
+    '<div class="prop-field" style="flex:1;"><label>Direction</label><div class="prop-radio-group">' +
+    '<label class="prop-radio"><input type="radio" name="dir" value="increasing" ' + (d.direction !== 'decreasing' ? 'checked' : '') + '> Increasing</label>' +
+    '<label class="prop-radio"><input type="radio" name="dir" value="decreasing" ' + (d.direction === 'decreasing' ? 'checked' : '') + '> Decreasing</label>' +
+    '</div></div>' +
+    '<div class="prop-field" style="flex:1;"><label>Step By</label><input type="text" id="f-step" value="' + escapeHtml(d.step || '1') + '"></div>' +
+    '</div>';
+  const varInput = dlg.body.querySelector('#f-var');
+  varInput.focus(); varInput.select();
+  dlg.okBtn.onclick = () => {
+    d.variable = varInput.value.trim();
+    d.start = dlg.body.querySelector('#f-start').value.trim();
+    d.end = dlg.body.querySelector('#f-end').value.trim();
+    d.direction = dlg.body.querySelector('input[name=dir]:checked').value;
+    d.step = dlg.body.querySelector('#f-step').value.trim() || '1';
+    if (!d.variable || !d.start || !d.end) { toast('Please fill in all fields', 'error'); return; }
+    shape.text = getDisplayText(shape);
+    renderAll(); dlg.close();
+  };
+  dlg.cancelBtn.onclick = dlg.close;
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openCallDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML =
+    '<div class="prop-field"><label>Function Name</label>' +
+    '<input type="text" id="f-func" value="' + escapeHtml(d.function || '') + '"></div>' +
+    '<div class="prop-field"><label>Parameters (comma-separated expressions)</label>' +
+    '<textarea id="f-params" placeholder="e.g. x, y, 10">' + escapeHtml(d.parameters || '') + '</textarea></div>';
+  const funcInput = dlg.body.querySelector('#f-func');
+  funcInput.focus(); funcInput.select();
+  dlg.okBtn.onclick = () => {
+    d.function = funcInput.value.trim();
+    d.parameters = dlg.body.querySelector('#f-params').value.trim();
+    if (!d.function) { toast('Please enter a function name', 'error'); return; }
+    shape.text = getDisplayText(shape);
+    renderAll(); dlg.close();
+  };
+  dlg.cancelBtn.onclick = dlg.close;
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openCommentDialog(shape) {
+  const d = shape.data;
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML =
+    '<div class="prop-field"><label>Comment Text</label>' +
+    '<textarea id="f-text" style="min-height:80px;">' + escapeHtml(d.text || '') + '</textarea></div>';
+  const textInput = dlg.body.querySelector('#f-text');
+  textInput.focus(); textInput.select();
+  dlg.okBtn.onclick = () => { d.text = textInput.value; shape.text = getDisplayText(shape); renderAll(); dlg.close(); };
+  dlg.cancelBtn.onclick = dlg.close;
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+function openBreakpointDialog(shape) {
+  const dlg = createDialogShell(shape);
+  dlg.body.innerHTML = '<p style="color:var(--fc-text-dim);font-size:13px;line-height:1.65;">A breakpoint pauses execution when reached. Click OK to keep it, or Cancel to discard.</p>';
+  dlg.okBtn.onclick = () => { renderAll(); dlg.close(); };
+  dlg.cancelBtn.onclick = dlg.close;
+  dlg.overlay.addEventListener('click', (e) => { if (e.target === dlg.overlay) dlg.close(); });
+}
+
+// ============================================================
+// EXPRESSION EVALUATOR
+// ============================================================
+// Built-in functions mirror Flowgorithm's standard library.
+// Flowgorithm is case-insensitive for function names — we honor
+// that by lowercasing every call site before evaluation (see
+// evalExpression). The keys here MUST be lowercase.
+const BUILTINS = {
+  // Math
+  sqrt:(x)=>Math.sqrt(x), abs:(x)=>Math.abs(x), floor:(x)=>Math.floor(x),
+  ceiling:(x)=>Math.ceil(x), round:(x)=>Math.round(x),
+  max:(...a)=>Math.max(...a), min:(...a)=>Math.min(...a),
+  power:(a,b)=>Math.pow(a,b),
+  sin:(x)=>Math.sin(x), cos:(x)=>Math.cos(x), tan:(x)=>Math.tan(x),
+  arcsin:(x)=>Math.asin(x), arccos:(x)=>Math.acos(x), arctan:(x)=>Math.atan(x),
+  log:(x)=>Math.log(x), log10:(x)=>(Math.log10?Math.log10(x):Math.log(x)/Math.LN10),
+  logten:(x)=>(Math.log10?Math.log10(x):Math.log(x)/Math.LN10),
+  exp:(x)=>Math.exp(x),
+  // Flowgorithm's Random(max) returns an integer in [0, max].
+  // Random(a, b) returns an integer in [a, b] (inclusive).
+  random:(a,b)=>{ if(b===undefined) return Math.floor(Math.random()*(a+1)); return Math.floor(Math.random()*(b-a+1))+a; },
+  randomseed:(s)=>{ /* no-op: JS has no portable seeded PRNG; seed is accepted for compatibility */ },
+  // String
+  length:(s)=>String(s).length,
+  // Flowgorithm: CharAt(s, i) → i-th character of s (0-indexed in our impl).
+  charat:(s,i)=>String(s)[Math.trunc(Number(i))]||'',
+  // Flowgorithm: Char(n) → character for ASCII code n. (Alias: chr)
+  char:(n)=>String.fromCharCode(Math.trunc(Number(n))),
+  chr:(n)=>String.fromCharCode(Math.trunc(Number(n))),
+  // Flowgorithm: Ascii(c) → ASCII value of first character. (Alias: asc)
+  ascii:(c)=>String(c).charCodeAt(0),
+  asc:(c)=>String(c).charCodeAt(0),
+  indexof:(s,sub)=>String(s).indexOf(String(sub)),
+  substring:(s,start,len)=>len===undefined?String(s).slice(Math.trunc(Number(start))):String(s).substr(Math.trunc(Number(start)),Math.trunc(Number(len))),
+  toupper:(s)=>String(s).toUpperCase(),
+  tolower:(s)=>String(s).toLowerCase(),
+  trim:(s)=>String(s).trim(),
+  // Conversion
+  tointeger:(x)=>parseInt(x,10),
+  toreal:(x)=>parseFloat(x),
+  tostring:(x)=>String(x),
+  tofixedstring:(x,d)=>{ const n=Number(x); const dec=Math.max(0,Math.trunc(Number(d)||0)); return isNaN(n)?String(x):n.toFixed(dec); },
+  // Type predicates (Flowgorithm)
+  isinteger:(x)=>{ if (typeof x==='number') return Number.isInteger(x); if (typeof x==='string') return /^-?\d+$/.test(x.trim()); return false; },
+  isreal:(x)=>{ if (typeof x==='number') return !Number.isNaN(x); if (typeof x==='string') return !isNaN(parseFloat(x)) && isFinite(x); return false; },
+  isnumber:(x)=>!isNaN(Number(x)),
+  isstring:(x)=>typeof x==='string',
+  isboolean:(x)=>typeof x==='boolean',
+};
+
+function translateToJS(expr) {
+  const strings = [];
+  let js = expr.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, (m) => { strings.push(m); return '\u0000S' + strings.length + '\u0000'; });
+  js = js.replace(/\u2260/g,'!=').replace(/\u2264/g,'<=').replace(/\u2265/g,'>=').replace(/\u00d7/g,'*').replace(/\u00f7/g,'/');
+  js = js.replace(/\^/g,'**');
+  js = js.replace(/\bmod\b/gi,'%').replace(/\bdiv\b/gi,'__ID__').replace(/\band\b/gi,'&&').replace(/\bor\b/gi,'||').replace(/\bnot\b/gi,'!').replace(/\bxor\b/gi,'!=');
+  // Flowgorithm: single & is string concatenation. Must run AFTER
+  // `and`→`&&` so we don't clobber the && we just produced. Use
+  // look-arounds to skip && (and &= isn't valid in Flowgorithm).
+  js = js.replace(/(?<!&)&(?!&)/g, '+');
+  js = js.replace(/([\w.\u0000()]+)\s*__ID__\s*([\w.\u0000()]+)/g, 'Math.trunc(($1)/($2))');
+  js = js.replace(/__ID__/g,'/');
+  js = js.replace(/(^|[^=!<>+\-*/%&|^~])(=)([^=])/g, (m,p,_,q) => p+'=='+q);
+  js = js.replace(/([^=!<>+\-*/%&|^~])=$/, '$1==');
+  js = js.replace(/\u0000S(\d+)\u0000/g, (_, i) => strings[parseInt(i,10)-1]);
+  return js;
+}
+
+function evalExpression(expr, vars) {
+  if (!expr || !expr.trim()) throw new Error('Empty expression');
+  let js = translateToJS(expr);
+
+  // Re-extract string literals so the identifier-rewriting passes below
+  // don't accidentally touch words inside strings (e.g. the "Name" in
+  // the literal "Name: " must NOT be rewritten to match a variable).
+  const __strings = [];
+  js = js.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, (m) => { __strings.push(m); return '\u0000S' + __strings.length + '\u0000'; });
+
+  // Flowgorithm is case-insensitive for built-in function names.
+  // Normalize any call site whose name (lowercased) matches a known
+  // builtin to that builtin's lowercase key, so the named-parameter
+  // binding below can find it.
+  const lowerBuiltinSet = new Set(Object.keys(BUILTINS));
+  const jsKeywords = new Set(['true','false','null','undefined','Math','NaN','Infinity',
+    'return','if','else','while','for','do','break','continue','function','var','let',
+    'const','new','this','typeof','instanceof','in','of','void','delete','throw','try',
+    'catch','finally','switch','case','default','yield','await','async','class','extends',
+    'super','import','export','Number','String','Boolean','Array','Object','Map','Set',
+    'Date','JSON','RegExp','Error','parseInt','parseFloat','isNaN','isFinite','Symbol']);
+
+  js = js.replace(/\b([A-Za-z_]\w*)\s*(?=\()/g, (match, name) => {
+    const lower = name.toLowerCase();
+    if (lowerBuiltinSet.has(lower)) return lower;
+    return match;
+  });
+
+  // Flowgorithm is also case-insensitive for variable names. We
+  // normalize every identifier in the expression to the case it was
+  // declared with, so the named-parameter binding below can find it.
+  // We must skip: builtin function names (already lowercased above),
+  // JS keywords/globals, property access (preceded by '.'), and
+  // function call sites (followed by '(') that aren't builtins.
+  const declaredNames = Array.from(vars.keys());
+  const caseInsensitiveVars = new Map();
+  declaredNames.forEach(n => caseInsensitiveVars.set(n.toLowerCase(), n));
+
+  if (caseInsensitiveVars.size > 0) {
+    js = js.replace(/\b([A-Za-z_]\w*)\b/g, (match, name, offset, full) => {
+      // Skip JS keywords/globals
+      if (jsKeywords.has(name)) return match;
+      // Skip builtin function names (already lowercased)
+      if (lowerBuiltinSet.has(name.toLowerCase())) return match;
+      // Skip property access (preceded by '.')
+      let i = offset - 1;
+      while (i >= 0 && /\s/.test(full[i])) i--;
+      if (i >= 0 && full[i] === '.') return match;
+      // Skip function call sites (followed by '(')
+      let j = offset + name.length;
+      while (j < full.length && /\s/.test(full[j])) j++;
+      if (j < full.length && full[j] === '(') return match;
+      // If the lowercased name matches a declared variable, rewrite
+      // to the declared case so the named-parameter binding works.
+      const lower = name.toLowerCase();
+      if (caseInsensitiveVars.has(lower)) {
+        return caseInsensitiveVars.get(lower);
+      }
+      return match;
+    });
+  }
+
+  // Restore string literals.
+  js = js.replace(/\u0000S(\d+)\u0000/g, (_, i) => __strings[parseInt(i,10)-1]);
+
+  const builtinNames = Object.keys(BUILTINS);
+  const builtinValues = builtinNames.map(n => BUILTINS[n]);
+  const declaredValues = declaredNames.map(n => vars.get(n).value);
+
+  try {
+    const fn = new Function(...builtinNames, ...declaredNames, '"use strict"; return (' + js + ');');
+    return fn(...builtinValues, ...declaredValues);
+  } catch (err) {
+    throw new Error('Cannot evaluate "' + expr + '" — ' + err.message);
+  }
+}
+
+function defaultValueForType(type) {
+  switch ((type||'').toLowerCase()) {
+    case 'integer': return 0;
+    case 'real': return 0.0;
+    case 'string': return '';
+    case 'boolean': return false;
+    default: return 0;
+  }
+}
+
+function inferType(value) {
+  if (typeof value === 'boolean') return 'Boolean';
+  if (typeof value === 'number') return Number.isInteger(value) ? 'Integer' : 'Real';
+  if (typeof value === 'string') return 'String';
+  return 'String';
+}
+
+function setVariable(name, value, forcedType) {
+  const type = forcedType || inferType(value);
+  const prev = State.variables.get(name);
+  let coerced = value;
+  if (forcedType === 'Integer' && typeof coerced === 'number') coerced = Math.trunc(coerced);
+  if (forcedType === 'Boolean') coerced = !!coerced;
+  State.variables.set(name, { type, value: coerced });
+  if (!prev || prev.value !== coerced) State.changedVars.add(name);
+}
+
+function parseValueAsType(input, type) {
+  const s = String(input).trim();
+  switch ((type||'').toLowerCase()) {
+    case 'integer': { const i = parseInt(s, 10); if (isNaN(i) || !/^-?\d+$/.test(s)) throw new Error('"' + s + '" is not a valid Integer'); return i; }
+    case 'real': { const r = parseFloat(s); if (isNaN(r)) throw new Error('"' + s + '" is not a valid Real number'); return r; }
+    case 'string': return String(input);
+    case 'boolean': { const b = s.toLowerCase(); if (['true','1','yes','y','t'].includes(b)) return true; if (['false','0','no','n','f'].includes(b)) return false; throw new Error('"' + s + '" is not a valid Boolean (use true/false)'); }
+    default: return input;
+  }
+}
+
+function formatValue(val) {
+  if (typeof val === 'boolean') return val ? 'true' : 'false';
+  if (typeof val === 'number') return String(val);
+  return String(val);
+}
+
+// ============================================================
+// EXECUTION ENGINE
+// ============================================================
+function startExecution() {
+  const start = findStartShape();
+  if (!start) { logError('No Start terminal found.'); return null; }
+  State.variables.clear();
+  State.changedVars.clear();
+  State.execution = { currentId: start.id, lastEdge: null, done: false, error: null, iterationCount: 0, maxIterations: 100000, forStates: new Map(), doStates: new Map() };
+  return State.execution;
+}
+
+async function executeStep() {
+  if (!State.execution || State.execution.done) return false;
+  if (State.execution.iterationCount++ > State.execution.maxIterations) {
+    State.execution.error = 'Maximum iterations exceeded — possible infinite loop.';
+    State.execution.done = true;
+    logError(State.execution.error);
+    return false;
+  }
+  const shape = getShape(State.execution.currentId);
+  if (!shape) { State.execution.error = 'Shape not found'; State.execution.done = true; return false; }
+  if (!shape.data) migrateShape(shape);
+  const d = shape.data;
+
+  try {
+    switch (shape.type) {
+      case 'terminal':
+        if (/^start/i.test(d.text || '')) {
+          State.execution.lastEdge = { from: shape.id, port: 'next' };
+          State.execution.currentId = shape.next;
+        } else {
+          State.execution.done = true;
+          logInfo('— Program finished —');
+        }
+        break;
+
+      case 'comment':
+        State.execution.lastEdge = { from: shape.id, port: 'next' };
+        State.execution.currentId = shape.next;
+        break;
+
+      case 'breakpoint':
+        logInfo('— Breakpoint reached —');
+        State.execution.lastEdge = { from: shape.id, port: 'next' };
+        State.execution.currentId = shape.next;
+        if (State.running) { State.running = false; State.paused = true; setStatus('paused', 'Paused (breakpoint)'); }
+        break;
+
+      case 'declare':
+        if (d.isArray) {
+          const size = parseInt(d.arraySize, 10);
+          const defVal = defaultValueForType(d.dataType);
+          const arr = new Array(size).fill(defVal);
+          State.variables.set(d.name, { type: d.dataType, value: arr });
+          State.changedVars.add(d.name);
+        } else {
+          setVariable(d.name, defaultValueForType(d.dataType), d.dataType);
+        }
+        State.execution.lastEdge = { from: shape.id, port: 'next' };
+        State.execution.currentId = shape.next;
+        break;
+
+      case 'process': {
+        const value = evalExpression(d.expression, State.variables);
+        const arrMatch = d.variable.match(/^([a-zA-Z_]\w*)\[(.+)\]$/);
+        if (arrMatch) {
+          const arrName = arrMatch[1];
+          const index = evalExpression(arrMatch[2], State.variables);
+          const arr = State.variables.get(arrName);
+          if (!arr) throw new Error('Array "' + arrName + '" not declared');
+          if (!Array.isArray(arr.value)) throw new Error('"' + arrName + '" is not an array');
+          arr.value[Math.trunc(index)] = value;
+          State.changedVars.add(arrName);
+        } else {
+          // Flowgorithm strict-mode: a variable must be Declared
+          // before it can be assigned. Auto-creating variables on
+          // first assignment hides bugs and doesn't match the
+          // Flowgorithm execution model.
+          const existing = State.variables.get(d.variable);
+          if (!existing) {
+            throw new Error('Variable "' + d.variable + '" has not been declared. Add a Declare statement first.');
+          }
+          setVariable(d.variable, value, existing.type);
+        }
+        State.execution.lastEdge = { from: shape.id, port: 'next' };
+        State.execution.currentId = shape.next;
+        break;
+      }
+
+      case 'input': {
+        // Flowgorithm strict-mode: a variable must be Declared before
+        // it can be used as an input target. We refuse to auto-create.
+        const existing = State.variables.get(d.variable);
+        if (!existing) {
+          throw new Error('Variable "' + d.variable + '" has not been declared. Add a Declare statement first.');
+        }
+        const effectiveType = existing.type;
+        const inputVal = await promptInput(d.variable, effectiveType, d.prompt);
+        if (inputVal === null) { State.execution.done = true; logInfo('— Program cancelled —'); break; }
+        setVariable(d.variable, inputVal, effectiveType);
+        State.execution.lastEdge = { from: shape.id, port: 'next' };
+        State.execution.currentId = shape.next;
+        break;
+      }
+
+      case 'output': {
+        const val = evalExpression(d.expression, State.variables);
+        const text = formatValue(val);
+        // Flowgorithm: when "Output a newline after" is unchecked,
+        // the next Output continues on the same console line.
+        logOutput(text, d.newline !== false);
+        State.execution.lastEdge = { from: shape.id, port: 'next' };
+        State.execution.currentId = shape.next;
+        break;
+      }
+
+      case 'decision': {
+        const cond = evalExpression(d.expression, State.variables);
+        if (cond) { State.execution.lastEdge = { from: shape.id, port: 'next' }; State.execution.currentId = shape.next; }
+        else { State.execution.lastEdge = { from: shape.id, port: 'alt' }; State.execution.currentId = shape.alt; }
+        break;
+      }
+
+      case 'loop': {
+        const cond = evalExpression(d.expression, State.variables);
+        if (cond) { State.execution.lastEdge = { from: shape.id, port: 'next' }; State.execution.currentId = shape.next; }
+        else { State.execution.lastEdge = { from: shape.id, port: 'alt' }; State.execution.currentId = shape.alt; }
+        break;
+      }
+
+      case 'for': {
+        // Flowgorithm: the For loop's control variable must be of
+        // type Integer. If it isn't declared yet, we auto-declare
+        // it (matching Flowgorithm's permissive default). If it is
+        // declared but not Integer, that's a runtime type error.
+        let forState = State.execution.forStates.get(shape.id);
+        if (!forState) {
+          const startVal = evalExpression(d.start, State.variables);
+          const existing = State.variables.get(d.variable);
+          if (existing && existing.type !== 'Integer') {
+            throw new Error('For loop variable "' + d.variable + '" must be Integer (declared as ' + existing.type + ').');
+          }
+          setVariable(d.variable, Math.trunc(Number(startVal)), 'Integer');
+          forState = { initialized: true };
+          State.execution.forStates.set(shape.id, forState);
+        } else {
+          const stepVal = evalExpression(d.step, State.variables);
+          const currVal = State.variables.get(d.variable).value;
+          const newVal = d.direction === 'decreasing' ? currVal - Math.trunc(Number(stepVal)) : currVal + Math.trunc(Number(stepVal));
+          setVariable(d.variable, newVal, 'Integer');
+        }
+        const endVal = evalExpression(d.end, State.variables);
+        const currVal = State.variables.get(d.variable).value;
+        const cond = d.direction === 'decreasing' ? currVal >= endVal : currVal <= endVal;
+        if (cond) { State.execution.lastEdge = { from: shape.id, port: 'next' }; State.execution.currentId = shape.next; }
+        else { State.execution.forStates.delete(shape.id); State.execution.lastEdge = { from: shape.id, port: 'alt' }; State.execution.currentId = shape.alt; }
+        break;
+      }
+
+      case 'do': {
+        let doState = State.execution.doStates.get(shape.id);
+        if (!doState) {
+          doState = { visited: true };
+          State.execution.doStates.set(shape.id, doState);
+          State.execution.lastEdge = { from: shape.id, port: 'next' };
+          State.execution.currentId = shape.next;
+        } else {
+          const cond = evalExpression(d.expression, State.variables);
+          if (cond) { State.execution.lastEdge = { from: shape.id, port: 'next' }; State.execution.currentId = shape.next; }
+          else { State.execution.doStates.delete(shape.id); State.execution.lastEdge = { from: shape.id, port: 'alt' }; State.execution.currentId = shape.alt; }
+        }
+        break;
+      }
+
+      case 'call':
+        logInfo('[call] ' + d.function + '(' + (d.parameters || '') + ')');
+        State.execution.lastEdge = { from: shape.id, port: 'next' };
+        State.execution.currentId = shape.next;
+        break;
+    }
+  } catch (err) {
+    State.execution.error = err.message;
+    State.execution.done = true;
+    logError('Runtime error at ' + shape.type + ' "' + getDisplayText(shape) + '": ' + err.message);
+    return false;
+  }
+
+  if (!State.execution.currentId) { State.execution.done = true; logInfo('— Program ended (no successor) —'); }
+  return !State.execution.done;
+}
+
+// ============================================================
+// INPUT MODAL
+// ============================================================
+function promptInput(varName, type, promptText) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const typeLabel = type || 'Auto';
+    const placeholder = type === 'Boolean' ? 'true or false' : type === 'Integer' ? 'e.g. 42' : type === 'Real' ? 'e.g. 3.14' : type === 'String' ? 'type any text' : 'type a value';
+    overlay.innerHTML =
+      '<div class="prop-dialog" style="max-width:440px;">' +
+        buildModalHeader('gold', HELP_ICONS.input, promptText ? promptText : 'Input Required') +
+        '<div class="prop-body">' +
+          '<div class="prop-field"><label>Variable: <code style="color:#239a4d;font-family:var(--fc-mono);">' + escapeHtml(varName) + '</code> &nbsp; Type: <code style="color:#2a8a44;font-family:var(--fc-mono);">' + typeLabel + '</code></label>' +
+          '<input type="text" id="input-value" autocomplete="off" spellcheck="false" placeholder="' + placeholder + '">' +
+          '<div class="help-text" id="input-error" style="color:#c92a2a;display:none;font-size:11px;margin-top:6px;font-weight:500;"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="prop-footer"><button class="prop-btn cancel">Cancel</button><button class="prop-btn primary submit">OK</button></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    const input = overlay.querySelector('#input-value');
+    const errEl = overlay.querySelector('#input-error');
+    input.focus();
+    const close = (val) => { overlay.remove(); resolve(val); };
+    overlay.querySelector('.cancel').onclick = () => close(null);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+    const submit = () => {
+      const raw = input.value;
+      if (raw === '') { errEl.textContent = 'Please enter a value.'; errEl.style.display = 'block'; return; }
+      try {
+        const parsed = parseValueAsType(raw, type);
+        logInput(raw + (type ? '  [' + type + ']' : ''));
+        close(parsed);
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+        input.focus(); input.select();
+      }
+    };
+    overlay.querySelector('.submit').onclick = submit;
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') close(null); });
+  });
+}
+
+// ============================================================
+// CONSOLE
+// ============================================================
+// Track the most recent "open" console line (one that was written
+// without a trailing newline). The next logOutput(false) appends to
+// it instead of creating a new line — mirroring Flowgorithm's
+// "Output a newline after = false" behavior.
+let _openConsoleLine = null;
+
+function logLine(text, cls) {
+  const c = $('#console');
+  const line = document.createElement('div');
+  line.className = 'console-line ' + (cls || 'console-out');
+  line.textContent = text;
+  c.appendChild(line);
+  _openConsoleLine = null;
+  c.scrollTop = c.scrollHeight;
+}
+
+function logOutput(t, newline) {
+  // newline === true (or undefined) → write the text and close the line.
+  // newline === false → append to the current open line (or open a new
+  //   one if none is open) and keep it open for the next call.
+  const c = $('#console');
+  const wantNewline = newline !== false;
+  if (_openConsoleLine && !wantNewline) {
+    _openConsoleLine.textContent += t;
+  } else if (!wantNewline) {
+    const line = document.createElement('div');
+    line.className = 'console-line console-out';
+    line.textContent = t;
+    c.appendChild(line);
+    _openConsoleLine = line;
+  } else {
+    const line = document.createElement('div');
+    line.className = 'console-line console-out';
+    line.textContent = t;
+    c.appendChild(line);
+    _openConsoleLine = null;
+  }
+  c.scrollTop = c.scrollHeight;
+}
+function logError(t) { logLine('ERROR: ' + t, 'console-err'); }
+function logInfo(t) { logLine(t, 'console-info'); }
+function logInput(t) { logLine('> ' + t, 'console-input'); }
+function logSuccess(t) { logLine(t, 'console-success'); }
+function clearConsole() { $('#console').innerHTML = ''; _openConsoleLine = null; }
+
+// ============================================================
+// RUN / STEP / STOP
+// ============================================================
+async function runProgram() {
+  if (State.running) return;
+  if (State.execution) State.execution = null;
+  clearConsole();
+  State.variables.clear();
+  logInfo('— Program started —');
+  if (!startExecution()) { setStatus('error', 'No Start'); return; }
+  State.running = true;
+  $('#btn-run').disabled = true;
+  $('#btn-step').disabled = true;
+  $('#btn-stop').disabled = false;
+  setStatus('running', 'Running...');
+  while (State.running && State.execution && !State.execution.done) {
+    const more = await executeStep();
+    renderShapes(); renderConnections(); renderVariables();
+    if (!more) break;
+    if (!State.running) break;
+    await sleep(State.speed);
+  }
+  State.running = false;
+  $('#btn-run').disabled = false;
+  $('#btn-step').disabled = false;
+  $('#btn-stop').disabled = true;
+  if (State.execution && State.execution.error) setStatus('error', 'Error');
+  else if (!State.paused) { setStatus('ready', 'Done'); logSuccess('Program completed.'); }
+  if (!State.paused) { setTimeout(() => { State.execution = null; renderShapes(); renderConnections(); }, 300); }
+}
+
+async function stepProgram() {
+  if (!State.execution || State.execution.done) {
+    clearConsole();
+    State.variables.clear();
+    logInfo('— Stepping —');
+    if (!startExecution()) { setStatus('error', 'No Start'); return; }
+    setStatus('paused', 'Paused');
+  }
+  const more = await executeStep();
+  renderShapes(); renderConnections(); renderVariables();
+  if (!more) {
+    if (State.execution && State.execution.error) setStatus('error', 'Error');
+    else setStatus('ready', 'Done');
+  }
+}
+
+function stopProgram() {
+  State.running = false;
+  State.paused = false;
+  if (State.execution) State.execution.done = true;
+  $('#btn-run').disabled = false;
+  $('#btn-step').disabled = false;
+  $('#btn-stop').disabled = true;
+  setStatus('ready', 'Stopped');
+  logInfo('— Program stopped —');
+}
+
+function resetProgram() {
+  stopProgram();
+  State.execution = null;
+  State.variables.clear();
+  clearConsole();
+  logInfo('Console cleared.');
+  setStatus('ready', 'Ready');
+  renderAll();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function setStatus(state, text) {
+  // Status pill / console status badge were removed from the ribbon,
+  // but the console panel header still has a count. Update the
+  // console-status element if it exists.
+  const cs = $('#console-status');
+  if (cs) cs.textContent = state === 'running' ? 'running' : state === 'paused' ? 'paused' : state === 'error' ? 'error' : 'idle';
+}
+
+// ============================================================
+// SAVE / LOAD
+// ============================================================
+function saveProgram() {
+  const data = { version: 2, nextId: State.nextId, shapes: Array.from(State.shapes.values()) };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'flowcode-program.json'; a.click();
+  URL.revokeObjectURL(url);
+  toast('Program saved', 'success');
+}
+
+function loadProgram() {
+  $('#file-input').click();
+  $('#file-input').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!data.shapes) throw new Error('Invalid file');
+        State.shapes.clear();
+        State.nextId = data.nextId || 1;
+        data.shapes.forEach(s => {
+          if (!s.data) migrateShape(s);
+          if (!s.text) s.text = getDisplayText(s);
+          State.shapes.set(s.id, s);
+        });
+        renderAll();
+        toast('Program loaded', 'success');
+      } catch (err) { toast('Failed: ' + err.message, 'error'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+}
+
+function newProgram() {
+  if (State.shapes.size > 0 && !confirm('Start new? Unsaved changes will be lost.')) return;
+  State.shapes.clear();
+  State.nextId = 1;
+  State.selectedId = null;
+  const s = createShape('terminal', 320, 40);
+  const o = createShape('output', 320, 120);
+  const e = createShape('terminal', 320, 200);
+  s.next = o.id; o.next = e.id;
+  renderAll();
+  toast('New program', 'success');
+}
+
+function loadExample() {
+  State.shapes.clear();
+  State.nextId = 1;
+  const start = createShape('terminal', 300, 30);
+  start.data = { text: 'Start' };
+  const decl = createShape('declare', 300, 100);
+  decl.data = { name: 'n', dataType: 'Integer', isArray: false, arraySize: 0 };
+  const decl2 = createShape('declare', 300, 170);
+  decl2.data = { name: 'sum', dataType: 'Integer', isArray: false, arraySize: 0 };
+  const inp = createShape('input', 300, 240);
+  inp.data = { variable: 'n', prompt: 'Enter a number' };
+  const init = createShape('process', 300, 310);
+  init.data = { variable: 'sum', expression: '0' };
+  const forl = createShape('for', 300, 380);
+  forl.data = { variable: 'i', start: '1', end: 'n', direction: 'increasing', step: '1' };
+  const add = createShape('process', 480, 470);
+  add.data = { variable: 'sum', expression: 'sum + i' };
+  const out = createShape('output', 300, 470);
+  out.data = { expression: '"Sum of 1 to " + n + " = " + sum', newline: true };
+  const end = createShape('terminal', 300, 550);
+  end.data = { text: 'End' };
+  start.next = decl.id; decl.next = decl2.id; decl2.next = inp.id; inp.next = init.id; init.next = forl.id;
+  forl.next = add.id; forl.alt = out.id; add.next = forl.id; out.next = end.id;
+  State.shapes.forEach(s => s.text = getDisplayText(s));
+  renderAll();
+  toast('Example loaded', 'success');
+}
+
+function loadArrayExample() {
+  State.shapes.clear();
+  State.nextId = 1;
+  const start = createShape('terminal', 300, 30);
+  start.data = { text: 'Start' };
+  const decl = createShape('declare', 300, 100);
+  decl.data = { name: 'nums', dataType: 'Integer', isArray: true, arraySize: 5 };
+  const decl2 = createShape('declare', 300, 170);
+  decl2.data = { name: 'i', dataType: 'Integer', isArray: false, arraySize: 0 };
+  const decl3 = createShape('declare', 300, 240);
+  decl3.data = { name: 'total', dataType: 'Integer', isArray: false, arraySize: 0 };
+  const init = createShape('process', 300, 310);
+  init.data = { variable: 'total', expression: '0' };
+  const forl = createShape('for', 300, 380);
+  forl.data = { variable: 'i', start: '0', end: '4', direction: 'increasing', step: '1' };
+  const assign = createShape('process', 480, 470);
+  assign.data = { variable: 'nums[i]', expression: 'i * 10' };
+  const add = createShape('process', 480, 540);
+  add.data = { variable: 'total', expression: 'total + nums[i]' };
+  const out = createShape('output', 300, 470);
+  out.data = { expression: '"Array: [" + nums[0] + ", " + nums[1] + ", " + nums[2] + ", " + nums[3] + ", " + nums[4] + "]"', newline: true };
+  const out2 = createShape('output', 300, 540);
+  out2.data = { expression: '"Total = " + total', newline: true };
+  const end = createShape('terminal', 300, 620);
+  end.data = { text: 'End' };
+  start.next = decl.id; decl.next = decl2.id; decl2.next = decl3.id; decl3.next = init.id; init.next = forl.id;
+  forl.next = assign.id; forl.alt = out.id; assign.next = add.id; add.next = forl.id; out.next = out2.id; out2.next = end.id;
+  State.shapes.forEach(s => s.text = getDisplayText(s));
+  renderAll();
+  toast('Array example loaded', 'success');
+}
+
+// ============================================================
+// TOOLBAR & MENU
+// ============================================================
+$('#btn-run').onclick = runProgram;
+$('#btn-step').onclick = stepProgram;
+$('#btn-stop').onclick = stopProgram;
+$('#btn-reset').onclick = resetProgram;
+$('#btn-clear-console').onclick = clearConsole;
+
+$('#speed-slider').oninput = (e) => {
+  const v = parseInt(e.target.value);
+  State.speed = Math.round(500 - (v / 100) * 495);
+  $('#speed-display').textContent = State.speed + 'ms';
+};
+$('#speed-slider').dispatchEvent(new Event('input'));
+
+const menus = {
+  file: [
+    { label: 'New', action: newProgram },
+    { label: 'Open...', action: loadProgram },
+    { label: 'Save...', action: saveProgram },
+    { sep: true },
+    { label: 'Load Example (For Loop)', action: loadExample },
+    { label: 'Load Array Example', action: loadArrayExample },
+  ],
+  edit: [
+    { label: 'Edit Properties', action: () => { if (State.selectedId) openPropertyDialog(State.selectedId); } },
+    { label: 'Delete Shape', action: () => { if (State.selectedId) deleteShape(State.selectedId); } },
+    { sep: true },
+    { label: 'Clear Console', action: clearConsole },
+  ],
+  help: [
+    { label: 'Quick Start Guide', action: showHelp },
+    { label: 'Syntax Reference', action: showSyntaxHelp },
+    { label: 'Keyboard Shortcuts', action: showShortcuts },
+    { sep: true },
+    { label: 'About FlowCode', action: showAbout },
+  ],
+};
+
+$$('.menu-btn').forEach(btn => {
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const name = btn.dataset.menu;
+    const rect = btn.getBoundingClientRect();
+    showMenuDropdown(name, rect.left, rect.bottom);
+  };
+});
+
+function showMenuDropdown(name, x, y) {
+  hideContextMenu();
+  const menu = $('#context-menu');
+  const items = menus[name] || [];
+  menu.innerHTML = items.map(it => {
+    if (it.sep) return '<div class="ctx-sep"></div>';
+    return '<div class="ctx-item">' + escapeHtml(it.label) + '</div>';
+  }).join('');
+  menu.style.display = 'block';
+  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  menu.querySelectorAll('.ctx-item').forEach((el, i) => {
+    el.onclick = () => { const item = items[i]; if (item && item.action) item.action(); hideContextMenu(); };
+  });
+}
+
+// ============================================================
+// HELP MODALS
+// ============================================================
+function buildModalHeader(variant, iconSvg, title) {
+  const colors = {
+    green:  '#239a4d',
+    blue:   '#005fa3',
+    gold:   '#b48608',
+    red:    '#ee5a52',
+    purple: '#7c5cb8',
+  };
+  const bg = colors[variant] || colors.green;
+  return '<div class="prop-header">' +
+    '<div class="prop-shape-icon" style="background:' + bg + ';box-shadow:0 4px 12px ' + bg + '40;">' + iconSvg + '</div>' +
+    '<h3 class="prop-title">' + escapeHtml(title) + '</h3>' +
+  '</div>';
+}
+
+const HELP_ICONS = {
+  guide: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>',
+  syntax: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+  keyboard: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>',
+  about: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  input: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+};
+
+function showHelp() {
+  const o = document.createElement('div');
+  o.className = 'modal-overlay';
+  o.innerHTML = '<div class="prop-dialog" style="max-width:560px;">' + buildModalHeader('blue', HELP_ICONS.guide, 'Quick Start Guide') +
+    '<div class="prop-body" style="font-size:13px;line-height:1.75;color:rgba(44,62,80,0.7);">' +
+    '<p><b style="color:var(--fc-text);">1. Add shapes:</b> Click a shape in the left palette, or drag it onto the canvas.</p>' +
+    '<p style="margin-top:10px;"><b style="color:var(--fc-text);">2. Edit properties:</b> Double-click any shape on the canvas to open its properties dialog. Each shape has its own dialog with the right fields.</p>' +
+    '<p style="margin-top:10px;"><b style="color:var(--fc-text);">3. Connect shapes:</b> Hover over a shape to see the green handle (pill-shaped). Drag from the handle onto another shape to connect. If/Loop/For/Do shapes have two handles: bottom = True, right = False.</p>' +
+    '<p style="margin-top:10px;"><b style="color:var(--fc-text);">4. Insert on a line:</b> Click any connection line to insert a new shape in between — a menu pops up with shape options.</p>' +
+    '<p style="margin-top:10px;"><b style="color:var(--fc-text);">5. Pan the canvas:</b> Hold <kbd>Space</kbd> and drag with the mouse to move the whole view around.</p>' +
+    '<p style="margin-top:10px;"><b style="color:var(--fc-text);">6. Run:</b> Click Run (F5) or Step (F10) to execute. Watch variables update in the bottom-right panel.</p>' +
+    '<p style="margin-top:10px;"><b style="color:var(--fc-text);">7. Generated code:</b> Watch the bottom-left Code panel update live as you build your flowchart.</p>' +
+    '</div><div class="prop-footer"><button class="prop-btn primary">Got it</button></div></div>';
+  document.body.appendChild(o);
+  o.querySelector('button').onclick = () => o.remove();
+  o.addEventListener('click', (e) => { if (e.target === o) o.remove(); });
+}
+
+function showSyntaxHelp() {
+  const o = document.createElement('div');
+  o.className = 'modal-overlay';
+  o.innerHTML = '<div class="prop-dialog" style="max-width:620px;">' + buildModalHeader('purple', HELP_ICONS.syntax, 'Syntax Reference') +
+    '<div class="prop-body" style="font-size:12.5px;line-height:1.8;color:rgba(44,62,80,0.7);max-height:55vh;overflow-y:auto;">' +
+    '<div style="font-weight:700;color:var(--fc-text);margin-bottom:6px;">Data Types</div>' +
+    '<div style="font-family:var(--fc-mono);">' +
+      '<div><span style="color:#2a8a44;">Integer</span> — whole numbers: 5, 42, -7</div>' +
+      '<div><span style="color:#3b7a99;">Real</span> — decimals: 3.14, 0.5</div>' +
+      '<div><span style="color:#b48608;">String</span> — text: "hello", "Bob"</div>' +
+      '<div><span style="color:#7c5cb8;">Boolean</span> — true or false</div>' +
+      '<div><span style="color:#c97a3a;">Array</span> — check "Array?" in Declare dialog</div>' +
+    '</div>' +
+    '<div style="font-weight:700;color:var(--fc-text);margin:12px 0 6px;">Operators</div>' +
+    '<div style="font-family:var(--fc-mono);">' +
+      '<div>+ - * / mod div ^ (power) &nbsp;|&nbsp; &amp; (string concat)</div>' +
+      '<div>= == != &lt; &gt; &lt;= &gt;= &nbsp;|&nbsp; ≠ ≤ ≥ × ÷</div>' +
+      '<div>and or not xor (logical)</div>' +
+    '</div>' +
+    '<div style="font-weight:700;color:var(--fc-text);margin:12px 0 6px;">Built-in Functions</div>' +
+    '<div style="font-family:var(--fc-mono);font-size:11.5px;">' +
+      '<div>sqrt abs floor ceiling round power max min random randomseed</div>' +
+      '<div>sin cos tan arcsin arccos arctan log log10 logten exp</div>' +
+      '<div>length char charat ascii asc chr substring toupper tolower trim indexof</div>' +
+      '<div>tointeger toreal tostring tofixedstring</div>' +
+      '<div>isinteger isreal isstring isboolean isnumber</div>' +
+      '<div style="color:rgba(44,62,80,0.55);margin-top:4px;">Function names are case-insensitive (Flowgorithm-compatible).</div>' +
+    '</div>' +
+    '<div style="font-weight:700;color:var(--fc-text);margin:12px 0 6px;">Array Access</div>' +
+    '<div style="font-family:var(--fc-mono);">nums[i] = 10 &nbsp; arr[0] + arr[1]</div>' +
+    '</div><div class="prop-footer"><button class="prop-btn primary">Close</button></div></div>';
+  document.body.appendChild(o);
+  o.querySelector('button').onclick = () => o.remove();
+  o.addEventListener('click', (e) => { if (e.target === o) o.remove(); });
+}
+
+function showShortcuts() {
+  const o = document.createElement('div');
+  o.className = 'modal-overlay';
+  const row = (label, key) => '<div style="display:flex;justify-content:space-between;align-items:center;"><span>' + label + '</span><code style="background:var(--fc-accent-soft);padding:3px 10px;border-radius:5px;color:var(--fc-accent);font-family:var(--fc-mono);font-weight:600;font-size:11px;">' + key + '</code></div>';
+  o.innerHTML = '<div class="prop-dialog" style="max-width:420px;">' + buildModalHeader('gold', HELP_ICONS.keyboard, 'Keyboard Shortcuts') +
+    '<div class="prop-body" style="font-size:13px;line-height:2.1;color:rgba(44,62,80,0.7);">' +
+      row('Run program', 'F5') +
+      row('Step', 'F10') +
+      row('Save', 'Ctrl+S') +
+      row('Open', 'Ctrl+O') +
+      row('Delete shape', 'Del') +
+      row('Edit properties', 'Double-click / Enter') +
+      row('Cancel', 'Esc') +
+    '</div><div class="prop-footer"><button class="prop-btn primary">Close</button></div></div>';
+  document.body.appendChild(o);
+  o.querySelector('button').onclick = () => o.remove();
+  o.addEventListener('click', (e) => { if (e.target === o) o.remove(); });
+}
+
+function showAbout() {
+  const o = document.createElement('div');
+  o.className = 'modal-overlay';
+  o.innerHTML = '<div class="prop-dialog" style="max-width:400px;text-align:center;">' + buildModalHeader('green', HELP_ICONS.about, 'About EmeraldStudio Flowchart') +
+    '<div class="prop-body" style="padding:8px 8px 16px;">' +
+      '<div style="font-size:11px;color:var(--fc-text-muted);margin-bottom:14px;letter-spacing:0.04em;">Part of EmeraldSuite</div>' +
+      '<div style="font-size:13px;color:rgba(44,62,80,0.7);line-height:1.7;">A visual flowchart programming environment inspired by Flowgorithm. Build, run, and debug algorithms visually — right in your browser.</div>' +
+    '</div><div class="prop-footer"><button class="prop-btn primary">Close</button></div></div>';
+  document.body.appendChild(o);
+  o.querySelector('button').onclick = () => o.remove();
+  o.addEventListener('click', (e) => { if (e.target === o) o.remove(); });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  ensureArrowhead($('#connections'));
+  renderAll();
+  window.addEventListener('resize', () => { ensureArrowhead($('#connections')); renderConnections(); });
+}
+init();
