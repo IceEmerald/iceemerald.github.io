@@ -839,15 +839,6 @@ select {
     box-shadow: none;
 }
 
-/* SVG-based shapes — no .shape-body needed */
-.shape.decision,
-.shape.loop,
-.shape.for,
-.shape.do,
-.shape.breakpoint {
-    /* Width/height set inline by JS based on getShapeSize */
-}
-
 .shape.decision .shape-body,
 .shape.loop .shape-body,
 .shape.for .shape-body,
@@ -1115,7 +1106,6 @@ select {
     flex: 0 0 auto;
     color: var(--fc-accent);
     opacity: 0.85;
-    vertical-align: middle;
 }
 
 .panel-count {
