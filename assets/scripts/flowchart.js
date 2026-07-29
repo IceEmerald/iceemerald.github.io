@@ -1861,7 +1861,7 @@ function serializeEmeraldCore(data) {
     '// Generated: ' + new Date().toISOString(),
     '// Shapes: ' + (data.shapes ? data.shapes.length : 0),
     '//',
-    '//',
+    '',
   ].join('\n');
   return header + JSON.stringify(data, null, 2);
 }
