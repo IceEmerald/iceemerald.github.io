@@ -1572,7 +1572,6 @@ select {
     font-family: var(--fc-mono);
     color: var(--fc-text-strong);
     outline: none;
-    max-width: 120px;
 }
 
 .prop-field input[type=text]:focus,
@@ -1585,9 +1584,11 @@ select {
 }
 
 .prop-field textarea {
-    min-height: 64px;
-    resize: vertical;
+    min-width: 202px;
+    resize: none;
     line-height: 1.6;
+    overflow-y: hidden;
+    height: 40px;
 }
 
 .prop-field select {
