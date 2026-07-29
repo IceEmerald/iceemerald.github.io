@@ -1843,15 +1843,29 @@ function parseEmeraldCore(text) {
 
 function serializeEmeraldCore(data) {
   const header = [
-    '// ============================================================',
-    '// EmeraldStudio Flowchart — .emeraldcore',
+    '// ====================================================',
+    '//                  flowchart.emeraldcore',
+    '// ====================================================',
+    '//',
+    '//',
+    '// ┌─ FLOWCHART ─────────────────────────────────────┐',
+    '// │                                                 │',
+    '// │  shapes → list of nodes and connectors          │',
+    '// │    id    → unique node/line identifier          │',
+    '// │    type  → process | decision | start | end     │',
+    '// │    label → text displayed inside the shape      │',
+    '// │                                                 │',
+    '// │  - Position & styles are AUTO-layout calculated │',
+    '// │  - Connectors link via node IDs                 │',
+    '// │  Nothing to position manually here!             │',
+    '// │                                                 │',
+    '// └─────────────────────────────────────────────────┘',
+    '//',
+    '//',
     '// Generated: ' + new Date().toISOString(),
     '// Shapes: ' + (data.shapes ? data.shapes.length : 0),
     '//',
-    '// This is JSONC: standard JSON with // and /* */ comments.',
-    '// You can safely edit values or add notes as comments.',
-    '// ============================================================',
-    '',
+    '//',
   ].join('\n');
   return header + JSON.stringify(data, null, 2);
 }
