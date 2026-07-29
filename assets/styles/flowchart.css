@@ -1466,6 +1466,7 @@ select {
     font-family: var(--fc-mono);
     color: var(--fc-text-strong);
     outline: none;
+    max-width: 120px;
 }
 
 .prop-field input[type=text]:focus,
@@ -1548,7 +1549,8 @@ select {
 
 .prop-assign-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: center;;
     gap: 10px;
 }
 
