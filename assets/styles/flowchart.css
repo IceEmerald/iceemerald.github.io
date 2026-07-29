@@ -221,6 +221,120 @@ select {
 }
 
 /* ============================================================
+   TOP-RIGHT FLOATING FILE TOOLBAR  (Save / Open / Clear)
+   Mirrors the brand-pill: same glass surface, same radius,
+   same shadow stack, same 12px top margin. The only difference
+   is the inner buttons are icon+label pairs instead of a logo.
+   ============================================================ */
+.fc-file-bar {
+    position: absolute;
+    top: var(--fc-margin);
+    right: var(--fc-margin);
+    z-index: 60;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 9px;
+    background: var(--fc-surface);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid var(--fc-border);
+    border-radius: 12px;
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(0, 0, 0, 0.04),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    animation: fc-brand-enter 0.4s var(--fc-ease) both;
+    pointer-events: auto;
+    height: 55px;
+    box-sizing: border-box;
+}
+
+.file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 39px;
+    padding: 0 14px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--fc-border);
+    border-radius: var(--fc-radius-xs);
+    color: var(--fc-text-dim);
+    font-family: var(--fc-sans);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    cursor: pointer;
+    transition: all 0.15s var(--fc-ease);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    white-space: nowrap;
+}
+
+.file-btn svg {
+    display: block;
+    flex-shrink: 0;
+    color: var(--fc-accent);
+    opacity: 0.9;
+}
+
+.file-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: var(--fc-accent-border);
+    color: var(--fc-text);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+.file-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.file-btn:focus-visible {
+    outline: 2px solid var(--fc-accent-ring);
+    outline-offset: 2px;
+}
+
+/* Clear button — danger tint (matches ribbon-btn.danger) */
+.file-btn.danger {
+    color: var(--fc-text-dim);
+}
+
+.file-btn.danger svg {
+    color: #c92a2a;
+    opacity: 0.85;
+}
+
+.file-btn.danger:hover:not(:disabled) {
+    background: rgba(220, 53, 69, 0.06);
+    border-color: rgba(220, 53, 69, 0.35);
+    color: #c92a2a;
+}
+
+.file-bar-divider {
+    width: 1px;
+    height: 22px;
+    background: var(--fc-border);
+    flex-shrink: 0;
+    margin: 0 2px;
+}
+
+@media (max-width: 720px) {
+    .fc-file-bar {
+        gap: 2px;
+        padding: 5px 6px;
+        height: 44px;
+    }
+    .file-btn {
+        height: 32px;
+        padding: 0 9px;
+        font-size: 11px;
+        gap: 5px;
+    }
+    .file-btn svg { width: 13px; height: 13px; }
+    .file-bar-divider { height: 18px; margin: 0 1px; }
+}
+
+/* ============================================================
    FLOATING RIBBON TOOLBAR (bottom-center floating pill)
    Sits between the bottom-left code panel and bottom-right
    variables/console panels.
@@ -1019,6 +1133,7 @@ select {
     gap: 14px;
     align-items: stretch;
     padding: 0;
+    transition: bottom 0.24s ease;
 }
 
 #panel-variables,
@@ -1080,6 +1195,7 @@ select {
 
 .fc-panel.minimized .panel-header {
     border-bottom: none;
+    padding-bottom: 2px;
 }
 
 .panel-header-actions {

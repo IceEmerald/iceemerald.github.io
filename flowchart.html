@@ -38,13 +38,13 @@
                  bottom-left code panel and bottom-right console/vars). -->
             <div class="fc-ribbon" id="fc-ribbon">
                 <div class="ribbon-row" id="menubar">
-                    <button class="ribbon-btn primary icon-only" id="btn-run" title="Run (F5)">
+                    <button class="ribbon-btn primary icon-only" id="btn-run" title="Run">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <polygon points="5 3 19 12 5 21 5 3" />
                         </svg>
                     </button>
-                    <button class="ribbon-btn icon-only" id="btn-step" title="Step (F10)">
+                    <button class="ribbon-btn icon-only" id="btn-step" title="Step">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <polygon points="5 4 15 12 5 20 5 4" />
@@ -77,6 +77,40 @@
         <div class="fc-brand-pill">
             <img src="/assets/images/favicon.webp" alt="EmeraldStudio" class="fc-brand-icon">
             <span class="fc-brand-text">EmeraldStudio Flowchart</span>
+        </div>
+
+        <!-- =====================================================
+             TOP-RIGHT FLOATING FILE TOOLBAR (Save / Open / Clear)
+             Mirrors the brand-pill's glass/white-box styling.
+             ===================================================== -->
+        <div class="fc-file-bar" id="fc-file-bar">
+            <button class="file-btn" id="btn-save" type="button" title="Save flowchart to a .json file">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                </svg>
+                <span>Save</span>
+            </button>
+            <button class="file-btn" id="btn-open" type="button" title="Open a .json flowchart file">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                </svg>
+                <span>Open</span>
+            </button>
+            <div class="file-bar-divider" aria-hidden="true"></div>
+            <button class="file-btn danger" id="btn-clear" type="button" title="Clear the canvas and start fresh">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                </svg>
+                <span>Clear</span>
+            </button>
         </div>
 
         <!-- =====================================================
@@ -224,10 +258,14 @@
         </div>
     </div>
 
-    <input type="file" id="file-input" accept=".json">
+    <input type="file" id="file-input" accept=".emeraldcore">
     <div id="context-menu" class="fc-context-menu"></div>
     <div id="toast" class="fc-toast"></div>
 
+    <!-- idb-storage.js MUST load before flowchart.js so the
+         window.EmeraldIDBStorage global is available when
+         flowchart.js initializes its persistence layer. -->
+    <script src="assets/scripts/idb-storage.js"></script>
     <script src="assets/scripts/flowchart.js"></script>
 </body>
 

@@ -33,6 +33,96 @@ const State = {
 
 const VALID_TYPES = ['Integer', 'Real', 'String', 'Boolean'];
 
+// ============================================================
+// PERSISTENT STORAGE (IndexedDB via window.EmeraldIDBStorage)
+// ------------------------------------------------------------
+// The flowchart is automatically saved to IndexedDB on every
+// meaningful state change (create / delete / move / connect /
+// edit / pan / speed). On page load, the saved flowchart is
+// restored so the user never loses their work.
+//
+// The storage layer itself lives in idb-storage.js and exposes
+// a synchronous in-memory cache backed by IndexedDB. We use:
+//   • getJSON(key)      — async read (after ready())
+//   • setJSONSync(k, v) — sync write to cache + queued IDB write
+//   • ready()           — promise that resolves once IDB is open
+// ============================================================
+const STORAGE_KEY = 'flowcode:current-program';
+let _persistenceReady = false;     // false until init() has loaded (or confirmed absent) saved state
+let _persistDebounceTimer = null;  // shared timer for drag/pan/speed debounced saves
+
+function serializeState() {
+  return {
+    version: 2,
+    nextId: State.nextId,
+    shapes: Array.from(State.shapes.values()).map(s => ({
+      id: s.id,
+      type: s.type,
+      x: s.x,
+      y: s.y,
+      text: s.text,
+      data: s.data,
+      next: s.next || null,
+      alt: s.alt || null,
+    })),
+    pan: { x: State.pan.x, y: State.pan.y },
+    speed: State.speed,
+    savedAt: Date.now(),
+  };
+}
+
+function deserializeState(data) {
+  if (!data || !Array.isArray(data.shapes)) return false;
+  State.shapes.clear();
+  State.nextId = data.nextId || 1;
+  data.shapes.forEach(s => {
+    if (!s.data) migrateShape(s);
+    if (!s.text) s.text = getDisplayText(s);
+    State.shapes.set(s.id, s);
+  });
+  if (data.pan && typeof data.pan.x === 'number') {
+    State.pan.x = data.pan.x;
+    State.pan.y = data.pan.y;
+    applyPan();
+  }
+  if (typeof data.speed === 'number') {
+    State.speed = data.speed;
+    const slider = $('#speed-slider');
+    if (slider) {
+      // Invert the slider formula: speed = 500 - (v/100)*495  →  v = (500 - speed) / 495 * 100
+      const v = Math.round((500 - data.speed) / 495 * 100);
+      slider.value = String(clamp(v, 1, 100));
+      const disp = $('#speed-display');
+      if (disp) disp.textContent = data.speed + 'ms';
+    }
+  }
+  State.selectedId = null;
+  return true;
+}
+
+function persistState() {
+  if (!_persistenceReady) return;            // don't overwrite stored state before we've loaded it
+  if (!window.EmeraldIDBStorage) return;     // storage layer unavailable — fail silently
+  try {
+    EmeraldIDBStorage.setJSONSync(STORAGE_KEY, serializeState());
+  } catch (err) {
+    console.warn('[FlowCode] Failed to persist flowchart state:', err);
+  }
+}
+
+function persistStateDebounced(delay = 350) {
+  if (_persistDebounceTimer) clearTimeout(_persistDebounceTimer);
+  _persistDebounceTimer = setTimeout(persistState, delay);
+}
+
+async function loadPersistedState() {
+  if (!window.EmeraldIDBStorage) return false;
+  await EmeraldIDBStorage.ready();
+  const data = await EmeraldIDBStorage.getJSON(STORAGE_KEY);
+  if (!data) return false;
+  return deserializeState(data);
+}
+
 const DIALOG_INFO = {
   terminal:  { title: 'Terminal Properties',  desc: 'A Terminal Statement marks the start or end of the program.' },
   declare:   { title: 'Declare Properties',   desc: 'A Declare Statement creates a new variable and defines its data type.' },
@@ -172,6 +262,10 @@ function renderAll() {
   renderShapes();
   renderConnections();
   renderVariables();
+  // renderAll is called after every structural mutation (create,
+  // delete, edit, insert, duplicate, new/load program, reset), so
+  // it's the single best hook point for persisting state.
+  persistState();
 }
 
 // Shape types that use SVG for their outline (because CSS clip-path
@@ -501,7 +595,7 @@ function applyPan() {
 
 $('#canvas-wrap').addEventListener('mousedown', (e) => {
   // Ignore clicks on floating UI panels
-  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill, .fc-file-bar')) return;
   if (State.spaceHeld || e.button === 1) {
     panInfo = { startX: e.clientX, startY: e.clientY, panX: State.pan.x, panY: State.pan.y };
     $('#canvas-wrap').classList.add('panning');
@@ -553,6 +647,7 @@ document.addEventListener('mousemove', (e) => {
     State.pan.x = panInfo.panX + (e.clientX - panInfo.startX);
     State.pan.y = panInfo.panY + (e.clientY - panInfo.startY);
     applyPan();
+    persistStateDebounced(500);   // save the new pan position (debounced — fires once at end of drag)
     return;
   }
   if (dragInfo) {
@@ -567,6 +662,7 @@ document.addEventListener('mousemove', (e) => {
       const el = document.querySelector('.shape[data-id="' + dragInfo.id + '"]');
       if (el) { el.style.left = shape.x + 'px'; el.style.top = shape.y + 'px'; }
       renderConnections();
+      if (dragInfo.moved) persistStateDebounced(500);   // save the new shape position (debounced)
     }
   }
   if (State.connecting) {
@@ -600,7 +696,9 @@ document.addEventListener('mouseup', (e) => {
     State.connecting = null;
     document.body.classList.remove('connecting-mode');
     renderConnections();
+    persistState();   // a new connection was just established — persist it
   }
+  if (dragInfo && dragInfo.moved) persistState();   // shape was dragged to a new position — persist it
   dragInfo = null;
 });
 
@@ -611,7 +709,7 @@ document.addEventListener('mouseup', (e) => {
 // and a double-click (or Enter) is required to edit it.
 $('#canvas-wrap').addEventListener('dblclick', (e) => {
   // Ignore double-clicks that originate on floating UI panels.
-  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill, .fc-file-bar')) return;
   // Ignore double-clicks on connection handles — those are for dragging
   // connections, not for opening properties.
   if (e.target.closest('.shape-handle')) return;
@@ -636,7 +734,7 @@ $('#canvas-wrap').addEventListener('dblclick', (e) => {
 // Right-click context menu (kept for power-user actions like Duplicate,
 // Disconnect, Delete — Edit Properties is also still there).
 $('#canvas-wrap').addEventListener('contextmenu', (e) => {
-  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill, .fc-file-bar')) return;
   const target = e.target.closest('.shape');
   if (target) {
     e.preventDefault();
@@ -720,12 +818,12 @@ $$('.panel-toggle').forEach(btn => {
 
 // Don't allow palette drops onto any floating panel
 $('#canvas-wrap').addEventListener('dragover', (e) => {
-  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill, .fc-file-bar')) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = 'copy';
 });
 $('#canvas-wrap').addEventListener('drop', (e) => {
-  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill')) return;
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill, .fc-file-bar')) return;
   e.preventDefault();
   const type = e.dataTransfer.getData('shape-type');
   if (!type) return;
@@ -752,10 +850,6 @@ document.addEventListener('keydown', (e) => {
     if (State.connecting) { State.connecting = null; document.body.classList.remove('connecting-mode'); renderConnections(); }
     hideContextMenu();
   }
-  else if (e.key === 'F5' || (e.ctrlKey && e.key === 'Enter')) { e.preventDefault(); runProgram(); }
-  else if (e.key === 'F10') { e.preventDefault(); stepProgram(); }
-  else if (e.ctrlKey && e.key === 's') { e.preventDefault(); saveProgram(); }
-  else if (e.ctrlKey && e.key === 'o') { e.preventDefault(); loadProgram(); }
 });
 
 document.addEventListener('keyup', (e) => {
@@ -805,8 +899,8 @@ function handleContextAction(action, id) {
     case 'edit': openPropertyDialog(id); break;
     case 'duplicate': { const copy = createShape(shape.type, shape.x + 30, shape.y + 30); copy.data = JSON.parse(JSON.stringify(shape.data)); copy.text = getDisplayText(copy); State.selectedId = copy.id; renderAll(); toast('Duplicated'); break; }
     case 'delete': deleteShape(id); toast('Deleted'); break;
-    case 'disconnect-next': shape.next = null; renderConnections(); break;
-    case 'disconnect-alt': shape.alt = null; renderConnections(); break;
+    case 'disconnect-next': shape.next = null; renderConnections(); persistState(); break;
+    case 'disconnect-alt': shape.alt = null; renderConnections(); persistState(); break;
   }
 }
 
@@ -1676,28 +1770,195 @@ function setStatus(state, text) {
 }
 
 // ============================================================
-// SAVE / LOAD
+// .emeraldcore FILE FORMAT (JSONC — JSON with comments)
+// ------------------------------------------------------------
+// Exports use the .emeraldcore extension. The format is plain
+// JSON but allows // line comments and /* block comments */
+// outside of string literals, so users can annotate their
+// saved flowcharts by hand. Imports ONLY accept .emeraldcore.
 // ============================================================
+function stripJsoncComments(text) {
+  // Walk the string character-by-character so we never strip
+  // comment-like sequences (// or /*) that appear inside string
+  // literals. Handles escape sequences inside strings.
+  let out = '';
+  let i = 0;
+  let inString = false;
+  let stringDelim = '';
+  const len = text.length;
+  while (i < len) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inString) {
+      out += ch;
+      if (ch === '\\') {
+        // Escaped character — copy the next char verbatim
+        if (i + 1 < len) { out += next; i += 2; continue; }
+      }
+      if (ch === stringDelim) inString = false;
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringDelim = ch;
+      out += ch;
+      i++;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      // Line comment — skip to end of line (but keep the newline)
+      while (i < len && text[i] !== '\n') i++;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      // Block comment — skip to closing */
+      i += 2;
+      while (i < len && !(text[i] === '*' && text[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+function parseEmeraldCore(text) {
+  const stripped = stripJsoncComments(text);
+  let data;
+  try {
+    data = JSON.parse(stripped);
+  } catch (err) {
+    throw new Error('The file is not valid .emeraldcore format. ' + err.message);
+  }
+  if (!data || typeof data !== 'object') {
+    throw new Error('The file does not contain a flowchart object.');
+  }
+  if (!Array.isArray(data.shapes)) {
+    throw new Error('The file is missing a "shapes" array — it may be a different kind of file.');
+  }
+  return data;
+}
+
+function serializeEmeraldCore(data) {
+  const header = [
+    '// ============================================================',
+    '// EmeraldStudio Flowchart — .emeraldcore',
+    '// Generated: ' + new Date().toISOString(),
+    '// Shapes: ' + (data.shapes ? data.shapes.length : 0),
+    '//',
+    '// This is JSONC: standard JSON with // and /* */ comments.',
+    '// You can safely edit values or add notes as comments.',
+    '// ============================================================',
+    '',
+  ].join('\n');
+  return header + JSON.stringify(data, null, 2);
+}
+
+// ============================================================
+// CUSTOM MODALS — error & confirm
+// ------------------------------------------------------------
+// Replaces native alert() / confirm() with modals that match
+// the existing prop-dialog design (same header, footer, buttons).
+// ============================================================
+function showErrorModal(title, message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML =
+      '<div class="prop-dialog" style="max-width:440px;">' +
+        buildModalHeader('red', HELP_ICONS.error, title) +
+        '<div class="prop-body" style="font-size:13px;line-height:1.65;color:var(--fc-text-dim);">' +
+          '<p style="margin:0;">' + escapeHtml(message) + '</p>' +
+        '</div>' +
+        '<div class="prop-footer"><button class="prop-btn primary">OK</button></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    const close = () => { overlay.remove(); document.removeEventListener('keydown', escHandler); resolve(); };
+    const escHandler = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', escHandler);
+    const btn = overlay.querySelector('button');
+    btn.onclick = close;
+    btn.focus();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  });
+}
+
+function showConfirmModal(opts) {
+  const title = opts.title || 'Confirm';
+  const message = opts.message || '';
+  const confirmLabel = opts.confirmLabel || 'Confirm';
+  const cancelLabel = opts.cancelLabel || 'Cancel';
+  const danger = opts.danger === true;
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    const confirmClass = danger ? 'prop-btn danger' : 'prop-btn primary';
+    const headerVariant = danger ? 'red' : 'gold';
+    const headerIcon = danger ? HELP_ICONS.error : HELP_ICONS.warning;
+    overlay.innerHTML =
+      '<div class="prop-dialog" style="max-width:440px;">' +
+        buildModalHeader(headerVariant, headerIcon, title) +
+        '<div class="prop-body" style="font-size:13px;line-height:1.65;color:var(--fc-text-dim);">' +
+          '<p style="margin:0;">' + escapeHtml(message) + '</p>' +
+        '</div>' +
+        '<div class="prop-footer">' +
+          '<button class="prop-btn cancel">' + escapeHtml(cancelLabel) + '</button>' +
+          '<button class="' + confirmClass + ' ok">' + escapeHtml(confirmLabel) + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    const close = (val) => { overlay.remove(); document.removeEventListener('keydown', escHandler); resolve(val); };
+    const escHandler = (e) => { if (e.key === 'Escape') close(false); };
+    document.addEventListener('keydown', escHandler);
+    overlay.querySelector('.cancel').onclick = () => close(false);
+    const okBtn = overlay.querySelector('.ok');
+    okBtn.onclick = () => close(true);
+    okBtn.focus();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+  });
+}
+
 function saveProgram() {
-  const data = { version: 2, nextId: State.nextId, shapes: Array.from(State.shapes.values()) };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'flowcode-program.json'; a.click();
-  URL.revokeObjectURL(url);
-  toast('Program saved', 'success');
+  try {
+    const data = { version: 2, nextId: State.nextId, shapes: Array.from(State.shapes.values()) };
+    const text = serializeEmeraldCore(data);
+    const blob = new Blob([text], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'flowchart.emeraldcore';
+    // Append to DOM before clicking — some browsers refuse to
+    // trigger a download for a detached <a> element.
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Give the browser a tick to start the download before revoking.
+    setTimeout(() => URL.revokeObjectURL(url), 200);
+    toast('Flowchart exported as .emeraldcore', 'success');
+  } catch (err) {
+    showErrorModal('Export Failed', err.message);
+  }
 }
 
 function loadProgram() {
-  $('#file-input').click();
-  $('#file-input').onchange = (e) => {
+  const input = $('#file-input');
+  // Set the handler BEFORE opening the picker so the change
+  // event is never missed (click() returns synchronously).
+  input.onchange = (e) => {
     const file = e.target.files[0];
+    e.target.value = '';   // reset so the same file can be re-picked later
     if (!file) return;
+    // Only .emeraldcore files are accepted on import.
+    if (!file.name.toLowerCase().endsWith('.emeraldcore')) {
+      showErrorModal('Unsupported File', 'Only .emeraldcore files can be imported. Please select a file with the .emeraldcore extension.');
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
-        const data = JSON.parse(ev.target.result);
-        if (!data.shapes) throw new Error('Invalid file');
+        const data = parseEmeraldCore(ev.target.result);
         State.shapes.clear();
         State.nextId = data.nextId || 1;
         data.shapes.forEach(s => {
@@ -1706,25 +1967,47 @@ function loadProgram() {
           State.shapes.set(s.id, s);
         });
         renderAll();
-        toast('Program loaded', 'success');
-      } catch (err) { toast('Failed: ' + err.message, 'error'); }
+        toast('Flowchart imported', 'success');
+      } catch (err) {
+        await showErrorModal('Import Failed', err.message);
+      }
+    };
+    reader.onerror = async () => {
+      await showErrorModal('Import Failed', 'Could not read the selected file.');
     };
     reader.readAsText(file);
-    e.target.value = '';
   };
+  input.click();
 }
 
-function newProgram() {
-  if (State.shapes.size > 0 && !confirm('Start new? Unsaved changes will be lost.')) return;
+// Creates the starter flowchart: Start → Output "Hello" → End.
+// Used both on first open (when no saved state exists) and when
+// the user clicks Clear. Does NOT call renderAll() — the caller
+// is responsible for rendering. Does NOT toast.
+//
+// IMPORTANT: the third terminal MUST be explicitly set to "End".
+// defaultDataForType('terminal') returns { text: 'Start' }, so
+// without this override both terminals would say "Start".
+function createStarterTemplate() {
   State.shapes.clear();
   State.nextId = 1;
   State.selectedId = null;
   const s = createShape('terminal', 320, 40);
+  s.data = { text: 'Start' };
   const o = createShape('output', 320, 120);
+  o.data = { expression: '"Hello"', newline: true };
   const e = createShape('terminal', 320, 200);
+  e.data = { text: 'End' };
   s.next = o.id; o.next = e.id;
+  // Refresh display text for all shapes (createShape computed
+  // .text from the default .data, which we then overrode).
+  State.shapes.forEach(sh => { sh.text = getDisplayText(sh); });
+}
+
+function newProgram() {
+  createStarterTemplate();
   renderAll();
-  toast('New program', 'success');
+  toast('Canvas cleared', 'success');
 }
 
 function loadExample() {
@@ -1796,10 +2079,28 @@ $('#btn-stop').onclick = stopProgram;
 $('#btn-reset').onclick = resetProgram;
 $('#btn-clear-console').onclick = clearConsole;
 
+// Top-right File toolbar (Save / Open / Clear)
+$('#btn-save').onclick = saveProgram;
+$('#btn-open').onclick = loadProgram;
+$('#btn-clear').onclick = async () => {
+  if (State.shapes.size > 0) {
+    const ok = await showConfirmModal({
+      title: 'Clear Canvas?',
+      message: 'This will remove all shapes from the canvas and cannot be undone. Make sure you have saved your work first.',
+      confirmLabel: 'Clear',
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
+  }
+  newProgram();
+};
+
 $('#speed-slider').oninput = (e) => {
   const v = parseInt(e.target.value);
   State.speed = Math.round(500 - (v / 100) * 495);
   $('#speed-display').textContent = State.speed + 'ms';
+  persistStateDebounced(300);   // save the new speed (debounced — fires once when slider settles)
 };
 $('#speed-slider').dispatchEvent(new Event('input'));
 
@@ -1875,6 +2176,8 @@ const HELP_ICONS = {
   keyboard: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg>',
   about: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
   input: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  error: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  warning: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
 };
 
 function showHelp() {
@@ -1887,7 +2190,7 @@ function showHelp() {
     '<p style="margin-top:10px;"><b style="color:var(--fc-text);">3. Connect shapes:</b> Hover over a shape to see the green handle (pill-shaped). Drag from the handle onto another shape to connect. If/Loop/For/Do shapes have two handles: bottom = True, right = False.</p>' +
     '<p style="margin-top:10px;"><b style="color:var(--fc-text);">4. Insert on a line:</b> Click any connection line to insert a new shape in between — a menu pops up with shape options.</p>' +
     '<p style="margin-top:10px;"><b style="color:var(--fc-text);">5. Pan the canvas:</b> Hold <kbd>Space</kbd> and drag with the mouse to move the whole view around.</p>' +
-    '<p style="margin-top:10px;"><b style="color:var(--fc-text);">6. Run:</b> Click Run (F5) or Step (F10) to execute. Watch variables update in the bottom-right panel.</p>' +
+    '<p style="margin-top:10px;"><b style="color:var(--fc-text);">6. Run:</b> Click the Run or Step button in the bottom toolbar to execute. Watch variables update in the bottom-right panel.</p>' +
     '<p style="margin-top:10px;"><b style="color:var(--fc-text);">7. Generated code:</b> Watch the bottom-left Code panel update live as you build your flowchart.</p>' +
     '</div><div class="prop-footer"><button class="prop-btn primary">Got it</button></div></div>';
   document.body.appendChild(o);
@@ -1937,10 +2240,6 @@ function showShortcuts() {
   const row = (label, key) => '<div style="display:flex;justify-content:space-between;align-items:center;"><span>' + label + '</span><code style="background:var(--fc-accent-soft);padding:3px 10px;border-radius:5px;color:var(--fc-accent);font-family:var(--fc-mono);font-weight:600;font-size:11px;">' + key + '</code></div>';
   o.innerHTML = '<div class="prop-dialog" style="max-width:420px;">' + buildModalHeader('gold', HELP_ICONS.keyboard, 'Keyboard Shortcuts') +
     '<div class="prop-body" style="font-size:13px;line-height:2.1;color:rgba(44,62,80,0.7);">' +
-      row('Run program', 'F5') +
-      row('Step', 'F10') +
-      row('Save', 'Ctrl+S') +
-      row('Open', 'Ctrl+O') +
       row('Delete shape', 'Del') +
       row('Edit properties', 'Double-click / Enter') +
       row('Cancel', 'Esc') +
@@ -1965,10 +2264,37 @@ function showAbout() {
 
 // ============================================================
 // INIT
+// ------------------------------------------------------------
+// On startup we first try to restore the previously-saved
+// flowchart from IndexedDB. Only after that attempt completes
+// do we enable persistence — this guarantees we never overwrite
+// a saved flowchart with the empty initial state.
 // ============================================================
-function init() {
+async function init() {
   ensureArrowhead($('#connections'));
+  let loaded = false;
+  try {
+    loaded = await loadPersistedState();
+  } catch (err) {
+    console.warn('[FlowCode] Failed to load persisted state:', err);
+  }
+  _persistenceReady = true;   // safe to persist from now on
+  // First-time open (or empty saved state) — show the starter
+  // template so the canvas isn't blank. This also persists the
+  // template to IndexedDB, so the next open restores it.
+  if (!loaded || State.shapes.size === 0) {
+    createStarterTemplate();
+  }
   renderAll();
+  if (loaded && State.shapes.size > 0) {
+    toast('Flowchart restored from previous session', 'success');
+  }
+  // Flush any pending debounced write when the user leaves — gives
+  // the IDB transaction the best chance to complete before unload.
+  window.addEventListener('beforeunload', () => {
+    if (_persistDebounceTimer) { clearTimeout(_persistDebounceTimer); _persistDebounceTimer = null; }
+    persistState();
+  });
   window.addEventListener('resize', () => { ensureArrowhead($('#connections')); renderConnections(); });
 }
 init();
