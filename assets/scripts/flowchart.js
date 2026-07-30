@@ -161,7 +161,9 @@ function toast(msg, type = '') {
 // ============================================================
 function createShape(type, x, y) {
   const id = uid();
-  const shape = { id, type, x: x || 200, y: y || 100, text: '', data: null, next: null, alt: null };
+  // Use ?? (not ||) so an explicit 0 coordinate is respected —
+  // `x || 200` would silently snap a shape placed at 0 to 200.
+  const shape = { id, type, x: x ?? 200, y: y ?? 100, text: '', data: null, next: null, alt: null };
   shape.data = defaultDataForType(type);
   shape.text = getDisplayText(shape);
   State.shapes.set(id, shape);
@@ -2004,11 +2006,17 @@ function createStarterTemplate() {
   State.shapes.clear();
   State.nextId = 1;
   State.selectedId = null;
-  const s = createShape('terminal', 320, 40);
+
+  // Lay the chain out on a clean vertical axis at the canvas origin.
+  // The whole group is then centered in the viewport by
+  // centerViewOnShapes(), which measures the real rendered boxes.
+  const STEP = 80; // shape height (40) + 40px gap
+
+  const s = createShape('terminal', 0, 0);
   s.data = { text: 'Start' };
-  const o = createShape('output', 320, 120);
+  const o = createShape('output', 0, STEP);
   o.data = { expression: '"Hello"', newline: true };
-  const e = createShape('terminal', 320, 200);
+  const e = createShape('terminal', 0, STEP * 2);
   e.data = { text: 'End' };
   s.next = o.id; o.next = e.id;
   // Refresh display text for all shapes (createShape computed
@@ -2016,9 +2024,33 @@ function createStarterTemplate() {
   State.shapes.forEach(sh => { sh.text = getDisplayText(sh); });
 }
 
+// Pan the viewport so the bounding box of all shapes sits in the
+// middle of the visible canvas. Must run AFTER renderAll() so the
+// shape elements exist and can be measured (getShapeSize() returns
+// nominal sizes that don't always match the CSS-rendered box).
+function centerViewOnShapes() {
+  if (State.shapes.size === 0) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  State.shapes.forEach(sh => {
+    const el = document.querySelector('.shape[data-id="' + sh.id + '"]');
+    const w = el ? el.offsetWidth : getShapeSize(sh).w;
+    const h = el ? el.offsetHeight : getShapeSize(sh).h;
+    minX = Math.min(minX, sh.x);
+    minY = Math.min(minY, sh.y);
+    maxX = Math.max(maxX, sh.x + w);
+    maxY = Math.max(maxY, sh.y + h);
+  });
+  const wrap = $('#canvas-wrap');
+  State.pan.x = Math.round((wrap.clientWidth - (maxX - minX)) / 2 - minX);
+  State.pan.y = Math.round((wrap.clientHeight - (maxY - minY)) / 2 - minY);
+  applyPan();
+  renderConnections();
+}
+
 function newProgram() {
   createStarterTemplate();
   renderAll();
+  centerViewOnShapes();
   toast('Canvas cleared', 'success');
 }
 
@@ -2294,10 +2326,14 @@ async function init() {
   // First-time open (or empty saved state) — show the starter
   // template so the canvas isn't blank. This also persists the
   // template to IndexedDB, so the next open restores it.
-  if (!loaded || State.shapes.size === 0) {
+  const isFreshStart = !loaded || State.shapes.size === 0;
+  if (isFreshStart) {
     createStarterTemplate();
   }
   renderAll();
+  // Only recenter for a brand-new canvas — a restored session keeps
+  // whatever pan position the user last scrolled to.
+  if (isFreshStart) centerViewOnShapes();
   if (loaded && State.shapes.size > 0) {
     toast('Flowchart restored from previous session', 'success');
   }

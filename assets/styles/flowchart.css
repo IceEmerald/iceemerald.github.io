@@ -649,6 +649,36 @@ select {
     border: 1.5px solid var(--shape-terminal-bd);
 }
 
+/* Flowgorithm-style left + top inner lines on Declare mini-icon */
+.mini-declare {
+    position: relative;
+    padding-left: 14px;
+}
+
+/* left vertical bar */
+.mini-declare::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 3px;
+    bottom: 3px;
+    width: 1.5px;
+    background: var(--shape-terminal-bd);
+    border-radius: 1px;
+}
+
+/* top horizontal bar */
+.mini-declare::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    top: 7px;
+    height: 1px;
+    background: var(--shape-terminal-bd);
+    border-radius: 1px;
+}
+
 .mini-input {
     background: var(--shape-input-bg);
     border: 1.5px solid var(--shape-input-bd);
@@ -909,6 +939,35 @@ select {
     background: var(--shape-terminal-bg);
     border: 2px solid var(--shape-terminal-bd);
     border-radius: 4px;
+}
+
+/* Flowgorithm-style left + top inner lines on Declare shapes */
+.shape.declare .shape-body {
+    padding-left: 22px;
+}
+
+/* left vertical bar */
+.shape.declare .shape-body::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    background: var(--shape-terminal-bd);
+    border-radius: 1px;
+}
+
+/* top horizontal bar */
+.shape.declare .shape-body::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    right: 4px;
+    top: 2px;
+    height: 2px;
+    background: var(--shape-terminal-bd);
+    border-radius: 1px;
 }
 
 .shape.input .shape-body {
