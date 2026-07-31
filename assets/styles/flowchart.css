@@ -1424,12 +1424,10 @@ select {
 }
 
 .var-empty {
-    text-align: center;
-    color: var(--fc-text-muted);
-    /* Match the console's font size so the "No variables yet..." and
-       "Ready. Build a flowchart and press Run." placeholder messages
-       look visually identical in both panels. */
+    font-family: var(--fc-mono);
+    color: var(--console-info);
     font-size: 12px;
+    font-weight: 400;
     padding: 16px 10px;
     font-style: italic;
     line-height: 1.7;
@@ -1864,74 +1862,105 @@ select {
 }
 
 /* ============================================================
-   CONTEXT MENU
+   CONTEXT MENU (Matches .rightclick-menu in index.html & aichat.html)
    ============================================================ */
-.fc-context-menu {
+.fc-context-menu,
+.rightclick-menu {
     position: fixed;
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--fc-border-strong);
-    border-radius: var(--fc-radius-sm);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-    padding: 4px;
-    min-width: 180px;
-    z-index: 500;
     display: none;
-    animation: fc-menu-in 0.18s var(--fc-ease);
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    min-width: 240px;
+    z-index: 10000;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    padding: 8px 0;
+    animation: ctxFadeIn 0.2s ease-out;
 }
 
-@keyframes fc-menu-in {
-    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes ctxFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-#context-menu .ctx-item {
+#context-menu .ctx-item,
+.rightclick-menu a {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 11px;
-    font-size: 12.5px;
-    border-radius: var(--fc-radius-xs);
-    color: var(--fc-text);
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    color: #000;
     cursor: pointer;
-    transition: background 0.12s var(--fc-ease), color 0.12s var(--fc-ease);
-    font-weight: 500;
+    transition: background 0.2s ease;
+    font-weight: 400;
+    font-family: var(--fc-sans);
+    text-decoration: none;
 }
 
-#context-menu .ctx-item:hover {
-    background: var(--fc-accent-soft);
-    color: var(--fc-accent);
+#context-menu .ctx-item:hover,
+.rightclick-menu a:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #000;
 }
 
-#context-menu .ctx-item.danger {
-    color: #c92a2a;
+#context-menu .ctx-item svg,
+.rightclick-menu a svg {
+    color: #333;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
 }
 
-#context-menu .ctx-item.danger:hover {
-    background: rgba(220, 53, 69, 0.08);
-    color: #c92a2a;
+#context-menu .ctx-item:hover svg,
+.rightclick-menu a:hover svg {
+    opacity: 1;
 }
 
-#context-menu .ctx-sep {
+#context-menu .ctx-item.danger,
+#context-menu .ctx-item.danger svg,
+.rightclick-menu a.ctx-danger,
+.rightclick-menu a.ctx-danger svg {
+    color: #d93025;
+}
+
+#context-menu .ctx-item.danger:hover,
+.rightclick-menu a.ctx-danger:hover {
+    background: rgba(217, 48, 37, 0.06);
+    color: #d93025;
+}
+
+#context-menu .ctx-sep,
+.rightclick-menu .ctx-divider {
     height: 1px;
-    background: var(--fc-border);
-    margin: 4px 4px;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 4px 0;
 }
 
 #context-menu .ctx-shortcut {
     margin-left: auto;
-    font-size: 10px;
-    color: var(--fc-text-muted);
+    font-size: 0.75rem;
+    color: rgba(0, 0, 0, 0.45);
     font-family: var(--fc-mono);
     font-weight: 400;
 }
 
-#context-menu .ctx-title {
-    padding: 6px 11px 4px;
-    font-size: 9px;
+#context-menu .ctx-title,
+.rightclick-menu .context-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px 4px;
+    font-size: 0.72rem;
     font-weight: 700;
-    color: var(--fc-text-muted);
+    color: #444;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     pointer-events: none;

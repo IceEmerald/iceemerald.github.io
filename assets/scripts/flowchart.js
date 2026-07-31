@@ -770,8 +770,7 @@ function showInsertMenu(x, y, fromId, port, toId) {
   ];
   menu.innerHTML = '<div class="ctx-title">Insert Shape Here</div><div class="ctx-sep"></div>' +
     options.map(o => '<div class="ctx-item" data-type="' + o.type + '">' + o.label + '</div>').join('');
-  menu.style.display = 'block';
-  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  positionContextMenu(menu, x, y);
   menu.querySelectorAll('.ctx-item[data-type]').forEach(el => {
     el.onclick = () => {
       const newShape = createShape(el.dataset.type, midX, midY);
@@ -873,21 +872,43 @@ window.addEventListener('blur', () => {
 // ============================================================
 // CONTEXT MENU
 // ============================================================
+// CONTEXT MENU
+// ============================================================
+function positionContextMenu(menu, x, y) {
+  menu.style.display = 'block';
+  const menuWidth = menu.offsetWidth || 240;
+  const menuHeight = menu.offsetHeight || 160;
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  let left = x;
+  let top = y;
+  if (left + menuWidth > viewportWidth) left = viewportWidth - menuWidth - 8;
+  if (left < 8) left = 8;
+  if (top + menuHeight > viewportHeight) top = viewportHeight - menuHeight - 8;
+  if (top < 8) top = 8;
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+}
+
 function showContextMenu(x, y, shapeId) {
   const menu = $('#context-menu');
   const shape = getShape(shapeId);
+  const editSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  const dupSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const discSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  const delSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+
   menu.innerHTML =
-    '<div class="ctx-item" data-action="edit">Edit Properties<span class="ctx-shortcut">Dbl-click</span></div>' +
+    '<div class="ctx-item" data-action="edit">' + editSvg + 'Edit Properties<span class="ctx-shortcut">Dbl-click</span></div>' +
     '<div class="ctx-sep"></div>' +
-    '<div class="ctx-item" data-action="duplicate">Duplicate</div>' +
+    '<div class="ctx-item" data-action="duplicate">' + dupSvg + 'Duplicate</div>' +
     (shape.type !== 'terminal' && shape.type !== 'comment' && shape.type !== 'breakpoint' ? (
-      (shape.next ? '<div class="ctx-item" data-action="disconnect-next">Disconnect True</div>' : '') +
-      (['decision','loop','for','do'].includes(shape.type) ? (shape.alt ? '<div class="ctx-item" data-action="disconnect-alt">Disconnect False</div>' : '') : '')
+      (shape.next ? '<div class="ctx-item" data-action="disconnect-next">' + discSvg + 'Disconnect True</div>' : '') +
+      (['decision','loop','for','do'].includes(shape.type) ? (shape.alt ? '<div class="ctx-item" data-action="disconnect-alt">' + discSvg + 'Disconnect False</div>' : '') : '')
     ) : '') +
     '<div class="ctx-sep"></div>' +
-    '<div class="ctx-item danger" data-action="delete">Delete<span class="ctx-shortcut">Del</span></div>';
-  menu.style.display = 'block';
-  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+    '<div class="ctx-item danger" data-action="delete">' + delSvg + 'Delete<span class="ctx-shortcut">Del</span></div>';
+  positionContextMenu(menu, x, y);
   menu.querySelectorAll('.ctx-item').forEach(it => {
     it.addEventListener('click', () => { handleContextAction(it.dataset.action, shapeId); hideContextMenu(); });
   });
@@ -2189,8 +2210,7 @@ function showMenuDropdown(name, x, y) {
     if (it.sep) return '<div class="ctx-sep"></div>';
     return '<div class="ctx-item">' + escapeHtml(it.label) + '</div>';
   }).join('');
-  menu.style.display = 'block';
-  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  positionContextMenu(menu, x, y);
   menu.querySelectorAll('.ctx-item').forEach((el, i) => {
     el.onclick = () => { const item = items[i]; if (item && item.action) item.action(); hideContextMenu(); };
   });
