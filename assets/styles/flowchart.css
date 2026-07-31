@@ -1880,6 +1880,21 @@ select {
     animation: ctxFadeIn 0.2s ease-out;
 }
 
+/* The flowchart page sets html/body { font-size: 14px }, which makes
+   the rem-based sizes inside this menu compute smaller than they do
+   on the AIChat / index pages (which use the browser default 16px
+   root). Pinning #context-menu back to 16px makes 0.9rem / 0.72rem
+   inside the menu render at exactly the same px size as AIChat. */
+#context-menu {
+    font-size: 16px;
+    /* No visible border — matches how the AIChat menu looks on
+       screen (the border in .rightclick-menu is barely visible
+       against AIChat's dark page, so for visual parity on the
+       flowchart's light page we drop it entirely and let the
+       box-shadow carry the depth. */
+    border: none;
+}
+
 @keyframes ctxFadeIn {
     from {
         opacity: 0;
@@ -1891,11 +1906,31 @@ select {
     }
 }
 
+/* `.context-section` groups related items under a title — matches
+   the .rightclick-menu structure used on the index page and in AIChat. */
+.context-section {
+    padding: 4px 0;
+}
+
+/* `.context-text` is an optional descriptive line under a title
+   (e.g. showing which shape/connection the menu targets). */
+.context-text {
+    padding: 0 16px 8px;
+    font-size: 0.85rem;
+    color: #333;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+/* Item rows — `display: block` (NOT flex) to match AIChat / index
+   exactly. AIChat's .rightclick-menu a uses display:block with no
+   gap / no align-items, so the text sits flush at the padding edge.
+   The previous flex+gap version reserved space for icons that no
+   longer exist, pushing text 8px too far right. */
 #context-menu .ctx-item,
+#context-menu a,
 .rightclick-menu a {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: block;
     padding: 10px 16px;
     font-size: 0.9rem;
     color: #000;
@@ -1907,52 +1942,47 @@ select {
 }
 
 #context-menu .ctx-item:hover,
+#context-menu a:hover,
 .rightclick-menu a:hover {
     background: rgba(0, 0, 0, 0.05);
     color: #000;
 }
 
 #context-menu .ctx-item svg,
+#context-menu a svg,
 .rightclick-menu a svg {
     color: #333;
-    opacity: 0.7;
-    transition: opacity 0.15s ease;
-}
-
-#context-menu .ctx-item:hover svg,
-.rightclick-menu a:hover svg {
-    opacity: 1;
 }
 
 #context-menu .ctx-item.danger,
 #context-menu .ctx-item.danger svg,
+#context-menu a.ctx-danger,
+#context-menu a.ctx-danger svg,
 .rightclick-menu a.ctx-danger,
 .rightclick-menu a.ctx-danger svg {
     color: #d93025;
 }
 
 #context-menu .ctx-item.danger:hover,
+#context-menu a.ctx-danger:hover,
 .rightclick-menu a.ctx-danger:hover {
     background: rgba(217, 48, 37, 0.06);
     color: #d93025;
 }
 
-#context-menu .ctx-sep,
+/* Separators — kept for the index-page .rightclick-menu, but the
+   flowchart #context-menu no longer emits .ctx-divider elements
+   (AIChat's MESSAGE / CHATS menus don't use them either). */
 .rightclick-menu .ctx-divider {
     height: 1px;
     background: rgba(0, 0, 0, 0.08);
     margin: 4px 0;
 }
 
-#context-menu .ctx-shortcut {
-    margin-left: auto;
-    font-size: 0.75rem;
-    color: rgba(0, 0, 0, 0.45);
-    font-family: var(--fc-mono);
-    font-weight: 400;
-}
-
+/* Category titles. Both `.ctx-title` (legacy flowchart) AND
+   `.context-title` (AIChat) are aliased. */
 #context-menu .ctx-title,
+#context-menu .context-title,
 .rightclick-menu .context-title {
     display: flex;
     align-items: center;

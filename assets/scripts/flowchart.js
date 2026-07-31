@@ -733,21 +733,57 @@ $('#canvas-wrap').addEventListener('dblclick', (e) => {
 // for opening a property modal via the mouse. (Keyboard Enter on a
 // selected shape still works — see the keydown handler.)
 
-// Right-click context menu (kept for power-user actions like Duplicate,
-// Disconnect, Delete — Edit Properties is also still there).
-$('#canvas-wrap').addEventListener('contextmenu', (e) => {
-  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill, .fc-file-bar')) return;
-  const target = e.target.closest('.shape');
-  if (target) {
-    e.preventDefault();
-    State.selectedId = target.dataset.id;
+// ============================================================
+// GLOBAL RIGHT-CLICK CONTEXT MENU
+// ------------------------------------------------------------
+// Mirrors the AIChat pattern: EVERY right-click on the flowchart
+// shows a contextual menu. The contents depend on the target —
+//   • SHAPE       → Edit / Duplicate / Disconnect / Delete
+//   • CONNECTION  → Insert <shape> Here / Disconnect
+//   • CANVAS      → Add <shape> Here / Copy Page Link / Clear
+// — but every variant uses the same flat structure as AIChat's
+// MESSAGE / CHATS menus: one title row + plain <a> items, no
+// dividers, no per-item icons, no shortcut hints.
+// ============================================================
+document.addEventListener('contextmenu', (e) => {
+  // Allow native menus inside text-editing fields so users can
+  // still use the browser's copy/paste/spell-check etc.
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  // Skip when a property/help/error modal is open — right-clicking
+  // inside a dialog shouldn't trigger the canvas menu underneath.
+  if (e.target.closest('.modal-overlay')) return;
+
+  e.preventDefault();
+
+  const shapeEl = e.target.closest('.shape');
+  const connHit = e.target.closest('.conn-hit');
+
+  if (shapeEl) {
+    State.selectedId = shapeEl.dataset.id;
     renderShapes();
-    showContextMenu(e.clientX, e.clientY, target.dataset.id);
+    showShapeContextMenu(e.clientX, e.clientY, shapeEl.dataset.id);
+  } else if (connHit) {
+    showConnectionContextMenu(
+      e.clientX, e.clientY,
+      connHit.dataset.from, connHit.dataset.port, connHit.dataset.to
+    );
+  } else {
+    // Blank canvas, ribbon, palette, panels, brand pill, file bar,
+    // or anywhere else — fall through to the CANVAS tools menu so
+    // every right-click on the page produces a contextual menu.
+    showCanvasContextMenu(e.clientX, e.clientY);
   }
 });
 
 // ============================================================
-// INSERT SHAPE ON LINE CLICK
+// INSERT SHAPE ON LINE CLICK  (left-click on a connection line)
+// ------------------------------------------------------------
+// Kept for backward compatibility with the documented "click a
+// connection line to insert a shape in between" UX. Now uses the
+// same .rightclick-menu design system as the right-click menus so
+// the visual language is consistent across both entry points.
 // ============================================================
 function showInsertMenu(x, y, fromId, port, toId) {
   const fromShape = getShape(fromId);
@@ -760,19 +796,21 @@ function showInsertMenu(x, y, fromId, port, toId) {
 
   const menu = $('#context-menu');
   const options = [
-    { type: 'process', label: 'Assign' },
-    { type: 'declare', label: 'Declare' },
-    { type: 'input', label: 'Input' },
-    { type: 'output', label: 'Output' },
-    { type: 'decision', label: 'If' },
-    { type: 'call', label: 'Call' },
-    { type: 'comment', label: 'Comment' },
+    { type: 'process', label: 'Insert Assign' },
+    { type: 'declare', label: 'Insert Declare' },
+    { type: 'input', label: 'Insert Input' },
+    { type: 'output', label: 'Insert Output' },
+    { type: 'decision', label: 'Insert If' },
+    { type: 'call', label: 'Insert Call' },
+    { type: 'comment', label: 'Insert Comment' },
   ];
-  menu.innerHTML = '<div class="ctx-title">Insert Shape Here</div><div class="ctx-sep"></div>' +
-    options.map(o => '<div class="ctx-item" data-type="' + o.type + '">' + o.label + '</div>').join('');
+  menu.innerHTML =
+    '<div class="context-title">' + _fcSvg.conn + ' CONNECTION</div>' +
+    options.map(o => '<a data-type="' + o.type + '">' + o.label + ' Here</a>').join('');
   positionContextMenu(menu, x, y);
-  menu.querySelectorAll('.ctx-item[data-type]').forEach(el => {
-    el.onclick = () => {
+  menu.querySelectorAll('a[data-type]').forEach(el => {
+    el.addEventListener('click', (ev) => {
+      ev.preventDefault();
       const newShape = createShape(el.dataset.type, midX, midY);
       if (port === 'next') fromShape.next = newShape.id;
       else fromShape.alt = newShape.id;
@@ -781,7 +819,7 @@ function showInsertMenu(x, y, fromId, port, toId) {
       renderAll();
       hideContextMenu();
       setTimeout(() => openPropertyDialog(newShape.id), 100);
-    };
+    });
   });
 }
 
@@ -890,27 +928,237 @@ function positionContextMenu(menu, x, y) {
   menu.style.top = top + 'px';
 }
 
-function showContextMenu(x, y, shapeId) {
+// ============================================================
+// CONTEXT MENU BUILDERS
+// ------------------------------------------------------------
+// Each builder produces a menu using the .rightclick-menu design
+// system (.context-title header + <a> items + .ctx-divider
+// separators + .ctx-danger for destructive actions), matching
+// the AIChat context-menu pattern exactly. The category title
+// (SHAPE / CONNECTION / CANVAS) is the equivalent of AIChat's
+// TOOLS / MESSAGE / CHATS header — same look, same role.
+// ============================================================
+
+// Shared SVG icons (12-13px, matches AIChat context-menu icon size).
+// Vertical-align trick keeps the icon centered on the text baseline.
+const _fcSvg = {
+  edit:   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.7"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+  dup:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.7"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  disc:   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.7"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  del:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.7"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+  add:    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.7"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  link:   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.7"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+  info:   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.7"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>',
+  // Category-title icons (12px, no margin — they sit in the title row)
+  shape:  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;display:inline-block"><rect x="3" y="8" width="18" height="8" rx="2"/></svg>',
+  conn:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;display:inline-block"><path d="M9 17H7a5 5 0 0 1 0-10h2"/><path d="M15 7h2a5 5 0 0 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+  canvas: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;display:inline-block"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
+};
+
+// ---------- SHAPE ----------
+// Right-click on a flowchart shape. Matches the AIChat MESSAGE /
+// CHATS menu structure exactly: one title row with an icon, then
+// plain <a> items — no dividers, no per-item icons, no shortcut
+// hints. Destructive items get .ctx-danger (red).
+function showShapeContextMenu(x, y, shapeId) {
   const menu = $('#context-menu');
   const shape = getShape(shapeId);
-  const editSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-  const dupSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-  const discSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-  const delSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+  if (!shape) return;
 
-  menu.innerHTML =
-    '<div class="ctx-item" data-action="edit">' + editSvg + 'Edit Properties<span class="ctx-shortcut">Dbl-click</span></div>' +
-    '<div class="ctx-sep"></div>' +
-    '<div class="ctx-item" data-action="duplicate">' + dupSvg + 'Duplicate</div>' +
-    (shape.type !== 'terminal' && shape.type !== 'comment' && shape.type !== 'breakpoint' ? (
-      (shape.next ? '<div class="ctx-item" data-action="disconnect-next">' + discSvg + 'Disconnect True</div>' : '') +
-      (['decision','loop','for','do'].includes(shape.type) ? (shape.alt ? '<div class="ctx-item" data-action="disconnect-alt">' + discSvg + 'Disconnect False</div>' : '') : '')
-    ) : '') +
-    '<div class="ctx-sep"></div>' +
-    '<div class="ctx-item danger" data-action="delete">' + delSvg + 'Delete<span class="ctx-shortcut">Del</span></div>';
+  let html = '<div class="context-title">' + _fcSvg.shape + ' SHAPE</div>';
+  html += '<a data-action="edit">Edit Properties</a>';
+  html += '<a data-action="duplicate">Duplicate</a>';
+
+  // Disconnect options — only on connectable shapes that actually
+  // have an outgoing edge on the relevant port.
+  if (shape.type !== 'terminal' && shape.type !== 'comment' && shape.type !== 'breakpoint') {
+    if (shape.next) {
+      html += '<a data-action="disconnect-next">Disconnect True</a>';
+    }
+    if (['decision','loop','for','do'].includes(shape.type) && shape.alt) {
+      html += '<a data-action="disconnect-alt">Disconnect False</a>';
+    }
+  }
+
+  html += '<a class="ctx-danger" data-action="delete">Delete</a>';
+
+  menu.innerHTML = html;
   positionContextMenu(menu, x, y);
-  menu.querySelectorAll('.ctx-item').forEach(it => {
-    it.addEventListener('click', () => { handleContextAction(it.dataset.action, shapeId); hideContextMenu(); });
+
+  menu.querySelectorAll('a[data-action]').forEach(a => {
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      handleContextAction(a.dataset.action, shapeId);
+      hideContextMenu();
+    });
+  });
+}
+
+// ---------- CONNECTION ----------
+// Right-click on a connection line. Same flat structure as the
+// SHAPE menu: title row + plain <a> items + divider + danger item.
+function showConnectionContextMenu(x, y, fromId, port, toId) {
+  const menu = $('#context-menu');
+  const fromShape = getShape(fromId);
+  const toShape = getShape(toId);
+  if (!fromShape || !toShape) return;
+
+  // Midpoint in canvas-space — where the newly inserted shape
+  // will land. Mirrors the calculation in showInsertMenu.
+  const fromPos = getPortPos(fromShape, port);
+  const toPos = getPortPos(toShape, 'in');
+  const midX = (fromPos.x + toPos.x) / 2 - 70;
+  const midY = (fromPos.y + toPos.y) / 2 - 22;
+
+  const insertOptions = [
+    { type: 'process',  label: 'Insert Assign' },
+    { type: 'declare',  label: 'Insert Declare' },
+    { type: 'input',    label: 'Insert Input' },
+    { type: 'output',   label: 'Insert Output' },
+    { type: 'decision', label: 'Insert If' },
+    { type: 'call',     label: 'Insert Call' },
+    { type: 'comment',  label: 'Insert Comment' },
+  ];
+
+  let html = '<div class="context-title">' + _fcSvg.conn + ' CONNECTION</div>';
+  insertOptions.forEach(o => {
+    html += '<a data-type="' + o.type + '">' + o.label + ' Here</a>';
+  });
+
+  html += '<a class="ctx-danger" data-action="disconnect">Disconnect</a>';
+
+  menu.innerHTML = html;
+  positionContextMenu(menu, x, y);
+
+  // Insert-shape handlers — splice a new shape into the connection
+  // by repointing the from-port to the new shape, and the new
+  // shape's `next` to the original target.
+  menu.querySelectorAll('a[data-type]').forEach(a => {
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const newShape = createShape(a.dataset.type, midX, midY);
+      if (port === 'next') fromShape.next = newShape.id;
+      else fromShape.alt = newShape.id;
+      newShape.next = toId;
+      State.selectedId = newShape.id;
+      renderAll();
+      hideContextMenu();
+      setTimeout(() => openPropertyDialog(newShape.id), 100);
+    });
+  });
+
+  // Disconnect handler — nulls the relevant port on the source
+  // shape, which removes the line on the next render pass.
+  const disc = menu.querySelector('a[data-action="disconnect"]');
+  if (disc) {
+    disc.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      if (port === 'next') fromShape.next = null;
+      else fromShape.alt = null;
+      renderConnections();
+      persistState();
+      hideContextMenu();
+      toast('Connection removed');
+    });
+  }
+}
+
+// ---------- CANVAS ----------
+// Right-click on blank canvas or any floating panel. The TOOLS
+// equivalent from AIChat — generic fallback menu. Same flat
+// structure: title + plain <a> items + dividers + danger item.
+function showCanvasContextMenu(x, y) {
+  const menu = $('#context-menu');
+
+  // Canvas-space coordinates for "Add ... Here" actions.
+  const rect = $('#canvas-wrap').getBoundingClientRect();
+  const cx = x - rect.left - State.pan.x - 65;
+  const cy = y - rect.top  - State.pan.y - 22;
+
+  const addOptions = [
+    { type: 'terminal',  label: 'Add Terminal' },
+    { type: 'declare',   label: 'Add Declare' },
+    { type: 'process',   label: 'Add Assign' },
+    { type: 'input',     label: 'Add Input' },
+    { type: 'output',    label: 'Add Output' },
+    { type: 'decision',  label: 'Add If' },
+    { type: 'call',      label: 'Add Call' },
+    { type: 'comment',   label: 'Add Comment' },
+  ];
+
+  let html = '<div class="context-title">' + _fcSvg.canvas + ' CANVAS</div>';
+  addOptions.forEach(o => {
+    html += '<a data-type="' + o.type + '">' + o.label + ' Here</a>';
+  });
+
+  html += '<a data-action="copy-link">Copy Page Link</a>';
+  html += '<a data-action="show-info">Show Canvas Info</a>';
+
+  // Only show "Clear Canvas" if there's actually something to clear.
+  if (State.shapes.size > 0) {
+    html += '<a class="ctx-danger" data-action="clear">Clear Canvas</a>';
+  }
+
+  menu.innerHTML = html;
+  positionContextMenu(menu, x, y);
+
+  // Add-shape handlers — create the shape at the click position and
+  // open its property dialog (except for Comment / Breakpoint which
+  // don't have one).
+  menu.querySelectorAll('a[data-type]').forEach(a => {
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const s = createShape(a.dataset.type, cx, cy);
+      State.selectedId = s.id;
+      renderAll();
+      hideContextMenu();
+      if (a.dataset.type !== 'comment' && a.dataset.type !== 'breakpoint') {
+        setTimeout(() => openPropertyDialog(s.id), 100);
+      }
+    });
+  });
+
+  // Tool-action handlers (Copy Page Link / Show Canvas Info / Clear)
+  menu.querySelectorAll('a[data-action]').forEach(a => {
+    a.addEventListener('click', async (ev) => {
+      ev.preventDefault();
+      const action = a.dataset.action;
+      if (action === 'copy-link') {
+        try {
+          await navigator.clipboard.writeText(location.href);
+          toast('Page link copied', 'success');
+        } catch {
+          toast('Could not copy link', 'error');
+        }
+      } else if (action === 'show-info') {
+        const n = State.shapes.size;
+        const conns = Array.from(State.shapes.values()).reduce(
+          (acc, s) => acc + (s.next ? 1 : 0) + (s.alt ? 1 : 0), 0
+        );
+        toast(
+          'Canvas — ' + n + ' shape' + (n === 1 ? '' : 's') +
+          ' · ' + conns + ' connection' + (conns === 1 ? '' : 's') +
+          ' · Pan (' + Math.round(State.pan.x) + ', ' + Math.round(State.pan.y) + ')'
+        );
+      } else if (action === 'clear') {
+        const ok = await showConfirmModal({
+          title: 'Clear Canvas',
+          message: 'Remove all ' + State.shapes.size + ' shape' +
+                   (State.shapes.size === 1 ? '' : 's') +
+                   ' from the canvas? This cannot be undone.',
+          confirmLabel: 'Clear All',
+          danger: true,
+        });
+        if (ok) {
+          State.shapes.clear();
+          State.selectedId = null;
+          renderAll();
+          persistState();
+          toast('Canvas cleared');
+        }
+      }
+      hideContextMenu();
+    });
   });
 }
 function hideContextMenu() { $('#context-menu').style.display = 'none'; }
