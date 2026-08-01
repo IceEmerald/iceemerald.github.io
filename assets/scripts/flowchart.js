@@ -150,10 +150,21 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;'
 
 function toast(msg, type = '') {
   const el = $('#toast');
-  el.textContent = msg;
-  el.className = 'show ' + type;
+  if (!el) return;
+  // innerHTML (not textContent) so callers can prefix an SVG icon —
+  // matches the showToast() pattern in rightclick.js on the index /
+  // aichat pages. All toast messages in this app are developer-
+  // controlled strings, so no sanitization is needed.
+  el.innerHTML = msg;
+  // Set className with 'show' included directly (like aichat's
+  // showToast). This keeps the toast visible when a new message
+  // replaces an old one — no flicker, no reflow trick needed.
+  // The `type` arg is kept for API compatibility but has NO visual
+  // effect (aichat / index toasts are always white bg + black text;
+  // the icon in the message carries the success/error signal).
+  el.className = 'fc-toast show' + (type ? ' ' + type : '');
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.className = '', 2200);
+  el._t = setTimeout(() => el.classList.remove('show'), 5000);
 }
 
 // ============================================================
@@ -883,7 +894,7 @@ document.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (e.key === 'Delete' || e.key === 'Backspace') { if (State.selectedId) { deleteShape(State.selectedId); toast('Shape deleted'); } }
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (State.selectedId) { deleteShape(State.selectedId); toast(_fcSvg.del + ' Shape deleted'); } }
   else if (e.key === 'Enter') { if (State.selectedId && !$('.modal-overlay')) openPropertyDialog(State.selectedId); }
   else if (e.key === 'Escape') {
     if (State.connecting) { State.connecting = null; document.body.classList.remove('connecting-mode'); renderConnections(); }
@@ -953,6 +964,9 @@ const _fcSvg = {
   shape:  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;display:inline-block"><rect x="3" y="8" width="18" height="8" rx="2"/></svg>',
   conn:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;display:inline-block"><path d="M9 17H7a5 5 0 0 1 0-10h2"/><path d="M15 7h2a5 5 0 0 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
   canvas: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;display:inline-block"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
+  // Toast-only icons (13px, slightly higher opacity for visibility)
+  check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.8"><path d="M20 6L9 17l-5-5"/></svg>',
+  warn:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:7px;opacity:0.8"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
 };
 
 // ---------- SHAPE ----------
@@ -1058,7 +1072,7 @@ function showConnectionContextMenu(x, y, fromId, port, toId) {
       renderConnections();
       persistState();
       hideContextMenu();
-      toast('Connection removed');
+      toast(_fcSvg.disc + ' Connection removed');
     });
   }
 }
@@ -1126,9 +1140,9 @@ function showCanvasContextMenu(x, y) {
       if (action === 'copy-link') {
         try {
           await navigator.clipboard.writeText(location.href);
-          toast('Page link copied', 'success');
+          toast(_fcSvg.link + ' Page link copied!', 'success');
         } catch {
-          toast('Could not copy link', 'error');
+          toast(_fcSvg.warn + ' Could not copy link!', 'error');
         }
       } else if (action === 'show-info') {
         const n = State.shapes.size;
@@ -1136,7 +1150,7 @@ function showCanvasContextMenu(x, y) {
           (acc, s) => acc + (s.next ? 1 : 0) + (s.alt ? 1 : 0), 0
         );
         toast(
-          'Canvas — ' + n + ' shape' + (n === 1 ? '' : 's') +
+          _fcSvg.info + ' Canvas — ' + n + ' shape' + (n === 1 ? '' : 's') +
           ' · ' + conns + ' connection' + (conns === 1 ? '' : 's') +
           ' · Pan (' + Math.round(State.pan.x) + ', ' + Math.round(State.pan.y) + ')'
         );
@@ -1154,7 +1168,7 @@ function showCanvasContextMenu(x, y) {
           State.selectedId = null;
           renderAll();
           persistState();
-          toast('Canvas cleared');
+          toast(_fcSvg.check + ' Canvas cleared', 'success');
         }
       }
       hideContextMenu();
@@ -1168,8 +1182,8 @@ function handleContextAction(action, id) {
   if (!shape) return;
   switch (action) {
     case 'edit': openPropertyDialog(id); break;
-    case 'duplicate': { const copy = createShape(shape.type, shape.x + 30, shape.y + 30); copy.data = JSON.parse(JSON.stringify(shape.data)); copy.text = getDisplayText(copy); State.selectedId = copy.id; renderAll(); toast('Duplicated'); break; }
-    case 'delete': deleteShape(id); toast('Deleted'); break;
+    case 'duplicate': { const copy = createShape(shape.type, shape.x + 30, shape.y + 30); copy.data = JSON.parse(JSON.stringify(shape.data)); copy.text = getDisplayText(copy); State.selectedId = copy.id; renderAll(); toast(_fcSvg.dup + ' Duplicated'); break; }
+    case 'delete': deleteShape(id); toast(_fcSvg.del + ' Deleted'); break;
     case 'disconnect-next': shape.next = null; renderConnections(); persistState(); break;
     case 'disconnect-alt': shape.alt = null; renderConnections(); persistState(); break;
   }
@@ -1309,8 +1323,8 @@ function openDeclareDialog(shape) {
   nameInput.focus(); nameInput.select();
   dlg.okBtn.onclick = () => {
     const name = nameInput.value.trim();
-    if (!name) { toast('Please enter a variable name', 'error'); return; }
-    if (!/^[a-zA-Z_]\w*$/.test(name)) { toast('Invalid variable name', 'error'); return; }
+    if (!name) { toast(_fcSvg.warn + ' Please enter a variable name', 'error'); return; }
+    if (!/^[a-zA-Z_]\w*$/.test(name)) { toast(_fcSvg.warn + ' Invalid variable name', 'error'); return; }
     d.name = name;
     d.dataType = dlg.body.querySelector('#f-type').value;
     d.isArray = arrayCheck.checked;
@@ -1337,10 +1351,10 @@ function openAssignDialog(shape) {
   varInput.focus(); varInput.select();
   dlg.okBtn.onclick = () => {
     const v = varInput.value.trim();
-    if (!v) { toast('Please enter a variable name', 'error'); return; }
+    if (!v) { toast(_fcSvg.warn + ' Please enter a variable name', 'error'); return; }
     d.variable = v;
     d.expression = exprInput.value.trim();
-    if (!d.expression) { toast('Please enter an expression', 'error'); return; }
+    if (!d.expression) { toast(_fcSvg.warn + ' Please enter an expression', 'error'); return; }
     shape.text = getDisplayText(shape);
     renderAll(); dlg.close();
   };
@@ -1364,7 +1378,7 @@ function openInputDialog(shape) {
   dlg.okBtn.onclick = () => {
     d.prompt = dlg.body.querySelector('#f-prompt').value.trim();
     d.variable = varInput.value.trim();
-    if (!d.variable) { toast('Please enter a variable name', 'error'); return; }
+    if (!d.variable) { toast(_fcSvg.warn + ' Please enter a variable name', 'error'); return; }
     shape.text = getDisplayText(shape);
     renderAll(); dlg.close();
   };
@@ -1383,7 +1397,7 @@ function openOutputDialog(shape) {
   exprInput.focus(); exprInput.select();
   dlg.okBtn.onclick = () => {
     d.expression = exprInput.value.trim();
-    if (!d.expression) { toast('Please enter an expression', 'error'); return; }
+    if (!d.expression) { toast(_fcSvg.warn + ' Please enter an expression', 'error'); return; }
     d.newline = dlg.body.querySelector('#f-nl').checked;
     shape.text = getDisplayText(shape);
     renderAll(); dlg.close();
@@ -1402,7 +1416,7 @@ function openIfDialog(shape) {
   exprInput.focus(); exprInput.select();
   dlg.okBtn.onclick = () => {
     d.expression = exprInput.value.trim();
-    if (!d.expression) { toast('Please enter an expression', 'error'); return; }
+    if (!d.expression) { toast(_fcSvg.warn + ' Please enter an expression', 'error'); return; }
     shape.text = getDisplayText(shape);
     renderAll(); dlg.close();
   };
@@ -1438,7 +1452,7 @@ function openForDialog(shape) {
     d.end = dlg.body.querySelector('#f-end').value.trim();
     d.direction = dlg.body.querySelector('input[name=dir]:checked').value;
     d.step = dlg.body.querySelector('#f-step').value.trim() || '1';
-    if (!d.variable || !d.start || !d.end) { toast('Please fill in all fields', 'error'); return; }
+    if (!d.variable || !d.start || !d.end) { toast(_fcSvg.warn + ' Please fill in all fields', 'error'); return; }
     shape.text = getDisplayText(shape);
     renderAll(); dlg.close();
   };
@@ -1459,7 +1473,7 @@ function openCallDialog(shape) {
   dlg.okBtn.onclick = () => {
     d.function = funcInput.value.trim();
     d.parameters = dlg.body.querySelector('#f-params').value.trim();
-    if (!d.function) { toast('Please enter a function name', 'error'); return; }
+    if (!d.function) { toast(_fcSvg.warn + ' Please enter a function name', 'error'); return; }
     shape.text = getDisplayText(shape);
     renderAll(); dlg.close();
   };
@@ -2219,7 +2233,7 @@ function saveProgram() {
     document.body.removeChild(a);
     // Give the browser a tick to start the download before revoking.
     setTimeout(() => URL.revokeObjectURL(url), 200);
-    toast('Flowchart exported as .emeraldcore', 'success');
+    toast(_fcSvg.check + ' Flowchart exported as .emeraldcore', 'success');
   } catch (err) {
     showErrorModal('Export Failed', err.message);
   }
@@ -2250,7 +2264,7 @@ function loadProgram() {
           State.shapes.set(s.id, s);
         });
         renderAll();
-        toast('Flowchart imported', 'success');
+        toast(_fcSvg.check + ' Flowchart imported', 'success');
       } catch (err) {
         await showErrorModal('Import Failed', err.message);
       }
@@ -2320,7 +2334,7 @@ function newProgram() {
   createStarterTemplate();
   renderAll();
   centerViewOnShapes();
-  toast('Canvas cleared', 'success');
+  toast(_fcSvg.check + ' Canvas cleared', 'success');
 }
 
 function loadExample() {
@@ -2348,7 +2362,7 @@ function loadExample() {
   forl.next = add.id; forl.alt = out.id; add.next = forl.id; out.next = end.id;
   State.shapes.forEach(s => s.text = getDisplayText(s));
   renderAll();
-  toast('Example loaded', 'success');
+  toast(_fcSvg.check + ' Example loaded', 'success');
 }
 
 function loadArrayExample() {
@@ -2380,7 +2394,7 @@ function loadArrayExample() {
   forl.next = assign.id; forl.alt = out.id; assign.next = add.id; add.next = forl.id; out.next = out2.id; out2.next = end.id;
   State.shapes.forEach(s => s.text = getDisplayText(s));
   renderAll();
-  toast('Array example loaded', 'success');
+  toast(_fcSvg.check + ' Array example loaded', 'success');
 }
 
 // ============================================================
@@ -2603,7 +2617,7 @@ async function init() {
   // whatever pan position the user last scrolled to.
   if (isFreshStart) centerViewOnShapes();
   if (loaded && State.shapes.size > 0) {
-    toast('Flowchart restored from previous session', 'success');
+    toast(_fcSvg.check + ' Flowchart restored from previous session', 'success');
   }
   // Flush any pending debounced write when the user leaves — gives
   // the IDB transaction the best chance to complete before unload.

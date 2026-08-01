@@ -97,7 +97,7 @@ body {
     font-family: var(--fc-sans);
     background: var(--fc-bg);
     color: var(--fc-text);
-    font-size: 14px;
+    font-size: 15px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     user-select: none;
@@ -1997,47 +1997,60 @@ select {
 }
 
 /* ============================================================
-   TOAST
+   TOAST  (Matches .custom-toast in index.html & aichat.html)
+   ------------------------------------------------------------
+   aichat / index toasts are ALWAYS white background + black text.
+   There is no .custom-toast--success or .custom-toast--error CSS
+   rule — the `type` argument passed to showToast() is a no-op for
+   styling. The visual signal (success vs error) is carried entirely
+   by the SVG icon prefixed to the message (green check, red warn,
+   blue info, etc.), NOT by the toast background.
    ============================================================ */
-.fc-toast {
+.fc-toast,
+.custom-toast {
     position: fixed;
     bottom: 24px;
     left: 50%;
-    transform: translateX(-50%) translateY(16px);
-    background: rgba(255, 255, 255, 0.98);
-    color: var(--fc-text);
-    border: 1px solid var(--fc-border-strong);
-    padding: 11px 22px;
-    border-radius: var(--fc-radius-sm);
-    font-size: 13px;
-    font-weight: 500;
-    z-index: 2000;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    color: #111;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    padding: 14px 24px;
+    border-radius: 12px;
+    line-height: 1.6;
+    z-index: 99999;
     opacity: 0;
-    transition: opacity 0.28s var(--fc-ease), transform 0.28s var(--fc-ease);
     pointer-events: none;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    white-space: normal;
+    word-break: break-word;
     max-width: 80vw;
     text-align: left;
     font-family: var(--fc-sans);
 }
 
-.fc-toast.show {
+/* Animation: on .show, fade in AND lift up 10px (matches aichat
+   exactly — the toast slides up from its resting position as it
+   appears, and slides back down as it fades out). */
+.fc-toast.show,
+.custom-toast.show {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) translateY(-10px);
 }
 
-.fc-toast.success {
-    background: var(--fc-accent);
-    color: #fff;
-    border-color: var(--fc-accent);
-}
-
-.fc-toast.error {
-    background: #c92a2a;
-    color: #fff;
-    border-color: #c92a2a;
+/* SVG icons inside toast messages (prefixed via innerHTML in
+   the toast() call). The icon colour comes from the SVG's own
+   stroke="currentColor" which inherits the toast's text color
+   (#111 black). Matches the rightclick.js showToast pattern on
+   the index page. */
+.fc-toast svg,
+.custom-toast svg {
+    vertical-align: -2px;
+    margin-right: 7px;
+    opacity: 0.8;
 }
 
 #file-input {
