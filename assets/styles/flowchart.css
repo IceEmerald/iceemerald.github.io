@@ -344,7 +344,7 @@ select {
     bottom: var(--fc-margin);
     left: 50%;
     transform: translateX(-50%);
-    z-index: 50;
+    z-index: 10000;
     width: max-content;
     max-width: calc(100% - var(--fc-right-w) - var(--fc-margin) * 3);
     min-width: 300px;
@@ -2009,7 +2009,7 @@ select {
 .fc-toast,
 .custom-toast {
     position: fixed;
-    bottom: 24px;
+    bottom: 72px;
     left: 50%;
     transform: translateX(-50%);
     background: rgba(255, 255, 255, 0.95);
@@ -2018,7 +2018,7 @@ select {
     padding: 14px 24px;
     border-radius: 12px;
     line-height: 1.6;
-    z-index: 99999;
+    z-index: 9999;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease, transform 0.3s ease;
