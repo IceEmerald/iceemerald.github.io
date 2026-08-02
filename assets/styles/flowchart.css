@@ -545,10 +545,6 @@ select {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-.palette-section {
-    border-bottom: 1px solid var(--fc-border-soft);
-}
-
 .palette-section:last-of-type {
     border-bottom: none;
 }
@@ -565,7 +561,7 @@ select {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    /* Match the Variables / Console panel titles — same color, same weight. */
+    border-bottom: 1px solid var(--fc-border);
     color: var(--fc-text);
     position: sticky;
     top: 0;
