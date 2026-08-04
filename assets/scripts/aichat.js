@@ -1438,7 +1438,7 @@ function animateChatSwitch(swapFn) {
     }
   }, 160);
 }
-function loadConversation(id, force) {
+function loadConversation(id, force, noAnimate = false) {
   const conv = getConv(id);
   if (!conv) return;
   // Skip if already viewing this conversation (avoid double-render when
@@ -1448,7 +1448,7 @@ function loadConversation(id, force) {
   if (!force && state.convId === id && !state.isTemp) return;
   state.convId = id;
   state.isTemp = false;
-  animateChatSwitch(() => {
+  const doSwap = () => {
     showMessages();
     $("messagesArea").innerHTML = typingIndicatorHTML();
     conv.messages.forEach((m) => {
@@ -1465,7 +1465,11 @@ function loadConversation(id, force) {
     updateTopbarTitle(conv.title);
     renderSidebar();
     scrollToBottom();
-  });
+  };
+  // noAnimate: branch navigation handles its own per-message animation,
+  // so skip the chat-level wrapper to avoid double-animating + extra delay.
+  if (noAnimate) doSwap();
+  else animateChatSwitch(doSwap);
 }
 function appendUserMessageDOM(text, files = [], msgId = null, branchRef = null) {
   const typingEl = $("typingIndicator");
@@ -4418,7 +4422,10 @@ function navigateBranch(originalMsgId, dir) {
   ];
   conv._editBranches[originalMsgId] = branchInfo;
   upsertConv(conv);
-  _animateBranchSwitch(() => loadConversation(conv.id, true));
+  _animateBranchSwitch(
+    () => loadConversation(conv.id, true, true),
+    `.message--user[data-branch-ref="${originalMsgId}"]`
+  );
 }
 function updateBranchNavDOM(originalMsgId) {
   if (!state.convId) return;
@@ -4467,32 +4474,40 @@ function navigateRegenBranch(branchId, dir) {
   conv.messages[msgIdx] = { ...branch.variants[newIdx], id: genId(), _regenBranchRef: branchId };
   conv._regenBranches[branchId] = branch;
   upsertConv(conv);
-  _animateBranchSwitch(() => loadConversation(conv.id, true));
+  _animateBranchSwitch(
+    () => loadConversation(conv.id, true, true),
+    `.message[data-ai="1"][data-regen-branch-ref="${branchId}"]`
+  );
 }
-/* ── Branch-switch blur animation ───────────────────────────────
-   Same blur-only effect as chat-switch, but lighter (shorter
-   duration, lighter blur) so branch navigation feels snappier.
-   Used by navigateBranch and navigateRegenBranch. */
-let _branchSwitchAnimating = false;
-function _animateBranchSwitch(swapFn) {
-  const content = $("chatContent");
-  if (!content || state.isStreaming) {
+/* ── Branch-switch per-message animation ───────────────────────
+   Animates ONLY the switched branch message (not the whole chat),
+   per user preference. No delay: the swap happens immediately,
+   then the new message element is found via `msgSelector` and
+   animated from blurred → clear. Used by navigateBranch (targets
+   the user message) and navigateRegenBranch (targets the AI msg). */
+function _animateBranchSwitch(swapFn, msgSelector) {
+  if (state.isStreaming) {
     swapFn();
     return;
   }
-  if (_branchSwitchAnimating) {
-    swapFn();
-    return;
-  }
-  _branchSwitchAnimating = true;
-  content.classList.add("is-branch-switching");
-  setTimeout(() => {
-    try { swapFn(); } finally {
-      void content.offsetWidth;
-      content.classList.remove("is-branch-switching");
-      setTimeout(() => { _branchSwitchAnimating = false; }, 150);
-    }
-  }, 120);
+  // Swap immediately — no setTimeout delay before something happens.
+  swapFn();
+  if (!msgSelector) return;
+  // Animate ONLY the target message element (the new branch variant).
+  requestAnimationFrame(() => {
+    const newMsg = document.querySelector(msgSelector);
+    if (!newMsg) return;
+    newMsg.classList.remove("is-branch-animating");
+    void newMsg.offsetWidth; // force reflow to restart animation
+    newMsg.classList.add("is-branch-animating");
+    const cleanup = () => {
+      newMsg.classList.remove("is-branch-animating");
+      newMsg.removeEventListener("animationend", cleanup);
+    };
+    newMsg.addEventListener("animationend", cleanup);
+    // Fallback cleanup in case animationend doesn't fire.
+    setTimeout(() => newMsg.classList.remove("is-branch-animating"), 600);
+  });
 }
 function updateRegenNavDOM(branchId) {
   if (!state.convId) return;

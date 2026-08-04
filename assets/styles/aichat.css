@@ -694,11 +694,11 @@ body.light-mode .model-dropdown-lock { color: #aaa; }
 }
 
 body.light-mode .input-reasoning-btn {
-    color: #888;
+    color: #555;
 }
 body.light-mode .input-reasoning-btn:hover {
     background: #f0f0f0;
-    color: #555;
+    color: #000;
 }
 body.light-mode .input-reasoning-btn.active {
     background: rgba(80, 200, 120, 0.12);
@@ -767,23 +767,31 @@ body.light-mode .input-reasoning-btn.active .reasoning-toggle-icon {
     pointer-events: none;
     overflow: hidden;
 }
-/* Branch-switch: lighter blur + shorter duration for snappier feel. */
-.chat-content.is-branch-switching {
-    filter: blur(4px);
-    opacity: 0.3;
-    pointer-events: none;
+/* ── Branch-switch per-message animation ───────────────────────
+   Animates ONLY the switched branch message element (not the whole
+   chat), per user preference. Triggered by navigateBranch and
+   navigateRegenBranch via the .is-branch-animating class.
+   Blur-in only (no slide). `both` fill-mode so the message starts
+   blurred on first frame, then unblurs — direct, no flash. */
+@keyframes branchMsgIn {
+    from { opacity: 0.3; filter: blur(5px); }
+    to { opacity: 1; filter: blur(0); }
 }
-/* Light mode: lighter blur to match the lighter UI. */
-body.light-mode .chat-content.is-switching {
-    filter: blur(5px);
+.message.is-branch-animating {
+    animation: branchMsgIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-body.light-mode .chat-content.is-branch-switching {
-    filter: blur(3px);
+/* Light mode: slightly lighter blur to match the lighter UI. */
+@keyframes branchMsgInLight {
+    from { opacity: 0.35; filter: blur(4px); }
+    to { opacity: 1; filter: blur(0); }
+}
+body.light-mode .message.is-branch-animating {
+    animation: branchMsgInLight 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @media (prefers-reduced-motion: reduce) {
     .chat-content { transition: none; }
-    .chat-content.is-switching,
-    .chat-content.is-branch-switching { filter: none; }
+    .chat-content.is-switching { filter: none; }
+    .message.is-branch-animating { animation: none; }
 }
 
 .welcome-screen {
