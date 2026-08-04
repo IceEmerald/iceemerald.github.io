@@ -8,6 +8,8 @@
 //  • Double-click on a shape opens its property dialog (single-click only selects)
 //  • Terminal dialog uses Start/End selectable buttons (no typing)
 //  • Flowgorithm strict-mode: variables MUST be Declared before Assign/Input
+//  • Declare now supports comma-separated names: "x, y, z : Integer"
+//    (Flowgorithm-compatible multi-variable declaration)
 //  • Branching shapes (If/While/For/Do): TRUE exits LEFT, FALSE exits RIGHT
 //  • New "Code" panel at bottom-left shows generated pseudo-code
 //  • Panel restack logic updated for the new bottom-right layout
@@ -184,7 +186,7 @@ function createShape(type, x, y) {
 function defaultDataForType(type) {
   switch (type) {
     case 'terminal':   return { text: 'Start' };
-    case 'declare':    return { name: 'x', dataType: 'Integer', isArray: false, arraySize: 10 };
+    case 'declare':    return { names: ['x'], dataType: 'Integer', isArray: false, arraySize: 10 };
     case 'process':    return { variable: 'x', expression: '0' };
     case 'input':      return { variable: 'x', prompt: '' };
     case 'output':     return { expression: '"Hello"', newline: true };
@@ -199,12 +201,22 @@ function defaultDataForType(type) {
   }
 }
 
+// Returns the list of variable names for a Declare shape.
+// Accepts both the new `names: [...]` array format and the legacy
+// `name: "x"` single-string format so older saved flowcharts keep
+// working without migration.
+function getDeclareNames(d) {
+  if (Array.isArray(d.names) && d.names.length) return d.names.filter(n => n);
+  if (typeof d.name === 'string' && d.name) return [d.name];
+  return ['x'];
+}
+
 function getDisplayText(shape) {
   const d = shape.data;
   if (!d) return shape.text || '';
   switch (shape.type) {
     case 'terminal':   return d.text || 'Start';
-    case 'declare':    return d.isArray ? d.name + '[' + d.arraySize + '] : ' + d.dataType : d.name + ' : ' + d.dataType;
+    case 'declare':    { const ns = getDeclareNames(d).map(n => d.isArray ? n + '[' + d.arraySize + ']' : n).join(', '); return ns + ' : ' + d.dataType; }
     case 'process':    return d.variable + ' = ' + d.expression;
     case 'input':      return d.prompt ? '"' + d.prompt + '" -> ' + d.variable : d.variable;
     case 'output':     return d.expression;
@@ -225,9 +237,24 @@ function migrateShape(shape) {
   switch (shape.type) {
     case 'terminal': shape.data = { text }; break;
     case 'declare': {
-      const m = text.match(/^([a-zA-Z_]\w*)\s*(?:\[(\d+)\])?\s*(?:as|:)\s*(\w+)/i);
-      if (m) shape.data = { name: m[1], dataType: capitalize(m[3].toLowerCase()), isArray: !!m[2], arraySize: m[2] ? parseInt(m[2],10) : 10 };
-      else shape.data = defaultDataForType('declare');
+      // Parse both single-name ("x : Integer") and comma-separated
+      // multi-name ("x, y, z : Integer") forms. Each name may
+      // optionally carry an array size: "a[5], b[10] : Integer".
+      const m = text.match(/^([a-zA-Z_]\w*(?:\s*\[\s*\d+\s*\])?(?:\s*,\s*[a-zA-Z_]\w*(?:\s*\[\s*\d+\s*\])?)*)\s*(?:as|:)\s*(\w+)/i);
+      if (m) {
+        const parts = m[1].split(',').map(s => s.trim()).filter(Boolean);
+        const names = [];
+        let isArray = false;
+        let firstSize = 10;
+        parts.forEach(p => {
+          const am = p.match(/^([a-zA-Z_]\w*)\s*\[\s*(\d+)\s*\]$/);
+          if (am) { names.push(am[1]); isArray = true; if (firstSize === 10) firstSize = parseInt(am[2], 10); }
+          else { names.push(p); }
+        });
+        shape.data = { names, dataType: capitalize(m[2].toLowerCase()), isArray, arraySize: firstSize };
+      } else {
+        shape.data = defaultDataForType('declare');
+      }
       break;
     }
     case 'process': {
@@ -1300,9 +1327,10 @@ function openTerminalDialog(shape) {
 function openDeclareDialog(shape) {
   const d = shape.data;
   const dlg = createDialogShell(shape);
+  const namesStr = getDeclareNames(d).join(', ');
   dlg.body.innerHTML =
-    '<div class="prop-field"><label>Name</label>' +
-    '<input type="text" id="f-name" value="' + escapeHtml(d.name || '') + '" placeholder="variable name"></div>' +
+    '<div class="prop-field"><label>Names <span style="color:var(--fc-text-muted);font-weight:400;font-size:11px;">(comma-separated, e.g. x, y, z)</span></label>' +
+    '<input type="text" id="f-name" value="' + escapeHtml(namesStr) + '" placeholder="e.g. x, y, z"></div>' +
     '<div class="prop-field"><label>Data Type</label>' +
     '<select id="f-type">' +
       '<option value="Integer">Integer</option>' +
@@ -1310,7 +1338,7 @@ function openDeclareDialog(shape) {
       '<option value="String">String</option>' +
       '<option value="Boolean">Boolean</option>' +
     '</select></div>' +
-    '<div class="prop-field"><label class="prop-checkbox"><input type="checkbox" id="f-array"> Array?</label></div>' +
+    '<div class="prop-field"><label class="prop-checkbox"><input type="checkbox" id="f-array"> Array? <span style="color:var(--fc-text-muted);font-weight:400;font-size:11px;">(applies to all names)</span></label></div>' +
     '<div class="prop-field" id="f-size-field" style="display:none;"><label>Array Size (number of elements)</label>' +
     '<input type="number" id="f-size" value="' + (d.arraySize || 10) + '" min="1" max="10000"></div>';
   dlg.body.querySelector('#f-type').value = d.dataType || 'Integer';
@@ -1322,10 +1350,29 @@ function openDeclareDialog(shape) {
   const nameInput = dlg.body.querySelector('#f-name');
   nameInput.focus(); nameInput.select();
   dlg.okBtn.onclick = () => {
-    const name = nameInput.value.trim();
-    if (!name) { toast(_fcSvg.warn + ' Please enter a variable name', 'error'); return; }
-    if (!/^[a-zA-Z_]\w*$/.test(name)) { toast(_fcSvg.warn + ' Invalid variable name', 'error'); return; }
-    d.name = name;
+    const raw = nameInput.value.trim();
+    if (!raw) { toast(_fcSvg.warn + ' Please enter at least one variable name', 'error'); return; }
+    // Split on commas, trim each token, drop empties.
+    const names = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if (names.length === 0) { toast(_fcSvg.warn + ' Please enter at least one variable name', 'error'); return; }
+    // Validate each name (legal identifier: letter/_ then word chars).
+    for (const n of names) {
+      if (!/^[a-zA-Z_]\w*$/.test(n)) {
+        toast(_fcSvg.warn + ' Invalid variable name: "' + n + '". Use letters, digits, _; cannot start with a digit.', 'error');
+        return;
+      }
+    }
+    // Reject duplicates (case-insensitive, matching Flowgorithm).
+    const lowered = names.map(n => n.toLowerCase());
+    if (new Set(lowered).size !== lowered.length) {
+      const seen = {};
+      let dup = '';
+      for (const l of lowered) { seen[l] = (seen[l] || 0) + 1; if (seen[l] > 1) { dup = l; break; } }
+      toast(_fcSvg.warn + ' Duplicate variable name: "' + dup + '"', 'error');
+      return;
+    }
+    d.names = names;
+    delete d.name; // drop legacy single-name field
     d.dataType = dlg.body.querySelector('#f-type').value;
     d.isArray = arrayCheck.checked;
     d.arraySize = parseInt(dlg.body.querySelector('#f-size').value, 10) || 1;
@@ -1740,19 +1787,28 @@ async function executeStep() {
         if (State.running) { State.running = false; State.paused = true; setStatus('paused', 'Paused (breakpoint)'); }
         break;
 
-      case 'declare':
+      case 'declare': {
+        // Flowgorithm: a Declare statement can declare one or more
+        // variables in a single block, separated by commas:
+        //   x, y, z : Integer
+        // All names share the same data type and array-ness.
+        const declNames = getDeclareNames(d);
         if (d.isArray) {
           const size = parseInt(d.arraySize, 10);
           const defVal = defaultValueForType(d.dataType);
-          const arr = new Array(size).fill(defVal);
-          State.variables.set(d.name, { type: d.dataType, value: arr });
-          State.changedVars.add(d.name);
+          declNames.forEach(n => {
+            // Fresh array per name so variables don't share a reference.
+            const arr = new Array(size).fill(defVal);
+            State.variables.set(n, { type: d.dataType, value: arr });
+            State.changedVars.add(n);
+          });
         } else {
-          setVariable(d.name, defaultValueForType(d.dataType), d.dataType);
+          declNames.forEach(n => setVariable(n, defaultValueForType(d.dataType), d.dataType));
         }
         State.execution.lastEdge = { from: shape.id, port: 'next' };
         State.execution.currentId = shape.next;
         break;
+      }
 
       case 'process': {
         const value = evalExpression(d.expression, State.variables);
@@ -2343,10 +2399,8 @@ function loadExample() {
   const start = createShape('terminal', 300, 30);
   start.data = { text: 'Start' };
   const decl = createShape('declare', 300, 100);
-  decl.data = { name: 'n', dataType: 'Integer', isArray: false, arraySize: 0 };
-  const decl2 = createShape('declare', 300, 170);
-  decl2.data = { name: 'sum', dataType: 'Integer', isArray: false, arraySize: 0 };
-  const inp = createShape('input', 300, 240);
+  decl.data = { names: ['n', 'sum'], dataType: 'Integer', isArray: false, arraySize: 0 };
+  const inp = createShape('input', 300, 170);
   inp.data = { variable: 'n', prompt: 'Enter a number' };
   const init = createShape('process', 300, 310);
   init.data = { variable: 'sum', expression: '0' };
@@ -2358,7 +2412,7 @@ function loadExample() {
   out.data = { expression: '"Sum of 1 to " + n + " = " + sum', newline: true };
   const end = createShape('terminal', 300, 550);
   end.data = { text: 'End' };
-  start.next = decl.id; decl.next = decl2.id; decl2.next = inp.id; inp.next = init.id; init.next = forl.id;
+  start.next = decl.id; decl.next = inp.id; inp.next = init.id; init.next = forl.id;
   forl.next = add.id; forl.alt = out.id; add.next = forl.id; out.next = end.id;
   State.shapes.forEach(s => s.text = getDisplayText(s));
   renderAll();
@@ -2373,10 +2427,8 @@ function loadArrayExample() {
   const decl = createShape('declare', 300, 100);
   decl.data = { name: 'nums', dataType: 'Integer', isArray: true, arraySize: 5 };
   const decl2 = createShape('declare', 300, 170);
-  decl2.data = { name: 'i', dataType: 'Integer', isArray: false, arraySize: 0 };
-  const decl3 = createShape('declare', 300, 240);
-  decl3.data = { name: 'total', dataType: 'Integer', isArray: false, arraySize: 0 };
-  const init = createShape('process', 300, 310);
+  decl2.data = { names: ['i', 'total'], dataType: 'Integer', isArray: false, arraySize: 0 };
+  const init = createShape('process', 300, 240);
   init.data = { variable: 'total', expression: '0' };
   const forl = createShape('for', 300, 380);
   forl.data = { variable: 'i', start: '0', end: '4', direction: 'increasing', step: '1' };
@@ -2390,7 +2442,7 @@ function loadArrayExample() {
   out2.data = { expression: '"Total = " + total', newline: true };
   const end = createShape('terminal', 300, 620);
   end.data = { text: 'End' };
-  start.next = decl.id; decl.next = decl2.id; decl2.next = decl3.id; decl3.next = init.id; init.next = forl.id;
+  start.next = decl.id; decl.next = decl2.id; decl2.next = init.id; init.next = forl.id;
   forl.next = assign.id; forl.alt = out.id; assign.next = add.id; add.next = forl.id; out.next = out2.id; out2.next = end.id;
   State.shapes.forEach(s => s.text = getDisplayText(s));
   renderAll();
