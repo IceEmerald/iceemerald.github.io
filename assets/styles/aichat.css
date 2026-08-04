@@ -548,118 +548,32 @@ body {
     color: #a8a8a8;
 }
 
-/* ── Tier badge (right-aligned, subtle) ──────────────────────
-   Shows V4.1 / V4 / V3.5 / V3 / V2 so the capability hierarchy is
-   visible at a glance. Auto has no badge. */
-.model-dropdown-item {
+/* ── Locked / disabled model ─────────────────────────────────
+   Rendered at the bottom of the dropdown. Cannot be selected,
+   hovered, or focused. Visibly grayed out with a lock icon and
+   a "Locked" badge so it's clearly intentional, not a bug. */
+.model-dropdown-item.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.model-dropdown-item.disabled .model-dropdown-title {
+    color: #707070;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
 }
 
-.model-dropdown-tier {
-    flex-shrink: 0;
-    margin-left: auto;
-    padding: 2px 6px;
-    border-radius: 5px;
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: #888;
-    background: #2a2a2a;
-    border: 1px solid #333;
-    text-transform: uppercase;
-    line-height: 1.4;
+.model-dropdown-item.disabled .model-dropdown-desc {
+    color: #5a5a5a;
 }
 
-.model-dropdown-item.active .model-dropdown-tier {
-    color: #50c878;
-    background: rgba(80, 200, 120, 0.1);
-    border-color: rgba(80, 200, 120, 0.2);
-}
-
-/* ── Divider between primary models and "Other Models" ────── */
-.model-dropdown-divider {
-    height: 1px;
-    margin: 5px 4px;
-    background: #2c2c2c;
-}
-
-/* ── "Other Models" hover trigger + flyout submenu ──────────
-   The trigger is a row that matches the .model-dropdown-item aesthetic.
-   Hovering OR keyboard-focusing OR having the active model inside the
-   submenu reveals the flyout. The flyout positions itself to the right of
-   the main dropdown; on mobile (see @media below) it expands inline. */
-.model-dropdown-other {
-    position: relative;
-    border-radius: 8px;
-    outline: none;
-}
-
-.model-dropdown-other-btn {
-    display: flex;
+.model-dropdown-lock {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 8px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    color: #a8a8a8;
-    font-size: 0.8rem;
-    font-weight: 500;
-    transition: background 0.14s, color 0.14s;
-}
-
-.model-dropdown-other:hover > .model-dropdown-other-btn,
-.model-dropdown-other:focus-within > .model-dropdown-other-btn,
-.model-dropdown-other.is-expanded > .model-dropdown-other-btn {
-    background: #252525;
-    color: #f0f0f0;
-}
-
-.model-dropdown-other-label {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.model-dropdown-other-chevron {
     color: #888;
     flex-shrink: 0;
-    transition: transform 0.18s ease, color 0.18s;
-}
-
-.model-dropdown-other:hover > .model-dropdown-other-btn .model-dropdown-other-chevron,
-.model-dropdown-other:focus-within > .model-dropdown-other-btn .model-dropdown-other-chevron,
-.model-dropdown-other.is-expanded > .model-dropdown-other-btn .model-dropdown-other-chevron {
-    transform: translateX(2px);
-    color: #50c878;
-}
-
-.model-dropdown-other-list {
-    position: absolute;
-    top: 0;
-    left: calc(100% + 6px);
-    min-width: 248px;
-    max-width: 320px;
-    background: #1e1e1e;
-    border: 1px solid #2c2c2c;
-    border-radius: 10px;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
-    padding: 5px;
-    z-index: 1001;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateX(-4px);
-    transform-origin: top left;
-    transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s;
-}
-
-.model-dropdown-other:hover > .model-dropdown-other-list,
-.model-dropdown-other:focus-within > .model-dropdown-other-list,
-.model-dropdown-other.is-expanded > .model-dropdown-other-list {
-    opacity: 1;
-    visibility: visible;
-    transform: translateX(0);
 }
 
 /* Light mode overrides — matches existing light-mode list aesthetic */
@@ -696,30 +610,10 @@ body.light-mode .model-dropdown-item.active .model-dropdown-title { color: #000;
 body.light-mode .model-dropdown-desc { color: #888; }
 body.light-mode .model-dropdown-item.active .model-dropdown-desc { color: #666; }
 
-/* Light mode overrides for tier badge + Other Models submenu */
-body.light-mode .model-dropdown-tier {
-    color: #888;
-    background: #f4f4f4;
-    border-color: #e0e0e0;
-}
-body.light-mode .model-dropdown-item.active .model-dropdown-tier {
-    color: #2a9d54;
-    background: rgba(80, 200, 120, 0.1);
-    border-color: rgba(80, 200, 120, 0.25);
-}
-body.light-mode .model-dropdown-divider { background: #e8e8e8; }
-body.light-mode .model-dropdown-other-btn { color: #555; }
-body.light-mode .model-dropdown-other:hover > .model-dropdown-other-btn,
-body.light-mode .model-dropdown-other:focus-within > .model-dropdown-other-btn,
-body.light-mode .model-dropdown-other.is-expanded > .model-dropdown-other-btn {
-    background: #f0f0f0;
-    color: #000;
-}
-body.light-mode .model-dropdown-other-list {
-    background: #ffffff;
-    border-color: #e8e8e8;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
-}
+/* Light mode overrides for locked model */
+body.light-mode .model-dropdown-item.disabled .model-dropdown-title { color: #aaa; }
+body.light-mode .model-dropdown-item.disabled .model-dropdown-desc { color: #b0b0b0; }
+body.light-mode .model-dropdown-lock { color: #aaa; }
 
 /* Mobile: shrink selector */
 @media (max-width: 640px) {
@@ -732,22 +626,6 @@ body.light-mode .model-dropdown-other-list {
     .model-dropdown {
         min-width: 230px;
         max-width: calc(100vw - 24px);
-    }
-    /* On touch screens, hover doesn't work — make the Other Models submenu
-       expand inline (push content down) instead of flying out to the side. */
-    .model-dropdown-other-list {
-        position: static;
-        margin-top: 4px;
-        box-shadow: none;
-        border: none;
-        padding: 0;
-        background: transparent;
-        transform: none;
-    }
-    .model-dropdown-other:hover > .model-dropdown-other-list,
-    .model-dropdown-other:focus-within > .model-dropdown-other-list,
-    .model-dropdown-other.is-expanded > .model-dropdown-other-list {
-        transform: none;
     }
 }
 
@@ -770,7 +648,7 @@ body.light-mode .model-dropdown-other-list {
     border: none;
     cursor: pointer;
     color: #D2D2D2;
-    margin-left: -5px;
+    padding: 5px;
     border-radius: 25px;
     margin-bottom: 1px;
     display: flex;
@@ -803,7 +681,6 @@ body.light-mode .model-dropdown-other-list {
 
 .input-reasoning-btn.active .reasoning-toggle-icon {
     color: #50c878;
-    /* Gentle pulse to telegraph "thinking is on". */
     animation: reasoning-pulse 2.4s ease-in-out infinite;
 }
 
@@ -816,9 +693,8 @@ body.light-mode .model-dropdown-other-list {
     .input-reasoning-btn.active .reasoning-toggle-icon { animation: none; }
 }
 
-/* Light mode overrides */
 body.light-mode .input-reasoning-btn {
-    color: #888;
+    color: #555;
 }
 body.light-mode .input-reasoning-btn:hover {
     background: #f0f0f0;
@@ -871,34 +747,43 @@ body.light-mode .input-reasoning-btn.active .reasoning-toggle-icon {
     display: flex;
     flex-direction: column;
     border-radius: 12px;
+    /* Reserve scrollbar gutter so content doesn't shift horizontally
+       when switching chats (scrollbar appears/disappears as content
+       height changes). This fixes the "shift slightly right" bug. */
+    scrollbar-gutter: stable;
+    transition: filter 0.16s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.16s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
 /* ── Chat-switch animation ────────────────────────────────────
-   When the user switches conversations, .is-switching is applied to
-   #chatContent for ~180ms while the inner content is swapped. The
-   transition blurs + fades the outgoing content out; removing the
-   class reverses it (unblur + fade in). pointer-events:none prevents
-   accidental clicks on stale content mid-transition. */
-.chat-content {
-    transition: filter 0.18s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-}
+   When the user switches conversations, .is-switching is applied
+   to #chatContent for ~160ms while the inner content is swapped.
+   The transition blurs + fades the outgoing content out; removing
+   the class reverses it (unblur + fade in). Blur-only (no slide)
+   per user preference. pointer-events:none prevents accidental
+   clicks on stale content mid-transition. */
 .chat-content.is-switching {
     filter: blur(6px);
     opacity: 0;
     pointer-events: none;
-    /* Keep scroll position stable during the swap so the new content
-       doesn't visually jump before the in-animation kicks in. */
     overflow: hidden;
 }
-/* Light mode: identical effect, just lighter blur to match the lighter UI. */
+/* Branch-switch: lighter blur + shorter duration for snappier feel. */
+.chat-content.is-branch-switching {
+    filter: blur(4px);
+    opacity: 0.3;
+    pointer-events: none;
+}
+/* Light mode: lighter blur to match the lighter UI. */
 body.light-mode .chat-content.is-switching {
     filter: blur(5px);
 }
-/* Respect prefers-reduced-motion: skip the animation entirely. */
+body.light-mode .chat-content.is-branch-switching {
+    filter: blur(3px);
+}
 @media (prefers-reduced-motion: reduce) {
     .chat-content { transition: none; }
-    .chat-content.is-switching { filter: none; opacity: 0; }
+    .chat-content.is-switching,
+    .chat-content.is-branch-switching { filter: none; }
 }
 
 .welcome-screen {
@@ -1444,6 +1329,7 @@ body.light-mode .esb-citation-chip:hover { background: #ebebeb; color: #333; }
     font-weight: 400;
     align-items: center;
     justify-content: center;
+    padding-bottom: 7px;
     line-height: 1.5;
     min-height: 28px;
     max-height: 180px;

@@ -30,21 +30,13 @@ const DISPLAY_MODEL = "EmeraldCore.AI";
     }
   });
 })();
-/* Frontend model registry. Order = capability descending. The `tier` string
-   is shown as a small badge in the dropdown so the hierarchy is visible at a
-   glance. ids MUST match the `publicId` field in worker.js MODELS. */
 const MODELS = [
-  { id: "gamma",     name: "EmeraldCore Gamma",     short: "Gamma",     tier: "v4.1", desc: "Deepest reasoning — math, code, hard logic." },
-  { id: "diamond",   name: "EmeraldCore Diamond",   short: "Diamond",   tier: "v4",   desc: "Creative strategy, planning, long-form writing." },
-  { id: "gold",      name: "EmeraldCore Gold",      short: "Gold",      tier: "v4",   desc: "Research, fact-checking, in-depth analysis." },
-  { id: "kappa",     name: "EmeraldCore Kappa",     short: "Kappa",     tier: "v3.5", desc: "Versatile — web, roleplay, basic math." },
-  { id: "starlight", name: "EmeraldCore Starlight", short: "Starlight", tier: "v3",   desc: "Balanced everyday chat and quick tasks." },
-  { id: "cream",     name: "EmeraldCore Cream",     short: "Cream",     tier: "v2",   desc: "Fast, lightweight answers for simple questions." }
+  { id: "gamma", name: "EmeraldCore Gamma", short: "Gamma", tier: "v4", desc: "V4 | Advanced technical reasoning." },
+  { id: "diamond", name: "EmeraldCore Diamond", short: "Diamond", tier: "v4", desc: "V4 | Highest creativity and strategic thinking." },
+  { id: "gold", name: "EmeraldCore Gold", short: "Gold", tier: "v4", desc: "V4 | Accurate research and deeper analysis." },
+  { id: "kappa", name: "EmeraldCore Kappa", short: "Kappa", tier: "v3", desc: "V3 | Enhanced reasoning and versatility." },
+  { id: "cream", name: "EmeraldCore Cream", short: "Cream", tier: "v2", desc: "V2 | Reliable general-purpose responses." }
 ];
-/* Primary models shown directly in the dropdown. Everything else is tucked
-   behind the \"Other Models\" hover trigger to keep the panel scannable. */
-const PRIMARY_MODEL_IDS = ["gamma", "diamond", "gold"];
-const OTHER_MODEL_IDS = ["kappa", "starlight", "cream"];
 const MODEL_DEFAULT_ID = "auto";
 function getModelById(id) {
   return MODELS.find((m) => m.id === id) || null;
@@ -195,8 +187,14 @@ function setupChatStorageSync() {
       const activeId = state.convId;
       const activeConv = activeId ? getConv(activeId) : null;
       renderSidebar();
+      // Skip reload if WE just wrote (same-tab change). Only reload for
+      // cross-tab changes that happen >300ms after our last write.
+      // This prevents race conditions where upsertConv triggers a
+      // storage event that fires DURING an edit/regen/navigate flow,
+      // clearing the DOM mid-operation and breaking branch navigation.
+      if (Date.now() - _lastSelfWrite < 300) return;
       if (activeId && activeConv && !state.isStreaming) {
-        loadConversation(activeId);
+        loadConversation(activeId, true);
       } else if (activeId && !activeConv) {
         state.convId = null;
         showWelcome();
@@ -306,7 +304,9 @@ ${f.extractedText}`;
 function getConv(id) {
   return loadConvs().find((c) => c.id === id) || null;
 }
+let _lastSelfWrite = 0;
 function upsertConv(conv) {
+  _lastSelfWrite = Date.now();
   const arr = loadConvs();
   const idx = arr.findIndex((c) => c.id === conv.id);
   if (idx >= 0) arr[idx] = conv;
@@ -816,12 +816,11 @@ function _streamDisplayText(raw) {
    triggers a blur-in animation DIRECTLY on insertion: the word
    starts hidden (opacity 0, blurred) and animates to sharp — no
    show→hide→animate flash. Words that were already shown are
-   left untouched (no `is-new` class) so they don't re-animate
-   every time the streaming innerHTML is rebuilt.
+   left untouched so they don't re-animate every time the streaming
+   innerHTML is rebuilt.
 
    Skips text inside <pre>/<code>/<script>/<style> where
-   word-wrapping would break formatting. The streaming cursor
-   span (no text content) is naturally skipped by the TreeWalker. */
+   word-wrapping would break formatting. */
 const _STREAM_WORD_SKIP = new Set(['PRE', 'CODE', 'SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT']);
 function _wrapStreamWords(textEl) {
   if (!textEl || !textEl.nodeType) return;
@@ -1347,54 +1346,8 @@ function moveLibTabIndicator(tabEl) {
   indicator.style.width = indW + "px";
   indicator.style.left = center - indW / 2 + "px";
 }
-/* ── Chat-switch animation ─────────────────────────────────────
-   When the user switches conversations (or returns to the welcome
-   screen), we blur + slide the chat content down + fade it out, swap
-   the inner content while invisible, then unblur + slide it back up.
-   This makes conversation switches feel smooth instead of jarring.
-
-   Guards:
-   - If streaming is in progress, skip the animation (the user is
-     mid-message and a fade would interrupt the stream).
-   - If a switch is already in flight, the second call swaps immediately
-     (no double-animation).
-   - The animation duration is 180ms each way (out → swap → in), so the
-     total perceived switch is ~360ms — fast enough to feel snappy.
-*/
-let _chatSwitchAnimating = false;
-function animateChatSwitch(swapFn) {
-  const content = $("chatContent");
-  if (!content || state.isStreaming) {
-    // No element to animate, or mid-stream — just swap immediately.
-    swapFn();
-    return;
-  }
-  if (_chatSwitchAnimating) {
-    // A switch is already animating — swap immediately to avoid stacking.
-    swapFn();
-    return;
-  }
-  _chatSwitchAnimating = true;
-  content.classList.add("is-switching");
-  // After the fade-out completes (~180ms), swap content and fade back in.
-  setTimeout(() => {
-    try { swapFn(); } finally {
-      // Force reflow so the swap paints before we remove the class,
-      // otherwise the browser may batch both into a single frame and
-      // skip the in-animation entirely.
-      void content.offsetWidth;
-      content.classList.remove("is-switching");
-      // Clear the flag slightly after the in-animation finishes so a
-      // rapid follow-up click can't fire mid-transition.
-      setTimeout(() => { _chatSwitchAnimating = false; }, 200);
-    }
-  }, 180);
-}
-
 function showWelcome() {
-  const wasShowingMessages = $("messagesArea") && $("messagesArea").style.display !== "none";
-  const applyWelcome = () => {
-    const GREETINGS = [
+  const GREETINGS = [
     (n) => `How can I help, ${n}?`,
     (n) => `What's on your agenda today, ${n}?`,
     (n) => `Ready when you are, ${n}. What do you need?`,
@@ -1414,12 +1367,6 @@ function showWelcome() {
   // Hide the "Temporary" pill on the new-chat/welcome screen; it should
   // only appear once the user actually starts chatting (showMessages()).
   if ($("tempBadge")) $("tempBadge").style.display = "none";
-    };
-    if (wasShowingMessages) {
-      animateChatSwitch(applyWelcome);
-    } else {
-      applyWelcome();
-    }
 }
 function showMessages() {
   $("welcomeScreen").style.display = "none";
@@ -1461,11 +1408,44 @@ function renderRecents() {
       <span class="history-item-text">${escapeHtml(c.title || "Untitled")}</span>
     </div>`).join("");
 }
-function loadConversation(id) {
+/* ── Chat-switch animation ─────────────────────────────────────
+   Blurs + fades the chat content out, swaps the inner content
+   while invisible, then unblurs + fades back in. Blur-only (no
+   vertical slide) per user preference.
+
+   Guards:
+   - If streaming is in progress, skip animation (mid-message).
+   - If a switch is already in flight, swap immediately (no stacking).
+   - 160ms out → swap → in, total ~320ms. */
+let _chatSwitchAnimating = false;
+function animateChatSwitch(swapFn) {
+  const content = $("chatContent");
+  if (!content || state.isStreaming) {
+    swapFn();
+    return;
+  }
+  if (_chatSwitchAnimating) {
+    swapFn();
+    return;
+  }
+  _chatSwitchAnimating = true;
+  content.classList.add("is-switching");
+  setTimeout(() => {
+    try { swapFn(); } finally {
+      void content.offsetWidth;
+      content.classList.remove("is-switching");
+      setTimeout(() => { _chatSwitchAnimating = false; }, 180);
+    }
+  }, 160);
+}
+function loadConversation(id, force) {
   const conv = getConv(id);
   if (!conv) return;
-  // Skip animation if we're already on this conversation.
-  if (state.convId === id && !state.isTemp) return;
+  // Skip if already viewing this conversation (avoid double-render when
+  // clicking the same sidebar item). `force=true` overrides this — used
+  // by branch navigation which needs to re-render the SAME conversation
+  // after swapping a message variant.
+  if (!force && state.convId === id && !state.isTemp) return;
   state.convId = id;
   state.isTemp = false;
   animateChatSwitch(() => {
@@ -1475,16 +1455,16 @@ function loadConversation(id) {
       if (m.role === "user") appendUserMessageDOM(m.text, m.files || [], m.id || null, m._editBranchRef || null);
       else appendStoredAIMessage(m);
     });
-  if (conv._editBranches) {
-    Object.keys(conv._editBranches).forEach((origId) => updateBranchNavDOM(origId));
-  }
-  if (conv._regenBranches) {
-    Object.keys(conv._regenBranches).forEach((branchId) => updateRegenNavDOM(branchId));
-  }
-  updateLastMsgActions();
-  updateTopbarTitle(conv.title);
-  renderSidebar();
-  scrollToBottom();
+    if (conv._editBranches) {
+      Object.keys(conv._editBranches).forEach((origId) => updateBranchNavDOM(origId));
+    }
+    if (conv._regenBranches) {
+      Object.keys(conv._regenBranches).forEach((branchId) => updateRegenNavDOM(branchId));
+    }
+    updateLastMsgActions();
+    updateTopbarTitle(conv.title);
+    renderSidebar();
+    scrollToBottom();
   });
 }
 function appendUserMessageDOM(text, files = [], msgId = null, branchRef = null) {
@@ -3273,56 +3253,56 @@ const AUTO_OPTION = {
   tier: "auto",
   desc: "Picks the best model automatically."
 };
-
+const LOCKED_MODELS = [
+  {
+    id: "emeraldcore-alpha-locked",
+    name: "EmeraldCore Alpha",
+    short: "Alpha",
+    tier: "v1",
+    desc: "V1 | Essential conversations.",
+    lockedReason: "Restricted for security reasons."
+  }
+];
 function _escapeAttr(s) {
   return String(s || "").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-
-/* Build a single dropdown row. The tier is rendered as a right-aligned badge
-   so the capability hierarchy is visible at a glance. Auto has no badge. */
-function _modelDropdownItemHTML(opt, selectedId) {
-  const isActive = opt.id === selectedId;
-  const tierBadge = opt.tier && opt.tier !== "auto"
-    ? `<span class="model-dropdown-tier">${escapeHtml(opt.tier.toUpperCase())}</span>`
-    : "";
-  return `
-    <div class="model-dropdown-item ${isActive ? "active" : ""}" role="menuitem"
-         data-model-id="${_escapeAttr(opt.id)}"
-         onclick="selectModel('${_escapeAttr(opt.id)}')">
-      <div class="model-dropdown-text">
-        <div class="model-dropdown-title">${escapeHtml(opt.name)}</div>
-        <div class="model-dropdown-desc">${escapeHtml(opt.desc)}</div>
-      </div>
-      ${tierBadge}
-    </div>`;
-}
-
-/* Render the dropdown: Auto + 3 primary models always visible; Kappa,
-   Starlight, Cream tucked behind an \"Other Models\" hover/focus trigger
-   that opens a flyout submenu. If the currently-selected model is one of the
-   \"other\" ones, the submenu auto-opens so the active row is visible. */
 function renderModelDropdown() {
   const dd = $("modelDropdown");
   if (!dd) return;
   const selectedId = getSelectedModelId();
-  const primary = [AUTO_OPTION, ...PRIMARY_MODEL_IDS.map(getModelById).filter(Boolean)];
-  const other = OTHER_MODEL_IDS.map(getModelById).filter(Boolean);
-  const primaryHTML = primary.map((opt) => _modelDropdownItemHTML(opt, selectedId)).join("");
-  const otherHTML = other.map((opt) => _modelDropdownItemHTML(opt, selectedId)).join("");
-  const otherExpanded = OTHER_MODEL_IDS.includes(selectedId);
-  dd.innerHTML = `
-    <div class="model-dropdown-primary">${primaryHTML}</div>
-    <div class="model-dropdown-divider"></div>
-    <div class="model-dropdown-other${otherExpanded ? " is-expanded" : ""}" tabindex="0" aria-haspopup="true" aria-expanded="${otherExpanded}">
-      <div class="model-dropdown-other-btn" role="menuitem">
-        <span class="model-dropdown-other-label">Other Models</span>
-        <svg class="model-dropdown-other-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg>
-      </div>
-      <div class="model-dropdown-other-list" role="menu">${otherHTML}</div>
-    </div>
-  `;
+  const items = [AUTO_OPTION, ...MODELS].map((opt) => {
+    const isActive = opt.id === selectedId;
+    return `
+      <div class="model-dropdown-item ${isActive ? "active" : ""}" role="menuitem"
+           data-model-id="${_escapeAttr(opt.id)}"
+           onclick="selectModel('${_escapeAttr(opt.id)}')">
+        <div class="model-dropdown-text">
+          <div class="model-dropdown-title">${escapeHtml(opt.name)}</div>
+          <div class="model-dropdown-desc">${escapeHtml(opt.desc)}</div>
+        </div>
+      </div>`;
+  }).join("");
+  const lockedItems = LOCKED_MODELS.map((opt) => {
+    const tooltip = (opt.lockedReason || "Restricted") + " \u2014 " + opt.name;
+    return `
+      <div class="model-dropdown-item disabled"
+           data-model-id="${_escapeAttr(opt.id)}"
+           aria-disabled="true"
+           tabindex="-1"
+           title="${_escapeAttr(tooltip)}"
+           onclick="return false;">
+        <div class="model-dropdown-text">
+          <div class="model-dropdown-title">
+            <span class="model-dropdown-lock" aria-hidden="true">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>${escapeHtml(opt.name)}
+          </div>
+          <div class="model-dropdown-desc">${escapeHtml(opt.desc)}</div>
+        </div>
+      </div>`;
+  }).join("");
+  dd.innerHTML = items + lockedItems;
 }
-
 function toggleModelDropdown(e) {
   if (e) {
     e.stopPropagation();
@@ -3334,13 +3314,16 @@ function toggleModelDropdown(e) {
   if (willOpen) renderModelDropdown();
   sel.classList.toggle("open", willOpen);
 }
-
 function closeModelDropdown() {
   const sel = $("modelSelector");
   if (sel) sel.classList.remove("open");
 }
-
 function selectModel(id) {
+  if (LOCKED_MODELS.some((m) => m.id === id)) {
+    const opt2 = LOCKED_MODELS.find((m) => m.id === id);
+    showToast(`${_aiSvgWarn || "\u26A0"} ${opt2 ? opt2.name : "This model"} is restricted for security reasons.`);
+    return;
+  }
   const valid = id === "auto" || MODELS.some((m) => m.id === id);
   if (!valid) return;
   setSelectedModelId(id);
@@ -4435,7 +4418,7 @@ function navigateBranch(originalMsgId, dir) {
   ];
   conv._editBranches[originalMsgId] = branchInfo;
   upsertConv(conv);
-  loadConversation(conv.id);
+  _animateBranchSwitch(() => loadConversation(conv.id, true));
 }
 function updateBranchNavDOM(originalMsgId) {
   if (!state.convId) return;
@@ -4484,7 +4467,32 @@ function navigateRegenBranch(branchId, dir) {
   conv.messages[msgIdx] = { ...branch.variants[newIdx], id: genId(), _regenBranchRef: branchId };
   conv._regenBranches[branchId] = branch;
   upsertConv(conv);
-  loadConversation(conv.id);
+  _animateBranchSwitch(() => loadConversation(conv.id, true));
+}
+/* ── Branch-switch blur animation ───────────────────────────────
+   Same blur-only effect as chat-switch, but lighter (shorter
+   duration, lighter blur) so branch navigation feels snappier.
+   Used by navigateBranch and navigateRegenBranch. */
+let _branchSwitchAnimating = false;
+function _animateBranchSwitch(swapFn) {
+  const content = $("chatContent");
+  if (!content || state.isStreaming) {
+    swapFn();
+    return;
+  }
+  if (_branchSwitchAnimating) {
+    swapFn();
+    return;
+  }
+  _branchSwitchAnimating = true;
+  content.classList.add("is-branch-switching");
+  setTimeout(() => {
+    try { swapFn(); } finally {
+      void content.offsetWidth;
+      content.classList.remove("is-branch-switching");
+      setTimeout(() => { _branchSwitchAnimating = false; }, 150);
+    }
+  }, 120);
 }
 function updateRegenNavDOM(branchId) {
   if (!state.convId) return;
