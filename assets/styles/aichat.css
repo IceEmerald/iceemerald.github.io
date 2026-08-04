@@ -694,11 +694,11 @@ body.light-mode .model-dropdown-lock { color: #aaa; }
 }
 
 body.light-mode .input-reasoning-btn {
-    color: #555;
+    color: #888;
 }
 body.light-mode .input-reasoning-btn:hover {
     background: #f0f0f0;
-    color: #000;
+    color: #555;
 }
 body.light-mode .input-reasoning-btn.active {
     background: rgba(80, 200, 120, 0.12);
