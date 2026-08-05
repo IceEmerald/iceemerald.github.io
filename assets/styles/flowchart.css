@@ -1186,6 +1186,7 @@ select {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    z-index: 99999999;
     align-items: stretch;
     padding: 0;
     transition: bottom 0.24s ease;
