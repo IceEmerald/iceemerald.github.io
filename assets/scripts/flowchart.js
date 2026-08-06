@@ -153,11 +153,28 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;'
 function toast(msg, type = '') {
   const el = $('#toast');
   if (!el) return;
-  // innerHTML (not textContent) so callers can prefix an SVG icon —
-  // matches the showToast() pattern in rightclick.js on the index /
-  // aichat pages. All toast messages in this app are developer-
-  // controlled strings, so no sanitization is needed.
-  el.innerHTML = msg;
+  // The message is structured as: [trusted SVG icon] + [human-readable text].
+  // The SVG icon (from _fcSvg.*) is a developer-controlled constant and is
+  // safe to assign via innerHTML. The text portion MAY include user input
+  // (e.g. an invalid variable name echoed back in a validation error on
+  // line ~1361), so it MUST be assigned via textContent to prevent DOM-based
+  // XSS (CodeQL js/xss-through-dom). Split at the end of the first </svg>
+  // tag — every _fcSvg icon is a well-formed single-element SVG block.
+  el.replaceChildren(); // clear previous content (no leftover HTML)
+  const svgEnd = msg.indexOf('</svg>');
+  if (svgEnd !== -1) {
+    const svgHtml = msg.slice(0, svgEnd + 6); // trusted: developer-controlled
+    const textPart = msg.slice(svgEnd + 6);   // untrusted: may include user input
+    const iconSpan = document.createElement('span');
+    iconSpan.innerHTML = svgHtml;             // safe: SVG markup is a constant
+    el.appendChild(iconSpan);
+    const textSpan = document.createElement('span');
+    textSpan.textContent = textPart;          // safe: textContent escapes HTML
+    el.appendChild(textSpan);
+  } else {
+    // No SVG prefix — treat the entire message as plain text.
+    el.textContent = msg;
+  }
   // Set className with 'show' included directly (like aichat's
   // showToast). This keeps the toast visible when a new message
   // replaces an old one — no flicker, no reflow trick needed.
