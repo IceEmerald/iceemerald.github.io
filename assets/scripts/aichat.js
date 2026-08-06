@@ -1,6 +1,6 @@
 const CHAT_WORKER_URL = "https://emeraldnetwork-aichatserver.iceemerald.workers.dev";
-const EMERALDBOT_API = "managed-by-worker";
-const DISPLAY_MODEL = "EmeraldCore.AI";
+const EMERALDBOT_API = "worker";
+const DISPLAY_MODEL = "EmeraldCore";
 (function _installConsoleNoiseFilter() {
   if (window._esbConsoleFilterInstalled) return;
   window._esbConsoleFilterInstalled = true;
