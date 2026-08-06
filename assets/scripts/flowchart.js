@@ -2687,8 +2687,6 @@ async function init() {
   }
   _persistenceReady = true;   // safe to persist from now on
   // First-time open (or empty saved state) — show the starter
-  // template so the canvas isn't blank. This also persists the
-  // template to IndexedDB, so the next open restores it.
   const isFreshStart = !loaded || State.shapes.size === 0;
   if (isFreshStart) {
     createStarterTemplate();
