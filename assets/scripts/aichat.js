@@ -2138,6 +2138,7 @@ function rateMsg(btn, type) {
 }
 async function handleSend() {
   if (state.isStreaming) return;
+  _autoScrollSticky = true;  // re-enable sticky scroll on new send
   const textarea = $("chatInput");
   const text = textarea.value.trim();
   const files = [...state.attachments];
@@ -2539,6 +2540,7 @@ function stopStreaming() {
 }
 async function regenerateMessage(msgEl) {
   if (state.isStreaming || !state.convId) return;
+  _autoScrollSticky = true;  // re-enable on regen
   const conv = getConv(state.convId);
   if (!conv) return;
   const apiKey = getApiKey();
@@ -3261,7 +3263,58 @@ function newChat() {
   updateTopbarTitle("");
   renderSidebar();
 }
+/* ── Smart auto-scroll ──────────────────────────────────────────
+   _autoScrollSticky tracks whether the chat should auto-scroll to
+   bottom during streaming.  It starts true.  If the user scrolls UP
+   (away from bottom), it flips to false and scrollToBottom() becomes
+   a no-op.  If the user scrolls back to the very bottom, it flips
+   back to true and auto-scroll resumes.  This gives the user full
+   control: scroll up to read earlier text without being forced down,
+   scroll back to bottom to re-lock onto the latest output. */
+let _autoScrollSticky = true;
+/* Threshold in px — if the user is within this distance of the
+   bottom, we consider them "at the bottom" and re-enable sticky. */
+const _AUTO_SCROLL_THRESHOLD = 60;
+function _initAutoScrollListener() {
+  const cc = $("chatContent");
+  if (!cc) return;
+  let _userScrolling = false;
+  /* We detect *user-initiated* scrolls by listening to the 'wheel'
+     and 'touchmove' events.  Programmatic scrollTop changes from
+     scrollToBottom() do NOT fire those, so they won't falsely
+     toggle the flag. */
+  const markUserScroll = () => { _userScrolling = true; };
+  cc.addEventListener('wheel', markUserScroll, { passive: true });
+  cc.addEventListener('touchmove', markUserScroll, { passive: true });
+  /* On keyboard scroll (PageUp/Down, arrow keys) */
+  cc.addEventListener('keydown', markUserScroll);
+  cc.addEventListener('scroll', () => {
+    if (!_userScrolling) return;  // programmatic scroll — ignore
+    _userScrolling = false;
+    const atBottom = cc.scrollHeight - cc.scrollTop - cc.clientHeight
+                     < _AUTO_SCROLL_THRESHOLD;
+    _autoScrollSticky = atBottom;
+  }, { passive: true });
+}
 function scrollToBottom() {
+  if (!_autoScrollSticky) return;
+  const cc = $("chatContent");
+  if (!cc) return;
+  /* Use smooth scroll so the motion feels natural instead of a
+     hard jump.  Only use instant scroll when the distance is tiny
+     (avoids visible micro-scrolls for 1–2 px differences). */
+  const distance = cc.scrollHeight - cc.scrollTop - cc.clientHeight;
+  if (distance <= 2) return;  // already there, no-op
+  if (distance < 80) {
+    cc.scrollTop = cc.scrollHeight;
+  } else {
+    cc.scrollTo({ top: cc.scrollHeight, behavior: 'smooth' });
+  }
+}
+/* Force-scroll to bottom (ignores sticky flag).  Used when the user
+   sends a new message — we always want to jump to bottom then. */
+function scrollToBottomForce() {
+  _autoScrollSticky = true;
   const cc = $("chatContent");
   if (cc) cc.scrollTop = cc.scrollHeight;
 }
@@ -3633,6 +3686,7 @@ async function init() {
     Array.from(e.dataTransfer.files).forEach(processFileForAttachment);
   });
   $("searchInput")?.addEventListener("input", doSearch);
+  _initAutoScrollListener();
 }
 document.addEventListener("DOMContentLoaded", function() {
   initTheme();
@@ -4342,6 +4396,7 @@ async function submitUserMsgEdit(msgId) {
   scrollToBottom();
   const typingEl = $("typingIndicator");
   typingEl.style.display = "flex";
+  _autoScrollSticky = true;  // re-enable on edit-resend
   scrollToBottom();
   const history = conv ? buildHistory(conv) : [...state.tempHistory];
   // Re-attach the original files to the latest user turn in history. Without
