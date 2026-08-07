@@ -755,6 +755,8 @@ function setupMarked() {
 function renderMarkdown(raw) {
   if (typeof marked === "undefined") return escapeHtml(raw);
   let text = raw;
+  text = text.replace(/<quiz>[\s\S]*?<\/quiz>/g, "");
+  text = text.replace(/<quiz>[\s\S]*$/g, "");
   const codeBlocks = [];
   text = text.replace(/(```[\s\S]*?```|`[^`\n]+`)/g, (m) => {
     const i = codeBlocks.push(m) - 1;
@@ -2367,30 +2369,15 @@ async function handleSend() {
     const _imgGenMatch = displayText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
     const _imgPrompt = _imgGenMatch ? _imgGenMatch[1].trim() : null;
     displayText = displayText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
-    let quizData = null;
-    let beforeQuizText = displayText;
-    let afterQuizText = "";
-    const quizMatch = displayText.match(/<quiz>([\s\S]+?)<\/quiz>/) || displayText.match(/<quiz>([\s\S]+)$/);
-    if (quizMatch) {
-      try {
-        quizData = JSON.parse(quizMatch[1]);
-      } catch (e) {
-        // Don't silently strip the quiz block when JSON parsing fails —
-        // otherwise the user loses both the quiz AND visibility into what
-        // the model actually returned. Leave displayText untouched.
-        console.warn("Quiz JSON parse failed:", e);
-      }
-      // Only slice displayText if we successfully parsed the quiz.
-      if (quizData) {
-        const qStart = displayText.indexOf("<quiz>");
-        beforeQuizText = displayText.slice(0, qStart).trim();
-        afterQuizText = displayText.slice(qStart + quizMatch[0].length).trim();
-        displayText = displayText.slice(0, qStart).trim();
-      }
-    }
+    const _quizResult = _extractQuiz(displayText);
+    const quizData = _quizResult.quizData;
+    const beforeQuizText = _quizResult.before;
+    const afterQuizText = _quizResult.after;
+    const _quizParseFailed = _quizResult.parseFailed;
+    displayText = _quizResult.before;
     textEl.classList.remove("stream-reveal");
-    const _textToShow = quizData ? beforeQuizText : displayText;
-    const _hasOtherContent = !!(quizData || _imgPrompt || memoryAdded);
+    const _textToShow = (quizData || _quizParseFailed) ? beforeQuizText : displayText;
+    const _hasOtherContent = !!(quizData || _quizParseFailed || _imgPrompt || memoryAdded);
     if (_textToShow) {
       textEl.innerHTML = renderMarkdown(_textToShow);
     } else if (_hasOtherContent) {
@@ -2421,6 +2408,10 @@ async function handleSend() {
         afterEl.innerHTML = renderMarkdown(afterQuizText);
         textEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
       }
+    } else if (_quizParseFailed) {
+      const errCard = document.createElement("div");
+      errCard.innerHTML = quizErrorCardHTML();
+      textEl.insertAdjacentElement("afterend", errCard.firstElementChild);
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
@@ -2439,10 +2430,10 @@ async function handleSend() {
         modelId: _usedModelId || void 0,
         modelName: _usedModelName || void 0,
         hasMemory: !!memoryAdded,
-        hasQuiz: !!quizData,
+        hasQuiz: !!(quizData || _quizParseFailed),
         quizData: quizData || void 0,
-        quizTextBefore: quizData ? beforeQuizText : void 0,
-        quizTextAfter: quizData ? afterQuizText : void 0,
+        quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
+        quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
         imagePrompt: _imgPrompt || void 0
       });
       conv.updatedAt = Date.now();
@@ -2655,26 +2646,15 @@ async function regenerateMessage(msgEl) {
     const imgGenMatch = displayText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
     const imgPrompt = imgGenMatch ? imgGenMatch[1].trim() : null;
     displayText = displayText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
-    let quizData = null;
-    let beforeQuizText = displayText;
-    let afterQuizText = "";
-    const quizMatch = displayText.match(/<quiz>([\s\S]+?)<\/quiz>/) || displayText.match(/<quiz>([\s\S]+)$/);
-    if (quizMatch) {
-      try {
-        quizData = JSON.parse(quizMatch[1]);
-      } catch (e) {
-        console.warn("Quiz JSON parse failed:", e);
-      }
-      if (quizData) {
-        const qStart = displayText.indexOf("<quiz>");
-        beforeQuizText = displayText.slice(0, qStart).trim();
-        afterQuizText = displayText.slice(qStart + quizMatch[0].length).trim();
-        displayText = displayText.slice(0, qStart).trim();
-      }
-    }
+    const _quizResult = _extractQuiz(displayText);
+    const quizData = _quizResult.quizData;
+    const beforeQuizText = _quizResult.before;
+    const afterQuizText = _quizResult.after;
+    const _quizParseFailed = _quizResult.parseFailed;
+    displayText = _quizResult.before;
     textEl.classList.remove("stream-reveal");
-    const _regenTextToShow = quizData ? beforeQuizText : displayText;
-    const _hasOtherContent = !!(quizData || imgPrompt || memoryAdded);
+    const _regenTextToShow = (quizData || _quizParseFailed) ? beforeQuizText : displayText;
+    const _hasOtherContent = !!(quizData || _quizParseFailed || imgPrompt || memoryAdded);
     if (_regenTextToShow) {
       textEl.innerHTML = renderMarkdown(_regenTextToShow);
     } else if (_hasOtherContent) {
@@ -2705,6 +2685,10 @@ async function regenerateMessage(msgEl) {
         afterEl.innerHTML = renderMarkdown(afterQuizText);
         textEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
       }
+    } else if (_quizParseFailed) {
+      const errCard = document.createElement("div");
+      errCard.innerHTML = quizErrorCardHTML();
+      textEl.insertAdjacentElement("afterend", errCard.firstElementChild);
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
@@ -2723,10 +2707,10 @@ async function regenerateMessage(msgEl) {
       modelName: _usedModelName || void 0,
       _regenBranchRef: regenBranchId,
       hasMemory: !!memoryAdded,
-      hasQuiz: !!quizData,
+      hasQuiz: !!(quizData || _quizParseFailed),
       quizData: quizData || void 0,
-      quizTextBefore: quizData ? beforeQuizText : void 0,
-      quizTextAfter: quizData ? afterQuizText : void 0,
+      quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
+      quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
       imagePrompt: imgPrompt || void 0
     };
     aiDiv.dataset.regenBranchRef = regenBranchId;
@@ -3917,11 +3901,26 @@ function clearAllChats() {
 }
 function appendStoredAIMessage(m) {
   const rawText = m.text || "";
-  const displayText = rawText.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  let displayText = rawText.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
   const hasMemory = m.hasMemory || /\[MEMORY:/.test(rawText);
-  const beforeQuiz = m.quizTextBefore !== void 0 ? m.quizTextBefore : m.hasQuiz ? "" : displayText;
-  const afterQuiz = m.quizTextAfter || "";
-  const _initText = m.hasQuiz ? beforeQuiz || "" : displayText || "";
+  let quizData = m.hasQuiz && m.quizData ? m.quizData : null;
+  let beforeQuiz = "";
+  let afterQuiz = "";
+  let quizParseFailed = false;
+  if (quizData) {
+    beforeQuiz = m.quizTextBefore !== void 0 ? m.quizTextBefore : "";
+    afterQuiz = m.quizTextAfter || "";
+  } else {
+    const _qr = _extractQuiz(displayText);
+    if (_qr.quizData || _qr.parseFailed) {
+      quizData = _qr.quizData;
+      beforeQuiz = _qr.before;
+      afterQuiz = _qr.after;
+      quizParseFailed = _qr.parseFailed;
+      displayText = _qr.before;
+    }
+  }
+  const _initText = (quizData || quizParseFailed) ? beforeQuiz : displayText;
   const _initHTML = m.isError ? `<span class="md-error">${escapeHtml(_initText)}</span>` : _initText ? renderMarkdown(_initText) : "";
   const div = document.createElement("div");
   div.className = "message";
@@ -3945,15 +3944,15 @@ function appendStoredAIMessage(m) {
     badge.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg> Updated memory';
     div.querySelector(".message-sender").insertAdjacentElement("afterend", badge);
   }
-  if (m.hasQuiz && m.quizData) {
-    const qid = m.quizData._id || "quiz_" + (m.id || genId());
-    m.quizData._id = qid;
+  if (quizData) {
+    const qid = quizData._id || "quiz_" + (m.id || genId());
+    quizData._id = qid;
     window._quizzes = window._quizzes || {};
     if (!window._quizzes[qid]) {
-      window._quizzes[qid] = { data: m.quizData, answers: {}, submitted: false };
+      window._quizzes[qid] = { data: quizData, answers: {}, submitted: false };
     }
     const cardEl = document.createElement("div");
-    cardEl.innerHTML = quizCardHTML(qid, m.quizData);
+    cardEl.innerHTML = quizCardHTML(qid, quizData);
     const textEl = div.querySelector(".message-text");
     textEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
     if (afterQuiz) {
@@ -3963,6 +3962,10 @@ function appendStoredAIMessage(m) {
       afterEl.innerHTML = renderMarkdown(afterQuiz);
       textEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
     }
+  } else if (quizParseFailed) {
+    const errCard = document.createElement("div");
+    errCard.innerHTML = quizErrorCardHTML();
+    div.querySelector(".message-text").insertAdjacentElement("afterend", errCard.firstElementChild);
   }
   div.querySelector(".message-body").appendChild(buildMessageActionsEl(m.id || genId()));
   if (m.imageData) {
@@ -3985,6 +3988,69 @@ function appendStoredAIMessage(m) {
   const typingEl = $("typingIndicator");
   $("messagesArea").insertBefore(div, typingEl);
   return div;
+}
+function _extractQuiz(text) {
+  const quizMatch = text.match(/<quiz>([\s\S]+?)<\/quiz>/) || text.match(/<quiz>([\s\S]+)$/);
+  if (!quizMatch) return { before: text, after: "", quizData: null, parseFailed: false };
+  const qStart = text.indexOf("<quiz>");
+  const before = text.slice(0, qStart).trim();
+  const after = text.slice(qStart + quizMatch[0].length).trim();
+  let quizData = null;
+  let parseFailed = false;
+  let raw = quizMatch[1];
+  // Strip markdown code fences the AI might wrap around the JSON
+  raw = raw.replace(/^[\s\n]*```(?:json)?[\s\n]*\n?/i, "");
+  raw = raw.replace(/\n?[\s\n]*```[\s\n]*$/i, "");
+  // Strip leading/trailing commentary the AI might add around the JSON
+  // Find the first { and last } — everything between is the JSON candidate
+  const firstBrace = raw.indexOf("{");
+  const lastBrace = raw.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    raw = raw.slice(firstBrace, lastBrace + 1);
+  }
+  try {
+    quizData = JSON.parse(raw);
+  } catch (e1) {
+    // Try fixing common issues: trailing commas, single quotes, unquoted keys
+    try {
+      let fixed = raw
+        .replace(/,\s*([}\]])/g, "$1")           // trailing commas before } or ]
+        .replace(/'/g, '"')                        // single → double quotes
+        .replace(/(\w+)\s*:/g, '"$1":');          // unquoted keys → quoted
+      quizData = JSON.parse(fixed);
+    } catch (e2) {
+      parseFailed = true;
+      console.warn("Quiz JSON parse failed:", e1);
+    }
+  }
+  // Normalize: ensure questions array exists and each question has expected shape
+  if (quizData && Array.isArray(quizData.questions)) {
+    quizData.questions = quizData.questions.map((q) => {
+      if (typeof q !== "object" || q === null) return q;
+      const norm = { ...q };
+      // Ensure 'q' field: some AIs use 'question' or 'text' instead
+      if (!norm.q && norm.question) norm.q = norm.question;
+      if (!norm.q && norm.text) norm.q = norm.text;
+      // Ensure 'options' is an array of strings
+      if (!Array.isArray(norm.options)) norm.options = [];
+      norm.options = norm.options.map(String);
+      // Ensure 'answer' is a number index for mcq, or string for fill/essay
+      if (norm.type === "fill" || norm.type === "essay") {
+        if (typeof norm.answer !== "string") norm.answer = String(norm.answer ?? "");
+      } else {
+        norm.type = norm.type || "mcq";
+        if (typeof norm.answer === "string") {
+          const idx = parseInt(norm.answer, 10);
+          norm.answer = isNaN(idx) ? 0 : idx;
+        }
+        if (typeof norm.answer !== "number" || norm.answer < 0) norm.answer = 0;
+      }
+      // Ensure 'explanation' exists
+      if (!norm.explanation) norm.explanation = "";
+      return norm;
+    });
+  }
+  return { before, after, quizData, parseFailed };
 }
 function quizLoadingCardHTML() {
   return `<div class="quiz-loading-card">
@@ -4012,6 +4078,17 @@ function quizCardHTML(qid, data) {
       <div class="quiz-card-meta">${n} question${n !== 1 ? "s" : ""} \xB7 Click to start</div>
     </div>
     <svg class="quiz-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </div>`;
+}
+function quizErrorCardHTML() {
+  return `<div class="quiz-card quiz-card--error">
+    <div class="quiz-card-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <div class="quiz-card-info">
+      <div class="quiz-card-title" style="color:#d93025">Quiz failed to load</div>
+      <div class="quiz-card-meta">The quiz data could not be parsed. Try regenerating.</div>
+    </div>
   </div>`;
 }
 function openQuizPanel(qid) {
@@ -4306,26 +4383,15 @@ async function submitUserMsgEdit(msgId) {
     const imgM = dispText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
     const imgPrompt = imgM ? imgM[1].trim() : null;
     dispText = dispText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
-    let quizData = null;
-    let beforeQuizText = dispText;
-    let afterQuizText = "";
-    const quizMatch = dispText.match(/<quiz>([\s\S]+?)<\/quiz>/) || dispText.match(/<quiz>([\s\S]+)$/);
-    if (quizMatch) {
-      try {
-        quizData = JSON.parse(quizMatch[1]);
-      } catch (e) {
-        console.warn("Quiz JSON parse failed:", e);
-      }
-      if (quizData) {
-        const qStart = dispText.indexOf("<quiz>");
-        beforeQuizText = dispText.slice(0, qStart).trim();
-        afterQuizText = dispText.slice(qStart + quizMatch[0].length).trim();
-        dispText = dispText.slice(0, qStart).trim();
-      }
-    }
+    const _quizResult = _extractQuiz(dispText);
+    const quizData = _quizResult.quizData;
+    const beforeQuizText = _quizResult.before;
+    const afterQuizText = _quizResult.after;
+    const _quizParseFailed = _quizResult.parseFailed;
+    dispText = _quizResult.before;
     aiTextEl.classList.remove("stream-reveal");
-    const _editTextToShow = quizData ? beforeQuizText : dispText;
-    const _hasOtherContent = !!(quizData || imgPrompt || memoryAdded);
+    const _editTextToShow = (quizData || _quizParseFailed) ? beforeQuizText : dispText;
+    const _hasOtherContent = !!(quizData || _quizParseFailed || imgPrompt || memoryAdded);
     if (_editTextToShow) {
       aiTextEl.innerHTML = renderMarkdown(_editTextToShow);
     } else if (_hasOtherContent) {
@@ -4356,6 +4422,10 @@ async function submitUserMsgEdit(msgId) {
         afterEl.innerHTML = renderMarkdown(afterQuizText);
         aiTextEl.nextElementSibling.insertAdjacentElement("afterend", afterEl);
       }
+    } else if (_quizParseFailed) {
+      const errCard = document.createElement("div");
+      errCard.innerHTML = quizErrorCardHTML();
+      aiTextEl.insertAdjacentElement("afterend", errCard.firstElementChild);
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
@@ -4374,10 +4444,10 @@ async function submitUserMsgEdit(msgId) {
         modelId: _usedModelId || void 0,
         modelName: _usedModelName || void 0,
         hasMemory: !!memoryAdded,
-        hasQuiz: !!quizData,
+        hasQuiz: !!(quizData || _quizParseFailed),
         quizData: quizData || void 0,
-        quizTextBefore: quizData ? beforeQuizText : void 0,
-        quizTextAfter: quizData ? afterQuizText : void 0,
+        quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
+        quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
         imagePrompt: imgPrompt || void 0
       });
       conv.updatedAt = Date.now();
@@ -4435,7 +4505,68 @@ function navigateBranch(originalMsgId, dir) {
   ];
   conv._editBranches[originalMsgId] = branchInfo;
   upsertConv(conv);
-  loadConversation(conv.id);
+  _branchAnimateSwap(() => _renderConversationMessages(conv), () => document.querySelector(`.message--user[data-branch-ref="${originalMsgId}"]`) || document.querySelector(`.message--user[data-msg-id="${originalMsgId}"]`));
+}
+function _renderConversationMessages(conv) {
+  showMessages();
+  $("messagesArea").innerHTML = typingIndicatorHTML();
+  conv.messages.forEach((m) => {
+    if (m.role === "user") appendUserMessageDOM(m.text, m.files || [], m.id || null, m._editBranchRef || null);
+    else appendStoredAIMessage(m);
+  });
+  if (conv._editBranches) {
+    Object.keys(conv._editBranches).forEach((origId) => updateBranchNavDOM(origId));
+  }
+  if (conv._regenBranches) {
+    Object.keys(conv._regenBranches).forEach((branchId) => updateRegenNavDOM(branchId));
+  }
+  updateLastMsgActions();
+  updateTopbarTitle(conv.title);
+  renderSidebar();
+  scrollToBottom();
+}
+function _getBranchMessagesFrom(anchorEl) {
+  const area = $("messagesArea");
+  if (!area || !anchorEl) return [];
+  const msgs = [];
+  let el = anchorEl;
+  while (el) {
+    if (el.classList && el.classList.contains("message")) msgs.push(el);
+    el = el.nextElementSibling;
+  }
+  return msgs;
+}
+function _branchAnimateSwap(swapFn, findAnchor) {
+  if (_chatSwitchAnimating) { swapFn(); return; }
+  const anchorEl = typeof findAnchor === "function" ? findAnchor() : null;
+  const targets = anchorEl ? _getBranchMessagesFrom(anchorEl) : [];
+  if (targets.length === 0) { swapFn(); return; }
+  _chatSwitchAnimating = true;
+  const TRANSITION = "filter 0.18s cubic-bezier(0.4,0,0.2,1), opacity 0.18s cubic-bezier(0.4,0,0.2,1)";
+  targets.forEach((el) => {
+    el.style.transition = TRANSITION;
+    el.classList.add("branch-switching");
+  });
+  setTimeout(() => {
+    try { swapFn(); } finally {
+      const newAnchor = typeof findAnchor === "function" ? findAnchor() : null;
+      const newTargets = newAnchor ? _getBranchMessagesFrom(newAnchor) : [];
+      newTargets.forEach((el) => {
+        el.style.transition = "none";
+        el.classList.add("branch-switching");
+      });
+      void (newTargets[0]?.offsetWidth);
+      newTargets.forEach((el) => {
+        el.style.transition = TRANSITION;
+        el.classList.remove("branch-switching");
+      });
+      setTimeout(() => {
+        targets.forEach((el) => { el.style.transition = ""; });
+        newTargets.forEach((el) => { el.style.transition = ""; });
+        _chatSwitchAnimating = false;
+      }, 200);
+    }
+  }, 180);
 }
 function updateBranchNavDOM(originalMsgId) {
   if (!state.convId) return;
@@ -4484,7 +4615,7 @@ function navigateRegenBranch(branchId, dir) {
   conv.messages[msgIdx] = { ...branch.variants[newIdx], id: genId(), _regenBranchRef: branchId };
   conv._regenBranches[branchId] = branch;
   upsertConv(conv);
-  loadConversation(conv.id);
+  _branchAnimateSwap(() => _renderConversationMessages(conv), () => document.querySelector(`[data-ai="1"][data-regen-branch-ref="${branchId}"]`) || document.querySelector(`[data-ai="1"][data-msg-id="${branchId}"]`));
 }
 function updateRegenNavDOM(branchId) {
   if (!state.convId) return;
@@ -4954,6 +5085,7 @@ try {
   if (typeof processImageGenTag !== "undefined" && typeof window.processImageGenTag === "undefined") window.processImageGenTag = processImageGenTag;
   if (typeof proxySearch !== "undefined" && typeof window.proxySearch === "undefined") window.proxySearch = proxySearch;
   if (typeof quizCardHTML !== "undefined" && typeof window.quizCardHTML === "undefined") window.quizCardHTML = quizCardHTML;
+  if (typeof quizErrorCardHTML !== "undefined" && typeof window.quizErrorCardHTML === "undefined") window.quizErrorCardHTML = quizErrorCardHTML;
   if (typeof quizLoadingCardHTML !== "undefined" && typeof window.quizLoadingCardHTML === "undefined") window.quizLoadingCardHTML = quizLoadingCardHTML;
   if (typeof rateMsg !== "undefined" && typeof window.rateMsg === "undefined") window.rateMsg = rateMsg;
   if (typeof refreshModelSelectorUI !== "undefined" && typeof window.refreshModelSelectorUI === "undefined") window.refreshModelSelectorUI = refreshModelSelectorUI;

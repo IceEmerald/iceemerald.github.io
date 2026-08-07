@@ -5005,6 +5005,8 @@ body.light-mode .quiz-card:hover {
 .quiz-card-meta  { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
 
 .quiz-card-arrow { color: var(--text-muted); flex-shrink: 0; }
+.quiz-card--error { cursor: default; border-color: rgba(217,48,37,.25); }
+.quiz-card--error:hover { border-color: rgba(217,48,37,.4); background: rgba(217,48,37,.04); }
 
 /* Quiz widget inside panel */
 .quiz-panel-body .quiz-widget {
@@ -5714,6 +5716,21 @@ body.light-mode .branch-nav-btn:hover:not(:disabled) {
   font-variant-numeric: tabular-nums;
   min-width: 32px;
   text-align: center;
+}
+
+/* Branch-switch per-message blur animation.
+   Applied to the branch anchor message and all messages below it
+   so only the affected portion of chat blurs during a branch switch. */
+.message.branch-switching {
+  filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+}
+body.light-mode .message.branch-switching {
+  filter: blur(5px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .message.branch-switching { filter: none; opacity: 0; }
 }
 
 /* Image Generation */
