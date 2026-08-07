@@ -880,16 +880,16 @@ body.light-mode .input-reasoning-btn.active .reasoning-toggle-icon {
    class reverses it (unblur + fade in). pointer-events:none prevents
    accidental clicks on stale content mid-transition. */
 .chat-content {
-    transition: filter 0.18s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: filter 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .chat-content.is-switching {
     filter: blur(6px);
     opacity: 0;
     pointer-events: none;
-    /* Keep scroll position stable during the swap so the new content
-       doesn't visually jump before the in-animation kicks in. */
-    overflow: hidden;
+    /* overflow-y: hidden prevents scrolling without removing the scrollbar
+       gutter, so the content doesn't shift right when the class is applied. */
+    overflow-y: hidden;
 }
 /* Light mode: identical effect, just lighter blur to match the lighter UI. */
 body.light-mode .chat-content.is-switching {

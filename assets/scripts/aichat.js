@@ -1364,33 +1364,38 @@ function moveLibTabIndicator(tabEl) {
      total perceived switch is ~360ms — fast enough to feel snappy.
 */
 let _chatSwitchAnimating = false;
+let _chatSwitchPending = null;
 function animateChatSwitch(swapFn) {
   const content = $("chatContent");
   if (!content || state.isStreaming) {
-    // No element to animate, or mid-stream — just swap immediately.
     swapFn();
     return;
   }
   if (_chatSwitchAnimating) {
-    // A switch is already animating — swap immediately to avoid stacking.
-    swapFn();
+    // A switch is already animating — store the latest swap and apply it
+    // when the current animation reaches the swap point.  This prevents
+    // the repeated blur→unblur→blur→unblur cycle when rapidly clicking
+    // through chats: the ongoing fade-out continues, the content is
+    // swapped at the midpoint, and then a single fade-in plays.
+    _chatSwitchPending = swapFn;
     return;
   }
   _chatSwitchAnimating = true;
   content.classList.add("is-switching");
-  // After the fade-out completes (~180ms), swap content and fade back in.
   setTimeout(() => {
     try { swapFn(); } finally {
-      // Force reflow so the swap paints before we remove the class,
-      // otherwise the browser may batch both into a single frame and
-      // skip the in-animation entirely.
+      // If a pending swap accumulated during the fade-out, apply it now
+      // before the fade-in so the user sees the latest chat, not a
+      // stale intermediate one.
+      if (_chatSwitchPending) {
+        try { _chatSwitchPending(); } catch {}
+        _chatSwitchPending = null;
+      }
       void content.offsetWidth;
       content.classList.remove("is-switching");
-      // Clear the flag slightly after the in-animation finishes so a
-      // rapid follow-up click can't fire mid-transition.
-      setTimeout(() => { _chatSwitchAnimating = false; }, 200);
+      setTimeout(() => { _chatSwitchAnimating = false; }, 180);
     }
-  }, 180);
+  }, 150);
 }
 
 function showWelcome() {
@@ -2561,10 +2566,24 @@ async function regenerateMessage(msgEl) {
   } else if (regenBranch.current >= 0) {
     regenBranch.variants[regenBranch.current] = currentVariant;
   }
+  // Save the tail (messages after the AI response) so regen branch
+  // navigation can restore them.  Without this, navigating back to an
+  // earlier regen variant loses any follow-up messages.
+  const regenTail = conv.messages.slice(idx + 1).map((m) => ({ ...m }));
   conv.messages = conv.messages.slice(0, idx);
   conv._regenBranches[regenBranchId] = regenBranch;
   upsertConv(conv);
-  msgEl.remove();
+  // Remove the AI message AND any subsequent DOM elements so orphaned
+  // messages don't linger during the streaming of the new response.
+  const _allMsgEls = Array.from($("messagesArea").querySelectorAll(".message:not(#typingIndicator)"));
+  const _domIdx = _allMsgEls.indexOf(msgEl);
+  if (_domIdx >= 0) _allMsgEls.slice(_domIdx).forEach((el) => el.remove());
+  else msgEl.remove();
+  // Store the tail on the current regen variant (the one being replaced)
+  // so navigateRegenBranch can restore it when switching back.
+  if (regenBranch.variants.length > 0 && regenBranch.current >= 0) {
+    regenBranch.variants[regenBranch.current]._regenTail = regenTail;
+  }
   const history = buildHistory(conv);
   state.isStreaming = true;
   state.abortCtrl = new AbortController();
@@ -3998,9 +4017,16 @@ function _extractQuiz(text) {
   let quizData = null;
   let parseFailed = false;
   let raw = quizMatch[1];
+
+  // ── Pre-extraction cleanup ──────────────────────────────────────────
   // Strip markdown code fences the AI might wrap around the JSON
-  raw = raw.replace(/^[\s\n]*```(?:json)?[\s\n]*\n?/i, "");
+  raw = raw.replace(/^[\s\n]*```(?:json|JSON)?[\s\n]*\n?/i, "");
   raw = raw.replace(/\n?[\s\n]*```[\s\n]*$/i, "");
+  // Strip HTML entities the AI might emit (e.g. &quot; → ")
+  raw = raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  // Strip JS/JSON comments (// and /* */)
+  raw = raw.replace(/\/\/[^\n]*/g, "");
+  raw = raw.replace(/\/\*[\s\S]*?\*\//g, "");
   // Strip leading/trailing commentary the AI might add around the JSON
   // Find the first { and last } — everything between is the JSON candidate
   const firstBrace = raw.indexOf("{");
@@ -4008,33 +4034,44 @@ function _extractQuiz(text) {
   if (firstBrace >= 0 && lastBrace > firstBrace) {
     raw = raw.slice(firstBrace, lastBrace + 1);
   }
+
+  // ── Parse attempt 1: as-is ──────────────────────────────────────────
   try {
     quizData = JSON.parse(raw);
   } catch (e1) {
-    // Try fixing common issues: trailing commas, single quotes, unquoted keys
+    // ── Parse attempt 2: fix common AI mistakes ───────────────────────
     try {
       let fixed = raw
-        .replace(/,\s*([}\]])/g, "$1")           // trailing commas before } or ]
-        .replace(/'/g, '"')                        // single → double quotes
-        .replace(/(\w+)\s*:/g, '"$1":');          // unquoted keys → quoted
+        .replace(/,\s*([}\]])/g, "$1")                // trailing commas before } or ]
+        .replace(/'/g, '"')                             // single → double quotes
+        .replace(/(?<=[{,])\s*(\w+)\s*:/g, '"$1":')   // unquoted keys after { or , → quoted
+        .replace(/:\s*undefined/g, ':null')            // undefined → null
+        .replace(/:\s*NaN/g, ':0')                     // NaN → 0
+        .replace(/\\(?!["\\/bfnrtu])/g, '\\\\');      // escape stray backslashes
       quizData = JSON.parse(fixed);
     } catch (e2) {
-      parseFailed = true;
-      console.warn("Quiz JSON parse failed:", e1);
+      // ── Parse attempt 3: aggressive — walk the string character by
+      // character, tracking brace/bracket depth, and extract the longest
+      // valid JSON substring that parses.  This catches cases where the
+      // AI adds extra text INSIDE the braces but outside the structure.
+      try {
+        quizData = _aggressiveJSONExtract(raw);
+      } catch (e3) {
+        parseFailed = true;
+        console.warn("Quiz JSON parse failed (all attempts):", e1?.message || e1);
+      }
     }
   }
-  // Normalize: ensure questions array exists and each question has expected shape
+
+  // ── Normalize: ensure questions array exists and each question has expected shape ──
   if (quizData && Array.isArray(quizData.questions)) {
     quizData.questions = quizData.questions.map((q) => {
       if (typeof q !== "object" || q === null) return q;
       const norm = { ...q };
-      // Ensure 'q' field: some AIs use 'question' or 'text' instead
       if (!norm.q && norm.question) norm.q = norm.question;
       if (!norm.q && norm.text) norm.q = norm.text;
-      // Ensure 'options' is an array of strings
       if (!Array.isArray(norm.options)) norm.options = [];
       norm.options = norm.options.map(String);
-      // Ensure 'answer' is a number index for mcq, or string for fill/essay
       if (norm.type === "fill" || norm.type === "essay") {
         if (typeof norm.answer !== "string") norm.answer = String(norm.answer ?? "");
       } else {
@@ -4045,12 +4082,33 @@ function _extractQuiz(text) {
         }
         if (typeof norm.answer !== "number" || norm.answer < 0) norm.answer = 0;
       }
-      // Ensure 'explanation' exists
       if (!norm.explanation) norm.explanation = "";
       return norm;
     });
   }
   return { before, after, quizData, parseFailed };
+}
+
+// Aggressive JSON extraction: tries to find the largest valid JSON object
+// within the raw string by scanning for balanced braces.
+function _aggressiveJSONExtract(raw) {
+  const opens = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === '{') opens.push(i);
+  }
+  // Try from outermost { to last }
+  for (const start of opens) {
+    let depth = 0;
+    for (let end = start; end < raw.length; end++) {
+      if (raw[end] === '{') depth++;
+      else if (raw[end] === '}') depth--;
+      if (depth === 0) {
+        try { return JSON.parse(raw.slice(start, end + 1)); } catch {}
+        break;
+      }
+    }
+  }
+  throw new Error('No valid JSON object found');
 }
 function quizLoadingCardHTML() {
   return `<div class="quiz-loading-card">
@@ -4610,9 +4668,19 @@ function navigateRegenBranch(branchId, dir) {
   let msgIdx = conv.messages.findIndex((m) => m._regenBranchRef === branchId);
   if (msgIdx < 0) msgIdx = conv.messages.findIndex((m) => m.id === branchId);
   if (msgIdx < 0) return;
-  branch.variants[branch.current] = { ...conv.messages[msgIdx], _regenBranchRef: branchId };
+  // Save the current variant (including the tail of messages after it)
+  const curTail = conv.messages.slice(msgIdx + 1).map((m) => ({ ...m }));
+  branch.variants[branch.current] = { ...conv.messages[msgIdx], _regenBranchRef: branchId, _regenTail: curTail };
+  // Switch to the new variant
   branch.current = newIdx;
-  conv.messages[msgIdx] = { ...branch.variants[newIdx], id: genId(), _regenBranchRef: branchId };
+  const target = branch.variants[newIdx];
+  const targetTail = (target._regenTail || []).map((m) => ({ ...m }));
+  // Replace the AI message and restore the target variant's tail
+  conv.messages = [
+    ...conv.messages.slice(0, msgIdx),
+    { ...target, id: genId(), _regenBranchRef: branchId },
+    ...targetTail
+  ];
   conv._regenBranches[branchId] = branch;
   upsertConv(conv);
   _branchAnimateSwap(() => _renderConversationMessages(conv), () => document.querySelector(`[data-ai="1"][data-regen-branch-ref="${branchId}"]`) || document.querySelector(`[data-ai="1"][data-msg-id="${branchId}"]`));
