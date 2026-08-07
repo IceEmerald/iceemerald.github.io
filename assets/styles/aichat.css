@@ -871,6 +871,7 @@ body.light-mode .input-reasoning-btn.active .reasoning-toggle-icon {
     display: flex;
     flex-direction: column;
     border-radius: 12px;
+    scrollbar-gutter: stable;
 }
 
 /* ── Chat-switch animation ────────────────────────────────────
@@ -887,9 +888,10 @@ body.light-mode .input-reasoning-btn.active .reasoning-toggle-icon {
     filter: blur(6px);
     opacity: 0;
     pointer-events: none;
-    /* overflow-y: hidden prevents scrolling without removing the scrollbar
-       gutter, so the content doesn't shift right when the class is applied. */
-    overflow-y: hidden;
+    /* No overflow-y change — scrollbar-gutter:stable on .chat-content keeps
+       the scrollbar track reserved at all times, so the content width never
+       shifts when the class is added or removed. pointer-events:none already
+       prevents scrolling during the transition. */
 }
 /* Light mode: identical effect, just lighter blur to match the lighter UI. */
 body.light-mode .chat-content.is-switching {
