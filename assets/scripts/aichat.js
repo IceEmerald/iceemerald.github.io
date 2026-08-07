@@ -796,7 +796,6 @@ function _streamDisplayText(raw) {
   let t = String(raw || "");
   t = t.replace(/\[MEMORY:[^\]]*\]?/g, "");
   t = t.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "");
-  t = t.replace(/\[IMAGE:[^\]]*\]?/g, "");
   t = _stripThinkingPreamble(t);
   const quizIdx = t.indexOf("<quiz>");
   if (quizIdx >= 0) {
@@ -2288,7 +2287,6 @@ async function handleSend(opts) {
   let continueCount = 0;
   let continueEl = null;
   let _groundingMetadata = null;
-  let _allInlineImages = [];
   const _doStream = async (h) => streamEmeraldBot(h, apiKey, (chunk) => {
     fullText += chunk;
     if (!aiDiv) {
@@ -2306,7 +2304,6 @@ async function handleSend(opts) {
     let _streamResult = await _doStream(history);
     let finishReason = _streamResult.finishReason;
     if (_streamResult.groundingMetadata) _groundingMetadata = _streamResult.groundingMetadata;
-    if (_streamResult.inlineImages?.length) _allInlineImages.push(..._streamResult.inlineImages);
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -2328,7 +2325,6 @@ async function handleSend(opts) {
       _streamResult = await _doStream(contHistory);
       finishReason = _streamResult.finishReason;
       if (_streamResult.groundingMetadata) _groundingMetadata = _streamResult.groundingMetadata;
-      if (_streamResult.inlineImages?.length) _allInlineImages.push(..._streamResult.inlineImages);
     }
     if (continueEl) continueEl.remove();
   } catch (err) {
@@ -2386,10 +2382,6 @@ async function handleSend(opts) {
     const _imgGenMatch = displayText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
     const _imgPrompt = _imgGenMatch ? _imgGenMatch[1].trim() : null;
     displayText = displayText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
-    // Extract [IMAGE: url] tags for inline web images
-    const _webImgMatches = [...displayText.matchAll(/\[IMAGE:\s*([^\]]+)\]/g)];
-    const _webImgUrls = _webImgMatches.map((m) => m[1].trim()).filter((u) => /^https?:\/\/.+/i.test(u));
-    displayText = displayText.replace(/\[IMAGE:\s*[^\]]+\]/g, "").trim();
     const _quizResult = _extractQuiz(displayText);
     const quizData = _quizResult.quizData;
     const beforeQuizText = _quizResult.before;
@@ -2398,7 +2390,7 @@ async function handleSend(opts) {
     displayText = _quizResult.before;
     textEl.classList.remove("stream-reveal");
     const _textToShow = (quizData || _quizParseFailed) ? beforeQuizText : displayText;
-    const _hasOtherContent = !!(quizData || _quizParseFailed || _imgPrompt || _webImgUrls.length || memoryAdded);
+    const _hasOtherContent = !!(quizData || _quizParseFailed || _imgPrompt || memoryAdded);
     if (_textToShow) {
       textEl.innerHTML = renderMarkdown(_textToShow);
     } else if (_hasOtherContent) {
@@ -2455,8 +2447,7 @@ async function handleSend(opts) {
         quizData: quizData || void 0,
         quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
         quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
-        imagePrompt: _imgPrompt || void 0,
-        webImageUrls: (_webImgUrls.length || _allInlineImages.length) ? [..._webImgUrls, ..._allInlineImages] : void 0
+        imagePrompt: _imgPrompt || void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -2468,12 +2459,6 @@ async function handleSend(opts) {
     }
     if (_imgPrompt) {
       processImageGenTag(aiDiv, _imgPrompt, state.convId, msgId);
-    }
-    if (_webImgUrls.length) {
-      renderWebImages(aiDiv, _webImgUrls);
-    }
-    if (_allInlineImages.length) {
-      renderWebImages(aiDiv, _allInlineImages);
     }
   } else if (aiDiv && textEl) {
     // No text came back (request error / cancellation / empty response).
@@ -2503,13 +2488,10 @@ function buildHistory(conv) {
     const msgs = allMsgs.slice(-HISTORY_MAX_MSGS).map((m, idx, arr) => {
       let text = m.text || "";
       text = text.replace(/<quiz>[\s\S]*?<\/quiz>/g, "[A quiz was provided here]");
-      text = text.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").replace(/\[IMAGE:\s*[^\]]+\]/g, "").trim();
+      text = text.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").trim();
       if (m.imagePrompt) {
         text += `
 [An image was generated and shown to the user for this prompt: "${m.imagePrompt}"]`;
-      }
-      if (m.webImageUrls && m.webImageUrls.length) {
-        text += `\n[Web images were shown: ${m.webImageUrls.join(", ")}]`;
       }
       const isRecent = idx >= arr.length - HISTORY_FULL_TAIL;
       if (!isRecent && text.length > HISTORY_MAX_CHARS) {
@@ -2658,7 +2640,6 @@ async function regenerateMessage(msgEl) {
       scrollToBottom();
     }, { useUrlContext: _urlsInMsg.length > 0, userText: _lastUserText });
     _groundingMetadata = _streamResult.groundingMetadata;
-    const _regenInlineImages = _streamResult.inlineImages || [];
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -2693,10 +2674,6 @@ async function regenerateMessage(msgEl) {
     const imgGenMatch = displayText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
     const imgPrompt = imgGenMatch ? imgGenMatch[1].trim() : null;
     displayText = displayText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
-    // Extract [IMAGE: url] tags for inline web images
-    const regenWebImgMatches = [...displayText.matchAll(/\[IMAGE:\s*([^\]]+)\]/g)];
-    const regenWebImgUrls = regenWebImgMatches.map((m) => m[1].trim()).filter((u) => /^https?:\/\/.+/i.test(u));
-    displayText = displayText.replace(/\[IMAGE:\s*[^\]]+\]/g, "").trim();
     const _quizResult = _extractQuiz(displayText);
     const quizData = _quizResult.quizData;
     const beforeQuizText = _quizResult.before;
@@ -2705,7 +2682,7 @@ async function regenerateMessage(msgEl) {
     displayText = _quizResult.before;
     textEl.classList.remove("stream-reveal");
     const _regenTextToShow = (quizData || _quizParseFailed) ? beforeQuizText : displayText;
-    const _hasOtherContent = !!(quizData || _quizParseFailed || imgPrompt || regenWebImgUrls.length || memoryAdded);
+    const _hasOtherContent = !!(quizData || _quizParseFailed || imgPrompt || memoryAdded);
     if (_regenTextToShow) {
       textEl.innerHTML = renderMarkdown(_regenTextToShow);
     } else if (_hasOtherContent) {
@@ -2762,8 +2739,7 @@ async function regenerateMessage(msgEl) {
       quizData: quizData || void 0,
       quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
       quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
-      imagePrompt: imgPrompt || void 0,
-      webImageUrls: (regenWebImgUrls.length || _regenInlineImages.length) ? [...regenWebImgUrls, ..._regenInlineImages] : void 0
+      imagePrompt: imgPrompt || void 0
     };
     aiDiv.dataset.regenBranchRef = regenBranchId;
     conv.messages.push(savedMsg);
@@ -2774,12 +2750,6 @@ async function regenerateMessage(msgEl) {
     updateRegenNavDOM(regenBranchId);
     if (imgPrompt) {
       processImageGenTag(aiDiv, imgPrompt, state.convId, newId);
-    }
-    if (regenWebImgUrls.length) {
-      renderWebImages(aiDiv, regenWebImgUrls);
-    }
-    if (_regenInlineImages.length) {
-      renderWebImages(aiDiv, _regenInlineImages);
     }
   } else if (aiDiv && textEl) {
     // No text came back (request error / cancellation / empty response).
@@ -2892,7 +2862,6 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
   let buffer = "";
   let finishReason = null;
   let groundingMetadata = null;
-  const inlineImages = [];
   const STREAM_IDLE_TIMEOUT = 3e4;
   let timedOut = false;
   let idleTimer = setTimeout(() => {
@@ -2931,10 +2900,6 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
           if (candidate?.content?.parts) {
             for (const part of candidate.content.parts) {
               if (part.text) onChunk(part.text);
-              // Collect inlineData images from the model response
-              if (part.inlineData && part.inlineData.mimeType && part.inlineData.data) {
-                inlineImages.push("data:" + part.inlineData.mimeType + ";base64," + part.inlineData.data);
-              }
             }
           }
           if (candidate?.finishReason) {
@@ -2958,7 +2923,7 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
     const reasonMap = { SAFETY: "Content blocked by safety filters", RECITATION: "Content blocked by recitation policy", OTHER: "Response blocked for an unknown reason" };
     throw new Error(reasonMap[finishReason] || `Response blocked: ${finishReason}`);
   }
-  return { finishReason, groundingMetadata, modelId: usedModelId, inlineImages };
+  return { finishReason, groundingMetadata, modelId: usedModelId };
 }
 function extractGroundingSources(groundingMetadata) {
   if (!groundingMetadata) return [];
@@ -4008,7 +3973,7 @@ function clearAllChats() {
 }
 function appendStoredAIMessage(m) {
   const rawText = m.text || "";
-  let displayText = rawText.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").replace(/\[IMAGE:\s*[^\]]+\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  let displayText = rawText.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
   displayText = _stripThinkingPreamble(displayText).replace(/^\s+/, "");
   const hasMemory = m.hasMemory || /\[MEMORY:/.test(rawText);
   let quizData = m.hasQuiz && m.quizData ? m.quizData : null;
@@ -4093,10 +4058,6 @@ function appendStoredAIMessage(m) {
     wrapper.appendChild(dlLink);
     insertBeforeMessageActions(div.querySelector(".message-body"), wrapper);
   }
-  // Render saved web images on reload
-  if (m.webImageUrls && m.webImageUrls.length) {
-    renderWebImages(div, m.webImageUrls);
-  }
   const typingEl = $("typingIndicator");
   $("messagesArea").insertBefore(div, typingEl);
   return div;
@@ -4158,12 +4119,6 @@ function _extractQuiz(text) {
 
   // ── Normalize: ensure questions array exists and each question has expected shape ──
   if (quizData && Array.isArray(quizData.questions)) {
-    // If the quiz parsed but has 0 questions, treat as a failure
-    if (quizData.questions.length === 0) {
-      parseFailed = true;
-      quizData = null;
-      console.warn("Quiz JSON parsed but has 0 questions — treating as parse failure");
-    } else {
     quizData.questions = quizData.questions.map((q) => {
       if (typeof q !== "object" || q === null) return q;
       const norm = { ...q };
@@ -4184,11 +4139,6 @@ function _extractQuiz(text) {
       if (!norm.explanation) norm.explanation = "";
       return norm;
     });
-    }
-  } else if (quizData && !Array.isArray(quizData.questions)) {
-    // Parsed but no questions array — treat as failure
-    parseFailed = true;
-    quizData = null;
   }
   return { before, after, quizData, parseFailed };
 }
@@ -4498,7 +4448,6 @@ async function submitUserMsgEdit(msgId) {
       scrollToBottom();
     }, { useUrlContext: _urlsInMsg.length > 0, userText: newText });
     _groundingMetadata = _streamResult.groundingMetadata;
-    const _editInlineImages = _streamResult.inlineImages || [];
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -4547,10 +4496,6 @@ async function submitUserMsgEdit(msgId) {
     const imgM = dispText.match(/\[GENERATE_IMAGE:\s*([^\]]+)\]/);
     const imgPrompt = imgM ? imgM[1].trim() : null;
     dispText = dispText.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "").trim();
-    // Extract [IMAGE: url] tags for inline web images
-    const editWebImgMatches = [...dispText.matchAll(/\[IMAGE:\s*([^\]]+)\]/g)];
-    const editWebImgUrls = editWebImgMatches.map((m) => m[1].trim()).filter((u) => /^https?:\/\/.+/i.test(u));
-    dispText = dispText.replace(/\[IMAGE:\s*[^\]]+\]/g, "").trim();
     const _quizResult = _extractQuiz(dispText);
     const quizData = _quizResult.quizData;
     const beforeQuizText = _quizResult.before;
@@ -4559,7 +4504,7 @@ async function submitUserMsgEdit(msgId) {
     dispText = _quizResult.before;
     aiTextEl.classList.remove("stream-reveal");
     const _editTextToShow = (quizData || _quizParseFailed) ? beforeQuizText : dispText;
-    const _hasOtherContent = !!(quizData || _quizParseFailed || imgPrompt || editWebImgUrls.length || memoryAdded);
+    const _hasOtherContent = !!(quizData || _quizParseFailed || imgPrompt || memoryAdded);
     if (_editTextToShow) {
       aiTextEl.innerHTML = renderMarkdown(_editTextToShow);
     } else if (_hasOtherContent) {
@@ -4616,8 +4561,7 @@ async function submitUserMsgEdit(msgId) {
         quizData: quizData || void 0,
         quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
         quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
-        imagePrompt: imgPrompt || void 0,
-        webImageUrls: (editWebImgUrls.length || _editInlineImages.length) ? [...editWebImgUrls, ..._editInlineImages] : void 0
+        imagePrompt: imgPrompt || void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -4627,12 +4571,6 @@ async function submitUserMsgEdit(msgId) {
     }
     if (imgPrompt) {
       processImageGenTag(aiDiv, imgPrompt, state.convId, aiMsgId);
-    }
-    if (editWebImgUrls.length) {
-      renderWebImages(aiDiv, editWebImgUrls);
-    }
-    if (_editInlineImages.length) {
-      renderWebImages(aiDiv, _editInlineImages);
     }
   } else if (aiDiv && aiTextEl) {
     // No text came back (request error / cancellation / empty response).
@@ -5147,50 +5085,6 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId) {
       textEl.innerHTML = _existing ? `${_existing}<br><span class="md-error">${_catchMsg}</span>` : `<span class="md-error">${_catchMsg}</span>`;
     }
   }
-  scrollToBottom();
-}
-
-/**
- * Render inline web images from [IMAGE: url] tags.
- * Called after the AI response is fully rendered.
- * @param {HTMLElement} aiDiv - The AI message container div
- * @param {string[]} urls - Array of image URLs to render
- */
-function renderWebImages(aiDiv, urls) {
-  if (!aiDiv || !urls || !urls.length) return;
-  const body = aiDiv.querySelector(".message-body");
-  if (!body) return;
-  const container = document.createElement("div");
-  container.className = "web-img-grid";
-  urls.forEach((url) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "web-img-wrapper";
-    const img = document.createElement("img");
-    img.src = url;
-    img.alt = "Image";
-    img.className = "web-img";
-    img.loading = "lazy";
-    img.referrerPolicy = "no-referrer";
-    // On error, hide the broken image gracefully
-    img.onerror = function () {
-      wrapper.classList.add("web-img--error");
-      wrapper.innerHTML = '<div class="web-img-error"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>Image unavailable</span></div>';
-    };
-    // Click to open in new tab
-    img.onclick = function () { window.open(url, "_blank", "noopener"); };
-    img.style.cursor = "pointer";
-    const dlLink = document.createElement("a");
-    dlLink.className = "web-img-open";
-    dlLink.href = url;
-    dlLink.target = "_blank";
-    dlLink.rel = "noopener noreferrer";
-    dlLink.title = "Open image";
-    dlLink.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
-    wrapper.appendChild(img);
-    wrapper.appendChild(dlLink);
-    container.appendChild(wrapper);
-  });
-  insertBeforeMessageActions(body, container);
   scrollToBottom();
 }
 
