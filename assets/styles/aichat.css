@@ -4038,6 +4038,7 @@ body.light-mode .input-attach-btn:hover {
     padding: 14px 18px 12px;
     border-bottom: 1px solid #242424;
     flex-shrink: 0;
+    gap: 12px;
     white-space: nowrap;
 }
 
