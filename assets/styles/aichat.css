@@ -4976,7 +4976,6 @@ body.light-mode .fp-text-code {
     gap: 12px;
     padding: 12px 16px;
     border-radius: 12px;
-    border: 1.5px solid var(--border);
     background: #1e1e1e;
     cursor: pointer;
     margin: 8px 0;
