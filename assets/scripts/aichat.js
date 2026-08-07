@@ -2288,6 +2288,7 @@ async function handleSend(opts) {
   let continueCount = 0;
   let continueEl = null;
   let _groundingMetadata = null;
+  let _allInlineImages = [];
   const _doStream = async (h) => streamEmeraldBot(h, apiKey, (chunk) => {
     fullText += chunk;
     if (!aiDiv) {
@@ -2305,6 +2306,7 @@ async function handleSend(opts) {
     let _streamResult = await _doStream(history);
     let finishReason = _streamResult.finishReason;
     if (_streamResult.groundingMetadata) _groundingMetadata = _streamResult.groundingMetadata;
+    if (_streamResult.inlineImages?.length) _allInlineImages.push(..._streamResult.inlineImages);
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -2326,6 +2328,7 @@ async function handleSend(opts) {
       _streamResult = await _doStream(contHistory);
       finishReason = _streamResult.finishReason;
       if (_streamResult.groundingMetadata) _groundingMetadata = _streamResult.groundingMetadata;
+      if (_streamResult.inlineImages?.length) _allInlineImages.push(..._streamResult.inlineImages);
     }
     if (continueEl) continueEl.remove();
   } catch (err) {
@@ -2453,7 +2456,7 @@ async function handleSend(opts) {
         quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
         quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
         imagePrompt: _imgPrompt || void 0,
-        webImageUrls: _webImgUrls.length ? _webImgUrls : void 0
+        webImageUrls: (_webImgUrls.length || _allInlineImages.length) ? [..._webImgUrls, ..._allInlineImages] : void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -2468,6 +2471,9 @@ async function handleSend(opts) {
     }
     if (_webImgUrls.length) {
       renderWebImages(aiDiv, _webImgUrls);
+    }
+    if (_allInlineImages.length) {
+      renderWebImages(aiDiv, _allInlineImages);
     }
   } else if (aiDiv && textEl) {
     // No text came back (request error / cancellation / empty response).
@@ -2652,6 +2658,7 @@ async function regenerateMessage(msgEl) {
       scrollToBottom();
     }, { useUrlContext: _urlsInMsg.length > 0, userText: _lastUserText });
     _groundingMetadata = _streamResult.groundingMetadata;
+    const _regenInlineImages = _streamResult.inlineImages || [];
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -2756,7 +2763,7 @@ async function regenerateMessage(msgEl) {
       quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
       quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
       imagePrompt: imgPrompt || void 0,
-      webImageUrls: regenWebImgUrls.length ? regenWebImgUrls : void 0
+      webImageUrls: (regenWebImgUrls.length || _regenInlineImages.length) ? [...regenWebImgUrls, ..._regenInlineImages] : void 0
     };
     aiDiv.dataset.regenBranchRef = regenBranchId;
     conv.messages.push(savedMsg);
@@ -2770,6 +2777,9 @@ async function regenerateMessage(msgEl) {
     }
     if (regenWebImgUrls.length) {
       renderWebImages(aiDiv, regenWebImgUrls);
+    }
+    if (_regenInlineImages.length) {
+      renderWebImages(aiDiv, _regenInlineImages);
     }
   } else if (aiDiv && textEl) {
     // No text came back (request error / cancellation / empty response).
@@ -2882,6 +2892,7 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
   let buffer = "";
   let finishReason = null;
   let groundingMetadata = null;
+  const inlineImages = [];
   const STREAM_IDLE_TIMEOUT = 3e4;
   let timedOut = false;
   let idleTimer = setTimeout(() => {
@@ -2920,6 +2931,10 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
           if (candidate?.content?.parts) {
             for (const part of candidate.content.parts) {
               if (part.text) onChunk(part.text);
+              // Collect inlineData images from the model response
+              if (part.inlineData && part.inlineData.mimeType && part.inlineData.data) {
+                inlineImages.push("data:" + part.inlineData.mimeType + ";base64," + part.inlineData.data);
+              }
             }
           }
           if (candidate?.finishReason) {
@@ -2943,7 +2958,7 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
     const reasonMap = { SAFETY: "Content blocked by safety filters", RECITATION: "Content blocked by recitation policy", OTHER: "Response blocked for an unknown reason" };
     throw new Error(reasonMap[finishReason] || `Response blocked: ${finishReason}`);
   }
-  return { finishReason, groundingMetadata, modelId: usedModelId };
+  return { finishReason, groundingMetadata, modelId: usedModelId, inlineImages };
 }
 function extractGroundingSources(groundingMetadata) {
   if (!groundingMetadata) return [];
@@ -4483,6 +4498,7 @@ async function submitUserMsgEdit(msgId) {
       scrollToBottom();
     }, { useUrlContext: _urlsInMsg.length > 0, userText: newText });
     _groundingMetadata = _streamResult.groundingMetadata;
+    const _editInlineImages = _streamResult.inlineImages || [];
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -4601,7 +4617,7 @@ async function submitUserMsgEdit(msgId) {
         quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
         quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
         imagePrompt: imgPrompt || void 0,
-        webImageUrls: editWebImgUrls.length ? editWebImgUrls : void 0
+        webImageUrls: (editWebImgUrls.length || _editInlineImages.length) ? [...editWebImgUrls, ..._editInlineImages] : void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -4614,6 +4630,9 @@ async function submitUserMsgEdit(msgId) {
     }
     if (editWebImgUrls.length) {
       renderWebImages(aiDiv, editWebImgUrls);
+    }
+    if (_editInlineImages.length) {
+      renderWebImages(aiDiv, _editInlineImages);
     }
   } else if (aiDiv && aiTextEl) {
     // No text came back (request error / cancellation / empty response).
