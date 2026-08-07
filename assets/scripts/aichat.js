@@ -3973,7 +3973,8 @@ function clearAllChats() {
 }
 function appendStoredAIMessage(m) {
   const rawText = m.text || "";
-  let displayText = rawText.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  let displayText = rawText.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  displayText = _stripThinkingPreamble(displayText).replace(/^\s+/, "");
   const hasMemory = m.hasMemory || /\[MEMORY:/.test(rawText);
   let quizData = m.hasQuiz && m.quizData ? m.quizData : null;
   let beforeQuiz = "";
