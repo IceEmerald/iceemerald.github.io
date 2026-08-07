@@ -1479,7 +1479,8 @@ function loadConversation(id) {
     showMessages();
     $("messagesArea").innerHTML = typingIndicatorHTML();
     conv.messages.forEach((m) => {
-      if (m.role === "user") appendUserMessageDOM(m.text, m.files || [], m.id || null, m._editBranchRef || null);
+      if (m.role === "user" && !m._silent) appendUserMessageDOM(m.text, m.files || [], m.id || null, m._editBranchRef || null);
+      else if (m.role === "user" && m._silent) { /* skip rendering silent quiz prompt */ }
       else appendStoredAIMessage(m);
     });
   if (conv._editBranches) {
@@ -2136,12 +2137,16 @@ function rateMsg(btn, type) {
     showToast(type === "like" ? `${_aiSvgThumbUp} You liked this response` : `${_aiSvgThumbDown} You disliked this response`);
   }
 }
-async function handleSend() {
-  if (state.isStreaming) return;
+async function handleSend(opts) {
+  const _silent = !!(opts && opts.silent);
+  if (state.isStreaming) {
+    if (_silent) showToast(`${_aiSvgWarn} Please wait — the AI is still responding.`);
+    return;
+  }
   _autoScrollSticky = true;  // re-enable sticky scroll on new send
   const textarea = $("chatInput");
-  const text = textarea.value.trim();
-  const files = [...state.attachments];
+  const text = _silent ? (opts.silentText || "").trim() : textarea.value.trim();
+  const files = _silent ? [] : [...state.attachments];
   if (!text && files.length === 0) return;
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -2151,19 +2156,21 @@ async function handleSend() {
   if (!state.isTemp && !state.convId) {
     state.convId = genId();
   }
-  textarea.value = "";
-  textarea.style.height = "auto";
-  clearAttachments();
+  if (!_silent) {
+    textarea.value = "";
+    textarea.style.height = "auto";
+    clearAttachments();
+  }
   showMessages();
   const userMsgId = genId();
-  appendUserMessageDOM(text, files, userMsgId);
+  if (!_silent) appendUserMessageDOM(text, files, userMsgId);
   scrollToBottom();
   const typingEl = $("typingIndicator");
   typingEl.style.display = "flex";
   scrollToBottom();
   const conv = !state.isTemp && state.convId ? getConv(state.convId) || {
     id: state.convId,
-    title: text.slice(0, 55) || "New Chat",
+    title: _silent ? "Quiz Feedback" : (text.slice(0, 55) || "New Chat"),
     messages: [],
     isTemp: false,
     createdAt: Date.now(),
@@ -2171,7 +2178,7 @@ async function handleSend() {
   } : null;
   if (conv) {
     const isNewConv = !getConv(conv.id);
-    conv.messages.push({ role: "user", text, files: files.map((f) => ({ name: f.name, type: f.type, size: f.size, data: f.data || void 0, extractedText: f.extractedText })), id: userMsgId });
+    conv.messages.push({ role: "user", text, files: files.map((f) => ({ name: f.name, type: f.type, size: f.size, data: f.data || void 0, extractedText: f.extractedText })), id: userMsgId, _silent: _silent || undefined });
     upsertConv(conv);
     if (isNewConv) updateTopbarTitle(conv.title);
     renderSidebar();
@@ -3901,17 +3908,9 @@ My answer: "${e.a}"${e.rubric ? `
     prompt += "\nPlease give me feedback.";
   }
   prompt += "\n\n[IMPORTANT: Only provide explanations and essay feedback for the above. Do NOT generate a new quiz. Do NOT generate an image. No <quiz> tags. No [GENERATE_IMAGE:...] tags. Just a plain helpful response.]";
-  const input = document.getElementById("chatInput");
-  if (input) {
-    input.value = prompt;
-    input.focus();
-    // Don't silently no-op when a stream is in progress — tell the user.
-    if (state.isStreaming) {
-      showToast(`${_aiSvgWarn} Please wait — the AI is still responding. Your question is in the input box.`);
-      return;
-    }
-    handleSend();
-  }
+  // Send silently — no user message bubble, no input box text.
+  // The AI typing indicator appears immediately; the response streams in directly.
+  handleSend({ silent: true, silentText: prompt });
 };
 function openMemoriesModal() {
   renderMemoriesModal();
@@ -4624,7 +4623,8 @@ function _renderConversationMessages(conv) {
   showMessages();
   $("messagesArea").innerHTML = typingIndicatorHTML();
   conv.messages.forEach((m) => {
-    if (m.role === "user") appendUserMessageDOM(m.text, m.files || [], m.id || null, m._editBranchRef || null);
+    if (m.role === "user" && !m._silent) appendUserMessageDOM(m.text, m.files || [], m.id || null, m._editBranchRef || null);
+    else if (m.role === "user" && m._silent) { /* skip rendering silent quiz prompt */ }
     else appendStoredAIMessage(m);
   });
   if (conv._editBranches) {
