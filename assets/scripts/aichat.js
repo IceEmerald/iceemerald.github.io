@@ -4324,7 +4324,7 @@ function appendStoredAIMessage(m) {
     div.querySelector(".message-sender").insertAdjacentElement("afterend", badge);
   }
   if (quizData) {
-    const qid = quizData._id || "quiz_" + (m.id || genId());
+    const qid = sanitizeQuizId(quizData._id, "quiz_" + (m.id || genId()));
     quizData._id = qid;
     window._quizzes = window._quizzes || {};
     if (!window._quizzes[qid]) {
@@ -4477,6 +4477,11 @@ function _aggressiveJSONExtract(raw) {
   }
   throw new Error('No valid JSON object found');
 }
+function sanitizeQuizId(value, fallback) {
+  const raw = String(value ?? "").trim();
+  const cleaned = raw.replace(/[^A-Za-z0-9_-]/g, "_").replace(/^_+|_+$/g, "");
+  return cleaned ? cleaned.slice(0, 128) : fallback;
+}
 function quizLoadingCardHTML() {
   return `<div class="quiz-loading-card">
     <div class="quiz-loading-icon">
@@ -4494,7 +4499,8 @@ function quizLoadingCardHTML() {
 }
 function quizCardHTML(qid, data) {
   const n = (data.questions || []).length;
-  return `<div class="quiz-card" onclick="openQuizPanel('${qid}')">
+  const safeQid = escapeHtmlAttr(sanitizeQuizId(qid, "quiz"));
+  return `<div class="quiz-card" onclick="openQuizPanel('${safeQid}')">
     <div class="quiz-card-icon">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
     </div>
