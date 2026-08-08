@@ -1133,7 +1133,7 @@ body.light-mode .chat-content.is-switching {
     display: flex;
     flex-direction: column;
     gap: 22px;
-    max-width: 730px;
+    max-width: 800px;
     width: 100%;
     margin: 0 auto;
 }
@@ -1330,7 +1330,7 @@ body.light-mode .message-avatar-user {
 }
 
 .chat-input-box {
-    max-width: 720px;
+    max-width: 800px;
     margin: 0 auto;
 }
 
@@ -5846,4 +5846,209 @@ body.light-mode .img-gen-loading-title {
 body.light-mode .ws-searching-badge {
   background: #f5f5f5;
   color: #666;
+}
+
+/* ============================================================
+   REASONING PANEL — minimal "Thinking for X seconds" design
+   ------------------------------------------------------------
+   Clean, minimal collapsible block: a thin vertical gray bar on
+   the left, a "Thinking for Xs…" label while the model works
+   (switches to "Thought for Xs" once done), and a chevron to
+   collapse/expand. NO filled background box, NO checkmark icon —
+   just the left rule as a visual separator. Matches the clean
+   Claude / o1 chat aesthetic.
+   ------------------------------------------------------------ */
+.reasoning-block {
+    --rs-bar: #6b6b6b;            /* left vertical bar (dark mode) */
+    --rs-bar-active: #50c878;      /* subtle emerald tint while thinking */
+    --rs-label: #8a8a8a;
+    --rs-label-done: #7a7a7a;
+    --rs-text: #8a8a8a;
+    --rs-chevron: #8a8a8a;
+    --rs-hover: rgba(255, 255, 255, 0.04);
+
+    font-family: 'DM Sans', sans-serif;
+    margin: 8px 0 8px 0;
+    padding-left: 14px;
+    position: relative;
+    transition: opacity 0.2s ease;
+}
+
+/* The vertical gray bar on the left — the only visual container. */
+.reasoning-block::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 3px;
+    background: var(--rs-bar);
+    border-radius: 2px;
+    transition: background 0.3s ease, opacity 0.3s ease;
+}
+/* While thinking, the bar gets a subtle emerald tint so the user
+   can tell the model is still working. */
+.reasoning-block:not(.is-done)::before {
+    background: var(--rs-bar-active);
+    opacity: 0.55;
+}
+.reasoning-block.is-done::before {
+    opacity: 0.85;
+}
+
+.reasoning-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 6px 4px 0;
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+.reasoning-header:focus-visible {
+    box-shadow: 0 0 0 2px rgba(80, 200, 120, 0.30);
+}
+
+.reasoning-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.reasoning-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--rs-label);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* While thinking, animate a trailing "…" so the user can tell the
+   model is still working even when nothing has streamed recently. */
+.reasoning-block:not(.is-done) .reasoning-label::after {
+    content: "...";
+    display: inline-block;
+    margin-left: 2px;
+    width: 1.2em;
+    text-align: left;
+    color: var(--rs-bar-active);
+    animation: reasoning-ellipsis 1.4s steps(4, end) infinite;
+    overflow: hidden;
+    vertical-align: baseline;
+}
+@keyframes reasoning-ellipsis {
+    0%   { width: 0; }
+    25%  { width: 0.4em; }
+    50%  { width: 0.8em; }
+    75%  { width: 1.2em; }
+    100% { width: 0; }
+}
+.reasoning-block.is-done .reasoning-label {
+    color: var(--rs-label-done);
+}
+
+.reasoning-chevron {
+    color: var(--rs-chevron);
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.reasoning-header:hover .reasoning-chevron,
+.reasoning-header:focus-visible .reasoning-chevron { opacity: 1; }
+.reasoning-block.is-expanded .reasoning-chevron {
+    transform: rotate(180deg);
+}
+
+/* Collapsible body — uses max-height + overflow:hidden for a
+   bulletproof collapse (the grid-template-rows: 0fr trick leaks
+   a few pixels because 0fr expands to minmax(auto, 0fr) and the
+   md-content class on the same element fights min-height: 0).
+   No custom scrollbar styling here — the project's global
+   scrollbar CSS controls the thumb/track appearance. */
+.reasoning-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+}
+.reasoning-block.is-expanded .reasoning-body {
+    max-height: 60vh;
+}
+.reasoning-block.is-expanded .reasoning-body > .reasoning-text {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.reasoning-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--rs-text);
+    padding: 8px 12px 10px 0;
+    opacity: 0.88;
+}
+.reasoning-text p { margin: 0 0 8px 0; }
+.reasoning-text p:last-child { margin-bottom: 0; }
+.reasoning-text ul,
+.reasoning-text ol { margin: 0 0 8px 0; padding-left: 20px; }
+.reasoning-text li { margin-bottom: 3px; }
+.reasoning-text code {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-family: 'Sarasa Mono SC', 'DM Mono', ui-monospace, monospace;
+}
+.reasoning-text pre {
+    background: rgba(0, 0, 0, 0.25);
+    padding: 8px 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 6px 0 8px 0;
+    font-size: 0.78rem;
+}
+.reasoning-text pre code {
+    background: none;
+    padding: 0;
+}
+.reasoning-text h1,
+.reasoning-text h2,
+.reasoning-text h3,
+.reasoning-text h4 {
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin: 10px 0 6px 0;
+    color: var(--rs-label);
+}
+
+/* Legacy icon spans (spinner / checkmark) are no longer rendered,
+   but if any persisted DOM references them, hide them silently. */
+.reasoning-icon { display: none !important; }
+
+/* Light mode overrides */
+body.light-mode .reasoning-block {
+    --rs-bar: #b0b0b0;
+    --rs-bar-active: #2a9d54;
+    --rs-label: #555;
+    --rs-label-done: #666;
+    --rs-text: #555;
+    --rs-chevron: #888;
+    --rs-hover: rgba(0, 0, 0, 0.03);
+}
+body.light-mode .reasoning-text code {
+    background: rgba(0, 0, 0, 0.05);
+}
+body.light-mode .reasoning-text pre {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+/* Small screens — keep the panel readable on mobile */
+@media (max-width: 640px) {
+    .reasoning-block { margin: 6px 0 12px 0; padding-left: 12px; }
+    .reasoning-header { padding: 4px 4px 4px 0; }
+    .reasoning-text { padding: 6px 8px 10px 0; font-size: 0.8rem; }
 }

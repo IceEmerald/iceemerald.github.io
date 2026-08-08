@@ -2094,6 +2094,125 @@ function buildMessageActionsEl(msgId) {
   _actDiv.appendChild(_dislikeBtn);
   return _actDiv;
 }
+/* ── Reasoning panel ─────────────────────────────────────────────
+   When reasoning mode is enabled, the worker streams Gemini's
+   `thought: true` parts separately (see streamEmeraldBot). We render
+   them inside a collapsible "Reasoning" block above the answer text —
+   the same UX Claude / o1 use: a header row with a spinner while
+   thinking, flipping to a checkmark + "Done" once the final answer
+   begins streaming; the body expands during reasoning and auto-
+   collapses when done (user can re-expand by clicking the header).
+
+   The block is created lazily (only when the first reasoning chunk
+   arrives) so messages without reasoning show no empty panel. */
+const _REASONING_EXPAND_MS = 250; // smooth height transition
+// Per-block interval timers for the "Thinking for Xs…" live label.
+// WeakMap so the timer reference dies with the DOM node if it's removed.
+const _reasoningTimers = new WeakMap();
+
+// Format an elapsed second count as "12s" or "1m 04s".
+function _fmtReasoningElapsed(sec) {
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+function _setReasoningLabel(block, verb /* "Thinking" | "Thought" */) {
+  if (!block) return;
+  const label = block.querySelector(".reasoning-label");
+  if (!label) return;
+  const start = Number(block.dataset.startedAt || 0);
+  if (!start) {
+    label.textContent = verb === "Thought" ? "Thought for a moment" : "Thinking";
+    return;
+  }
+  const sec = Math.max(1, Math.round((Date.now() - start) / 1000));
+  label.textContent = `${verb} for ${_fmtReasoningElapsed(sec)}`;
+}
+
+function reasoningBlockHTML(isDone) {
+  // isDone=true is used when rendering a stored message that already
+  // has completed reasoning — label says "Thought for a moment" since
+  // we don't have the original elapsed time persisted.
+  return `<div class="reasoning-block${isDone ? " is-done" : ""}" data-state="${isDone ? "done" : "thinking"}">
+    <div class="reasoning-header" role="button" tabindex="0" aria-expanded="${isDone ? "false" : "true"}" onclick="toggleReasoningBlock(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleReasoningBlock(this);}">
+      <div class="reasoning-title">
+        <span class="reasoning-label">${isDone ? "Thought for a moment" : "Thinking"}</span>
+      </div>
+      <svg class="reasoning-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="reasoning-body"><div class="reasoning-text md-content"></div></div>
+  </div>`;
+}
+function createReasoningBlock(aiDiv) {
+  if (!aiDiv) return null;
+  const existing = aiDiv.querySelector(".reasoning-block");
+  if (existing) return existing;
+  const sender = aiDiv.querySelector(".message-sender");
+  if (!sender) return null;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = reasoningBlockHTML(false);
+  const block = tmp.firstElementChild;
+  sender.insertAdjacentElement("afterend", block);
+  // Start expanded while thinking.
+  block.classList.add("is-expanded");
+  // Live-tick the "Thinking for Xs…" label once per second.
+  block.dataset.startedAt = String(Date.now());
+  _setReasoningLabel(block, "Thinking");
+  const timer = setInterval(() => {
+    if (!block.classList.contains("is-done")) _setReasoningLabel(block, "Thinking");
+  }, 1000);
+  _reasoningTimers.set(block, timer);
+  return block;
+}
+function appendReasoningToBlock(block, chunk) {
+  if (!block || !chunk) return;
+  const textEl = block.querySelector(".reasoning-text");
+  if (!textEl) return;
+  // Use a dataset accumulator (not textContent) because renderMarkdown
+  // produces HTML — concatenating innerHTML would re-parse partial HTML
+  // and corrupt formatting mid-stream.
+  let acc = block.dataset.reasoningRaw || "";
+  acc += chunk;
+  block.dataset.reasoningRaw = acc;
+  // Render markdown incrementally. Keep the user scrolled to bottom of
+  // the reasoning panel while it streams (mirrors the answer streaming UX).
+  textEl.innerHTML = renderMarkdown(acc);
+  // Auto-scroll within the reasoning body if the user hasn't scrolled up.
+  const body = block.querySelector(".reasoning-body");
+  if (body && _autoScrollSticky) body.scrollTop = body.scrollHeight;
+}
+function markReasoningDone(block) {
+  if (!block) return;
+  block.classList.add("is-done");
+  block.dataset.state = "done";
+  // Stop the live timer and freeze the label at "Thought for Xs".
+  const timer = _reasoningTimers.get(block);
+  if (timer) { clearInterval(timer); _reasoningTimers.delete(block); }
+  _setReasoningLabel(block, "Thought");
+  const header = block.querySelector(".reasoning-header");
+  if (header) header.setAttribute("aria-expanded", "false");
+  // After reasoning completes, auto-collapse (Claude-style). The user can
+  // click to re-expand. Skip auto-collapse if user has already manually
+  // collapsed or expanded (signaled by the `is-user-toggled` class).
+  if (!block.classList.contains("is-user-toggled")) {
+    // Small delay so the user briefly sees the "Done" state before
+    // the panel collapses.
+    setTimeout(() => {
+      if (!block.classList.contains("is-user-toggled")) {
+        block.classList.remove("is-expanded");
+      }
+    }, 350);
+  }
+}
+function toggleReasoningBlock(headerEl) {
+  const block = headerEl?.closest(".reasoning-block");
+  if (!block) return;
+  block.classList.toggle("is-expanded");
+  block.classList.add("is-user-toggled");
+  const isExpanded = block.classList.contains("is-expanded");
+  headerEl.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+}
 function appendAIMessageDOM(text, msgId, streaming = false) {
   const typingEl = $("typingIndicator");
   const div = document.createElement("div");
@@ -2287,7 +2406,33 @@ async function handleSend(opts) {
   let continueCount = 0;
   let continueEl = null;
   let _groundingMetadata = null;
+  let _reasoningText = "";
+  let _reasoningBlock = null;
+  let _reasoningDone = false;
+  const _markReasoningDoneOnce = () => {
+    if (_reasoningDone) return;
+    _reasoningDone = true;
+    if (_reasoningBlock) markReasoningDone(_reasoningBlock);
+  };
+  _streamOpts.onReasoningChunk = (chunk) => {
+    // First reasoning chunk creates the message bubble early (typing
+    // indicator hides) and the reasoning panel — same UX Claude / o1 use
+    // where the "Thinking…" block appears before any answer text streams.
+    if (!aiDiv) {
+      typingEl.style.display = "none";
+      aiDiv = appendAIMessageDOM("", msgId, true);
+      textEl = aiDiv.querySelector(".message-text");
+      textEl.classList.add("stream-reveal");
+    }
+    if (!_reasoningBlock) _reasoningBlock = createReasoningBlock(aiDiv);
+    _reasoningText += chunk;
+    appendReasoningToBlock(_reasoningBlock, chunk);
+    scrollToBottom();
+  };
   const _doStream = async (h) => streamEmeraldBot(h, apiKey, (chunk) => {
+    // First non-thought chunk means reasoning phase is over → flip the
+    // reasoning block to "Done" (auto-collapses shortly after).
+    _markReasoningDoneOnce();
     fullText += chunk;
     if (!aiDiv) {
       typingEl.style.display = "none";
@@ -2364,6 +2509,10 @@ async function handleSend(opts) {
     }
   }
   typingEl.style.display = "none";
+  // Stream ended — flip the reasoning panel to "Done" (if one exists).
+  // Important for the case where the model produced reasoning but no
+  // answer text (e.g. error / abort before first answer chunk).
+  _markReasoningDoneOnce();
   if (!fullText && !aiDiv) {
     aiDiv = appendAIMessageDOM("", msgId, true);
     textEl = aiDiv.querySelector(".message-text");
@@ -2447,7 +2596,11 @@ async function handleSend(opts) {
         quizData: quizData || void 0,
         quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
         quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
-        imagePrompt: _imgPrompt || void 0
+        imagePrompt: _imgPrompt || void 0,
+        // Persist the reasoning text so the collapsible "Reasoning" panel
+        // can be re-rendered on page reload. Stored separately from `text`
+        // so buildHistory never sends reasoning back to Gemini.
+        reasoning: _reasoningText || void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -2625,8 +2778,17 @@ async function regenerateMessage(msgEl) {
   let fullText = "";
   let _usedModelId = "";
   let _usedModelName = "";
+  let _reasoningText = "";
+  let _reasoningBlock = null;
+  let _reasoningDone = false;
+  const _markReasoningDoneOnce = () => {
+    if (_reasoningDone) return;
+    _reasoningDone = true;
+    if (_reasoningBlock) markReasoningDone(_reasoningBlock);
+  };
   try {
     const _streamResult = await streamEmeraldBot(history, apiKey, (chunk) => {
+      _markReasoningDoneOnce();
       fullText += chunk;
       if (!aiDiv) {
         rTypingEl.style.display = "none";
@@ -2638,7 +2800,22 @@ async function regenerateMessage(msgEl) {
       textEl.innerHTML = (_sd.text ? renderMarkdown(_sd.text) : "") + (_sd.quizStarted ? quizLoadingCardHTML() : '<span class="stream-cursor" aria-hidden="true"></span>');
       _wrapStreamWords(textEl);
       scrollToBottom();
-    }, { useUrlContext: _urlsInMsg.length > 0, userText: _lastUserText });
+    }, {
+      useUrlContext: _urlsInMsg.length > 0,
+      userText: _lastUserText,
+      onReasoningChunk: (chunk) => {
+        if (!aiDiv) {
+          rTypingEl.style.display = "none";
+          aiDiv = appendAIMessageDOM("", newId, true);
+          textEl = aiDiv.querySelector(".message-text");
+          textEl.classList.add("stream-reveal");
+        }
+        if (!_reasoningBlock) _reasoningBlock = createReasoningBlock(aiDiv);
+        _reasoningText += chunk;
+        appendReasoningToBlock(_reasoningBlock, chunk);
+        scrollToBottom();
+      }
+    });
     _groundingMetadata = _streamResult.groundingMetadata;
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
@@ -2656,6 +2833,7 @@ async function regenerateMessage(msgEl) {
     }
   }
   rTypingEl.style.display = "none";
+  _markReasoningDoneOnce();
   if (!fullText && !aiDiv) {
     aiDiv = appendAIMessageDOM("", newId, true);
     textEl = aiDiv.querySelector(".message-text");
@@ -2739,7 +2917,8 @@ async function regenerateMessage(msgEl) {
       quizData: quizData || void 0,
       quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
       quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
-      imagePrompt: imgPrompt || void 0
+      imagePrompt: imgPrompt || void 0,
+      reasoning: _reasoningText || void 0
     };
     aiDiv.dataset.regenBranchRef = regenBranchId;
     conv.messages.push(savedMsg);
@@ -2899,7 +3078,18 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
           const candidate = json.candidates?.[0];
           if (candidate?.content?.parts) {
             for (const part of candidate.content.parts) {
-              if (part.text) onChunk(part.text);
+              // Gemini tags reasoning tokens with `thought: true` when
+              // thinkingConfig.includeThoughts is on (worker.js relays them
+              // unchanged). Route them to a separate onReasoningChunk callback
+              // so the UI can render them inside the collapsible "Reasoning"
+              // panel above the answer, instead of mixing them into the answer.
+              if (part.thought === true) {
+                if (part.text && typeof options.onReasoningChunk === "function") {
+                  options.onReasoningChunk(part.text);
+                }
+              } else if (part.text) {
+                onChunk(part.text);
+              }
             }
           }
           if (candidate?.finishReason) {
@@ -4011,6 +4201,17 @@ function appendStoredAIMessage(m) {
       <div class="message-sender">EmeraldBot</div>
       <div class="message-text md-content"${_initText ? "" : ' style="display:none"'}>${_initHTML}</div>
     </div>`;
+  // Re-render persisted reasoning (collapsed by default — the model has
+  // already finished thinking). Stored separately from `text` so it never
+  // gets sent back to Gemini in buildHistory.
+  if (m.reasoning && typeof m.reasoning === "string" && m.reasoning.trim()) {
+    const _rb = document.createElement("div");
+    _rb.innerHTML = reasoningBlockHTML(true);
+    const block = _rb.firstElementChild;
+    block.querySelector(".reasoning-text").innerHTML = renderMarkdown(m.reasoning);
+    block.dataset.reasoningRaw = m.reasoning;
+    div.querySelector(".message-text").insertAdjacentElement("beforebegin", block);
+  }
   if (hasMemory) {
     const badge = document.createElement("div");
     badge.className = "memory-badge";
@@ -4433,8 +4634,17 @@ async function submitUserMsgEdit(msgId) {
   const aiMsgId = genId();
   let aiDiv = null, aiTextEl = null, aiFullText = "";
   let _usedModelId = "", _usedModelName = "";
+  let _reasoningText = "";
+  let _reasoningBlock = null;
+  let _reasoningDone = false;
+  const _markReasoningDoneOnce = () => {
+    if (_reasoningDone) return;
+    _reasoningDone = true;
+    if (_reasoningBlock) markReasoningDone(_reasoningBlock);
+  };
   try {
     const _streamResult = await streamEmeraldBot(history, apiKey, (chunk) => {
+      _markReasoningDoneOnce();
       aiFullText += chunk;
       if (!aiDiv) {
         typingEl.style.display = "none";
@@ -4446,7 +4656,22 @@ async function submitUserMsgEdit(msgId) {
       aiTextEl.innerHTML = (_sd.text ? renderMarkdown(_sd.text) : "") + (_sd.quizStarted ? quizLoadingCardHTML() : '<span class="stream-cursor" aria-hidden="true"></span>');
       _wrapStreamWords(aiTextEl);
       scrollToBottom();
-    }, { useUrlContext: _urlsInMsg.length > 0, userText: newText });
+    }, {
+      useUrlContext: _urlsInMsg.length > 0,
+      userText: newText,
+      onReasoningChunk: (chunk) => {
+        if (!aiDiv) {
+          typingEl.style.display = "none";
+          aiDiv = appendAIMessageDOM("", aiMsgId, true);
+          aiTextEl = aiDiv.querySelector(".message-text");
+          aiTextEl.classList.add("stream-reveal");
+        }
+        if (!_reasoningBlock) _reasoningBlock = createReasoningBlock(aiDiv);
+        _reasoningText += chunk;
+        appendReasoningToBlock(_reasoningBlock, chunk);
+        scrollToBottom();
+      }
+    });
     _groundingMetadata = _streamResult.groundingMetadata;
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
@@ -4479,6 +4704,7 @@ async function submitUserMsgEdit(msgId) {
     }
   }
   typingEl.style.display = "none";
+  _markReasoningDoneOnce();
   if (!aiFullText && !aiDiv) {
     aiDiv = appendAIMessageDOM("", aiMsgId, true);
     aiTextEl = aiDiv.querySelector(".message-text");
@@ -4561,7 +4787,8 @@ async function submitUserMsgEdit(msgId) {
         quizData: quizData || void 0,
         quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
         quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
-        imagePrompt: imgPrompt || void 0
+        imagePrompt: imgPrompt || void 0,
+        reasoning: _reasoningText || void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -5258,6 +5485,7 @@ try {
   if (typeof submitUserMsgEdit !== "undefined" && typeof window.submitUserMsgEdit === "undefined") window.submitUserMsgEdit = submitUserMsgEdit;
   if (typeof toggleModelDropdown !== "undefined" && typeof window.toggleModelDropdown === "undefined") window.toggleModelDropdown = toggleModelDropdown;
   if (typeof togglePreviewConsole !== "undefined" && typeof window.togglePreviewConsole === "undefined") window.togglePreviewConsole = togglePreviewConsole;
+  if (typeof toggleReasoningBlock !== "undefined" && typeof window.toggleReasoningBlock === "undefined") window.toggleReasoningBlock = toggleReasoningBlock;
   if (typeof toggleTempChat !== "undefined" && typeof window.toggleTempChat === "undefined") window.toggleTempChat = toggleTempChat;
   if (typeof typingIndicatorHTML !== "undefined" && typeof window.typingIndicatorHTML === "undefined") window.typingIndicatorHTML = typingIndicatorHTML;
   if (typeof updateBranchNavDOM !== "undefined" && typeof window.updateBranchNavDOM === "undefined") window.updateBranchNavDOM = updateBranchNavDOM;
