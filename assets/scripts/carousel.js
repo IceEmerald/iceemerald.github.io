@@ -96,7 +96,7 @@ window.addEventListener('load', function () {
         });
     }
 
-    var base = '/assets/images/news/news';
+    var base = '/assets/images/ui/news/news';
 
     function addNewsItem(imgSrc) {
         var img       = document.createElement('img');
