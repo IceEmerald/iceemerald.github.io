@@ -728,9 +728,26 @@ body.light-mode .model-dropdown-other-list {
         max-width: calc(-24px + 100vw);
     }
 
+    /* Mobile-only: drop the 'Other Models' hover trigger entirely and
+       render the secondary models inline below the primary list. Touch
+       devices cannot hover, so the desktop flyout pattern leaves a big
+       blank gap below 'Other Models' until the user taps it. Showing the
+       other models directly removes that gap with no expansion state.
+       PC (hover-flyout) behaviour is untouched because this whole block
+       is scoped to max-width: 640px. */
+    .model-dropdown-other {
+        position: static;
+    }
+
+    .model-dropdown-other-btn {
+        display: none;
+    }
+
     .model-dropdown-other-list {
         position: static;
-        margin-top: 4px;
+        margin-top: 0;
+        min-width: 0;
+        max-width: none;
         box-shadow: none;
         border-width: medium;
         border-style: none;
@@ -738,10 +755,23 @@ body.light-mode .model-dropdown-other-list {
         border-image: none;
         padding: 0px;
         background: transparent;
+        /* Force visible - overrides the default opacity:0 / visibility:hidden
+           that powers the desktop hover-flyout. Without this, the list still
+           occupies layout space on mobile while staying invisible, which is
+           exactly the blank-gap bug users see. */
+        opacity: 1;
+        visibility: visible;
         transform: none;
+        transition: none;
     }
 
-    .model-dropdown-other:hover > .model-dropdown-other-list, .model-dropdown-other:focus-within > .model-dropdown-other-list, .model-dropdown-other.is-expanded > .model-dropdown-other-list {
+    /* Neutralise the hover/focus/expanded pseudo-states on mobile so they
+       cannot re-hide or transform the now-always-visible list. */
+    .model-dropdown-other:hover > .model-dropdown-other-list,
+    .model-dropdown-other:focus-within > .model-dropdown-other-list,
+    .model-dropdown-other.is-expanded > .model-dropdown-other-list {
+        opacity: 1;
+        visibility: visible;
         transform: none;
     }
 }
