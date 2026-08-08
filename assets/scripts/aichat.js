@@ -1481,22 +1481,51 @@ function updateTopbarTitle(title) {
 function renderSidebar() {
   renderRecents();
 }
+function _categorizeByTime(convs) {
+  const now = new Date();
+  const today    = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const lastWeek  = new Date(today.getTime() - 7 * 86400000);
+  const lastMonth = new Date(today.getTime() - 30 * 86400000);
+  const groups = [
+    { label: "Today",        test: (d) => d >= today },
+    { label: "Yesterday",    test: (d) => d >= yesterday },
+    { label: "Last 7 Days",  test: (d) => d >= lastWeek },
+    { label: "Last 30 Days", test: (d) => d >= lastMonth },
+    { label: "Older",        test: () => true },
+  ];
+  const result = [];
+  const assigned = new Set();
+  for (const g of groups) {
+    const items = convs.filter((c) => {
+      if (assigned.has(c.id)) return false;
+      const ts = c.updatedAt || c.createdAt || 0;
+      if (g.test(new Date(ts))) { assigned.add(c.id); return true; }
+      return false;
+    });
+    if (items.length) result.push({ label: g.label, items });
+  }
+  return result;
+}
 function renderRecents() {
   const container = $("sidebarHistory");
   if (!container) return;
   const convs = loadConvs().filter((c) => !c.isTemp);
-  const recent = convs.slice(0, 30);
-  if (recent.length === 0) {
+  if (convs.length === 0) {
     container.innerHTML = `<div class="sidebar-section-title">Recents</div><div class="sidebar-empty">No conversations yet</div>`;
     return;
   }
-  container.innerHTML = `<div class="sidebar-section-title">Recents</div>` + recent.map((c) => `
+  const groups = _categorizeByTime(convs);
+  const itemHTML = (c) => `
     <div class="history-item${state.convId === c.id ? " active" : ""}" 
          data-conv-id="${escapeHtmlAttr(c.id)}" 
          onclick="loadConversation('${escapeHtmlAttr(c.id)}')">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
       <span class="history-item-text">${escapeHtml(c.title || "Untitled")}</span>
-    </div>`).join("");
+    </div>`;
+  container.innerHTML = groups.map((g) =>
+    `<div class="sidebar-time-group">${g.label}</div>` + g.items.map(itemHTML).join("")
+  ).join("");
 }
 function loadConversation(id) {
   const conv = getConv(id);

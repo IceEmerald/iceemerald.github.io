@@ -240,6 +240,28 @@ body {
     opacity: 0;
 }
 
+.sidebar-time-group {
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: rgb(120, 120, 120);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 14px 10px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: opacity 0.18s;
+}
+
+.sidebar.collapsed .sidebar-time-group {
+    opacity: 0;
+}
+
+body.light-mode .sidebar-time-group {
+    color: rgb(140, 140, 140);
+}
+
+
 .sidebar-history {
     flex: 1 1 0%;
     overflow-y: auto;
