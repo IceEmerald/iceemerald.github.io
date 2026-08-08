@@ -3409,7 +3409,7 @@ body.light-mode .disclaimer {
 }
 
 body.light-mode .msg-file-card {
-    background: #ececec;
+    background: #ffffff;
     border-color: #ddd;
     color: #444;
 }
@@ -3511,7 +3511,7 @@ body.light-mode .icon-btn:hover {
 
 body.light-mode .message-text.user-text {
     background: #ffffff;
-    border: 1px solid #cdcdcd;
+    border: 1px solid #ddd;
     border-radius: 12px;
     padding: 11px 15px;
     color: #1a1a1a;
