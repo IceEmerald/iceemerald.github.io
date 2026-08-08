@@ -56,11 +56,11 @@ html {
     scrollbar-gutter: auto;
 }
 
-.notes-app * {
+.slides-app * {
     box-sizing: border-box;
 }
 
-.notes-app {
+.slides-app {
     position: relative;
     z-index: 1;
     font-family: "DM Sans", sans-serif;
@@ -74,7 +74,7 @@ html {
     opacity: 1 !important;
 }
 
-.notes-header {
+.slides-header {
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(3px);
     color: rgb(44, 62, 80);
@@ -2020,7 +2020,7 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
 }
 
 @media (max-width: 1023px) {
-    .notes-app {
+    .slides-app {
         overflow: hidden;
         position: relative;
     }
@@ -2483,7 +2483,7 @@ body.collab-non-owner #exportNoteBtn, body.collab-non-owner #deleteNoteBtn, body
 }
 
 @media (max-width: 1023px) {
-    .notes-app, .notes-header, .ribbon, .ribbon-btn, .sidebar, .sidebar-toggle, .sidebar-header, .new-note-btn, .note-item, .editor-area, .editor-header, .action-btn, .action-btntwo, .ms-dropdown-btn, .ms-dropdown-menu, .mobile-more-panel, .welcome-btn, .font-family, .font-size, .delete-modal-content, .table-modal-content, .link-modal-content {
+    .slides-app, .slides-header, .ribbon, .ribbon-btn, .sidebar, .sidebar-toggle, .sidebar-header, .new-note-btn, .note-item, .editor-area, .editor-header, .action-btn, .action-btntwo, .ms-dropdown-btn, .ms-dropdown-menu, .mobile-more-panel, .welcome-btn, .font-family, .font-size, .delete-modal-content, .table-modal-content, .link-modal-content {
         backdrop-filter: none !important;
     }
 

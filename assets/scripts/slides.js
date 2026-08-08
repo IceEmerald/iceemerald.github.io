@@ -1,6 +1,6 @@
 /* ============================================================
    EmeraldSuite Slides — Professional Presentation Engine
-   SlidesApp class — complete replacement for the notes-based editor
+   SlidesApp class — presentation editor for slide decks
    ============================================================ */
 
 'use strict';
