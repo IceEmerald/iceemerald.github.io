@@ -6525,7 +6525,7 @@ body.light-mode .ws-searching-badge {
     --rs-chevron: #8a8a8a;
     --rs-hover: rgba(255, 255, 255, 0.04);
     font-family: "DM Sans", sans-serif;
-    margin: 8px 0px 0px 0px;
+    margin: 8px 0px 8px 0px;
     padding-left: 14px;
     position: relative;
     transition: opacity 0.2s;
