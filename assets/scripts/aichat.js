@@ -1,4 +1,5 @@
 const CHAT_WORKER_URL = "https://emeraldnetwork-aichatserver.iceemerald.workers.dev";
+const IMAGE_SEARCH_URL = CHAT_WORKER_URL + "/image-search";
 const EMERALDBOT_API = "worker";
 const DISPLAY_MODEL = "EmeraldCore";
 (function _installConsoleNoiseFilter() {
@@ -714,7 +715,7 @@ function setupMarked() {
         const raw = typeof c === "object" ? c.text ?? "" : String(c ?? "");
         try {
           const inline = marked.parseInline(raw);
-          return typeof DOMPurify !== "undefined" ? DOMPurify.sanitize(inline, { ADD_ATTR: ["target"] }) : inline;
+          return typeof DOMPurify !== "undefined" ? DOMPurify.sanitize(inline, { ADD_ATTR: ["target", "loading", "referrerpolicy", "onerror", "onload", "data-web-img"] }) : inline;
         } catch {
           return escapeHtml(raw);
         }
@@ -757,6 +758,20 @@ function renderMarkdown(raw) {
   let text = raw;
   text = text.replace(/<quiz>[\s\S]*?<\/quiz>/g, "");
   text = text.replace(/<quiz>[\s\S]*$/g, "");
+  // Convert [IMAGE: url] tags to inline image HTML before markdown processing.
+  // This ensures images render inline in the chat like ChatGPT, not as raw text.
+  const webImageBlocks = [];
+  text = text.replace(/\[IMAGE:\s*([^\]]+)\]/gi, (_, url) => {
+    const cleanUrl = url.trim();
+    const i = webImageBlocks.push({ type: 'url', value: cleanUrl }) - 1;
+    return `WEBIMAGE${i}WEBIMAGE`;
+  });
+  // Also convert [IMAGE_SEARCH: query] tags - these will be processed client-side
+  text = text.replace(/\[IMAGE_SEARCH:\s*([^\]]+)\]/gi, (_, query) => {
+    const cleanQuery = query.trim();
+    const i = webImageBlocks.push({ type: 'search', value: cleanQuery }) - 1;
+    return `WEBIMAGE${i}WEBIMAGE`;
+  });
   const codeBlocks = [];
   text = text.replace(/(```[\s\S]*?```|`[^`\n]+`)/g, (m) => {
     const i = codeBlocks.push(m) - 1;
@@ -774,8 +789,21 @@ function renderMarkdown(raw) {
   text = text.replace(/\x02CODEBLOCK(\d+)\x02/g, (_, i) => codeBlocks[+i]);
   let html = marked.parse(text);
   if (typeof DOMPurify !== "undefined") {
-    html = DOMPurify.sanitize(html, { ADD_ATTR: ["target"] });
+    html = DOMPurify.sanitize(html, { ADD_ATTR: ["target", "loading", "referrerpolicy", "onerror", "onload", "data-web-img"] });
   }
+  // Re-insert web image HTML after DOMPurify (img is allowed by default)
+  html = html.replace(/WEBIMAGE(\d+)WEBIMAGE/g, (_, i) => {
+    const imgData = webImageBlocks[+i];
+    if (!imgData) return '';
+    if (imgData.type === 'search') {
+      // [IMAGE_SEARCH: query] - show loading placeholder, will be filled by JS
+      const safeQuery = escapeHtmlAttr(imgData.value);
+      return `<div class="web-image-result web-image-searching" data-img-search="${safeQuery}"><div class="web-image-search-spinner"></div><span class="web-image-search-text">Searching for "${safeQuery}"...</span></div>`;
+    }
+    // [IMAGE: url] - direct URL
+    const safeUrl = escapeHtmlAttr(imgData.value);
+    return `<div class="web-image-result" data-web-img="1"><img class="web-image" src="${safeUrl}" alt="Image" loading="lazy"></div>`;
+  });
   html = html.replace(/MATHBLOCK(\d+)MATHBLOCK/g, (_, i) => {
     try {
       return typeof katex !== "undefined" ? `<div class="md-math-block">${katex.renderToString(mathBlocks[i].src, { throwOnError: false, displayMode: true })}</div>` : `<pre>$$${mathBlocks[i].src}$$</pre>`;
@@ -796,6 +824,8 @@ function _streamDisplayText(raw) {
   let t = String(raw || "");
   t = t.replace(/\[MEMORY:[^\]]*\]?/g, "");
   t = t.replace(/\[GENERATE_IMAGE:[^\]]*\]?/g, "");
+  t = t.replace(/\[IMAGE:\s*[^\]]+\]/g, "");
+  t = t.replace(/\[IMAGE_SEARCH:\s*[^\]]+\]/g, "");
   t = _stripThinkingPreamble(t);
   const quizIdx = t.indexOf("<quiz>");
   if (quizIdx >= 0) {
@@ -2577,7 +2607,10 @@ async function handleSend(opts) {
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
-    if (_allSources.length) renderCitations(aiDiv, _allSources);
+    if (_allSources.length) {
+      renderCitations(aiDiv, _allSources);
+      _stripSourcesFromHTML(textEl); // Remove AI-written Sources: list (pills already show them)
+    }
     aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(msgId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
@@ -2613,6 +2646,8 @@ async function handleSend(opts) {
     if (_imgPrompt) {
       processImageGenTag(aiDiv, _imgPrompt, state.convId, msgId);
     }
+    // Always process [IMAGE_SEARCH:] tags regardless of [GENERATE_IMAGE:]
+    processImageSearchTags(aiDiv, state.convId, msgId);
   } else if (aiDiv && textEl) {
     // No text came back (request error / cancellation / empty response).
     // Persist the error so it survives a page reload instead of vanishing.
@@ -2641,7 +2676,7 @@ function buildHistory(conv) {
     const msgs = allMsgs.slice(-HISTORY_MAX_MSGS).map((m, idx, arr) => {
       let text = m.text || "";
       text = text.replace(/<quiz>[\s\S]*?<\/quiz>/g, "[A quiz was provided here]");
-      text = text.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").trim();
+      text = text.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").replace(/\[IMAGE:\s*[^\]]+\]/g, "").replace(/\[IMAGE_SEARCH:\s*[^\]]+\]/g, "").trim();
       if (m.imagePrompt) {
         text += `
 [An image was generated and shown to the user for this prompt: "${m.imagePrompt}"]`;
@@ -2898,7 +2933,10 @@ async function regenerateMessage(msgEl) {
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
-    if (_allSources.length) renderCitations(aiDiv, _allSources);
+    if (_allSources.length) {
+      renderCitations(aiDiv, _allSources);
+      _stripSourcesFromHTML(textEl);
+    }
     aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(newId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
@@ -4161,6 +4199,22 @@ function clearAllChats() {
   closeModal("settingsModal");
   showToast("\u2713 All chats & memories cleared");
 }
+/* ── Render cached image search results (from IndexedDB) without re-fetching ── */
+function _renderCachedImageSearchResults(aiDiv, cacheMap) {
+  if (!cacheMap || typeof cacheMap !== 'object') return;
+  // For each [IMAGE_SEARCH:] placeholder, look up its cached result by query
+  const placeholders = aiDiv.querySelectorAll(".web-image-searching");
+  placeholders.forEach(el => {
+    const query = el.dataset.imgSearch;
+    if (query && cacheMap[query]) {
+      const { url, alt } = cacheMap[query];
+      el.classList.remove("web-image-searching");
+      el.classList.add("web-image-loaded");
+      el.dataset.webImg = "1";
+      el.innerHTML = '<img class="web-image" src="' + escapeHtmlAttr(url) + '" alt="' + escapeHtmlAttr(alt || "Image") + '" loading="lazy">';
+    }
+  });
+}
 function appendStoredAIMessage(m) {
   const rawText = m.text || "";
   let displayText = rawText.replace(/\[MEMORY:\s*[^\]]+\]/g, "").replace(/\[GENERATE_IMAGE:\s*[^\]]+\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
@@ -4261,6 +4315,13 @@ function appendStoredAIMessage(m) {
   }
   const typingEl = $("typingIndicator");
   $("messagesArea").insertBefore(div, typingEl);
+  // ── Render image search results: use cached results if available (stable on reload) ──
+  if (m.imageSearchCache && Object.keys(m.imageSearchCache).length) {
+    _renderCachedImageSearchResults(div, m.imageSearchCache);
+  } else {
+    // First time or no cached results → fetch from API and cache
+    processImageSearchTags(div, state.convId, m.id);
+  }
   return div;
 }
 function _extractQuiz(text) {
@@ -4768,7 +4829,10 @@ async function submitUserMsgEdit(msgId) {
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
-    if (_allSources.length) renderCitations(aiDiv, _allSources);
+    if (_allSources.length) {
+      renderCitations(aiDiv, _allSources);
+      _stripSourcesFromHTML(textEl);
+    }
     aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(aiMsgId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
@@ -5185,6 +5249,40 @@ ${(dp.content || "").slice(0, 3e3)}
   }
   return { contextText, sources };
 }
+/* Strip AI-written "Sources:" section from rendered HTML when grounding pills exist */
+function _stripSourcesFromHTML(textEl) {
+  if (!textEl) return;
+  // Look for the last <strong>/<b> containing "Sources" followed by a list or paragraph
+  const strongs = textEl.querySelectorAll("strong, b");
+  for (let i = strongs.length - 1; i >= 0; i--) {
+    const txt = strongs[i].textContent.trim().replace(/[\s:：]/g, "").toLowerCase();
+    if (txt === "sources" || txt === "source" || txt === "references" || txt === "reference") {
+      // Found a "Sources" header — remove it and everything after it
+      let node = strongs[i];
+      // Check if it's inside a heading (h1-h6) or paragraph
+      const parent = node.closest("h1,h2,h3,h4,h5,h6,p,li");
+      const removeStart = parent || node;
+      // Remove removeStart and all following siblings
+      while (removeStart.nextSibling) removeStart.nextSibling.remove();
+      removeStart.remove();
+      return;
+    }
+  }
+  // Also check for "Sources:" as plain text in an <ol> or <ul>
+  const lists = textEl.querySelectorAll("ol, ul");
+  for (let i = lists.length - 1; i >= 0; i--) {
+    const prev = lists[i].previousElementSibling;
+    if (prev && (prev.closest("strong,b") || prev.tagName.match(/^H[1-6]$/))) {
+      const prevTxt = prev.textContent.trim().replace(/[\s:：]/g, "").toLowerCase();
+      if (prevTxt === "sources" || prevTxt === "references") {
+        prev.remove();
+        lists[i].remove();
+        return;
+      }
+    }
+  }
+}
+
 function renderCitations(aiDiv, sources) {
   if (!sources?.length) return;
   const body = aiDiv?.querySelector(".message-body");
@@ -5315,6 +5413,188 @@ async function processImageGenTag(aiDiv, prompt, convId, msgId) {
   scrollToBottom();
 }
 
+function processWebImageTags(aiDiv, displayText) {
+  const body = aiDiv?.querySelector(".message-body");
+  if (!body) return displayText;
+  const imgMatches = [...displayText.matchAll(/\[IMAGE:\s*([^\]]+)\]/gi)];
+  if (!imgMatches.length) return displayText;
+  let cleanText = displayText.replace(/\[IMAGE:\s*[^\]]+\]/gi, "").replace(/\n{3,}/g, "\n\n").trim();
+  const container = document.createElement("div");
+  container.className = "web-image-gallery";
+  for (const match of imgMatches) {
+    const url = match[1].trim();
+    if (!url) continue;
+    const wrapper = document.createElement("div");
+    wrapper.className = "web-image-result";
+    const img = document.createElement("img");
+    img.className = "web-image";
+    img.src = url;
+    img.alt = "Image";
+    img.loading = "lazy";
+    wrapper.dataset.webImg = "1";
+    wrapper.appendChild(img);
+    container.appendChild(wrapper);
+  }
+  insertBeforeMessageActions(body, container);
+  return cleanText;
+}
+
+
+/* ── Image Search: Fetch real images from the image search API ── */
+async function processImageSearchTags(aiDiv, convId, msgId) {
+  const searchingEls = aiDiv?.querySelectorAll(".web-image-searching");
+  if (!searchingEls || !searchingEls.length) return;
+
+  // Process all image searches in parallel, each placeholder independently
+  const results = await Promise.allSettled(Array.from(searchingEls).map(async (el) => {
+    const query = el.dataset.imgSearch;
+    if (!query) return { el, img: null };
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const res = await fetch(IMAGE_SEARCH_URL + "?q=" + encodeURIComponent(query) + "&count=1", { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) return { el, img: null };
+      const data = await res.json();
+      if (!data.images || !data.images.length) return { el, img: null };
+      return { el, img: data.images[0], query };
+    } catch {
+      return { el, img: null };
+    }
+  }));
+
+  // Collect successful and failed results
+  const good = results.filter(r => r.status === 'fulfilled' && r.value?.img).map(r => r.value);
+  const bad = results.filter(r => r.status === 'fulfilled' && !r.value?.img).map(r => r.value?.el).filter(Boolean);
+
+  // Mark failed — each stays in place with error state (visible placeholder)
+  for (const el of bad) {
+    el.classList.remove("web-image-searching");
+    el.classList.add("web-image-failed");
+  }
+  if (!good.length) return;
+
+  // ── Place each image inline at its own placeholder position ──
+  // No gallery grouping — each [IMAGE_SEARCH:] tag gets its own image right where it appears
+  for (const { el, img, query } of good) {
+    el.classList.remove("web-image-searching");
+    el.classList.add("web-image-loaded");
+    el.dataset.webImg = "1";
+    el.innerHTML = '<img class="web-image" src="' + escapeHtmlAttr(img.url) + '" alt="' + escapeHtmlAttr(img.alt || query) + '" loading="lazy">';
+  }
+  scrollToBottom();
+
+  // ── Persist image search results to IndexedDB so they survive reload ──
+  // Store results indexed by query so each can be matched back to its placeholder on reload
+  if (convId && msgId) {
+    try {
+      const convArr = loadConvs();
+      const convObj = convArr.find((c) => c.id === convId);
+      if (convObj) {
+        const savedMsg = convObj.messages.find((m) => m.id === msgId);
+        if (savedMsg) {
+          // Build a map: query → {url, alt} so each placeholder can find its cached result
+          const cacheMap = {};
+          for (const { img, query } of good) {
+            cacheMap[query] = { url: img.url, alt: img.alt || query };
+          }
+          // Merge with any existing cached results (preserve results from other placeholders)
+          if (!savedMsg.imageSearchCache) savedMsg.imageSearchCache = {};
+          Object.assign(savedMsg.imageSearchCache, cacheMap);
+          upsertConv(convObj);
+        }
+      }
+    } catch (e) {
+      console.warn("[ImageSearch] Failed to cache results:", e);
+    }
+  }
+}
+/* ── Web Image Preview (right-side panel) + load/error delegation ── */
+function _openImagePreviewPanel(src, name) {
+  if (typeof closeCodePreviewPanel === "function") closeCodePreviewPanel();
+  if (typeof closeQuizPanel === "function") closeQuizPanel();
+  const panel = document.getElementById("filePreviewPanel");
+  const body = document.getElementById("fpPanelBody");
+  const title = document.getElementById("fpPanelTitle");
+  if (!panel || !body) { window.open(src, "_blank"); return; }
+  if (title) title.textContent = name || "Image Preview";
+  if (typeof _fpZoom !== "undefined") { _fpZoom = 1; }
+  if (typeof _fpUpdateZoomLabel === "function") _fpUpdateZoomLabel();
+  if (typeof _fpCurrentFid !== "undefined") { _fpCurrentFid = null; }
+  body.innerHTML = '<div class="fp-img-wrap"><img src="' + src + '" alt="' + (name || "Image") + '" id="fpImgEl" style="transform-origin:top center; max-width:100%; border-radius:8px;"></div>';
+  panel.classList.add("open");
+  if (typeof _fpApplyZoom === "function") _fpApplyZoom();
+}
+/* Image load/error event delegation using data-web-img attribute.
+   This avoids inline on* handlers that DOMPurify strips. */
+document.addEventListener("load", function(e) {
+  if (e.target && e.target.classList && e.target.classList.contains("web-image")) {
+    const parent = e.target.parentNode;
+    if (parent) parent.classList.add("web-image-loaded");
+  }
+}, true);  /* capture phase to catch load before it bubbles */
+document.addEventListener("error", function(e) {
+  if (e.target && e.target.classList && e.target.classList.contains("web-image")) {
+    const parent = e.target.parentNode;
+    if (parent) {
+      parent.classList.remove("web-image-loaded");
+      parent.classList.add("web-image-failed");
+    }
+  }
+}, true);  /* capture phase */
+/* Click handler: open image in right-side preview panel, or retry failed images */
+document.addEventListener("click", function(e) {
+  /* Retry failed web images on click */
+  const failedResult = e.target.closest(".web-image-result.web-image-failed");
+  if (failedResult) {
+    e.preventDefault();
+    const img = failedResult.querySelector(".web-image");
+    if (img && img.src) {
+      /* Retry loading the same URL */
+      failedResult.classList.remove("web-image-failed");
+      failedResult.classList.add("web-image-loaded");
+      const retrySrc = img.src;
+      img.src = "";
+      img.src = retrySrc;
+    } else if (failedResult.dataset.imgSearch) {
+      /* Retry image search for this query */
+      const query = failedResult.dataset.imgSearch;
+      failedResult.classList.remove("web-image-failed");
+      failedResult.classList.add("web-image-searching");
+      failedResult.innerHTML = '<div class="web-image-search-spinner"></div><span class="web-image-search-text">Searching for "' + escapeHtmlAttr(query) + '"...</span>';
+      const msgDiv = failedResult.closest(".message");
+      const retryMsgId = msgDiv?.dataset?.msgId;
+      processImageSearchTags(msgDiv, state.convId, retryMsgId);
+    }
+    return;
+  }
+  /* Click on the image itself, or on the error/result container */
+  const webResult = e.target.closest(".web-image-result");
+  if (webResult) {
+    const img = webResult.querySelector(".web-image");
+    if (img && img.src) {
+      e.preventDefault();
+      _openImagePreviewPanel(img.src, "Web Image");
+      return;
+    }
+  }
+  /* Also handle generated images */
+  const genImg = e.target.closest(".img-gen-image");
+  if (genImg && genImg.src) {
+    e.preventDefault();
+    _openImagePreviewPanel(genImg.src, "Generated Image");
+  }
+  /* Also handle img-gen-result container */
+  const genResult = e.target.closest(".img-gen-result");
+  if (genResult) {
+    const img = genResult.querySelector(".img-gen-image");
+    if (img && img.src) {
+      e.preventDefault();
+      _openImagePreviewPanel(img.src, "Generated Image");
+    }
+  }
+});
+
 try {
   if (typeof _cryptoInt !== "undefined" && typeof window._cryptoInt === "undefined") window._cryptoInt = _cryptoInt;
   if (typeof _docxEl !== "undefined" && typeof window._docxEl === "undefined") window._docxEl = _docxEl;
@@ -5434,6 +5714,8 @@ try {
   if (typeof positionMenu !== "undefined" && typeof window.positionMenu === "undefined") window.positionMenu = positionMenu;
   if (typeof processFileForAttachment !== "undefined" && typeof window.processFileForAttachment === "undefined") window.processFileForAttachment = processFileForAttachment;
   if (typeof processImageGenTag !== "undefined" && typeof window.processImageGenTag === "undefined") window.processImageGenTag = processImageGenTag;
+  if (typeof processWebImageTags !== "undefined" && typeof window.processWebImageTags === "undefined") window.processWebImageTags = processWebImageTags;
+  if (typeof processImageSearchTags !== "undefined" && typeof window.processImageSearchTags === "undefined") window.processImageSearchTags = processImageSearchTags;
   if (typeof proxySearch !== "undefined" && typeof window.proxySearch === "undefined") window.proxySearch = proxySearch;
   if (typeof quizCardHTML !== "undefined" && typeof window.quizCardHTML === "undefined") window.quizCardHTML = quizCardHTML;
   if (typeof quizErrorCardHTML !== "undefined" && typeof window.quizErrorCardHTML === "undefined") window.quizErrorCardHTML = quizErrorCardHTML;
