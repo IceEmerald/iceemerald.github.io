@@ -3716,6 +3716,18 @@ function escapeHtml(s) {
 function escapeHtmlAttr(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+function decodeHtmlEntities(value) {
+  return String(value ?? "").replace(/&(quot|#39|amp|lt|gt);/g, (entity) => {
+    switch (entity) {
+      case "&quot;": return '"';
+      case "&#39;": return "'";
+      case "&amp;": return "&";
+      case "&lt;": return "<";
+      case "&gt;": return ">";
+      default: return entity;
+    }
+  });
+}
 // Single source of truth for AI-chat error copy: every user-facing error
 // bubble in the chat (generating, regenerating, editing, image gen, etc.)
 // should read "An error occurred while <doing what>." so the wording stays
@@ -4377,8 +4389,8 @@ function _extractQuiz(text) {
   // Strip markdown code fences the AI might wrap around the JSON
   raw = raw.replace(/^[\s\n]*```(?:json|JSON)?[\s\n]*\n?/i, "");
   raw = raw.replace(/\n?[\s\n]*```[\s\n]*$/i, "");
-  // Strip HTML entities the AI might emit (e.g. &quot; → ")
-  raw = raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  // Decode HTML entities exactly once before JSON parsing to avoid double-unescaping issues.
+  raw = decodeHtmlEntities(raw);
   // Strip JS/JSON comments (// and /* */)
   raw = raw.replace(/\/\/[^\n]*/g, "");
   raw = raw.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -5566,7 +5578,19 @@ function _openImagePreviewPanel(src, name) {
   if (typeof _fpZoom !== "undefined") { _fpZoom = 1; }
   if (typeof _fpUpdateZoomLabel === "function") _fpUpdateZoomLabel();
   if (typeof _fpCurrentFid !== "undefined") { _fpCurrentFid = null; }
-  body.innerHTML = '<div class="fp-img-wrap"><img src="' + src + '" alt="' + (name || "Image") + '" id="fpImgEl" style="transform-origin:top center; max-width:100%; border-radius:8px;"></div>';
+
+  const wrap = document.createElement("div");
+  wrap.className = "fp-img-wrap";
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = name || "Image";
+  img.id = "fpImgEl";
+  img.style.transformOrigin = "top center";
+  img.style.maxWidth = "100%";
+  img.style.borderRadius = "8px";
+  wrap.appendChild(img);
+  body.replaceChildren(wrap);
+
   panel.classList.add("open");
   if (typeof _fpApplyZoom === "function") _fpApplyZoom();
 }
