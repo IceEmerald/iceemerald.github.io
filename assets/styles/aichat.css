@@ -5899,7 +5899,6 @@ body.light-mode .ws-searching-badge {
 .reasoning-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 8px;
     padding: 4px 6px 4px 0;
     cursor: pointer;
