@@ -1545,7 +1545,7 @@ body.light-mode .esb-citation-chip:hover { background: #ebebeb; color: #333; }
 
 /*  Attachment preview  */
 .attach-preview {
-    max-width: 720px;
+    max-width: 800px;
     width: 100%;
     box-sizing: border-box;
     margin: 0 auto 8px;
