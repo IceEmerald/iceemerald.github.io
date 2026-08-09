@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/images/icons/favicon.webp" alt="EmeraldNetwork Logo" width="80" />
+<img src="assets/images/favicon.ico" alt="EmeraldNetwork Logo" width="80" />
 
 # EmeraldNetwork
 
@@ -19,67 +19,53 @@ Built and maintained by [IceEmerald](https://github.com/IceEmerald).
 
 ---
 
-## Project overview
+## What's here
 
-EmeraldNetwork is a static, multi-page ecosystem for personal projects, utilities, and public-facing experiences. The site is designed to be lightweight, CDN-friendly, and resilient when offline, while also supporting interactive web apps such as the AI chat interface and the presentation tooling.
+A static multi-page site hosting several personal projects and tools:
 
-### Included experiences
-
-- Landing page and company/principles overview
-- EmeraldBot AI chat and image workflows
-- EmeraldSuite presentation/editor app
-- Product and support pages
-- Public notes and documentation
-- Status monitoring and offline fallback pages
+- **Landing page** — main intro and news
+- **AI Chat** — EmeraldBot, a browser-based AI chat interface
+- **EmeraldSuite** — an all-in-one office-style web app
+- **EmeraldEssentials** — plugin documentation
+- **Discord bot** — overview and command reference for the EmeraldBot Discord bot
+- **Status** — live service status monitoring
+- **Products** — catalog of projects and tools
+- **Notes** — public notes and info
 
 ---
 
 ## Pages
 
-| File | Purpose |
-|------|---------|
+| File | Page |
+|------|------|
 | [`index.html`](index.html) | Home |
-| [`about.html`](about.html) | About |
-| [`aichat.html`](aichat.html) | AI Chat |
-| [`slides.html`](slides.html) | Presentation app |
-| [`notes.html`](notes.html) | Notes |
+| [`aichat.html`](aichat.html) | AI Chat (EmeraldBot) |
 | [`emeraldsuite.html`](emeraldsuite.html) | EmeraldSuite |
-| [`emeraldessentialsplugin.html`](emeraldessentialsplugin.html) | EmeraldEssentials |
-| [`discordemeraldbot.html`](discordemeraldbot.html) | Discord bot overview |
-| [`discordemeraldbotcmds.html`](discordemeraldbotcmds.html) | Bot commands |
-| [`status.html`](status.html) | Service status |
-| [`products.html`](products.html) | Product catalog |
+| [`emeraldessentialsplugin.html`](emeraldessentialsplugin.html) | EmeraldEssentials Plugin |
+| [`discordemeraldbot.html`](discordemeraldbot.html) | Discord Bot |
+| [`discordemeraldbotcmds.html`](discordemeraldbotcmds.html) | Discord Bot Commands |
+| [`status.html`](status.html) | Status |
+| [`products.html`](products.html) | Products |
+| [`notes.html`](notes.html) | Notes |
 | [`privacy.html`](privacy.html) | Privacy Policy |
 | [`terms.html`](terms.html) | Terms of Service |
-| [`404.html`](404.html) | Not found fallback |
-| [`offline.html`](offline.html) | Offline response |
+| [`404.html`](404.html) | 404 page |
+| [`offline.html`](offline.html) | Offline fallback |
 
 ---
 
-## Repository structure
+## Structure
 
-```text
+```
 ├── assets/
-│   ├── data/
 │   ├── images/
 │   ├── scripts/
 │   └── styles/
-├── *.html
-├── sw.js
-├── robots.txt
+├── *.html          # all pages
+├── sw.js           # service worker (offline support)
 ├── sitemap.xml
-├── SECURITY.md
-├── README.md
-└── CNAME
+└── robots.txt
 ```
-
----
-
-## Security and maintenance notes
-
-- The project uses strict DOM-sanitization patterns for user-generated chat content.
-- Service worker caches are intentionally versioned and purged on activation.
-- Security reports should be sent privately rather than via public issues.
 
 ---
 

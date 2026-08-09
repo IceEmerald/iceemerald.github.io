@@ -1,7 +1,17 @@
+# #######################################################
+# ############## EmeraldNetwork robots.txt ##############
+# #######################################################
+
 User-agent: *
-Allow: /assets/images/icons/
-Allow: /assets/images/content/
-Disallow: /assets/images/ui/
+
+Allow: /
+Allow: /assets/images/
+
+Disallow: /assets/images/discordemeraldbot/
+Disallow: /assets/images/emeraldessentialsplugin/
+Disallow: /assets/images/news/
+Disallow: /assets/images/products/
+Disallow: /assets/images/why/
 Disallow: /offline.html
 Disallow: /404.html
 Disallow: /sw.js

@@ -430,61 +430,51 @@ function positionMenu(menu, x, y) {
 function buildContextMenu(type) {
   const menu = document.getElementById("aiContextMenu");
   if (!menu) return;
-
-  const appendTitle = (label, svgMarkup) => {
-    const title = document.createElement("div");
-    title.className = "context-title";
-    const icon = document.createElement("span");
-    icon.innerHTML = svgMarkup;
-    const text = document.createTextNode(label);
-    title.append(icon, text);
-    menu.appendChild(title);
-  };
-
-  const appendAction = (label, handler, extraClass = "") => {
-    const link = document.createElement("a");
-    link.textContent = label;
-    if (extraClass) link.classList.add(extraClass);
-    if (typeof handler === "function") {
-      link.addEventListener("click", (event) => {
-        event.preventDefault();
-        handler();
-      });
-    }
-    menu.appendChild(link);
-  };
-
-  menu.replaceChildren();
-
   if (type === "history") {
-    const id = _ctxTarget?.dataset?.convId || "";
-    appendTitle("CHATS", '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>');
-    appendAction("Rename", () => renameConvPrompt(id));
-    appendAction("Delete", () => deleteConvConfirm(id), "ctx-danger");
-    return;
-  }
-
-  if (type === "message") {
-    appendTitle("MESSAGE", '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>');
-    appendAction("Copy text", () => copyMsgText());
-    appendAction("Show Used Model", () => showUsedModel());
-    if (isLatestAIMessage(_ctxTarget)) appendAction("Regenerate", () => regenFromCtx());
-    return;
-  }
-
-  if (type === "user-message") {
+    const id = _ctxTarget?.dataset.convId;
+    menu.innerHTML = `
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        CHATS
+      </div>
+      <a onclick="renameConvPrompt('${id}')">Rename</a>
+      <a onclick="deleteConvConfirm('${id}')" class="ctx-danger">Delete</a>`;
+  } else if (type === "message") {
+    const regen = isLatestAIMessage(_ctxTarget) ? '<a onclick="regenFromCtx()">Regenerate</a>' : "";
+    menu.innerHTML = `
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        MESSAGE
+      </div>
+      <a onclick="copyMsgText()">Copy text</a>
+      <a onclick="showUsedModel()">Show Used Model</a>
+      ${regen}`;
+  } else if (type === "user-message") {
     const msgId = _ctxTarget?.dataset?.msgId || "";
     const canEdit = !!msgId && !!state.convId;
-    appendTitle("YOUR MESSAGE", '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>');
-    appendAction("Copy Text", () => copyUserMsgText());
-    if (canEdit) appendAction("Edit", () => editUserMsg(msgId));
-    return;
+    menu.innerHTML = `
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+        YOUR MESSAGE
+      </div>
+      <a onclick="copyUserMsgText()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:7px"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+        Copy Text
+      </a>
+      ${canEdit ? `<a onclick="editUserMsg('${msgId}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:7px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Edit
+      </a>` : ""}`;
+  } else {
+    menu.innerHTML = `
+      <div class="context-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        TOOLS
+      </div>
+      <a onclick="ctxCopyText()">Copy Text</a>
+      <a onclick="ctxCopyPageLink()">Copy Page Link</a>
+      <a onclick="ctxShowElementInfo()">Show Element Info</a>`;
   }
-
-  appendTitle("TOOLS", '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>');
-  appendAction("Copy Text", () => ctxCopyText());
-  appendAction("Copy Page Link", () => ctxCopyPageLink());
-  appendAction("Show Element Info", () => ctxShowElementInfo());
 }
 function isLatestAIMessage(msgEl) {
   const aiMsgs = Array.from(document.querySelectorAll('.message[data-ai="1"]'));
@@ -1477,7 +1467,7 @@ function showMessages() {
 }
 function typingIndicatorHTML() {
   return `<div class="message" id="typingIndicator" style="display:none;">
-    <div class="message-avatar ai"><img src="/assets/images/icons/favicon.webp" alt="EmeraldBot"></div>
+    <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
     <div class="message-body">
       <div class="message-sender">EmeraldBot</div>
       <div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>
@@ -2134,9 +2124,9 @@ function fileIconHTML(name, mimeType) {
   const isSheet = type.includes("sheet") || type.includes("xlsx") || type.includes("csv") || ["xlsx", "xls", "csv", "ods"].includes(ext);
   const isPres = type.includes("presentation") || type.includes("pptx") || ["pptx", "ppt", "odp"].includes(ext);
   if (isImg) return `<div class="lib-icon lib-icon--img"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
-  if (isDoc) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/icons/docsicon.webp" alt="doc"></div>`;
-  if (isSheet) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/icons/sheetsicon.webp" alt="sheet"></div>`;
-  if (isPres) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/icons/slidesicon.webp" alt="presentation"></div>`;
+  if (isDoc) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/docsicon.webp" alt="doc"></div>`;
+  if (isSheet) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/sheeticon.webp" alt="sheet"></div>`;
+  if (isPres) return `<div class="lib-icon lib-icon--file"><img src="/assets/images/presentationicon.webp" alt="presentation"></div>`;
   return `<div class="lib-icon lib-icon--other"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></div>`;
 }
 function fileIcon(mimeType) {
@@ -2289,7 +2279,7 @@ function appendAIMessageDOM(text, msgId, streaming = false) {
   div.dataset.ai = "1";
   div.dataset.msgId = msgId;
   div.innerHTML = `
-    <div class="message-avatar ai"><img src="/assets/images/icons/favicon.webp" alt="EmeraldBot"></div>
+    <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
     <div class="message-body">
       <div class="message-sender">EmeraldBot</div>
       <div class="message-text md-content">${streaming ? "" : renderMarkdown(text)}</div>
@@ -3716,18 +3706,6 @@ function escapeHtml(s) {
 function escapeHtmlAttr(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-function decodeHtmlEntities(value) {
-  return String(value ?? "").replace(/&(quot|#39|amp|lt|gt);/g, (entity) => {
-    switch (entity) {
-      case "&quot;": return '"';
-      case "&#39;": return "'";
-      case "&amp;": return "&";
-      case "&lt;": return "<";
-      case "&gt;": return ">";
-      default: return entity;
-    }
-  });
-}
 // Single source of truth for AI-chat error copy: every user-facing error
 // bubble in the chat (generating, regenerating, editing, image gen, etc.)
 // should read "An error occurred while <doing what>." so the wording stays
@@ -4301,7 +4279,7 @@ function appendStoredAIMessage(m) {
   if (m._regenBranchRef) div.dataset.regenBranchRef = m._regenBranchRef;
   if (m._editBranchRef) div.dataset.branchRef = m._editBranchRef;
   div.innerHTML = `
-    <div class="message-avatar ai"><img src="/assets/images/icons/favicon.webp" alt="EmeraldBot"></div>
+    <div class="message-avatar ai"><img src="/assets/images/favicon.webp" alt="EmeraldBot"></div>
     <div class="message-body">
       <div class="message-sender">EmeraldBot</div>
       <div class="message-text md-content"${_initText ? "" : ' style="display:none"'}>${_initHTML}</div>
@@ -4324,7 +4302,7 @@ function appendStoredAIMessage(m) {
     div.querySelector(".message-sender").insertAdjacentElement("afterend", badge);
   }
   if (quizData) {
-    const qid = sanitizeQuizId(quizData._id, "quiz_" + (m.id || genId()));
+    const qid = quizData._id || "quiz_" + (m.id || genId());
     quizData._id = qid;
     window._quizzes = window._quizzes || {};
     if (!window._quizzes[qid]) {
@@ -4389,8 +4367,8 @@ function _extractQuiz(text) {
   // Strip markdown code fences the AI might wrap around the JSON
   raw = raw.replace(/^[\s\n]*```(?:json|JSON)?[\s\n]*\n?/i, "");
   raw = raw.replace(/\n?[\s\n]*```[\s\n]*$/i, "");
-  // Decode HTML entities exactly once before JSON parsing to avoid double-unescaping issues.
-  raw = decodeHtmlEntities(raw);
+  // Strip HTML entities the AI might emit (e.g. &quot; → ")
+  raw = raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   // Strip JS/JSON comments (// and /* */)
   raw = raw.replace(/\/\/[^\n]*/g, "");
   raw = raw.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -4477,11 +4455,6 @@ function _aggressiveJSONExtract(raw) {
   }
   throw new Error('No valid JSON object found');
 }
-function sanitizeQuizId(value, fallback) {
-  const raw = String(value ?? "").trim();
-  const cleaned = raw.replace(/[^A-Za-z0-9_-]/g, "_").replace(/^_+|_+$/g, "");
-  return cleaned ? cleaned.slice(0, 128) : fallback;
-}
 function quizLoadingCardHTML() {
   return `<div class="quiz-loading-card">
     <div class="quiz-loading-icon">
@@ -4499,8 +4472,7 @@ function quizLoadingCardHTML() {
 }
 function quizCardHTML(qid, data) {
   const n = (data.questions || []).length;
-  const safeQid = escapeHtmlAttr(sanitizeQuizId(qid, "quiz"));
-  return `<div class="quiz-card" onclick="openQuizPanel('${safeQid}')">
+  return `<div class="quiz-card" onclick="openQuizPanel('${qid}')">
     <div class="quiz-card-icon">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
     </div>
@@ -5537,13 +5509,7 @@ async function processImageSearchTags(aiDiv, convId, msgId) {
     el.classList.remove("web-image-searching");
     el.classList.add("web-image-loaded");
     el.dataset.webImg = "1";
-    el.replaceChildren();
-    const image = document.createElement("img");
-    image.className = "web-image";
-    image.src = img.url;
-    image.alt = img.alt || query;
-    image.loading = "lazy";
-    el.appendChild(image);
+    el.innerHTML = '<img class="web-image" src="' + escapeHtmlAttr(img.url) + '" alt="' + escapeHtmlAttr(img.alt || query) + '" loading="lazy">';
   }
   scrollToBottom();
 
@@ -5584,19 +5550,7 @@ function _openImagePreviewPanel(src, name) {
   if (typeof _fpZoom !== "undefined") { _fpZoom = 1; }
   if (typeof _fpUpdateZoomLabel === "function") _fpUpdateZoomLabel();
   if (typeof _fpCurrentFid !== "undefined") { _fpCurrentFid = null; }
-
-  const wrap = document.createElement("div");
-  wrap.className = "fp-img-wrap";
-  const img = document.createElement("img");
-  img.src = src;
-  img.alt = name || "Image";
-  img.id = "fpImgEl";
-  img.style.transformOrigin = "top center";
-  img.style.maxWidth = "100%";
-  img.style.borderRadius = "8px";
-  wrap.appendChild(img);
-  body.replaceChildren(wrap);
-
+  body.innerHTML = '<div class="fp-img-wrap"><img src="' + src + '" alt="' + (name || "Image") + '" id="fpImgEl" style="transform-origin:top center; max-width:100%; border-radius:8px;"></div>';
   panel.classList.add("open");
   if (typeof _fpApplyZoom === "function") _fpApplyZoom();
 }
@@ -5636,13 +5590,7 @@ document.addEventListener("click", function(e) {
       const query = failedResult.dataset.imgSearch;
       failedResult.classList.remove("web-image-failed");
       failedResult.classList.add("web-image-searching");
-      failedResult.replaceChildren();
-      const spinner = document.createElement("div");
-      spinner.className = "web-image-search-spinner";
-      const label = document.createElement("span");
-      label.className = "web-image-search-text";
-      label.textContent = `Searching for "${query}"...`;
-      failedResult.append(spinner, label);
+      failedResult.innerHTML = '<div class="web-image-search-spinner"></div><span class="web-image-search-text">Searching for "' + escapeHtmlAttr(query) + '"...</span>';
       const msgDiv = failedResult.closest(".message");
       const retryMsgId = msgDiv?.dataset?.msgId;
       processImageSearchTags(msgDiv, state.convId, retryMsgId);
