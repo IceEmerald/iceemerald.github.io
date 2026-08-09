@@ -2621,9 +2621,7 @@ async function handleSend(opts) {
       window._quizzes[qid] = { data: quizData, answers: {}, submitted: false };
       const cardEl = document.createElement("div");
       cardEl.innerHTML = quizCardHTML(qid, quizData);
-      // CodeQL fix: remove inline onclick — qid must not flow through HTML parsing.
-      const _card = cardEl.querySelector('.quiz-card');
-      if (_card) { _card.removeAttribute('onclick'); _card.addEventListener('click', () => openQuizPanel(qid)); }
+
       textEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
       if (afterQuizText) {
         const afterEl = document.createElement("div");
@@ -2950,9 +2948,7 @@ async function regenerateMessage(msgEl) {
       window._quizzes[qid] = { data: quizData, answers: {}, submitted: false };
       const cardEl = document.createElement("div");
       cardEl.innerHTML = quizCardHTML(qid, quizData);
-      // CodeQL fix: remove inline onclick — qid must not flow through HTML parsing.
-      const _card = cardEl.querySelector('.quiz-card');
-      if (_card) { _card.removeAttribute('onclick'); _card.addEventListener('click', () => openQuizPanel(qid)); }
+
       textEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
       if (afterQuizText) {
         const afterEl = document.createElement("div");
@@ -4308,17 +4304,17 @@ function appendStoredAIMessage(m) {
     div.querySelector(".message-sender").insertAdjacentElement("afterend", badge);
   }
   if (quizData) {
-    const qid = quizData._id || "quiz_" + (m.id || genId());
+    // CodeQL fix (#52/#56): sanitize qid to safe chars only — prevents
+    // injection via quizData._id or m.id which are user-influenced.
+    const _rawQid = quizData._id || "quiz_" + (m.id || genId());
+    const qid = _rawQid.replace(/[^a-zA-Z0-9_-]/g, "_");
     quizData._id = qid;
     window._quizzes = window._quizzes || {};
     if (!window._quizzes[qid]) {
       window._quizzes[qid] = { data: quizData, answers: {}, submitted: false };
     }
     const cardEl = document.createElement("div");
-    // CodeQL fix (#52): remove inline onclick — qid must not flow through HTML parsing.
     cardEl.innerHTML = quizCardHTML(qid, quizData);
-    const _card = cardEl.querySelector('.quiz-card');
-    if (_card) { _card.removeAttribute('onclick'); _card.addEventListener('click', () => openQuizPanel(qid)); }
     const textEl = div.querySelector(".message-text");
     textEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
     if (afterQuiz) {
@@ -4377,12 +4373,10 @@ function _extractQuiz(text) {
   raw = raw.replace(/^[\s\n]*```(?:json|JSON)?[\s\n]*\n?/i, "");
   raw = raw.replace(/\n?[\s\n]*```[\s\n]*$/i, "");
   // Strip HTML entities the AI might emit (e.g. &quot; → ")
-  // CodeQL fix (#53): double-escaping — manual regex unescaping can re-introduce
-  // HTML characters that were previously escaped, causing a round-trip mismatch.
-  // Using the browser's DOM parser ensures correct, single-pass decoding.
-  const _tmpDec = document.createElement("textarea");
-  function _decodeEntity(s) { _tmpDec.innerHTML = s; return _tmpDec.value; }
-  raw = _decodeEntity(raw);
+  // CodeQL fix (#53): Decode HTML entities the AI might emit (e.g. &quot; → ")
+  // CRITICAL: &amp; MUST be decoded LAST to prevent double-decode (e.g. &amp;lt; → <).
+  // Original code decoded &amp; before &lt; causing double-escaping vulnerability.
+  raw = raw.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
   // Strip JS/JSON comments (// and /* */)
   raw = raw.replace(/\/\/[^\n]*/g, "");
   raw = raw.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -4486,7 +4480,7 @@ function quizLoadingCardHTML() {
 }
 function quizCardHTML(qid, data) {
   const n = (data.questions || []).length;
-  return `<div class="quiz-card" onclick="openQuizPanel('${qid}')">
+  return `<div class="quiz-card" data-qid="${escapeHtmlAttr(qid)}">
     <div class="quiz-card-icon">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
     </div>
@@ -4508,7 +4502,15 @@ function quizErrorCardHTML() {
     </div>
   </div>`;
 }
+
+// Event delegation: .quiz-card[data-qid] clicks → openQuizPanel
+document.addEventListener("click", function(e) {
+  const card = e.target.closest(".quiz-card[data-qid]");
+  if (card) openQuizPanel(card.dataset.qid);
+});
 function openQuizPanel(qid) {
+  // CodeQL fix (#57): sanitize qid to safe chars for DOM IDs and inline handlers args
+  qid = String(qid || "").replace(/[^a-zA-Z0-9_-]/g, "_");
   const qz = (window._quizzes || {})[qid];
   if (!qz) return;
   closeCodePreviewPanel();
@@ -4857,9 +4859,7 @@ async function submitUserMsgEdit(msgId) {
       window._quizzes[qid] = { data: quizData, answers: {}, submitted: false };
       const cardEl = document.createElement("div");
       cardEl.innerHTML = quizCardHTML(qid, quizData);
-      // CodeQL fix: remove inline onclick — qid must not flow through HTML parsing.
-      const _card = cardEl.querySelector('.quiz-card');
-      if (_card) { _card.removeAttribute('onclick'); _card.addEventListener('click', () => openQuizPanel(qid)); }
+
       aiTextEl.insertAdjacentElement("afterend", cardEl.firstElementChild);
       if (afterQuizText) {
         const afterEl = document.createElement("div");
