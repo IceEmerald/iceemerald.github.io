@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/images/icons/favicon.webp" alt="EmeraldNetwork Logo" width="80" />
+<img src="assets/images/favicon.webp" alt="EmeraldNetwork Logo" width="80" />
 
 # EmeraldNetwork
 
