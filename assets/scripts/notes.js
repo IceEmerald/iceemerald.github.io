@@ -76,6 +76,7 @@ class NotesApp {
         this.renderNotesList();
         this.renderNotesCards();
         this.showWelcomeScreenIfNeeded();
+        this.updateRibbonAvailability();
         this.checkShareSessionFromURL();
         this.setupMobileUI();
         this.setupSwipeGesture();
@@ -1111,10 +1112,7 @@ class NotesApp {
         // Undo/redo should be enabled for any collaborator with edit permission,
         // regardless of whether they are the session owner. Only disable when the
         // session is truly view-only (non-owner + permission === 'view').
-        const undoBtn = document.getElementById('undoBtn');
-        const redoBtn = document.getElementById('redoBtn');
-        if (undoBtn) undoBtn.disabled = this.isViewOnly;
-        if (redoBtn) redoBtn.disabled = this.isViewOnly;
+        this.updateRibbonAvailability();
         this._updateLeaveButtonVisibility();
     }
     _hideLeaveButton() {
@@ -1161,10 +1159,7 @@ class NotesApp {
         }
         // Visually disable undo/redo in view-only mode so the user gets immediate
         // feedback that those operations are blocked.
-        const undoBtn = document.getElementById('undoBtn');
-        const redoBtn = document.getElementById('redoBtn');
-        if (undoBtn) undoBtn.disabled = isViewOnly;
-        if (redoBtn) redoBtn.disabled = isViewOnly;
+        this.updateRibbonAvailability();
         if (textEditor) {
             const editorHasFocus = document.activeElement === textEditor;
             let savedOffset = null;
@@ -1604,9 +1599,13 @@ class NotesApp {
                 } else if (this.currentNoteId && !this.collabNoteVisible) {
                     this.updateNoteContent();
                 }
+                this.updateRibbonAvailability();
             });
         }
-        document.addEventListener('selectionchange', () => this.handleSelectionChange());
+        document.addEventListener('selectionchange', () => {
+            this.handleSelectionChange();
+            this.updateRibbonAvailability();
+        });
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
         document.querySelectorAll('.ribbon-btn, .ribbon-tab').forEach(el => {
             el.addEventListener('mousedown', (e) => e.preventDefault());
@@ -1770,6 +1769,7 @@ class NotesApp {
             btn.addEventListener('mousedown', (e) => e.preventDefault());
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
+                if (btn.disabled) return;
                 this.executeCommand(command);
                 this.updateButtonStates();
             });
@@ -1926,19 +1926,20 @@ class NotesApp {
         const mobileDrawBtn = row.querySelector('#mobileDrawBtn');
         const desktopImageInput = document.getElementById('insertImageInput');
         if (mobileInsertTableBtn) {
-            mobileInsertTableBtn.addEventListener('click', () => this.insertTable());
+            mobileInsertTableBtn.addEventListener('click', () => { if (!mobileInsertTableBtn.disabled) this.insertTable(); });
         }
         if (mobileInsertImageBtn) {
             mobileInsertImageBtn.addEventListener('click', () => {
+                if (mobileInsertImageBtn.disabled) return;
                 this.saveSelection();
                 if (desktopImageInput) desktopImageInput.click();
             });
         }
         if (mobileInsertTodoBtn) {
-            mobileInsertTodoBtn.addEventListener('click', () => this.insertTodo());
+            mobileInsertTodoBtn.addEventListener('click', () => { if (!mobileInsertTodoBtn.disabled) this.insertTodo(); });
         }
         if (mobileDrawBtn) {
-            mobileDrawBtn.addEventListener('click', () => this.toggleDrawMode());
+            mobileDrawBtn.addEventListener('click', () => { if (!mobileDrawBtn.disabled) this.toggleDrawMode(); });
         }
         ribbonContent.appendChild(row);
     }
@@ -2006,6 +2007,7 @@ class NotesApp {
         btn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (btn.disabled) return;
             this.saveSelection();
             const wasActive = dropdownEl.classList.contains('active');
             document.querySelectorAll('.ms-dropdown.active').forEach(d => {
@@ -2075,9 +2077,11 @@ class NotesApp {
         document.querySelectorAll('.format-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
+                if (btn.disabled) return;
                 const command = btn.dataset.command;
                 this.executeCommand(command);
                 this.updateButtonStates();
+                this.updateRibbonAvailability();
             });
         });
         const undoBtn = document.getElementById('undoBtn');
@@ -2086,28 +2090,30 @@ class NotesApp {
             // View-only collaborators must not be able to mutate the document,
             // even locally — `execCommand('undo')` would silently bypass
             // contentEditable=false in some browsers.
-            if (this.isViewOnly) return;
+            if (this.isViewOnly || undoBtn.disabled) return;
             document.getElementById('textEditor').focus();
             document.execCommand('undo');
+            setTimeout(() => this.updateRibbonAvailability(), 0);
         });
         if (redoBtn) redoBtn.addEventListener('click', () => {
-            if (this.isViewOnly) return;
+            if (this.isViewOnly || redoBtn.disabled) return;
             document.getElementById('textEditor').focus();
             document.execCommand('redo');
+            setTimeout(() => this.updateRibbonAvailability(), 0);
         });
         const cutBtn = document.getElementById('cutBtn');
         const copyBtn = document.getElementById('copyBtn');
         const pasteBtn = document.getElementById('pasteBtn');
-        if (cutBtn) cutBtn.addEventListener('click', () => this.executeCommand('cut'));
-        if (copyBtn) copyBtn.addEventListener('click', () => this.executeCommand('copy'));
-        if (pasteBtn) pasteBtn.addEventListener('click', () => this.executeCommand('paste'));
+        if (cutBtn) cutBtn.addEventListener('click', () => { if (!cutBtn.disabled) this.executeCommand('cut'); });
+        if (copyBtn) copyBtn.addEventListener('click', () => { if (!copyBtn.disabled) this.executeCommand('copy'); });
+        if (pasteBtn) pasteBtn.addEventListener('click', () => { if (!pasteBtn.disabled) this.executeCommand('paste'); });
         const insertTableBtn = document.getElementById('insertTableBtn');
         const insertTodoBtn = document.getElementById('insertTodoBtn');
         const drawBtn = document.getElementById('drawBtn');
         const insertImageBtn = document.getElementById('insertImageBtn');
         const insertImageInput = document.getElementById('insertImageInput');
-        if (insertTableBtn) insertTableBtn.addEventListener('click', () => this.insertTable());
-        if (insertTodoBtn) insertTodoBtn.addEventListener('click', () => this.insertTodo());
+        if (insertTableBtn) insertTableBtn.addEventListener('click', () => { if (!insertTableBtn.disabled) this.insertTable(); });
+        if (insertTodoBtn) insertTodoBtn.addEventListener('click', () => { if (!insertTodoBtn.disabled) this.insertTodo(); });
         const findReplaceBtn = document.getElementById('findReplaceBtn');
         if (findReplaceBtn) findReplaceBtn.addEventListener('click', () => this.openFindReplace());
         const ribbonRoot = document.querySelector('.ribbon');
@@ -2121,8 +2127,9 @@ class NotesApp {
                 }
             }, true);
         }
-        if (drawBtn) drawBtn.addEventListener('click', () => this.toggleDrawMode());
+        if (drawBtn) drawBtn.addEventListener('click', () => { if (!drawBtn.disabled) this.toggleDrawMode(); });
         if (insertImageBtn) insertImageBtn.addEventListener('click', () => {
+            if (insertImageBtn.disabled) return;
             this.saveSelection();
             if (insertImageInput) insertImageInput.click();
         });
@@ -2143,10 +2150,12 @@ class NotesApp {
         editor.addEventListener('mouseup', () => {
             this.saveSelection();
             this.updateButtonStates();
+            this.updateRibbonAvailability();
         });
         editor.addEventListener('keyup', () => {
             this.saveSelection();
             this.updateButtonStates();
+            this.updateRibbonAvailability();
         });
         editor.addEventListener('blur', () => this.saveSelection());
         document.addEventListener('keydown', (e) => {
@@ -2317,10 +2326,104 @@ class NotesApp {
             console.error('Error executing command:', command, error);
         }
         this.updateNoteContent();
+        this.updateRibbonAvailability();
+    }
+    getRibbonSelectionState() {
+        const editor = document.getElementById('textEditor');
+        const selection = window.getSelection();
+        let selectionInEditor = false;
+        let hasSelectedText = false;
+        if (editor && selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            selectionInEditor = editor.contains(range.commonAncestorContainer)
+                || editor.contains(selection.anchorNode)
+                || editor.contains(selection.focusNode);
+            hasSelectedText = selectionInEditor && !selection.isCollapsed && selection.toString().length > 0;
+        }
+        return {
+            editor,
+            hasActiveNote: !!this.currentNoteId,
+            canEdit: !!this.currentNoteId && !this.isViewOnly,
+            selectionInEditor,
+            hasSelectedText
+        };
+    }
+    setRibbonControlDisabled(control, disabled) {
+        if (!control) return;
+        control.disabled = !!disabled;
+        control.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        control.classList.toggle('is-unavailable', !!disabled);
+    }
+    setCommandControlsDisabled(command, disabled) {
+        document.querySelectorAll(`[data-command="${command}"]`).forEach(control => {
+            this.setRibbonControlDisabled(control, disabled);
+        });
+    }
+    setRibbonGroupAvailability(groupId, enabled) {
+        const group = document.getElementById(groupId);
+        if (!group) return;
+        group.style.opacity = '';
+        group.style.pointerEvents = '';
+        group.querySelectorAll('.group-label, .font-group-label').forEach(label => {
+            label.style.opacity = '1';
+            label.style.pointerEvents = 'auto';
+        });
+        group.querySelectorAll('button, input, select, textarea').forEach(control => {
+            if (control.type === 'file') return;
+            this.setRibbonControlDisabled(control, !enabled);
+        });
+    }
+    updateRibbonAvailability() {
+        const state = this.getRibbonSelectionState();
+        const editableContext = state.canEdit && state.selectionInEditor;
+        const editableSelection = state.canEdit && state.hasSelectedText;
+        const readableSelection = state.hasActiveNote && state.hasSelectedText;
+
+        this.setRibbonControlDisabled(document.getElementById('undoBtn'), !state.canEdit || !this.queryEditingCommandEnabled('undo'));
+        this.setRibbonControlDisabled(document.getElementById('redoBtn'), !state.canEdit || !this.queryEditingCommandEnabled('redo'));
+        this.setRibbonControlDisabled(document.getElementById('cutBtn'), !editableSelection);
+        this.setRibbonControlDisabled(document.getElementById('copyBtn'), !readableSelection);
+        this.setRibbonControlDisabled(document.getElementById('pasteBtn'), !editableContext);
+
+        this.setCommandControlsDisabled('undo', !state.canEdit || !this.queryEditingCommandEnabled('undo'));
+        this.setCommandControlsDisabled('redo', !state.canEdit || !this.queryEditingCommandEnabled('redo'));
+        this.setCommandControlsDisabled('cut', !editableSelection);
+        this.setCommandControlsDisabled('copy', !readableSelection);
+        this.setCommandControlsDisabled('paste', !editableContext);
+        ['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript'].forEach(command => {
+            this.setCommandControlsDisabled(command, !editableContext);
+        });
+        ['justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList'].forEach(command => {
+            this.setCommandControlsDisabled(command, !editableContext);
+        });
+
+        this.setRibbonGroupAvailability('fontGroup', editableContext);
+        this.setRibbonGroupAvailability('paragraphGroup', editableContext);
+        this.setRibbonGroupAvailability('insertGroup', state.canEdit);
+
+        ['mobileFontFamilyDropdown', 'mobileFontSizeDropdown', 'mobileFontColorDropdown', 'mobileHighlightDropdown'].forEach(id => {
+            this.setRibbonControlDisabled(document.querySelector(`#${id} .ms-dropdown-btn`), !editableContext);
+        });
+        ['mobileInsertTableBtn', 'mobileInsertImageBtn', 'mobileInsertTodoBtn', 'mobileDrawBtn'].forEach(id => {
+            this.setRibbonControlDisabled(document.getElementById(id), !state.canEdit);
+        });
+
+        document.body.classList.toggle('ribbon-has-unavailable-actions', true);
+    }
+    queryEditingCommandEnabled(command) {
+        if (!this.currentNoteId || this.isViewOnly) return false;
+        try {
+            return document.queryCommandEnabled(command);
+        } catch {
+            return false;
+        }
     }
     updateButtonStates() {
         const selection = window.getSelection();
-        if (selection.rangeCount === 0) return;
+        if (selection.rangeCount === 0) {
+            this.updateRibbonAvailability();
+            return;
+        }
         const commands = ['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript', 'justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList'];
         commands.forEach(command => {
             const btns = document.querySelectorAll(`[data-command="${command}"]`);
@@ -2331,6 +2434,7 @@ class NotesApp {
             });
         });
         this.updateFontStateFromDOM();
+        this.updateRibbonAvailability();
     }
     updateFontStateFromDOM() {
         const selection = window.getSelection();
@@ -2524,10 +2628,7 @@ class NotesApp {
                 // Switching from a view-only shared note back to one of our own notes —
                 // the local isViewOnly flag must be reset so editing works again.
                 this.isViewOnly = false;
-                const undoBtn = document.getElementById('undoBtn');
-                const redoBtn = document.getElementById('redoBtn');
-                if (undoBtn) undoBtn.disabled = false;
-                if (redoBtn) redoBtn.disabled = false;
+                this.updateRibbonAvailability();
             }
             this._hideLeaveButton();
             const textEditor = document.getElementById('textEditor');
@@ -2591,10 +2692,12 @@ class NotesApp {
         this.updateStatusBar();
         this._setOwnerOnlyButtonsVisible(!this.collabMode || this.collabIsOwner || !this.collabNoteVisible || this.currentNoteId !== this.collabNoteId);
         this._updateLeaveButtonVisibility();
+        this.updateRibbonAvailability();
         setTimeout(() => {
             const textEditorFocus = document.getElementById('textEditor');
             if (textEditorFocus) {
                 textEditorFocus.focus();
+                this.updateRibbonAvailability();
             } else {
                 console.warn('Expected DOM element not found: textEditor');
             }
@@ -2786,6 +2889,7 @@ class NotesApp {
             //   - ?share= / ?s= : importNoteFromUrl() clears it after importing
             //   - Any other URL : left alone (e.g. refresh on a non-notes page)
         }
+        this.updateRibbonAvailability();
     }
     insertTable() { this.saveSelection(); this.showTableModal(); }
     insertTodo() {
@@ -3850,6 +3954,7 @@ class NotesApp {
             });
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (btn.disabled) return;
                 this.saveSelection();
                 if (this._portalDropdown === dropdown) {
                     this._closePortal();

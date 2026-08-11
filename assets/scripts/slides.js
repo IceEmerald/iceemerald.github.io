@@ -6284,19 +6284,27 @@ class SlidesApp {
         const isShape = el?.type === 'shape';
         const isImg   = el?.type === 'image';
         const hasEl   = !!el;
+        const setRibbonGroupEnabled = (group, enabled) => {
+            if (!group) return;
+            group.style.opacity = '';
+            group.style.pointerEvents = '';
+            Array.from(group.children).forEach((child) => {
+                const isLabel = child.classList.contains('group-label') || child.classList.contains('font-group-label');
+                child.style.opacity = isLabel || enabled ? '1' : '0.45';
+                child.style.pointerEvents = isLabel || enabled ? 'auto' : 'none';
+            });
+        };
 
         // Text format group visibility — dim + disable interaction when no text element is selected
         const tfg = document.getElementById('textFormatGroup');
         if (tfg) {
-            tfg.style.opacity = isText ? '1' : '0.45';
-            tfg.style.pointerEvents = isText ? 'auto' : 'none';
+            setRibbonGroupEnabled(tfg, isText);
         }
 
         // Paragraph group visibility — dim + disable interaction when no text element is selected
         const pg = document.getElementById('paragraphGroup');
         if (pg) {
-            pg.style.opacity = isText ? '1' : '0.45';
-            pg.style.pointerEvents = isText ? 'auto' : 'none';
+            setRibbonGroupEnabled(pg, isText);
         }
 
         // Shape Format contextual tab — show only when a shape is selected
@@ -6326,22 +6334,19 @@ class SlidesApp {
         // Arrange group: enable only when element selected
         const ag = document.getElementById('arrangeGroup');
         if (ag) {
-            ag.style.opacity = hasEl ? '1' : '0.45';
-            ag.style.pointerEvents = hasEl ? 'auto' : 'none';
+            setRibbonGroupEnabled(ag, hasEl);
         }
 
         // Background group — dim when no slide is active
         const bgGroup = document.getElementById('backgroundGroup');
         if (bgGroup) {
-            bgGroup.style.opacity = this.currentSlide ? '1' : '0.45';
-            bgGroup.style.pointerEvents = this.currentSlide ? 'auto' : 'none';
+            setRibbonGroupEnabled(bgGroup, !!this.currentSlide);
         }
 
         // Export group — dim when no presentation is open
         const expGroup = document.getElementById('exportGroup');
         if (expGroup) {
-            expGroup.style.opacity = this.pres ? '1' : '0.45';
-            expGroup.style.pointerEvents = this.pres ? 'auto' : 'none';
+            setRibbonGroupEnabled(expGroup, !!this.pres);
         }
 
         // Update format button active states
