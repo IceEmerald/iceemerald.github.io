@@ -31,6 +31,7 @@ const State = {
   speed: 30,
   variables: new Map(),
   changedVars: new Set(),
+  zoom: 1,
 };
 
 const VALID_TYPES = ['Integer', 'Real', 'String', 'Boolean'];
@@ -68,6 +69,7 @@ function serializeState() {
       alt: s.alt || null,
     })),
     pan: { x: State.pan.x, y: State.pan.y },
+    zoom: State.zoom,
     speed: State.speed,
     savedAt: Date.now(),
   };
@@ -85,8 +87,9 @@ function deserializeState(data) {
   if (data.pan && typeof data.pan.x === 'number') {
     State.pan.x = data.pan.x;
     State.pan.y = data.pan.y;
-    applyPan();
   }
+  State.zoom = clamp(typeof data.zoom === 'number' ? data.zoom : 1, 0.4, 2.5);
+  applyPan();
   if (typeof data.speed === 'number') {
     State.speed = data.speed;
     const slider = $('#speed-slider');
@@ -216,7 +219,7 @@ function defaultDataForType(type) {
     case 'terminal':   return { text: 'Start' };
     case 'declare':    return { names: ['x'], dataType: 'Integer', isArray: false, arraySize: 10 };
     case 'process':    return { variable: 'x', expression: '0' };
-    case 'input':      return { variable: 'x', prompt: '' };
+    case 'input':      return { variable: 'x' };
     case 'output':     return { expression: '"Hello"', newline: true };
     case 'decision':   return { expression: 'x > 0' };
     case 'loop':       return { expression: 'x < 10' };
@@ -246,7 +249,7 @@ function getDisplayText(shape) {
     case 'terminal':   return d.text || 'Start';
     case 'declare':    { const ns = getDeclareNames(d).map(n => d.isArray ? n + '[' + d.arraySize + ']' : n).join(', '); return ns + ' : ' + d.dataType; }
     case 'process':    return d.variable + ' = ' + d.expression;
-    case 'input':      return d.prompt ? '"' + d.prompt + '" -> ' + d.variable : d.variable;
+    case 'input':      return d.variable;
     case 'output':     return d.expression;
     case 'decision':   return d.expression;
     case 'loop':       return d.expression;
@@ -291,7 +294,7 @@ function migrateShape(shape) {
       else shape.data = { variable: 'x', expression: text };
       break;
     }
-    case 'input': shape.data = { variable: text.trim(), prompt: '' }; break;
+    case 'input': shape.data = { variable: text.trim() }; break;
     case 'output': shape.data = { expression: text, newline: true }; break;
     case 'decision': shape.data = { expression: text }; break;
     case 'loop': shape.data = { expression: text }; break;
@@ -657,8 +660,36 @@ State.pan = { x: 0, y: 0 };
 State.spaceHeld = false;
 
 function applyPan() {
-  $('#canvas-content').style.transform = 'translate(' + State.pan.x + 'px, ' + State.pan.y + 'px)';
+  $('#canvas-content').style.transform = 'translate(' + State.pan.x + 'px, ' + State.pan.y + 'px) scale(' + State.zoom + ')';
   $('#canvas-wrap').style.backgroundPosition = State.pan.x + 'px ' + State.pan.y + 'px';
+  $('#canvas-wrap').style.backgroundSize = (22 * State.zoom) + 'px ' + (22 * State.zoom) + 'px';
+}
+
+function canvasPointFromClient(clientX, clientY) {
+  const rect = $('#canvas-wrap').getBoundingClientRect();
+  return {
+    x: (clientX - rect.left - State.pan.x) / State.zoom,
+    y: (clientY - rect.top - State.pan.y) / State.zoom,
+  };
+}
+
+function setCanvasZoom(nextZoom, anchorClientX, anchorClientY) {
+  const wrap = $('#canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const oldZoom = State.zoom;
+  const newZoom = clamp(nextZoom, 0.4, 2.5);
+  if (Math.abs(newZoom - oldZoom) < 0.001) return;
+  const sx = anchorClientX - rect.left;
+  const sy = anchorClientY - rect.top;
+  const worldX = (sx - State.pan.x) / oldZoom;
+  const worldY = (sy - State.pan.y) / oldZoom;
+  State.zoom = newZoom;
+  State.pan.x = sx - worldX * newZoom;
+  State.pan.y = sy - worldY * newZoom;
+  applyPan();
+  renderConnections();
+  persistStateDebounced(400);
+  toast('canvas', ' Zoom ' + Math.round(State.zoom * 100) + '%');
 }
 
 $('#canvas-wrap').addEventListener('mousedown', (e) => {
@@ -677,8 +708,8 @@ $('#canvas-wrap').addEventListener('mousedown', (e) => {
       const fromId = target.dataset.id;
       const fromPort = handle.dataset.port;
       if (fromPort === 'in') return;
-      const rect = $('#canvas-wrap').getBoundingClientRect();
-      State.connecting = { fromId, fromPort, mouseX: e.clientX - rect.left - State.pan.x, mouseY: e.clientY - rect.top - State.pan.y };
+      const pt = canvasPointFromClient(e.clientX, e.clientY);
+      State.connecting = { fromId, fromPort, mouseX: pt.x, mouseY: pt.y };
       document.body.classList.add('connecting-mode');
       e.preventDefault();
       return;
@@ -687,11 +718,11 @@ $('#canvas-wrap').addEventListener('mousedown', (e) => {
     const wasSelected = State.selectedId === id;
     State.selectedId = id;
     const shape = getShape(id);
-    const rect = $('#canvas-wrap').getBoundingClientRect();
+    const pt = canvasPointFromClient(e.clientX, e.clientY);
     dragInfo = {
       id,
-      offsetX: e.clientX - rect.left - State.pan.x - shape.x,
-      offsetY: e.clientY - rect.top - State.pan.y - shape.y,
+      offsetX: pt.x - shape.x,
+      offsetY: pt.y - shape.y,
       startX: e.clientX,
       startY: e.clientY,
       moved: false,
@@ -710,7 +741,6 @@ $('#canvas-wrap').addEventListener('mousedown', (e) => {
 });
 
 document.addEventListener('mousemove', (e) => {
-  const rect = $('#canvas-wrap').getBoundingClientRect();
   if (panInfo) {
     State.pan.x = panInfo.panX + (e.clientX - panInfo.startX);
     State.pan.y = panInfo.panY + (e.clientY - panInfo.startY);
@@ -725,8 +755,9 @@ document.addEventListener('mousemove', (e) => {
     }
     const shape = getShape(dragInfo.id);
     if (shape) {
-      shape.x = e.clientX - rect.left - State.pan.x - dragInfo.offsetX;
-      shape.y = e.clientY - rect.top - State.pan.y - dragInfo.offsetY;
+      const pt = canvasPointFromClient(e.clientX, e.clientY);
+      shape.x = pt.x - dragInfo.offsetX;
+      shape.y = pt.y - dragInfo.offsetY;
       const el = document.querySelector('.shape[data-id="' + dragInfo.id + '"]');
       if (el) { el.style.left = shape.x + 'px'; el.style.top = shape.y + 'px'; }
       renderConnections();
@@ -734,11 +765,21 @@ document.addEventListener('mousemove', (e) => {
     }
   }
   if (State.connecting) {
-    State.connecting.mouseX = e.clientX - rect.left - State.pan.x;
-    State.connecting.mouseY = e.clientY - rect.top - State.pan.y;
+    const pt = canvasPointFromClient(e.clientX, e.clientY);
+    State.connecting.mouseX = pt.x;
+    State.connecting.mouseY = pt.y;
     renderConnections();
   }
 });
+
+$('#canvas-wrap').addEventListener('wheel', (e) => {
+  if (!e.ctrlKey) return;
+  if (e.target.closest('.fc-ribbon, .fc-palette, .fc-panel, .fc-brand-pill, .fc-file-bar')) return;
+  e.preventDefault();
+  const direction = e.deltaY > 0 ? -1 : 1;
+  const factor = direction > 0 ? 1.1 : 1 / 1.1;
+  setCanvasZoom(State.zoom * factor, e.clientX, e.clientY);
+}, { passive: false });
 
 document.addEventListener('mouseup', (e) => {
   if (panInfo) {
@@ -894,8 +935,8 @@ $$('.palette-item').forEach(item => {
   item.addEventListener('click', () => {
     const type = item.dataset.type;
     const rect = $('#canvas-wrap').getBoundingClientRect();
-    const x = rect.width / 2 - 70 + (Math.random() * 40 - 20) - State.pan.x;
-    const y = 60 + State.shapes.size * 6 - State.pan.y;
+    const x = (rect.width / 2 - State.pan.x) / State.zoom - 70 + (Math.random() * 40 - 20);
+    const y = (60 - State.pan.y) / State.zoom + State.shapes.size * 6;
     const shape = createShape(type, x, y);
     State.selectedId = shape.id;
     renderAll();
@@ -932,8 +973,8 @@ $('#canvas-wrap').addEventListener('drop', (e) => {
   e.preventDefault();
   const type = e.dataTransfer.getData('shape-type');
   if (!type) return;
-  const rect = $('#canvas-wrap').getBoundingClientRect();
-  const shape = createShape(type, e.clientX - rect.left - State.pan.x - 65, e.clientY - rect.top - State.pan.y - 22);
+  const pt = canvasPointFromClient(e.clientX, e.clientY);
+  const shape = createShape(type, pt.x - 65, pt.y - 22);
   State.selectedId = shape.id;
   renderAll();
 });
@@ -1140,9 +1181,9 @@ function showCanvasContextMenu(x, y) {
   const menu = $('#context-menu');
 
   // Canvas-space coordinates for "Add ... Here" actions.
-  const rect = $('#canvas-wrap').getBoundingClientRect();
-  const cx = x - rect.left - State.pan.x - 65;
-  const cy = y - rect.top  - State.pan.y - 22;
+  const pt = canvasPointFromClient(x, y);
+  const cx = pt.x - 65;
+  const cy = pt.y - 22;
 
   const addOptions = [
     { type: 'terminal',  label: 'Add Terminal' },
@@ -1445,15 +1486,13 @@ function openInputDialog(shape) {
   const d = shape.data;
   const dlg = createDialogShell(shape);
   dlg.body.innerHTML =
-    '<div class="prop-field"><label>Prompt</label>' +
-    '<input type="text" id="f-prompt" value="' + escapeHtml(d.prompt || '') + '" placeholder="e.g. Enter your age"></div>' +
     '<div class="prop-field"><label>Variable</label>' +
     '<input type="text" id="f-var" value="' + escapeHtml(d.variable || '') + '" placeholder="variable name"></div>';
   const varInput = dlg.body.querySelector('#f-var');
   varInput.focus(); varInput.select();
   dlg.okBtn.onclick = () => {
-    d.prompt = dlg.body.querySelector('#f-prompt').value.trim();
     d.variable = varInput.value.trim();
+    delete d.prompt;
     if (!d.variable) { toast('warn', ' Please enter a variable name', 'error'); return; }
     shape.text = getDisplayText(shape);
     renderAll(); dlg.close();
@@ -1874,7 +1913,7 @@ async function executeStep() {
           throw new Error('Variable "' + d.variable + '" has not been declared. Add a Declare statement first.');
         }
         const effectiveType = existing.type;
-        const inputVal = await promptInput(d.variable, effectiveType, d.prompt);
+        const inputVal = await promptInput(d.variable, effectiveType);
         if (inputVal === null) { State.execution.done = true; logInfo('— Program cancelled —'); break; }
         setVariable(d.variable, inputVal, effectiveType);
         State.execution.lastEdge = { from: shape.id, port: 'next' };
@@ -1971,7 +2010,7 @@ async function executeStep() {
 // ============================================================
 // INPUT MODAL
 // ============================================================
-function promptInput(varName, type, promptText) {
+function promptInput(varName, type) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -1979,7 +2018,7 @@ function promptInput(varName, type, promptText) {
     const placeholder = type === 'Boolean' ? 'true or false' : type === 'Integer' ? 'e.g. 42' : type === 'Real' ? 'e.g. 3.14' : type === 'String' ? 'type any text' : 'type a value';
     overlay.innerHTML =
       '<div class="prop-dialog" style="max-width:440px;">' +
-        buildModalHeader('gold', HELP_ICONS.input, promptText ? promptText : 'Input Required') +
+        buildModalHeader('gold', HELP_ICONS.input, 'Input Required') +
         '<div class="prop-body">' +
           '<div class="prop-field"><label>Variable: <code style="color:#239a4d;font-family:var(--fc-mono);">' + escapeHtml(varName) + '</code> &nbsp; Type: <code style="color:#2a8a44;font-family:var(--fc-mono);">' + typeLabel + '</code></label>' +
           '<input type="text" id="input-value" autocomplete="off" spellcheck="false" placeholder="' + placeholder + '">' +
@@ -2324,6 +2363,270 @@ function saveProgram() {
   }
 }
 
+function cssVar(name, fallback) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function getFlowchartBounds(padding = 56) {
+  if (!State.shapes.size) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  State.shapes.forEach(shape => {
+    const sz = getShapeSize(shape);
+    minX = Math.min(minX, shape.x);
+    minY = Math.min(minY, shape.y);
+    maxX = Math.max(maxX, shape.x + sz.w);
+    maxY = Math.max(maxY, shape.y + sz.h);
+  });
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    w: Math.max(1, maxX - minX + padding * 2),
+    h: Math.max(1, maxY - minY + padding * 2)
+  };
+}
+
+function roundedRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+  ctx.lineTo(x + w, y + h - rr);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  ctx.lineTo(x + rr, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+  ctx.lineTo(x, y + rr);
+  ctx.quadraticCurveTo(x, y, x + rr, y);
+  ctx.closePath();
+}
+
+function polygonPath(ctx, points) {
+  ctx.beginPath();
+  points.forEach((p, i) => i === 0 ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]));
+  ctx.closePath();
+}
+
+function drawWrappedText(ctx, text, x, y, w, h, options = {}) {
+  const fontSize = options.fontSize || 12.5;
+  const lineHeight = options.lineHeight || 16;
+  const maxLines = Math.max(1, Math.floor((h - 10) / lineHeight));
+  ctx.font = (options.weight ? options.weight + ' ' : '') + fontSize + 'px "DM Mono", monospace';
+  ctx.fillStyle = options.color || cssVar('--fc-text-strong', '#1f2933');
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  const pushLongWord = (word) => {
+    let chunk = '';
+    Array.from(word).forEach(ch => {
+      const next = chunk + ch;
+      if (ctx.measureText(next).width <= w || !chunk) {
+        chunk = next;
+      } else {
+        lines.push(chunk);
+        chunk = ch;
+      }
+    });
+    line = chunk;
+  };
+  words.forEach(word => {
+    const next = line ? line + ' ' + word : word;
+    if (ctx.measureText(next).width <= w) {
+      line = next;
+    } else {
+      if (line) lines.push(line);
+      if (ctx.measureText(word).width > w) pushLongWord(word);
+      else line = word;
+    }
+  });
+  if (line) lines.push(line);
+  if (!lines.length) lines.push('');
+  const visible = lines.slice(0, maxLines);
+  if (lines.length > maxLines && visible.length) {
+    let last = visible[visible.length - 1];
+    while (last.length > 1 && ctx.measureText(last + '...').width > w) last = last.slice(0, -1);
+    visible[visible.length - 1] = last + '...';
+  }
+  const startY = y + h / 2 - ((visible.length - 1) * lineHeight) / 2;
+  visible.forEach((l, i) => ctx.fillText(l, x + w / 2, startY + i * lineHeight));
+}
+
+function drawExportConnection(ctx, fromShape, portName, toShape, label) {
+  const start = getPortPos(fromShape, portName);
+  const end = getPortPos(toShape, 'in');
+  const dx = end.x - start.x, dy = end.y - start.y;
+  const adx = Math.abs(dx), ady = Math.abs(dy);
+  const r = Math.min(8, adx / 2, ady / 2, 12);
+  let arrowFrom = { x: start.x, y: start.y };
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  if (adx < 3 || ady < 3) {
+    ctx.lineTo(end.x, end.y);
+  } else if (ady >= adx) {
+    const midY = start.y + dy / 2;
+    const sy = dy > 0 ? 1 : -1;
+    const sx = dx > 0 ? 1 : -1;
+    ctx.lineTo(start.x, midY - sy * r);
+    ctx.quadraticCurveTo(start.x, midY, start.x + sx * r, midY);
+    ctx.lineTo(end.x - sx * r, midY);
+    ctx.quadraticCurveTo(end.x, midY, end.x, midY + sy * r);
+    ctx.lineTo(end.x, end.y);
+    arrowFrom = { x: end.x, y: midY + sy * r };
+  } else {
+    const midX = start.x + dx / 2;
+    const sx = dx > 0 ? 1 : -1;
+    const sy = dy > 0 ? 1 : -1;
+    ctx.lineTo(midX - sx * r, start.y);
+    ctx.quadraticCurveTo(midX, start.y, midX, start.y + sy * r);
+    ctx.lineTo(midX, end.y - sy * r);
+    ctx.quadraticCurveTo(midX, end.y, midX + sx * r, end.y);
+    ctx.lineTo(end.x, end.y);
+    arrowFrom = { x: midX + sx * r, y: end.y };
+  }
+  ctx.strokeStyle = 'rgba(44, 62, 80, 0.62)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  const angle = Math.atan2(end.y - arrowFrom.y, end.x - arrowFrom.x);
+  const arrowLen = 9;
+  ctx.beginPath();
+  ctx.moveTo(end.x, end.y);
+  ctx.lineTo(end.x - arrowLen * Math.cos(angle - Math.PI / 6), end.y - arrowLen * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(end.x - arrowLen * Math.cos(angle + Math.PI / 6), end.y - arrowLen * Math.sin(angle + Math.PI / 6));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(44, 62, 80, 0.62)';
+  ctx.fill();
+
+  if (['decision', 'loop', 'for', 'do'].includes(fromShape.type) && label) {
+    const lblX = start.x + (end.x - start.x) * 0.25;
+    const lblY = start.y + (end.y - start.y) * 0.25;
+    roundedRectPath(ctx, lblX - 8, lblY - 9, 16, 16, 3);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.14)';
+    ctx.lineWidth = 0.75;
+    ctx.stroke();
+    ctx.font = '700 11px "DM Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = cssVar('--fc-text', '#2c3e50');
+    ctx.fillText(label, lblX, lblY);
+  }
+}
+
+function drawExportShape(ctx, shape) {
+  const sz = getShapeSize(shape);
+  const x = shape.x, y = shape.y, w = sz.w, h = sz.h;
+  const styles = {
+    terminal: [cssVar('--shape-terminal-bg', '#e9f7ef'), cssVar('--shape-terminal-bd', '#239a4d')],
+    declare: [cssVar('--shape-terminal-bg', '#e9f7ef'), cssVar('--shape-terminal-bd', '#239a4d')],
+    process: [cssVar('--shape-terminal-bg', '#e9f7ef'), cssVar('--shape-terminal-bd', '#239a4d')],
+    input: [cssVar('--shape-input-bg', '#d6ecf5'), cssVar('--shape-input-bd', '#3b7a99')],
+    output: [cssVar('--shape-output-bg', '#fff3cd'), cssVar('--shape-output-bd', '#b48608')],
+    loop: [cssVar('--shape-loop-bg', '#f3e8ff'), cssVar('--shape-loop-bd', '#7c3aed')],
+    for: [cssVar('--shape-loop-bg', '#f3e8ff'), cssVar('--shape-loop-bd', '#7c3aed')],
+    do: [cssVar('--shape-loop-bg', '#f3e8ff'), cssVar('--shape-loop-bd', '#7c3aed')],
+    decision: [cssVar('--shape-decision-bg', '#fde2e2'), cssVar('--shape-decision-bd', '#c92a2a')],
+    call: [cssVar('--shape-call-bg', '#e7f0ff'), cssVar('--shape-call-bd', '#2563eb')],
+    comment: ['rgba(255, 255, 255, 0.96)', 'rgba(0, 0, 0, 0.35)'],
+    breakpoint: [cssVar('--shape-breakpoint-bg', '#fee2e2'), cssVar('--shape-breakpoint-bd', '#b91c1c')]
+  };
+  const [fill, stroke] = styles[shape.type] || styles.process;
+  ctx.save();
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = shape.type === 'comment' ? 1.25 : 2;
+  ctx.setLineDash(shape.type === 'comment' ? [5, 4] : []);
+
+  if (shape.type === 'terminal') {
+    roundedRectPath(ctx, x, y, w, h, h / 2);
+  } else if (shape.type === 'input' || shape.type === 'output') {
+    polygonPath(ctx, [[x + 12, y], [x + w, y], [x + w - 12, y + h], [x, y + h]]);
+  } else if (shape.type === 'decision') {
+    polygonPath(ctx, [[x + w / 2, y], [x + w, y + h / 2], [x + w / 2, y + h], [x, y + h / 2]]);
+  } else if (['loop', 'for', 'do'].includes(shape.type)) {
+    polygonPath(ctx, [[x + w * 0.12, y], [x + w * 0.88, y], [x + w, y + h / 2], [x + w * 0.88, y + h], [x + w * 0.12, y + h], [x, y + h / 2]]);
+  } else if (shape.type === 'breakpoint') {
+    polygonPath(ctx, [[x + w * 0.3, y], [x + w * 0.7, y], [x + w, y + h * 0.3], [x + w, y + h * 0.7], [x + w * 0.7, y + h], [x + w * 0.3, y + h], [x, y + h * 0.7], [x, y + h * 0.3]]);
+  } else {
+    roundedRectPath(ctx, x, y, w, h, shape.type === 'comment' ? 4 : 3);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  if (shape.type === 'declare') {
+    ctx.setLineDash([]);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 5, y + 5);
+    ctx.lineTo(x + w - 5, y + 5);
+    ctx.moveTo(x + 5, y + 5);
+    ctx.lineTo(x + 5, y + h - 5);
+    ctx.stroke();
+  }
+  if (shape.type === 'call') {
+    ctx.setLineDash([]);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + 3);
+    ctx.lineTo(x + 10, y + h - 3);
+    ctx.moveTo(x + w - 10, y + 3);
+    ctx.lineTo(x + w - 10, y + h - 3);
+    ctx.stroke();
+  }
+
+  const displayText = shape.type === 'terminal' ? getDisplayText(shape).toUpperCase() : getDisplayText(shape);
+  drawWrappedText(ctx, displayText, x + 10, y + 4, w - 20, h - 8, {
+    fontSize: shape.type === 'terminal' ? 11.5 : 12.5,
+    weight: shape.type === 'terminal' ? '700' : '',
+    color: shape.type === 'comment' ? cssVar('--fc-text-muted', '#64748b') : cssVar('--fc-text-strong', '#1f2933')
+  });
+  ctx.restore();
+}
+
+function exportFlowchartPng() {
+  const bounds = getFlowchartBounds();
+  if (!bounds) { toast('warn', ' Nothing to export yet.', 'error'); return; }
+  const scale = 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(bounds.w * scale);
+  canvas.height = Math.ceil(bounds.h * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.translate(-bounds.x, -bounds.y);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+
+  State.shapes.forEach(shape => {
+    if (shape.next) {
+      const to = getShape(shape.next);
+      if (to) drawExportConnection(ctx, shape, 'next', to, 'T');
+    }
+    if (shape.alt) {
+      const to = getShape(shape.alt);
+      if (to) drawExportConnection(ctx, shape, 'alt', to, 'F');
+    }
+  });
+  Array.from(State.shapes.values())
+    .sort((a, b) => a.y - b.y || a.x - b.x)
+    .forEach(shape => drawExportShape(ctx, shape));
+
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.download = 'flowchart-' + date + '.png';
+  a.href = canvas.toDataURL('image/png');
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('check', ' Flowchart exported as PNG', 'success');
+}
+
 function loadProgram() {
   const input = $('#file-input');
   // Set the handler BEFORE opening the picker so the change
@@ -2409,8 +2712,8 @@ function centerViewOnShapes() {
     maxY = Math.max(maxY, sh.y + h);
   });
   const wrap = $('#canvas-wrap');
-  State.pan.x = Math.round((wrap.clientWidth - (maxX - minX)) / 2 - minX);
-  State.pan.y = Math.round((wrap.clientHeight - (maxY - minY)) / 2 - minY);
+  State.pan.x = Math.round((wrap.clientWidth - (maxX - minX) * State.zoom) / 2 - minX * State.zoom);
+  State.pan.y = Math.round((wrap.clientHeight - (maxY - minY) * State.zoom) / 2 - minY * State.zoom);
   applyPan();
   renderConnections();
 }
@@ -2430,7 +2733,7 @@ function loadExample() {
   const decl = createShape('declare', 300, 100);
   decl.data = { names: ['n', 'sum'], dataType: 'Integer', isArray: false, arraySize: 0 };
   const inp = createShape('input', 300, 170);
-  inp.data = { variable: 'n', prompt: 'Enter a number' };
+  inp.data = { variable: 'n' };
   const init = createShape('process', 300, 310);
   init.data = { variable: 'sum', expression: '0' };
   const forl = createShape('for', 300, 380);
@@ -2487,8 +2790,9 @@ $('#btn-stop').onclick = stopProgram;
 $('#btn-reset').onclick = resetProgram;
 $('#btn-clear-console').onclick = clearConsole;
 
-// Top-right File toolbar (Save / Open / Clear)
+// Top-right File toolbar (Save / PNG / Open / Clear)
 $('#btn-save').onclick = saveProgram;
+$('#btn-export-png').onclick = exportFlowchartPng;
 $('#btn-open').onclick = loadProgram;
 $('#btn-clear').onclick = async () => {
   if (State.shapes.size > 0) {
