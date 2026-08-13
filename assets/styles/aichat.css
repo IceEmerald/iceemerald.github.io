@@ -6506,7 +6506,7 @@ body.light-mode .img-gen-loading-title {
 .img-gen-image {
     display: block;
     width: 100%;
-    max-width: 720px;
+    max-width: 400px;
     max-height: none;
     height: auto;
     border-radius: 12px;
