@@ -2399,7 +2399,7 @@ async function handleSend(opts) {
   if (_wsNeeded) {
     if (urlsInMsg.length) {
       for (const url of urlsInMsg.slice(0, 3)) {
-        _webSources.push({ title: url, uri: url });
+        _webSources.push({ title: "", uri: url });
       }
       for (const url of urlsInMsg.slice(0, 3)) {
         const ghMatch = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/?#]+)/);
@@ -2473,6 +2473,7 @@ async function handleSend(opts) {
   let _usedModelName = "";
   const _streamOpts = {
     useUrlContext: urlsInMsg.length > 0,
+    useWebSearch: _wsNeeded,
     userText: text,
     files
   };
@@ -2522,7 +2523,16 @@ async function handleSend(opts) {
   try {
     let _streamResult = await _doStream(history);
     let finishReason = _streamResult.finishReason;
-    if (_streamResult.groundingMetadata) _groundingMetadata = _streamResult.groundingMetadata;
+    if (_streamResult.groundingMetadata) {
+      // Merge grounding chunks from continuations instead of overwriting
+      if (_groundingMetadata?.groundingChunks) {
+        const existingUris = new Set(_groundingMetadata.groundingChunks.map(c => c?.web?.uri));
+        const newChunks = (_streamResult.groundingMetadata.groundingChunks || []).filter(c => !existingUris.has(c?.web?.uri));
+        _groundingMetadata = { groundingChunks: [..._groundingMetadata.groundingChunks, ...newChunks] };
+      } else {
+        _groundingMetadata = _streamResult.groundingMetadata;
+      }
+    }
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -2543,7 +2553,16 @@ async function handleSend(opts) {
       ];
       _streamResult = await _doStream(contHistory);
       finishReason = _streamResult.finishReason;
-      if (_streamResult.groundingMetadata) _groundingMetadata = _streamResult.groundingMetadata;
+      if (_streamResult.groundingMetadata) {
+      // Merge grounding chunks from continuations instead of overwriting
+      if (_groundingMetadata?.groundingChunks) {
+        const existingUris = new Set(_groundingMetadata.groundingChunks.map(c => c?.web?.uri));
+        const newChunks = (_streamResult.groundingMetadata.groundingChunks || []).filter(c => !existingUris.has(c?.web?.uri));
+        _groundingMetadata = { groundingChunks: [..._groundingMetadata.groundingChunks, ...newChunks] };
+      } else {
+        _groundingMetadata = _streamResult.groundingMetadata;
+      }
+    }
     }
     if (continueEl) continueEl.remove();
   } catch (err) {
@@ -2652,10 +2671,10 @@ async function handleSend(opts) {
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
-    if (_allSources.length) {
-      renderCitations(aiDiv, _allSources);
-      _stripSourcesFromHTML(textEl); // Remove AI-written Sources: list (pills already show them)
-    }
+    // Always render citations (converts [N] to orphan badges when no sources).
+    // Only strip the AI-written "Sources:" list when we have actual source chips.
+    renderCitations(aiDiv, _allSources);
+    if (_allSources.length) _stripSourcesFromHTML(textEl);
     aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(msgId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
@@ -2896,8 +2915,16 @@ async function regenerateMessage(msgEl) {
         appendReasoningToBlock(_reasoningBlock, chunk);
         scrollToBottom();
       }
-    });
-    _groundingMetadata = _streamResult.groundingMetadata;
+    }, { useWebSearch: _wsNeeded });
+    if (_streamResult.groundingMetadata) {
+      if (_groundingMetadata?.groundingChunks) {
+        const existingUris = new Set(_groundingMetadata.groundingChunks.map(c => c?.web?.uri));
+        const newChunks = (_streamResult.groundingMetadata.groundingChunks || []).filter(c => !existingUris.has(c?.web?.uri));
+        _groundingMetadata = { groundingChunks: [..._groundingMetadata.groundingChunks, ...newChunks] };
+      } else {
+        _groundingMetadata = _streamResult.groundingMetadata;
+      }
+    }
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -2980,10 +3007,8 @@ async function regenerateMessage(msgEl) {
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
-    if (_allSources.length) {
-      renderCitations(aiDiv, _allSources);
-      _stripSourcesFromHTML(textEl);
-    }
+    renderCitations(aiDiv, _allSources);
+    if (_allSources.length) _stripSourcesFromHTML(textEl);
     aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(newId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
@@ -3057,6 +3082,7 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
     memories: loadMemories(),
     userDisplayName: (loadSettings().userName || "").trim() || null,
     useUrlContext: !!options.useUrlContext,
+    useWebSearch: !!options.useWebSearch,
     tools: options.tools || [],
     reasoning: isReasoningEnabled()
   };
@@ -3218,11 +3244,22 @@ function extractGroundingSources(groundingMetadata) {
           const u = new URL(uri);
           const pathSegs = u.pathname.split("/").filter(Boolean);
           if (pathSegs.length) {
+            // Use the last meaningful path segment as title
             displayTitle = decodeURIComponent(pathSegs[pathSegs.length - 1]).replace(/[-_]/g, " ");
+            // Clean up common file extensions and numeric IDs
+            displayTitle = displayTitle.replace(/\.\w{1,5}$/, "").replace(/^\d+[-_]?\s*/, "");
             if (displayTitle.length > 1) displayTitle = displayTitle[0].toUpperCase() + displayTitle.slice(1);
             if (displayTitle.length > 60) displayTitle = displayTitle.slice(0, 57) + "...";
           } else {
-            displayTitle = "";
+            // No path segments — try hostname as fallback (stripped of www. and TLD)
+            const host = u.hostname.replace(/^www\./, "");
+            const parts = host.split(".");
+            if (parts.length > 1) {
+              displayTitle = parts[0];
+              if (displayTitle.length > 1) displayTitle = displayTitle[0].toUpperCase() + displayTitle.slice(1);
+            } else {
+              displayTitle = "";
+            }
           }
         } catch { displayTitle = ""; }
       }
@@ -4813,8 +4850,16 @@ async function submitUserMsgEdit(msgId) {
         appendReasoningToBlock(_reasoningBlock, chunk);
         scrollToBottom();
       }
-    });
-    _groundingMetadata = _streamResult.groundingMetadata;
+    }, { useWebSearch: _wsNeeded });
+    if (_streamResult.groundingMetadata) {
+      if (_groundingMetadata?.groundingChunks) {
+        const existingUris = new Set(_groundingMetadata.groundingChunks.map(c => c?.web?.uri));
+        const newChunks = (_streamResult.groundingMetadata.groundingChunks || []).filter(c => !existingUris.has(c?.web?.uri));
+        _groundingMetadata = { groundingChunks: [..._groundingMetadata.groundingChunks, ...newChunks] };
+      } else {
+        _groundingMetadata = _streamResult.groundingMetadata;
+      }
+    }
     if (_streamResult.modelId) {
       _usedModelId = _streamResult.modelId;
       const _m = getModelById(_usedModelId);
@@ -4911,10 +4956,8 @@ async function submitUserMsgEdit(msgId) {
     }
     const _groundingSources = extractGroundingSources(_groundingMetadata);
     const _allSources = [..._groundingSources, ..._webSources];
-    if (_allSources.length) {
-      renderCitations(aiDiv, _allSources);
-      _stripSourcesFromHTML(textEl);
-    }
+    renderCitations(aiDiv, _allSources);
+    if (_allSources.length) _stripSourcesFromHTML(textEl);
     aiDiv.querySelector(".message-body").appendChild(buildMessageActionsEl(aiMsgId));
     if (aiDiv) {
       aiDiv.dataset.modelId = _usedModelId || "";
@@ -5367,21 +5410,42 @@ function _stripSourcesFromHTML(textEl) {
 }
 
 function renderCitations(aiDiv, sources) {
-  if (!sources?.length) return;
+  // Always process [N] patterns — even without sources, convert them to
+  // orphan badges so they're not left as raw "[1]" plain text.
+  if (!sources) sources = [];
   const body = aiDiv?.querySelector(".message-body");
   if (!body) return;
 
   // ── Step 1: Convert inline [1], [2], [1][2] citations to clickable superscript badges ──
   const mdContent = body.querySelector(".md-content") || body;
-  if (mdContent && sources.length) {
+  if (mdContent) {
     // Walk text nodes to replace [N] patterns without breaking HTML
+    // Skip text nodes inside <code> and <pre> elements — those should stay as-is
     const walker = document.createTreeWalker(mdContent, NodeFilter.SHOW_TEXT, null, false);
     const textNodes = [];
-    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    while (walker.nextNode()) {
+      const n = walker.currentNode;
+      // Skip if inside a <code> or <pre> tag
+      let p = n.parentElement;
+      let skip = false;
+      while (p && p !== mdContent) {
+        if (p.tagName === 'CODE' || p.tagName === 'PRE') { skip = true; break; }
+        p = p.parentElement;
+      }
+      if (!skip) textNodes.push(n);
+    }
 
     for (const node of textNodes) {
-      // Match [N] where N is 1-99 — also handle clustered like [1][2]
-      const replaced = node.nodeValue.replace(/\[(\d{1,2})\]/g, (match, numStr) => {
+      // Match [N], [N,M], [N-M] where N is 1-99 — also handle clustered like [1][2]
+      // First pass: expand compound citations like [1,2] → [1][2] and [1-3] → [1][2][3]
+      let expanded = node.nodeValue.replace(/\[(\d{1,2})\s*,\s*(\d{1,2})\]/g, '[$1][$2]');
+      expanded = expanded.replace(/\[(\d{1,2})\s*-\s*(\d{1,2})\]/g, (_, start, end) => {
+        let out = '';
+        for (let n = parseInt(start); n <= Math.min(parseInt(end), 99); n++) out += `[${n}]`;
+        return out;
+      });
+      // Second pass: convert each [N] to a marker
+      const replaced = expanded.replace(/\[(\d{1,2})\]/g, (match, numStr) => {
         const idx = parseInt(numStr, 10) - 1;
         if (idx >= 0 && idx < sources.length && sources[idx]?.uri) {
           return `\x01CITE${idx}\x01`;  // Has source → clickable link
@@ -5448,10 +5512,14 @@ function renderCitations(aiDiv, sources) {
     try {
       host = new URL(s.uri).hostname.replace(/^www\./, "");
     } catch {}
-    // Build chip text: "domain" or "domain > Title"
+    // Build chip text: "domain" or "domain › Title"
     let displayTitle = s.title || "";
     if (displayTitle && displayTitle.includes("://")) {
       // Title is actually a URL — strip it
+      displayTitle = "";
+    }
+    // If title is just the domain repeated (e.g. "example.com" for example.com url), skip it
+    if (displayTitle && host && (displayTitle === host || displayTitle === "www." + host)) {
       displayTitle = "";
     }
     // Truncate very long titles

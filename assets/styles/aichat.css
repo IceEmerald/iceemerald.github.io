@@ -1432,6 +1432,8 @@ body.light-mode .message-avatar-user {
     margin-top: 10px;
     padding-top: 10px;
     border-top: 1px solid rgb(35, 35, 35);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .esb-citations-query {
@@ -1459,11 +1461,17 @@ body.light-mode .message-avatar-user {
     line-height: 1;
     transition: background 0.15s, color 0.15s;
     cursor: pointer;
+    position: relative;
+    top: -2px;
 }
 .esb-inline-cite:hover {
     background: rgba(80, 200, 120, 0.3);
     color: rgb(120, 230, 150);
     text-decoration: none;
+}
+.esb-inline-cite:focus-visible {
+    outline: 2px solid rgb(80, 200, 120);
+    outline-offset: 1px;
 }
 .esb-cite-orphan {
     background: rgba(80, 200, 120, 0.08);
@@ -1497,9 +1505,14 @@ body.light-mode .esb-cite-orphan {
     text-decoration: none;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
     max-width: 280px;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.esb-citation-chip svg {
+    flex-shrink: 0;
+    opacity: 0.5;
 }
 
 .esb-citation-chip:hover {
@@ -1525,6 +1538,10 @@ body.light-mode .esb-citation-chip {
 body.light-mode .esb-citation-chip:hover {
     background: rgb(235, 235, 235);
     color: rgb(51, 51, 51);
+    border-color: rgb(200, 200, 200);
+}
+body.light-mode .esb-citation-chip svg {
+    opacity: 0.4;
 }
 
 .chat-textarea {
