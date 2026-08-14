@@ -2678,7 +2678,8 @@ async function handleSend(opts) {
         // Persist the reasoning text so the collapsible "Reasoning" panel
         // can be re-rendered on page reload. Stored separately from `text`
         // so buildHistory never sends reasoning back to Gemini.
-        reasoning: _reasoningText || void 0
+        reasoning: _reasoningText || void 0,
+        sources: _allSources.length ? _allSources.map(s => ({ title: s.title || '', uri: s.uri })) : void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -3002,7 +3003,8 @@ async function regenerateMessage(msgEl) {
       quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
       quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
       imagePrompt: imgPrompt || void 0,
-      reasoning: _reasoningText || void 0
+      reasoning: _reasoningText || void 0,
+      sources: _allSources.length ? _allSources.map(s => ({ title: s.title || '', uri: s.uri })) : void 0
     };
     aiDiv.dataset.regenBranchRef = regenBranchId;
     conv.messages.push(savedMsg);
@@ -3209,8 +3211,22 @@ function extractGroundingSources(groundingMetadata) {
     const title = chunk?.web?.title || "";
     if (uri && !seen.has(uri)) {
       seen.add(uri);
-      // Use actual title if available; otherwise empty string so renderCitations falls back to hostname
-      sources.push({ title: title && title !== uri ? title : "", uri });
+      let displayTitle = title;
+      if (!displayTitle || displayTitle === uri || displayTitle.includes("://")) {
+        // Gemini didn't provide a real title — try to extract a readable one from the URL
+        try {
+          const u = new URL(uri);
+          const pathSegs = u.pathname.split("/").filter(Boolean);
+          if (pathSegs.length) {
+            displayTitle = decodeURIComponent(pathSegs[pathSegs.length - 1]).replace(/[-_]/g, " ");
+            if (displayTitle.length > 1) displayTitle = displayTitle[0].toUpperCase() + displayTitle.slice(1);
+            if (displayTitle.length > 60) displayTitle = displayTitle.slice(0, 57) + "...";
+          } else {
+            displayTitle = "";
+          }
+        } catch { displayTitle = ""; }
+      }
+      sources.push({ title: displayTitle, uri });
     }
   }
   return sources;
@@ -4372,6 +4388,10 @@ function appendStoredAIMessage(m) {
     // First time or no cached results → fetch from API and cache
     processImageSearchTags(div, state.convId, m.id);
   }
+  // ── Restore citations from persisted sources ──
+  if (m.sources && Array.isArray(m.sources) && m.sources.length) {
+    renderCitations(div, m.sources);
+  }
   return div;
 }
 function _extractQuiz(text) {
@@ -4914,7 +4934,8 @@ async function submitUserMsgEdit(msgId) {
         quizTextBefore: (quizData || _quizParseFailed) ? beforeQuizText : void 0,
         quizTextAfter: (quizData || _quizParseFailed) ? afterQuizText : void 0,
         imagePrompt: imgPrompt || void 0,
-        reasoning: _reasoningText || void 0
+        reasoning: _reasoningText || void 0,
+        sources: _allSources.length ? _allSources.map(s => ({ title: s.title || '', uri: s.uri })) : void 0
       });
       conv.updatedAt = Date.now();
       upsertConv(conv);
@@ -5439,6 +5460,8 @@ function renderCitations(aiDiv, sources) {
     if (displayTitle && displayTitle !== host) {
       chipText = host + " › " + displayTitle;
     }
+    // Tooltip shows full title+URL on hover (useful when chip text is truncated)
+    a.title = (displayTitle || host) + "\n" + s.uri;
     a.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>${escapeHtml(chipText)}`;
     wrap.appendChild(a);
   });

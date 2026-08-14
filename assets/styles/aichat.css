@@ -1513,10 +1513,10 @@ body.light-mode .esb-citations {
 }
 
 body.light-mode .esb-citations-query {
-    color: rgb(170, 170, 170);
+    color: rgb(100, 100, 100);
 }
 
-.esb-citation-chip {
+body.light-mode .esb-citation-chip {
     background: rgb(245, 245, 245);
     border-color: rgb(224, 224, 224);
     color: rgb(102, 102, 102);
