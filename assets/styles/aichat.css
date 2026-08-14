@@ -1465,6 +1465,12 @@ body.light-mode .message-avatar-user {
     color: rgb(120, 230, 150);
     text-decoration: none;
 }
+.esb-cite-orphan {
+    background: rgba(80, 200, 120, 0.08);
+    color: rgb(130, 130, 130);
+    cursor: default;
+    pointer-events: none;
+}
 body.light-mode .esb-inline-cite {
     background: rgba(0, 130, 70, 0.1);
     color: rgb(0, 130, 70);
@@ -1472,6 +1478,10 @@ body.light-mode .esb-inline-cite {
 body.light-mode .esb-inline-cite:hover {
     background: rgba(0, 130, 70, 0.2);
     color: rgb(0, 100, 50);
+}
+body.light-mode .esb-cite-orphan {
+    background: rgba(0, 0, 0, 0.05);
+    color: rgb(140, 140, 140);
 }
 
 .esb-citation-chip {
@@ -1486,11 +1496,10 @@ body.light-mode .esb-inline-cite:hover {
     color: rgb(136, 136, 136);
     text-decoration: none;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
-    max-width: 100%;
+    max-width: 280px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    word-break: break-all;
 }
 
 .esb-citation-chip:hover {

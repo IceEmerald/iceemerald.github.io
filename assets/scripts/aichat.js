@@ -5363,29 +5363,47 @@ function renderCitations(aiDiv, sources) {
       const replaced = node.nodeValue.replace(/\[(\d{1,2})\]/g, (match, numStr) => {
         const idx = parseInt(numStr, 10) - 1;
         if (idx >= 0 && idx < sources.length && sources[idx]?.uri) {
-          return `\x01CITE${idx}\x01`;
+          return `\x01CITE${idx}\x01`;  // Has source → clickable link
         }
-        return match; // Leave [N] as-is if no matching source
+        return `\x01ORPHAN${numStr}\x01`;  // No source → styled badge (not clickable)
       });
       if (replaced !== node.nodeValue) {
         // Split into parts: text + <a> citations
-        const parts = replaced.split(/\x01CITE(\d+)\x01/);
+        // Split on both CITE and ORPHAN markers
+        const parts = replaced.split(/\x01(?:CITE|ORPHAN)(\d+)\x01/);
+        const types = [];
+        // Track which marker type each split came from
+        const markerRe = /\x01(CITE|ORPHAN)(\d+)\x01/g;
+        let m;
+        while ((m = markerRe.exec(replaced)) !== null) types.push({ type: m[1], idx: parseInt(m[2], 10), pos: m.index });
         const frag = document.createDocumentFragment();
         for (let i = 0; i < parts.length; i++) {
           if (i % 2 === 0) {
             // Text part
             if (parts[i]) frag.appendChild(document.createTextNode(parts[i]));
           } else {
-            // Citation index
-            const srcIdx = parseInt(parts[i], 10);
-            const src = sources[srcIdx];
-            const citeLink = document.createElement("a");
-            citeLink.className = "esb-inline-cite";
-            citeLink.href = src.uri;
-            citeLink.target = "_blank";
-            citeLink.rel = "noopener noreferrer";
-            citeLink.textContent = String(srcIdx + 1);
-            frag.appendChild(citeLink);
+            // Marker part (odd indices are the captured group from split)
+            const markerIdx = Math.floor(i / 2);
+            const marker = markerIdx < types.length ? types[markerIdx] : null;
+            if (marker && marker.type === "CITE") {
+              // Has source → clickable link
+              const src = sources[marker.idx];
+              if (src?.uri) {
+                const citeLink = document.createElement("a");
+                citeLink.className = "esb-inline-cite";
+                citeLink.href = src.uri;
+                citeLink.target = "_blank";
+                citeLink.rel = "noopener noreferrer";
+                citeLink.textContent = String(marker.idx + 1);
+                frag.appendChild(citeLink);
+              }
+            } else {
+              // No source → styled badge (not clickable)
+              const badge = document.createElement("span");
+              badge.className = "esb-inline-cite esb-cite-orphan";
+              badge.textContent = String(parseInt(parts[i], 10));
+              frag.appendChild(badge);
+            }
           }
         }
         node.parentNode.replaceChild(frag, node);
@@ -5409,13 +5427,19 @@ function renderCitations(aiDiv, sources) {
     try {
       host = new URL(s.uri).hostname.replace(/^www\./, "");
     } catch {}
-    // Clean title: if title contains the URL itself, strip it — just show hostname
+    // Build chip text: "domain" or "domain > Title"
     let displayTitle = s.title || "";
     if (displayTitle && displayTitle.includes("://")) {
-      // Title is actually a URL — don't show it, fall back to hostname
+      // Title is actually a URL — strip it
       displayTitle = "";
     }
-    a.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>${escapeHtml(displayTitle || host || "Source")}`;
+    // Truncate very long titles
+    if (displayTitle.length > 60) displayTitle = displayTitle.slice(0, 57) + "...";
+    let chipText = host || "Source";
+    if (displayTitle && displayTitle !== host) {
+      chipText = host + " › " + displayTitle;
+    }
+    a.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>${escapeHtml(chipText)}`;
     wrap.appendChild(a);
   });
   if (wrap.children.length) body.insertAdjacentElement("beforeend", wrap);
