@@ -1441,6 +1441,39 @@ body.light-mode .message-avatar-user {
     margin-bottom: 2px;
 }
 
+.esb-inline-cite {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    margin: 0 1px;
+    border-radius: 4px;
+    background: rgba(80, 200, 120, 0.15);
+    color: rgb(80, 200, 120);
+    font-size: 0.7em;
+    font-weight: 600;
+    text-decoration: none;
+    vertical-align: super;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+    cursor: pointer;
+}
+.esb-inline-cite:hover {
+    background: rgba(80, 200, 120, 0.3);
+    color: rgb(120, 230, 150);
+    text-decoration: none;
+}
+body.light-mode .esb-inline-cite {
+    background: rgba(0, 130, 70, 0.1);
+    color: rgb(0, 130, 70);
+}
+body.light-mode .esb-inline-cite:hover {
+    background: rgba(0, 130, 70, 0.2);
+    color: rgb(0, 100, 50);
+}
+
 .esb-citation-chip {
     display: inline-flex;
     align-items: center;
@@ -1474,7 +1507,7 @@ body.light-mode .esb-citations-query {
     color: rgb(170, 170, 170);
 }
 
-body.light-mode .esb-citation-chip {
+.esb-citation-chip {
     background: rgb(245, 245, 245);
     border-color: rgb(224, 224, 224);
     color: rgb(102, 102, 102);
@@ -2527,13 +2560,22 @@ body.light-mode .md-code-header {
 
 .md-blockquote {
     border-left: 3px solid rgb(80, 200, 120);
-    padding: 6px 14px;
+    padding: 8px 14px;
     margin: 0.75em 0px;
     background: rgba(80, 200, 120, 0.04);
     border-radius: 0px 6px 6px 0px;
-    color: rgb(153, 153, 153);
-    font-style: italic;
+    color: rgb(180, 180, 180);
 }
+
+.md-blockquote strong { color: rgb(232, 232, 232); font-weight: 700; }
+.md-blockquote em { color: rgb(192, 192, 192); font-style: italic; }
+.md-blockquote code { background: rgb(30,30,30); border: 1px solid rgb(42,42,42); border-radius: 5px; padding: 1px 6px; font-family: "Fira Code",Consolas,monospace; font-size: 0.84em; color: rgb(80,200,120); }
+.md-blockquote a { color: rgb(80, 200, 120); text-decoration: underline; }
+.md-blockquote ul, .md-blockquote ol { padding-left: 20px; margin: 0.4em 0; }
+.md-blockquote li { margin: 0.2em 0; }
+.md-blockquote p { margin: 0.4em 0; }
+.md-blockquote blockquote { border-left: 2px solid rgba(80, 200, 120, 0.5); padding: 4px 10px; margin: 0.5em 0; background: rgba(80, 200, 120, 0.02); }
+.md-blockquote h1, .md-blockquote h2, .md-blockquote h3, .md-blockquote h4 { color: rgb(232, 232, 232); font-weight: 700; margin: 0.5em 0 0.3em; }
 
 .md-math-block {
     overflow-x: auto;
@@ -3689,9 +3731,15 @@ body.light-mode .md-content em {
 }
 
 body.light-mode .md-blockquote {
-    color: rgb(102, 102, 102);
+    color: rgb(80, 80, 80);
     background: rgba(80, 200, 120, 0.05);
 }
+body.light-mode .md-blockquote strong { color: rgb(0, 0, 0); }
+body.light-mode .md-blockquote em { color: rgb(60, 60, 60); }
+body.light-mode .md-blockquote code { background: rgb(245, 245, 245); border: 1px solid rgb(220, 220, 220); color: rgb(0, 120, 60); }
+body.light-mode .md-blockquote a { color: rgb(0, 130, 70); }
+body.light-mode .md-blockquote blockquote { background: rgba(80, 200, 120, 0.03); }
+body.light-mode .md-blockquote h1, body.light-mode .md-blockquote h2, body.light-mode .md-blockquote h3, body.light-mode .md-blockquote h4 { color: rgb(0, 0, 0); }
 
 body.light-mode .md-table-wrap {
     border-color: rgb(224, 224, 224);
