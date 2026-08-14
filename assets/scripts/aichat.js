@@ -3199,7 +3199,8 @@ function extractGroundingSources(groundingMetadata) {
     const title = chunk?.web?.title || "";
     if (uri && !seen.has(uri)) {
       seen.add(uri);
-      sources.push({ title: title || uri, uri });
+      // Use actual title if available; otherwise empty string so renderCitations falls back to hostname
+      sources.push({ title: title && title !== uri ? title : "", uri });
     }
   }
   return sources;
@@ -5338,6 +5339,51 @@ function renderCitations(aiDiv, sources) {
   if (!sources?.length) return;
   const body = aiDiv?.querySelector(".message-body");
   if (!body) return;
+
+  // ── Step 1: Convert inline [1], [2], [1][2] citations to clickable superscript badges ──
+  const mdContent = body.querySelector(".md-content") || body;
+  if (mdContent && sources.length) {
+    // Walk text nodes to replace [N] patterns without breaking HTML
+    const walker = document.createTreeWalker(mdContent, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+    for (const node of textNodes) {
+      // Match [N] where N is 1-99 — also handle clustered like [1][2]
+      const replaced = node.nodeValue.replace(/\[(\d{1,2})\]/g, (match, numStr) => {
+        const idx = parseInt(numStr, 10) - 1;
+        if (idx >= 0 && idx < sources.length && sources[idx]?.uri) {
+          return `\x01CITE${idx}\x01`;
+        }
+        return match; // Leave [N] as-is if no matching source
+      });
+      if (replaced !== node.nodeValue) {
+        // Split into parts: text + <a> citations
+        const parts = replaced.split(/\x01CITE(\d+)\x01/);
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < parts.length; i++) {
+          if (i % 2 === 0) {
+            // Text part
+            if (parts[i]) frag.appendChild(document.createTextNode(parts[i]));
+          } else {
+            // Citation index
+            const srcIdx = parseInt(parts[i], 10);
+            const src = sources[srcIdx];
+            const citeLink = document.createElement("a");
+            citeLink.className = "esb-inline-cite";
+            citeLink.href = src.uri;
+            citeLink.target = "_blank";
+            citeLink.rel = "noopener noreferrer";
+            citeLink.textContent = String(srcIdx + 1);
+            frag.appendChild(citeLink);
+          }
+        }
+        node.parentNode.replaceChild(frag, node);
+      }
+    }
+  }
+
+  // ── Step 2: Build source chips at the bottom ──
   const wrap = document.createElement("div");
   wrap.className = "esb-citations";
   const seen = /* @__PURE__ */ new Set();
@@ -5352,9 +5398,14 @@ function renderCitations(aiDiv, sources) {
     let host = "";
     try {
       host = new URL(s.uri).hostname.replace(/^www\./, "");
-    } catch {
+    } catch {}
+    // Clean title: if title contains the URL itself, strip it — just show hostname
+    let displayTitle = s.title || "";
+    if (displayTitle && displayTitle.includes("://")) {
+      // Title is actually a URL — don't show it, fall back to hostname
+      displayTitle = "";
     }
-    a.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>${escapeHtml(s.title || host || "Source")}`;
+    a.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>${escapeHtml(displayTitle || host || "Source")}`;
     wrap.appendChild(a);
   });
   if (wrap.children.length) body.insertAdjacentElement("beforeend", wrap);
