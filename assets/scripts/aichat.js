@@ -156,6 +156,9 @@ function loadSettings() {
 async function initTheme() {
   await migrateChatStorageToIndexedDB();
   applyTheme(loadSettings().theme || "system");
+  // Bugfix: sync reasoning toggle UI from persisted settings on page load/reload.
+  // Without this, the button shows "off" even when settings.reasoning is true.
+  refreshReasoningToggleUI();
 }
 function saveSettingsObj(o) {
   S.set(SETTINGS_KEY, o);
@@ -191,6 +194,8 @@ function setupChatStorageSync() {
     if (!watchedKeys.has(key)) return;
     if (key === SETTINGS_KEY) {
       applyTheme(loadSettings().theme || "system");
+      // Bugfix: also sync reasoning toggle UI when settings change (e.g. cross-tab).
+      refreshReasoningToggleUI();
     }
     if (key === CONV_KEY) {
       const activeId = state.convId;
