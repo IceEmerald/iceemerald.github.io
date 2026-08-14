@@ -734,7 +734,17 @@ function setupMarked() {
     return false;
   }
   function _blockquoteRenderer(token) {
-    const body = token && typeof token === "object" ? token.body ?? token.text ?? "" : String(token ?? "");
+    let body = "";
+    if (token && typeof token === "object") {
+      // marked v18: token.tokens contains parsed child tokens — render recursively
+      if (Array.isArray(token.tokens) && this.parser) {
+        body = this.parser.parse(token.tokens);
+      } else {
+        body = token.body ?? token.text ?? "";
+      }
+    } else {
+      body = String(token ?? "");
+    }
     return `<blockquote class="md-blockquote">${body}</blockquote>`;
   }
   function _linkRenderer(token) {
