@@ -768,6 +768,93 @@ function setupMarked() {
     marked.setOptions({ renderer, breaks: true, gfm: true });
   }
 }
+// Preprocess LaTeX source to convert \color{X}... into \textcolor{X}{...}
+// (the two-argument form KaTeX renders reliably even in nested contexts).
+//
+// The model produces THREE variants of \color usage that we must handle:
+//
+//   (A) \color{X}{Y}      — TWO-ARG, INVALID LaTeX. The model treats \color
+//                           as if it were \textcolor. NOT standard LaTeX
+//                           (in real LaTeX, \color{X} sets the color for the
+//                           rest of the group; the following {Y} is a
+//                           separate group). KaTeX accepts this but it is
+//                           brittle. We convert it to \textcolor{X}{Y}.
+//
+//   (B) \color{X}content  — ONE-ARG SWITCH (the real LaTeX form). Sets color
+//                           for the rest of the current group. We find the
+//                           enclosing {...} group and wrap its content in
+//                           \textcolor{X}{...}.
+//                           e.g.  e^{\color{red}i\pi}  →  e^{\textcolor{red}{i\pi}}
+//
+//   (C) \textcolor{X}{Y}  — already correct. Leave alone.
+//
+// Pass 1 handles (A). Pass 2 handles (B). Existing \textcolor is untouched.
+function _preprocessLatexColor(src) {
+  if (!src || src.indexOf('\\color{') === -1) return src;
+  let result = src;
+
+  // ── Pass 1: \color{X}{Y} (two-arg malformed) → \textcolor{X}{Y}
+  // Match \color{X} immediately followed by { (with optional whitespace).
+  // Replace only the \color{X} part — leave the {Y} part intact so the
+  // closing brace of Y stays balanced. Effect: \color{X}{Y} → \textcolor{X}{Y}.
+  // We must NOT touch \textcolor{X}{Y} (already correct). The regex below
+  // only matches \color{ (not \textcolor{) because of the negative lookbehind
+  // for "text" before the backslash.
+  result = result.replace(/(?<!\\text)\\color\{([^}]+)\}(\s*)\{/g,
+    (full, color, ws) => '\\textcolor{' + color + '}' + ws + '{');
+
+  // ── Pass 2: \color{X}content (one-arg switch) → \textcolor{X}{content}
+  // Now any remaining \color{X} is the switch form (NOT immediately followed
+  // by a { group of its own). Find the enclosing {...} group and wrap its
+  // content in \textcolor{X}{...}.
+  //   e.g.  e^{\color{red}i\pi}  →  e^{\textcolor{red}{i\pi}}
+  //   e.g.  {\color{blue}a + b}  →  {\textcolor{blue}{a + b}}
+  const re = /\\color\{([^}]+)\}/g;
+  let match;
+  const replacements = [];
+  while ((match = re.exec(result)) !== null) {
+    const start = match.index;
+    const afterColor = start + match[0].length;
+    const color = match[1];
+    // Skip if immediately followed by { — that was Pass 1's job.
+    // (Pass 1 already converted those, but be defensive in case the regex
+    // missed something — e.g. whitespace edge cases.)
+    let nextNonWs = afterColor;
+    while (nextNonWs < result.length && /\s/.test(result[nextNonWs])) nextNonWs++;
+    if (result[nextNonWs] === '{') continue;
+
+    // Find the enclosing { by scanning backwards
+    let depth = 0, braceStart = -1;
+    for (let k = start - 1; k >= 0; k--) {
+      if (result[k] === '}') depth++;
+      else if (result[k] === '{') {
+        if (depth === 0) { braceStart = k; break; }
+        depth--;
+      }
+    }
+    if (braceStart === -1) continue;
+    // Find the matching } for braceStart by scanning forwards
+    depth = 1;
+    let braceEnd = -1;
+    for (let k = afterColor; k < result.length; k++) {
+      if (result[k] === '{') depth++;
+      else if (result[k] === '}') { depth--; if (depth === 0) { braceEnd = k; break; } }
+    }
+    if (braceEnd === -1) continue;
+    const content = result.slice(afterColor, braceEnd);
+    replacements.push({
+      start: start,
+      end: braceEnd,
+      replacement: '\\textcolor{' + color + '}{' + content + '}'
+    });
+  }
+  for (let i = replacements.length - 1; i >= 0; i--) {
+    const r = replacements[i];
+    result = result.slice(0, r.start) + r.replacement + result.slice(r.end);
+  }
+  return result;
+}
+
 function renderMarkdown(raw) {
   if (typeof marked === "undefined") return escapeHtml(raw);
   let text = raw;
@@ -797,7 +884,56 @@ function renderMarkdown(raw) {
     const i = mathBlocks.push({ type: "block", src: m }) - 1;
     return `MATHBLOCK${i}MATHBLOCK`;
   });
-  text = text.replace(/\$([^$\n]+?)\$/g, (_, m) => {
+  // Also support \[...\] block math delimiters (some models use these)
+  text = text.replace(/\\\[([\s\S]+?)\\\]/g, (_, m) => {
+    const i = mathBlocks.push({ type: "block", src: m }) - 1;
+    return `MATHBLOCK${i}MATHBLOCK`;
+  });
+  // Inline math: $...$
+  // CRITICAL: The naive regex /\$([^$\n]+?)\$/g treats ANY pair of $
+  // signs as math delimiters. When the output contains currency amounts
+  // (e.g. "$62,932.68 USD. Euler's identity is $e^{i\pi}$."), the regex
+  // matches from the first $ to the second $, swallowing the prose between
+  // them into a single "math" block. KaTeX fails to parse prose as math,
+  // and with throwOnError:false it falls back to raw markup — the
+  // "raw LaTeX" / "mashed words" bug.
+  //
+  // Fix: use an exec-based loop with content validation. When a match is
+  // rejected (not valid math), we advance past only the opening $, so the
+  // closing $ can serve as the opening $ of the next potential math block.
+  // This correctly handles "$currency. Math is $e^{i\pi}$." — the first
+  // pair is rejected (prose), and the second pair is accepted (real math).
+  {
+    const _mathRe = /\$([^$\n]+?)\$/g;
+    let _mm, _lastEnd = 0, _result = '';
+    while ((_mm = _mathRe.exec(text)) !== null) {
+      const _fullStart = _mm.index;
+      const _inner = _mm[1];
+      // Reject if content has sentence boundary (prose between $ signs)
+      // or starts with a digit + has comma/space + no LaTeX commands (currency)
+      const _isCurrency = /^\d/.test(_inner) && /[, ]/.test(_inner) && !/\\[a-zA-Z]/.test(_inner);
+      if (/\.\s/.test(_inner) || _isCurrency) {
+        // Not valid math — keep the opening $ and content as literal text,
+        // but let the closing $ be re-scanned as a potential opening $
+        _result += text.slice(_lastEnd, _fullStart + 1 + _inner.length);
+        _lastEnd = _fullStart + 1 + _inner.length; // position of closing $
+        _mathRe.lastIndex = _lastEnd;
+      } else {
+        // Valid math — replace with placeholder (consume both $ signs)
+        _result += text.slice(_lastEnd, _fullStart);
+        const i = mathBlocks.push({ type: "inline", src: _inner }) - 1;
+        _result += `MATHINLINE${i}MATHINLINE`;
+        _lastEnd = _fullStart + _mm[0].length;
+        _mathRe.lastIndex = _lastEnd;
+      }
+    }
+    _result += text.slice(_lastEnd);
+    text = _result;
+  }
+  // Also support \(...\) inline math delimiters (some models use these).
+  // Use a tempered greedy token to allow backslashes inside the content
+  // (e.g. \(e^{i\pi}\)) — the old regex [^\\\n]+? stopped at the first \.
+  text = text.replace(/\\\(((?:(?!\\\))[\s\S])+?)\\\)/g, (_, m) => {
     const i = mathBlocks.push({ type: "inline", src: m }) - 1;
     return `MATHINLINE${i}MATHINLINE`;
   });
@@ -821,14 +957,16 @@ function renderMarkdown(raw) {
   });
   html = html.replace(/MATHBLOCK(\d+)MATHBLOCK/g, (_, i) => {
     try {
-      return typeof katex !== "undefined" ? `<div class="md-math-block">${katex.renderToString(mathBlocks[i].src, { throwOnError: false, displayMode: true })}</div>` : `<pre>$$${mathBlocks[i].src}$$</pre>`;
+      const src = _preprocessLatexColor(mathBlocks[i].src);
+      return typeof katex !== "undefined" ? `<div class="md-math-block">${katex.renderToString(src, { throwOnError: false, displayMode: true })}</div>` : `<pre>$$${mathBlocks[i].src}$$</pre>`;
     } catch {
       return `<pre>$$${mathBlocks[i].src}$$</pre>`;
     }
   });
   html = html.replace(/MATHINLINE(\d+)MATHINLINE/g, (_, i) => {
     try {
-      return typeof katex !== "undefined" ? katex.renderToString(mathBlocks[i].src, { throwOnError: false }) : `$${mathBlocks[i].src}$`;
+      const src = _preprocessLatexColor(mathBlocks[i].src);
+      return typeof katex !== "undefined" ? katex.renderToString(src, { throwOnError: false }) : `$${mathBlocks[i].src}$`;
     } catch {
       return `$${mathBlocks[i].src}$`;
     }
@@ -2227,7 +2365,12 @@ function createReasoningBlock(aiDiv) {
   const tmp = document.createElement("div");
   tmp.innerHTML = reasoningBlockHTML(false);
   const block = tmp.firstElementChild;
-  sender.insertAdjacentElement("afterend", block);
+  const searchingBlock = aiDiv.querySelector(".searching-block");
+  if (searchingBlock) {
+    searchingBlock.insertAdjacentElement("afterend", block);
+  } else {
+    sender.insertAdjacentElement("afterend", block);
+  }
   // Start expanded while thinking.
   block.classList.add("is-expanded");
   // Live-tick the "Thinking for Xs…" label once per second.
@@ -2281,6 +2424,93 @@ function markReasoningDone(block) {
 }
 function toggleReasoningBlock(headerEl) {
   const block = headerEl?.closest(".reasoning-block");
+  if (!block) return;
+  block.classList.toggle("is-expanded");
+  block.classList.add("is-user-toggled");
+  const isExpanded = block.classList.contains("is-expanded");
+  headerEl.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+}
+
+// ── Searching panel (same design as Reasoning, separate UI block) ──────
+const _searchingTimers = new WeakMap();
+
+function _setSearchingLabel(block, verb) {
+  if (!block) return;
+  const label = block.querySelector(".searching-label");
+  if (!label) return;
+  const start = Number(block.dataset.startedAt || 0);
+  if (!start) {
+    label.textContent = verb === "Searched" ? "Searched" : "Searching";
+    return;
+  }
+  const sec = Math.max(1, Math.round((Date.now() - start) / 1000));
+  label.textContent = `${verb} for ${_fmtReasoningElapsed(sec)}`;
+}
+
+function searchingBlockHTML(isDone) {
+  return `<div class="searching-block${isDone ? " is-done" : ""}" data-state="${isDone ? "done" : "searching"}">
+    <div class="searching-header" role="button" tabindex="0" aria-expanded="${isDone ? "false" : "true"}" onclick="toggleSearchingBlock(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSearchingBlock(this);}">
+      <div class="searching-title">
+        <span class="searching-label">${isDone ? "Searched" : "Searching"}</span>
+      </div>
+      <svg class="searching-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="searching-body"><div class="searching-text md-content"></div></div>
+  </div>`;
+}
+
+function createSearchingBlock(aiDiv) {
+  if (!aiDiv) return null;
+  const existing = aiDiv.querySelector(".searching-block");
+  if (existing) return existing;
+  const sender = aiDiv.querySelector(".message-sender");
+  if (!sender) return null;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = searchingBlockHTML(false);
+  const block = tmp.firstElementChild;
+  sender.insertAdjacentElement("afterend", block);
+  block.classList.add("is-expanded");
+  block.dataset.startedAt = String(Date.now());
+  _setSearchingLabel(block, "Searching");
+  const timer = setInterval(() => {
+    if (!block.classList.contains("is-done")) _setSearchingLabel(block, "Searching");
+  }, 1000);
+  _searchingTimers.set(block, timer);
+  return block;
+}
+
+function appendSearchingToBlock(block, chunk) {
+  if (!block || !chunk) return;
+  const textEl = block.querySelector(".searching-text");
+  if (!textEl) return;
+  let acc = block.dataset.searchingRaw || "";
+  acc += chunk;
+  block.dataset.searchingRaw = acc;
+  textEl.innerHTML = renderMarkdown(acc);
+  const body = block.querySelector(".searching-body");
+  if (body && _autoScrollSticky) body.scrollTop = body.scrollHeight;
+}
+
+function markSearchingDone(block) {
+  if (!block) return;
+  block.classList.add("is-done");
+  block.dataset.state = "done";
+  const timer = _searchingTimers.get(block);
+  if (timer) { clearInterval(timer); _searchingTimers.delete(block); }
+  _setSearchingLabel(block, "Searched");
+  const header = block.querySelector(".searching-header");
+  if (header) header.setAttribute("aria-expanded", "false");
+  if (!block.classList.contains("is-user-toggled")) {
+    setTimeout(() => {
+      if (!block.classList.contains("is-user-toggled")) {
+        block.classList.remove("is-expanded");
+      }
+    }, 350);
+  }
+}
+
+function toggleSearchingBlock(headerEl) {
+  const block = headerEl?.closest(".searching-block");
   if (!block) return;
   block.classList.toggle("is-expanded");
   block.classList.add("is-user-toggled");
@@ -2484,12 +2714,31 @@ async function handleSend(opts) {
   let _reasoningText = "";
   let _reasoningBlock = null;
   let _reasoningDone = false;
+  let _searchingBlock = null;
+  let _searchingDone = false;
   const _markReasoningDoneOnce = () => {
     if (_reasoningDone) return;
     _reasoningDone = true;
     if (_reasoningBlock) markReasoningDone(_reasoningBlock);
   };
+  const _markSearchingDoneOnce = () => {
+    if (_searchingDone) return;
+    _searchingDone = true;
+    if (_searchingBlock) markSearchingDone(_searchingBlock);
+  };
+  _streamOpts.onSearchStatusChunk = (chunk) => {
+    if (!aiDiv) {
+      typingEl.style.display = "none";
+      aiDiv = appendAIMessageDOM("", msgId, true);
+      textEl = aiDiv.querySelector(".message-text");
+      textEl.classList.add("stream-reveal");
+    }
+    if (!_searchingBlock) _searchingBlock = createSearchingBlock(aiDiv);
+    appendSearchingToBlock(_searchingBlock, chunk);
+    scrollToBottom();
+  };
   _streamOpts.onReasoningChunk = (chunk) => {
+    _markSearchingDoneOnce();
     // First reasoning chunk creates the message bubble early (typing
     // indicator hides) and the reasoning panel — same UX Claude / o1 use
     // where the "Thinking…" block appears before any answer text streams.
@@ -2507,6 +2756,7 @@ async function handleSend(opts) {
   const _doStream = async (h) => streamEmeraldBot(h, apiKey, (chunk) => {
     // First non-thought chunk means reasoning phase is over → flip the
     // reasoning block to "Done" (auto-collapses shortly after).
+    _markSearchingDoneOnce();
     _markReasoningDoneOnce();
     fullText += chunk;
     if (!aiDiv) {
@@ -2605,6 +2855,7 @@ async function handleSend(opts) {
   // Stream ended — flip the reasoning panel to "Done" (if one exists).
   // Important for the case where the model produced reasoning but no
   // answer text (e.g. error / abort before first answer chunk).
+  _markSearchingDoneOnce();
   _markReasoningDoneOnce();
   if (!fullText && !aiDiv) {
     aiDiv = appendAIMessageDOM("", msgId, true);
@@ -2881,13 +3132,21 @@ async function regenerateMessage(msgEl) {
   let _reasoningText = "";
   let _reasoningBlock = null;
   let _reasoningDone = false;
+  let _searchingBlock = null;
+  let _searchingDone = false;
   const _markReasoningDoneOnce = () => {
     if (_reasoningDone) return;
     _reasoningDone = true;
     if (_reasoningBlock) markReasoningDone(_reasoningBlock);
   };
+  const _markSearchingDoneOnce = () => {
+    if (_searchingDone) return;
+    _searchingDone = true;
+    if (_searchingBlock) markSearchingDone(_searchingBlock);
+  };
   try {
     const _streamResult = await streamEmeraldBot(history, apiKey, (chunk) => {
+      _markSearchingDoneOnce();
       _markReasoningDoneOnce();
       fullText += chunk;
       if (!aiDiv) {
@@ -2903,7 +3162,19 @@ async function regenerateMessage(msgEl) {
     }, {
       useUrlContext: _urlsInMsg.length > 0,
       userText: _lastUserText,
+      onSearchStatusChunk: (chunk) => {
+        if (!aiDiv) {
+          rTypingEl.style.display = "none";
+          aiDiv = appendAIMessageDOM("", newId, true);
+          textEl = aiDiv.querySelector(".message-text");
+          textEl.classList.add("stream-reveal");
+        }
+        if (!_searchingBlock) _searchingBlock = createSearchingBlock(aiDiv);
+        appendSearchingToBlock(_searchingBlock, chunk);
+        scrollToBottom();
+      },
       onReasoningChunk: (chunk) => {
+        _markSearchingDoneOnce();
         if (!aiDiv) {
           rTypingEl.style.display = "none";
           aiDiv = appendAIMessageDOM("", newId, true);
@@ -2941,6 +3212,7 @@ async function regenerateMessage(msgEl) {
     }
   }
   rTypingEl.style.display = "none";
+  _markSearchingDoneOnce();
   _markReasoningDoneOnce();
   if (!fullText && !aiDiv) {
     aiDiv = appendAIMessageDOM("", newId, true);
@@ -3195,7 +3467,11 @@ async function streamEmeraldBot(history, _unused, onChunk, options = {}) {
               // unchanged). Route them to a separate onReasoningChunk callback
               // so the UI can render them inside the collapsible "Reasoning"
               // panel above the answer, instead of mixing them into the answer.
-              if (part.thought === true) {
+              if (part.searchStatus === true) {
+                if (part.text && typeof options.onSearchStatusChunk === "function") {
+                  options.onSearchStatusChunk(part.text);
+                }
+              } else if (part.thought === true) {
                 if (part.text && typeof options.onReasoningChunk === "function") {
                   options.onReasoningChunk(part.text);
                 }
@@ -4816,13 +5092,21 @@ async function submitUserMsgEdit(msgId) {
   let _reasoningText = "";
   let _reasoningBlock = null;
   let _reasoningDone = false;
+  let _searchingBlock = null;
+  let _searchingDone = false;
   const _markReasoningDoneOnce = () => {
     if (_reasoningDone) return;
     _reasoningDone = true;
     if (_reasoningBlock) markReasoningDone(_reasoningBlock);
   };
+  const _markSearchingDoneOnce = () => {
+    if (_searchingDone) return;
+    _searchingDone = true;
+    if (_searchingBlock) markSearchingDone(_searchingBlock);
+  };
   try {
     const _streamResult = await streamEmeraldBot(history, apiKey, (chunk) => {
+      _markSearchingDoneOnce();
       _markReasoningDoneOnce();
       aiFullText += chunk;
       if (!aiDiv) {
@@ -4838,7 +5122,19 @@ async function submitUserMsgEdit(msgId) {
     }, {
       useUrlContext: _urlsInMsg.length > 0,
       userText: newText,
+      onSearchStatusChunk: (chunk) => {
+        if (!aiDiv) {
+          typingEl.style.display = "none";
+          aiDiv = appendAIMessageDOM("", aiMsgId, true);
+          aiTextEl = aiDiv.querySelector(".message-text");
+          aiTextEl.classList.add("stream-reveal");
+        }
+        if (!_searchingBlock) _searchingBlock = createSearchingBlock(aiDiv);
+        appendSearchingToBlock(_searchingBlock, chunk);
+        scrollToBottom();
+      },
       onReasoningChunk: (chunk) => {
+        _markSearchingDoneOnce();
         if (!aiDiv) {
           typingEl.style.display = "none";
           aiDiv = appendAIMessageDOM("", aiMsgId, true);
@@ -4891,6 +5187,7 @@ async function submitUserMsgEdit(msgId) {
     }
   }
   typingEl.style.display = "none";
+  _markSearchingDoneOnce();
   _markReasoningDoneOnce();
   if (!aiFullText && !aiDiv) {
     aiDiv = appendAIMessageDOM("", aiMsgId, true);
@@ -5997,6 +6294,7 @@ try {
   if (typeof toggleModelDropdown !== "undefined" && typeof window.toggleModelDropdown === "undefined") window.toggleModelDropdown = toggleModelDropdown;
   if (typeof togglePreviewConsole !== "undefined" && typeof window.togglePreviewConsole === "undefined") window.togglePreviewConsole = togglePreviewConsole;
   if (typeof toggleReasoningBlock !== "undefined" && typeof window.toggleReasoningBlock === "undefined") window.toggleReasoningBlock = toggleReasoningBlock;
+  if (typeof toggleSearchingBlock !== "undefined" && typeof window.toggleSearchingBlock === "undefined") window.toggleSearchingBlock = toggleSearchingBlock;
   if (typeof toggleTempChat !== "undefined" && typeof window.toggleTempChat === "undefined") window.toggleTempChat = toggleTempChat;
   if (typeof typingIndicatorHTML !== "undefined" && typeof window.typingIndicatorHTML === "undefined") window.typingIndicatorHTML = typingIndicatorHTML;
   if (typeof updateBranchNavDOM !== "undefined" && typeof window.updateBranchNavDOM === "undefined") window.updateBranchNavDOM = updateBranchNavDOM;

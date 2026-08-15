@@ -7010,3 +7010,196 @@ body.light-mode .reasoning-text pre {
         font-size: 0.8rem;
     }
 }
+/* ── Searching panel — same design as Reasoning, separate UI block ────── */
+/* Mirrors .reasoning-block styles. The searching block appears BEFORE the
+   reasoning block, giving users a clear visual separation between
+   "Searching: <query>" and "Thinking..." panels. */
+
+.searching-block {
+    --ss-bar: #6b6b6b;
+    --ss-bar-active: #50c878;
+    --ss-label: #8a8a8a;
+    --ss-label-done: #7a7a7a;
+    --ss-text: #8a8a8a;
+    --ss-chevron: #8a8a8a;
+    --ss-hover: rgba(255, 255, 255, 0.04);
+    font-family: "DM Sans", sans-serif;
+    margin: 8px 0px 8px 0px;
+    padding-left: 14px;
+    position: relative;
+    transition: opacity 0.2s;
+}
+
+.searching-block::before {
+    content: "";
+    position: absolute;
+    left: 0px;
+    top: 4px;
+    bottom: 4px;
+    width: 3px;
+    background: var(--ss-bar);
+    border-radius: 2px;
+    transition: background 0.3s, opacity 0.3s;
+}
+
+.searching-block:not(.is-done)::before {
+    background: var(--ss-bar-active);
+    opacity: 0.55;
+}
+
+.searching-block.is-done::before {
+    opacity: 0.85;
+}
+
+.searching-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px 4px 0px;
+    cursor: pointer;
+    user-select: none;
+    outline: none;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.searching-header:focus-visible {
+    box-shadow: rgba(80, 200, 120, 0.3) 0px 0px 0px 2px;
+}
+
+.searching-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0px;
+}
+
+.searching-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--ss-label);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.searching-block:not(.is-done) .searching-label::after {
+    content: "...";
+    display: inline-block;
+    margin-left: 2px;
+    width: 1.2em;
+    text-align: left;
+    color: var(--ss-bar-active);
+    animation: 1.4s steps(4) 0s infinite normal none running reasoning-ellipsis;
+    overflow: hidden;
+    vertical-align: baseline;
+}
+
+.searching-block.is-done .searching-label {
+    color: var(--ss-label-done);
+}
+
+.searching-chevron {
+    color: var(--ss-chevron);
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.searching-header:hover .searching-chevron,
+.searching-header:focus-visible .searching-chevron {
+    opacity: 1;
+}
+
+.searching-block.is-expanded .searching-chevron {
+    transform: rotate(180deg);
+}
+
+.searching-body {
+    overflow: hidden;
+    max-height: 0px;
+    transition: max-height 0.3s;
+}
+
+.searching-block.is-expanded .searching-body {
+    max-height: 60vh;
+}
+
+.searching-block.is-expanded .searching-body > .searching-text {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.searching-text {
+    font-family: "DM Sans", sans-serif;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--ss-text);
+    padding: 8px 12px 10px 0px;
+    opacity: 0.88;
+}
+
+.searching-text p {
+    margin: 0px 0px 8px;
+}
+
+.searching-text p:last-child {
+    margin-bottom: 0px;
+}
+
+.searching-text code {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-family: "Sarasa Mono SC", "DM Mono", ui-monospace, monospace;
+}
+
+.searching-text pre {
+    background: rgba(0, 0, 0, 0.25);
+    padding: 8px 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 6px 0px 8px;
+    font-size: 0.78rem;
+}
+
+.searching-text pre code {
+    background: none;
+    padding: 0px;
+}
+
+body.light-mode .searching-block {
+    --ss-bar: #b0b0b0;
+    --ss-bar-active: #2a9d54;
+    --ss-label: #555;
+    --ss-label-done: #666;
+    --ss-text: #555;
+    --ss-chevron: #888;
+    --ss-hover: rgba(0, 0, 0, 0.03);
+}
+
+body.light-mode .searching-text code {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.light-mode .searching-text pre {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+@media (max-width: 640px) {
+    .searching-block {
+        margin: 6px 0px 12px;
+        padding-left: 12px;
+    }
+
+    .searching-header {
+        padding: 4px 4px 4px 0px;
+    }
+
+    .searching-text {
+        padding: 6px 8px 10px 0px;
+        font-size: 0.8rem;
+    }
+}
