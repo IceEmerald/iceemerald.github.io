@@ -30,7 +30,72 @@
     var RESUME_MS = 1000;
     var VEL_STOP = 0.003;
 
-    /* ── Detailed continent outlines ─────────────────── */
+    /* ── Real-earth data (loaded from CDN, falls back to hand-drawn) ── */
+    var landCountries = null;   /* [{ rings: [[[lat,lon],...], ...holes] }] */
+    var DATA_URLS = [
+        'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json',
+        'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
+    ];
+
+    function decodeTopology(topo) {
+        if (!topo || !topo.transform || !topo.objects || !topo.objects.countries) return null;
+        var sx = topo.transform.scale[0], sy = topo.transform.scale[1];
+        var tx = topo.transform.translate[0], ty = topo.transform.translate[1];
+        var arcsRaw = topo.arcs.map(function (arc) {
+            var x = 0, y = 0, out = [];
+            for (var i = 0; i < arc.length; i++) {
+                x += arc[i][0]; y += arc[i][1];
+                out.push([y * sy + ty, x * sx + tx]); /* [lat, lon] */
+            }
+            return out;
+        });
+        function ring(arcIdxs) {
+            var pts = [];
+            for (var i = 0; i < arcIdxs.length; i++) {
+                var idx = arcIdxs[i];
+                var rev = idx < 0;
+                var arc = arcsRaw[rev ? ~idx : idx].slice();
+                if (rev) arc.reverse();
+                if (pts.length > 0) arc.shift();
+                pts = pts.concat(arc);
+            }
+            return pts;
+        }
+        function geomToPolys(geom) {
+            if (!geom) return [];
+            if (geom.type === 'Polygon') return [{ rings: geom.arcs.map(ring) }];
+            if (geom.type === 'MultiPolygon') {
+                return geom.arcs.map(function (poly) { return { rings: poly.map(ring) }; });
+            }
+            return [];
+        }
+        var geoms = topo.objects.countries.geometries || [topo.objects.countries];
+        var countries = [];
+        for (var g = 0; g < geoms.length; g++) {
+            var polys = geomToPolys(geoms[g]);
+            for (var p = 0; p < polys.length; p++) countries.push(polys[p]);
+        }
+        return countries.length ? countries : null;
+    }
+
+    function loadEarthData() {
+        var attempt = 0;
+        function tryNext() {
+            if (attempt >= DATA_URLS.length) return;
+            var url = DATA_URLS[attempt++];
+            fetch(url)
+                .then(function (res) { if (!res.ok) throw new Error('http'); return res.json(); })
+                .then(function (topo) {
+                    var decoded = decodeTopology(topo);
+                    if (decoded) landCountries = decoded; else throw new Error('decode');
+                })
+                .catch(function () { tryNext(); });
+        }
+        tryNext();
+    }
+    loadEarthData();
+
+    /* ── Fallback: simplified continent outlines ─────── */
     var continents = [
         [[71, -157], [72, -152], [72, -146], [72, -140], [71, -134], [70, -128], [70, -122], [69, -115], [68, -108], [67, -102], [66, -96], [65, -90], [64, -85], [62, -79], [60, -74], [58, -68], [56, -63], [54, -58], [52, -56], [50, -57], [48, -59], [46, -62], [44, -65], [43, -68], [42, -70], [41, -72], [40, -74], [38, -76], [37, -76], [35, -77], [34, -78], [32, -80], [31, -81], [30, -81], [29, -82], [28, -83], [27, -82], [26, -82], [25, -81], [25, -83], [26, -85], [27, -86], [28, -88], [29, -90], [29, -92], [28, -94], [27, -95], [26, -97], [24, -98], [22, -98], [20, -97], [19, -96], [18, -95], [17, -93], [16, -91], [15, -89], [15, -87], [16, -88], [16, -91], [17, -95], [18, -98], [19, -101], [20, -104], [22, -107], [24, -110], [26, -112], [28, -114], [30, -116], [32, -117], [34, -119], [36, -121], [38, -123], [40, -124], [42, -124], [44, -125], [47, -125], [49, -127], [51, -130], [53, -133], [55, -136], [57, -139], [59, -143], [60, -147], [62, -150], [63, -154], [64, -158], [65, -162], [66, -165], [68, -166], [70, -164], [71, -160], [71, -157]],
         [[12, -72], [11, -69], [10, -66], [9, -63], [8, -60], [7, -57], [6, -54], [5, -52], [4, -50], [2, -48], [0, -46], [-1, -44], [-3, -41], [-5, -38], [-7, -35], [-9, -35], [-11, -37], [-13, -39], [-15, -40], [-17, -41], [-19, -42], [-21, -43], [-23, -45], [-25, -47], [-27, -49], [-29, -51], [-31, -53], [-33, -55], [-35, -57], [-37, -59], [-39, -61], [-41, -63], [-43, -64], [-45, -66], [-47, -67], [-49, -68], [-51, -69], [-53, -69], [-54, -68], [-55, -66], [-54, -64], [-53, -66], [-52, -69], [-50, -72], [-48, -74], [-46, -75], [-44, -74], [-42, -73], [-40, -72], [-38, -71], [-36, -70], [-34, -70], [-32, -70], [-30, -70], [-28, -69], [-26, -69], [-24, -70], [-22, -71], [-20, -72], [-18, -73], [-16, -75], [-14, -76], [-12, -77], [-10, -78], [-8, -79], [-6, -80], [-4, -80], [-2, -79], [0, -78], [2, -78], [4, -77], [6, -76], [8, -75], [10, -74], [12, -72]],
@@ -113,7 +178,7 @@
 
     /* ── Drawing helpers ─────────────────────────────── */
     function drawGrid() {
-        ctx.strokeStyle = 'rgba(35,154,77,0.055)'; ctx.lineWidth = 0.5;
+        ctx.strokeStyle = 'rgba(60,120,110,0.07)'; ctx.lineWidth = 0.5;
         for (var lat = -60; lat <= 60; lat += 30) { ctx.beginPath(); var s = false; for (var lon = -180; lon <= 180; lon += 3) { var p = project(lat, lon); if (p.z > 0) { if (!s) { ctx.moveTo(p.x, p.y); s = true; } else ctx.lineTo(p.x, p.y); } else s = false; } ctx.stroke(); }
         for (var lon2 = -180; lon2 < 180; lon2 += 30) { ctx.beginPath(); var s2 = false; for (var lat2 = -90; lat2 <= 90; lat2 += 3) { var p2 = project(lat2, lon2); if (p2.z > 0) { if (!s2) { ctx.moveTo(p2.x, p2.y); s2 = true; } else ctx.lineTo(p2.x, p2.y); } else s2 = false; } ctx.stroke(); }
     }
@@ -121,7 +186,7 @@
     function drawEquator() {
         ctx.beginPath(); var s = false;
         for (var lon = -180; lon <= 180; lon += 2) { var p = project(0, lon); if (p.z > 0) { if (!s) { ctx.moveTo(p.x, p.y); s = true; } else ctx.lineTo(p.x, p.y); } else s = false; }
-        ctx.strokeStyle = 'rgba(35,154,77,0.11)'; ctx.lineWidth = 0.7; ctx.stroke();
+        ctx.strokeStyle = 'rgba(60,120,110,0.14)'; ctx.lineWidth = 0.7; ctx.stroke();
     }
 
     function drawArcs() {
@@ -138,24 +203,95 @@
         }
     }
 
-    function drawContinents() {
-        for (var ci = 0; ci < continents.length; ci++) {
-            var continent = continents[ci], n = continent.length, pts = [];
-            for (var pi = 0; pi < n; pi++) pts.push(project(continent[pi][0], continent[pi][1]));
-            var segs = [], cur = [];
-            for (var i = 0; i < n; i++) {
-                var p = pts[i], pn = pts[(i + 1) % n];
-                if (p.z > 0.01) cur.push({ x: p.x, y: p.y });
-                if (p.z > 0.01 && pn.z <= 0.01) { var ep = edgePoint(p, pn); if (ep) cur.push(ep); if (cur.length > 1) segs.push(cur); cur = []; }
-                if (p.z <= 0.01 && pn.z > 0.01) { var ep2 = edgePoint(p, pn); cur = ep2 ? [ep2] : []; }
-            }
-            if (cur.length > 0 && segs.length > 0) segs[0] = cur.concat(segs[0]); else if (cur.length > 1) segs.push(cur);
-            for (var si = 0; si < segs.length; si++) {
-                var seg = segs[si]; if (seg.length < 2) continue;
-                ctx.beginPath(); traceSmoothPath(seg); ctx.closePath(); ctx.fillStyle = 'rgba(35,154,77,0.11)'; ctx.fill();
-                ctx.beginPath(); traceSmoothPath(seg); ctx.strokeStyle = 'rgba(35,154,77,0.34)'; ctx.lineWidth = 0.9; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+    /* ── Horizon-aware ring tracing ──────────────────── */
+    function keepPt(cur, p) {
+        /* Decimate: skip points closer than ~0.6px to the previous one */
+        if (!cur.length) return true;
+        var q = cur[cur.length - 1];
+        var dx = p.x - q.x, dy = p.y - q.y;
+        return dx * dx + dy * dy > 0.36;
+    }
+
+    function collectVisibleSegs(pts) {
+        var n = pts.length;
+        if (n < 3) return [];
+        var proj = new Array(n);
+        for (var i = 0; i < n; i++) proj[i] = project(pts[i][0], pts[i][1]);
+        var segs = [], cur = [];
+        for (var j = 0; j < n; j++) {
+            var p = proj[j], pn = proj[(j + 1) % n];
+            if (p.z > 0 && keepPt(cur, p)) cur.push(p);
+            if (p.z > 0 && pn.z <= 0) { var ep = edgePoint(p, pn); if (ep) cur.push(ep); if (cur.length > 1) segs.push(cur); cur = []; }
+            else if (p.z <= 0 && pn.z > 0) { var ep2 = edgePoint(p, pn); cur = ep2 ? [ep2] : []; }
+        }
+        if (cur.length > 0 && segs.length > 0) segs[0] = cur.concat(segs[0]);
+        else if (cur.length > 1) segs.push(cur);
+        return segs;
+    }
+
+    function traceRing(pts) {
+        var segs = collectVisibleSegs(pts);
+        for (var si = 0; si < segs.length; si++) {
+            var seg = segs[si];
+            ctx.beginPath();
+            ctx.moveTo(seg[0].x, seg[0].y);
+            for (var k = 1; k < seg.length; k++) ctx.lineTo(seg[k].x, seg[k].y);
+            ctx.stroke();
+        }
+    }
+
+    function fillCountry(polys, evenodd) {
+        /* Build one combined path of visible segments per polygon */
+        ctx.beginPath();
+        for (var pi = 0; pi < polys.length; pi++) {
+            var rings = polys[pi].rings;
+            for (var ri = 0; ri < rings.length; ri++) {
+                var segs = collectVisibleSegs(rings[ri]);
+                for (var si = 0; si < segs.length; si++) {
+                    var seg = segs[si];
+                    ctx.moveTo(seg[0].x, seg[0].y);
+                    for (var k = 1; k < seg.length; k++) ctx.lineTo(seg[k].x, seg[k].y);
+                    ctx.closePath();
+                }
             }
         }
+        ctx.fill(evenodd ? 'evenodd' : 'nonzero');
+    }
+
+    function drawRealEarth() {
+        /* Fill all countries */
+        ctx.fillStyle = 'rgba(46,160,92,0.32)';
+        for (var c = 0; c < landCountries.length; c++) fillCountry([landCountries[c]], false);
+        /* Country borders + coastline strokes */
+        ctx.strokeStyle = 'rgba(21,120,66,0.45)';
+        ctx.lineWidth = 0.8;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for (var d = 0; d < landCountries.length; d++) {
+            var polys = [landCountries[d]];
+            for (var pi = 0; pi < polys.length; pi++) {
+                for (var ri = 0; ri < polys[pi].rings.length; ri++) traceRing(polys[pi].rings[ri]);
+            }
+        }
+    }
+
+    function drawLegacyEarth() {
+        var legacy = [];
+        for (var ci = 0; ci < continents.length; ci++) {
+            var rings = continents[ci].map(function (pt) { return [pt[0], pt[1]]; });
+            legacy.push({ rings: [rings] });
+        }
+        ctx.fillStyle = 'rgba(46,160,92,0.28)';
+        for (var f = 0; f < legacy.length; f++) fillCountry([legacy[f]], false);
+        ctx.strokeStyle = 'rgba(21,120,66,0.42)';
+        ctx.lineWidth = 0.9; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for (var s = 0; s < legacy.length; s++) {
+            for (var ri = 0; ri < legacy[s].rings.length; ri++) traceRing(legacy[s].rings[ri]);
+        }
+    }
+
+    function drawContinents() {
+        if (landCountries) drawRealEarth();
+        else drawLegacyEarth();
     }
 
     function drawCities() {
@@ -297,14 +433,36 @@
 
         /* Clip to sphere */
         ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
-        ctx.fillStyle = 'rgba(35,154,77,0.015)'; ctx.fillRect(0, 0, w, h);
+
+        /* Ocean gradient — soft blue-green, lighter toward the sun */
+        var oG = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.05, cx, cy, r);
+        oG.addColorStop(0, '#eef7f3');
+        oG.addColorStop(0.55, '#e2f1ec');
+        oG.addColorStop(1, '#cfe6df');
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = oG; ctx.fill();
+
+        /* Subtle depth tint near the limb (fakes sphere curvature) */
+        var lG = ctx.createRadialGradient(cx, cy, r * 0.72, cx, cy, r);
+        lG.addColorStop(0, 'rgba(120,170,155,0)');
+        lG.addColorStop(1, 'rgba(90,145,130,0.16)');
+        ctx.fillStyle = lG; ctx.fillRect(0, 0, w, h);
+
         drawGrid(); drawEquator(); drawArcs(); drawContinents(); drawCities();
         ctx.restore();
 
-        /* 3D shading */
+        /* Specular highlight (sun reflection top-left) */
+        var spG = ctx.createRadialGradient(cx - r * 0.42, cy - r * 0.45, 0, cx - r * 0.42, cy - r * 0.45, r * 0.75);
+        spG.addColorStop(0, 'rgba(255,255,255,0.35)');
+        spG.addColorStop(0.25, 'rgba(255,255,255,0.12)');
+        spG.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = spG; ctx.fill();
+
+        /* 3D shading + limb darkening */
         var shG = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.05, cx + r * 0.1, cy + r * 0.1, r * 1.1);
-        shG.addColorStop(0, 'rgba(255,255,255,0.055)'); shG.addColorStop(0.35, 'rgba(255,255,255,0.01)');
-        shG.addColorStop(0.7, 'rgba(0,0,0,0.02)'); shG.addColorStop(1, 'rgba(0,0,0,0.07)');
+        shG.addColorStop(0, 'rgba(255,255,255,0.06)');
+        shG.addColorStop(0.35, 'rgba(255,255,255,0.01)');
+        shG.addColorStop(0.7, 'rgba(30,60,50,0.03)');
+        shG.addColorStop(1, 'rgba(20,50,40,0.12)');
         ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = shG; ctx.fill();
 
         /* Rings */
