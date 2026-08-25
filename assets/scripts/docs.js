@@ -1,3 +1,4 @@
+/* BUILD 2026-08-25.10 (Layout > Zoom: removed the zoom-percentage counter label; 4 zoom buttons + status-bar % remain) */
 /* =========================================================
    Z Docs — Word Processor  (v2)
    Real pagination engine: content is distributed across real
@@ -10,7 +11,9 @@
      of being pushed whole to the next page (which created
      cascades of empty pages).
    - Find & Replace (Ctrl+F / Ctrl+H) with match highlighting.
-   - Insert Link (Ctrl+K), Image (upload/url), Table (grid), HR.
+   - Insert Link (Ctrl+K; Ctrl+click opens in new tab), Image (OS file
+     picker, Slides-style), Table (grid), HR. Page-break markers are
+     click-to-remove.
    - Undo/Redo, Dark theme toggle, Export (.txt/.html/print),
      Word-count stats dialog, Ruler.
    ========================================================= */
@@ -22,7 +25,7 @@
   var CARET_BLOCK_ATTR = "data-caret-block";
   var CARET_OFFSET_ATTR = "data-caret-offset";
   var STORAGE_KEY = "zdocs.document.v3";
-  var THEME_KEY = "zdocs.theme";
+  // THEME_KEY removed — dark mode is no longer supported.
   var VERSIONS_KEY = "zdocs.versions";
   var MARGINS_KEY = "zdocs.margins";
   var GOAL_KEY = "zdocs.goal";
@@ -34,6 +37,9 @@
   var PAGE_HEIGHT = 1123;
   var MIN_MARGIN = 32;
   var MAX_MARGIN = 300;
+  // Zoom limits match Slides: 20% – 400% (Slides uses clamp(scale, 0.2, 4)).
+  var MIN_ZOOM = 20;
+  var MAX_ZOOM = 400;
 
   /* ---------------- State ---------------- */
   var paginateScheduled = false;
@@ -65,11 +71,7 @@
     content.setAttribute("role", "textbox");
     content.setAttribute("aria-multiline", "true");
 
-    var badge = document.createElement("div");
-    badge.className = "page-badge";
-
     page.appendChild(content);
-    page.appendChild(badge);
 
     attachPageEvents(content);
     return page;
@@ -250,6 +252,7 @@
     removeTrailingEmptyPages();
     ensureFirstPage();
     ensureTableCellsEditable();
+    syncHeaderFooter(); // re-apply header/footer strips to new pages
     updatePageNumbers();
     updateDynamicFields();
     applySectionConfigs();
@@ -550,16 +553,13 @@
 
   function updateStatus() {
     var stats = getStats();
-    $("wordCount").textContent = stats.words + " " + (stats.words === 1 ? "word" : "words");
+    var wc = $("wordCount");
+    if (wc) wc.textContent = stats.words + " " + (stats.words === 1 ? "word" : "words");
     $("charCount").textContent = stats.chars + " " + (stats.chars === 1 ? "character" : "characters");
 
     var cur = getCurrentPageIndex() + 1;
     if (cur < 1) cur = 1;
     $("pageInfo").textContent = "Page " + cur + " of " + stats.pages;
-
-    var prev = $("prevPage"), next = $("nextPage");
-    if (prev) prev.disabled = cur <= 1;
-    if (next) next.disabled = cur >= stats.pages;
 
     // Update caret position (Ln, Col)
     updateCaretPosition();
@@ -588,9 +588,17 @@
     var el = $("caretPos");
     if (!el) return;
     var sel = window.getSelection();
-    if (!sel || !sel.rangeCount) return;
+    if (!sel || !sel.rangeCount) {
+      // No selection — reset to "Ln 1, Col 1" (e.g. when the editor loses focus
+      // or the page is empty and nothing is selected).
+      el.textContent = "Ln 1, Col 1";
+      return;
+    }
     var node = sel.anchorNode;
-    if (!node) return;
+    if (!node) {
+      el.textContent = "Ln 1, Col 1";
+      return;
+    }
     // Check if we're in the editor
     var inEditor = false;
     var checkNode = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
@@ -598,14 +606,27 @@
       if (checkNode.classList && checkNode.classList.contains("page-content")) { inEditor = true; break; }
       checkNode = checkNode.parentElement;
     }
-    if (!inEditor) return;
+    if (!inEditor) {
+      el.textContent = "Ln 1, Col 1";
+      return;
+    }
 
-    // Find the block element containing the caret
+    // Find the block element containing the caret — i.e. the direct child of
+    // .page-content (typically a <p>, <h1>, <ul>, <blockquote>, etc.).
+    // We walk UP from the anchor node until the parent has .page-content.
     var block = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
     while (block && block.parentElement && !block.parentElement.classList.contains("page-content")) {
       block = block.parentElement;
     }
-    if (!block) return;
+    // Guard: if block walked PAST .page-content (happens when the selection is
+    // directly on the .page-content element itself — e.g. an empty page with no
+    // <p> child yet), the walk escapes to <body> and `selectNodeContents(block)`
+    // would grab the entire document, producing a bogus column like "Col 15733".
+    // In that case, default to line 1, col 1.
+    if (!block || !block.parentElement || !block.parentElement.classList.contains("page-content")) {
+      el.textContent = "Ln 1, Col 1";
+      return;
+    }
 
     // Count which block number this is (across all pages)
     var pages = getPages();
@@ -618,6 +639,11 @@
         blockIndex++;
       }
     }
+    // If we somehow didn't find the block in any page (shouldn't happen, but be safe):
+    if (!found) {
+      el.textContent = "Ln 1, Col 1";
+      return;
+    }
     // Line = block number + 1
     var line = blockIndex + 1;
 
@@ -629,7 +655,9 @@
       preRange.selectNodeContents(block);
       preRange.setEnd(range.startContainer, range.startOffset);
       col = preRange.toString().length + 1;
-    } catch (e) {}
+    } catch (e) {
+      col = 1;
+    }
 
     el.textContent = "Ln " + line + ", Col " + col;
   }
@@ -842,8 +870,9 @@
     if (!sel || !sel.rangeCount || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
       if (fc) fc.focus();
     }
-    // Insert a page-break marker element followed by an empty paragraph
-    var html = '<div class="zdocs-page-break" contenteditable="false"><span class="pb-label">— Page Break —</span></div><p><br></p>';
+    // Insert a page-break marker element followed by an empty paragraph.
+    // The marker is clickable afterwards to remove (cancel) the break.
+    var html = '<div class="zdocs-page-break" contenteditable="false" title="Click to remove this page break"><span class="pb-label">— Page Break —</span></div><p><br></p>';
     document.execCommand("insertHTML", false, html);
     schedulePaginate();
     scheduleAutosave();
@@ -1153,7 +1182,7 @@
   }
 
   function showLinkPreview(a, e) {
-    var href = a.getAttribute("href") || "";
+    var href = normalizeExternalUrl(a.getAttribute("href") || "");
     var text = a.textContent || "";
     linkPreviewEl.innerHTML =
       '<div class="lp-url">' + escapeHtml(href) + "</div>" +
@@ -1331,9 +1360,7 @@
       try {
         var data = serialize();
         pushVersion(data);
-        // update the version count badge in the status bar
-        var vc = $("versionCountText");
-        if (vc) vc.textContent = String(getVersions().length);
+        // (Version count badge removed from status bar — no UI to update.)
       } catch (e) {}
     }, AUTOSAVE_SNAPSHOT_MS);
   }
@@ -1368,6 +1395,12 @@
   }
 
   function exec(cmd, value) {
+    // Indent/Outdent: plain margin-left indentation — NOT execCommand's
+    // blockquote wrapper (which rendered as a blue quote block).
+    if (cmd === "indent" || cmd === "outdent") {
+      applyIndent(cmd === "indent" ? 1 : -1);
+      return;
+    }
     restoreEditorSelection();
     var sel = window.getSelection();
     var inEditor = false;
@@ -1386,35 +1419,69 @@
   }
 
   function applyBlock(tag) { exec("formatBlock", "<" + (tag === "p" ? "p" : tag) + ">"); }
-  function applyFontFamily(value) { exec("fontName", value); }
-  function applyFontSize(value) { exec("fontSize", value); }
 
-  function applyLineSpacing(value) {
+  function applyIndent(direction) {
+    restoreEditorSelection();
     var block = getCurrentBlock();
-    if (block) {
-      block.style.lineHeight = value;
+    if (!block) return;
+    var cur = parseFloat(block.style.marginLeft) || 0;
+    var next = direction > 0 ? cur + 40 : Math.max(0, cur - 40);
+    if (next === cur) return;
+    block.style.marginLeft = next + "px";
+    schedulePaginate();
+    scheduleAutosave();
+  }
+  function applyFontFamily(value) { exec("fontName", value); }
+
+  /* Exact pixel font sizes (Slides parity): execCommand only supports a
+     coarse 1–7 scale, so we wrap the selection with <font size="7"> and then
+     convert that wrapper into a <span style="font-size:Npx"> carrying the
+     exact size picked in the dropdown. */
+  function applyFontSize(value) {
+    var v = parseFloat(value);
+    if (isNaN(v) || v <= 0) return;
+    // Legacy 1–7 values (old macros / format painter) still pass straight through
+    if (v >= 1 && v <= 7) { exec("fontSize", String(Math.round(v))); return; }
+
+    // Remember pre-existing size="7" wrappers so only the new one is converted
+    var before = document.querySelectorAll('.page-content font[size="7"]');
+    var skip = [];
+    for (var b = 0; b < before.length; b++) skip.push(before[b]);
+
+    try { document.execCommand("styleWithCSS", false, false); } catch (e) {}
+    exec("fontSize", "7");
+
+    var fonts = document.querySelectorAll('.page-content font[size="7"]');
+    var converted = 0;
+    for (var i = 0; i < fonts.length; i++) {
+      var f = fonts[i];
+      if (skip.indexOf(f) !== -1) continue;
+      var span = document.createElement("span");
+      span.style.fontSize = v + "px";
+      while (f.firstChild) span.appendChild(f.firstChild);
+      f.parentNode.replaceChild(span, f);
+      converted++;
+    }
+    if (converted) {
       schedulePaginate();
       scheduleAutosave();
+      setTimeout(updateToolbarStates, 10);
     }
   }
 
   function applyTextColor(color) {
-    $("textColorBar").style.background = color;
-    exec("foreColor", color);
-    // macro recording
-    if (typeof macroRecording !== "undefined" && macroRecording) {
-      macroSteps.push({ type: "color", target: "text", value: color });
-    }
+    var bar = $("textColorBar");
+    if (bar) bar.style.background = color;
+    var input = $("textColor");
+    if (input) input.value = color;
   }
 
   function applyHiliteColor(color) {
-    $("hiliteColorBar").style.background = color;
+    var bar = $("hiliteColorBar");
+    if (bar) bar.style.background = color;
+    var input = $("hiliteColor");
+    if (input) input.value = color;
     try { document.execCommand("styleWithCSS", false, true); } catch (e) {}
-    exec("hiliteColor", color);
-    // macro recording
-    if (typeof macroRecording !== "undefined" && macroRecording) {
-      macroSteps.push({ type: "color", target: "hilite", value: color });
-    }
   }
 
   function clearFormatting() { exec("removeFormat"); }
@@ -1441,19 +1508,8 @@
       try { active = document.queryCommandState(cmds[i]); } catch (e) {}
       if (active) btn.classList.add("active"); else btn.classList.remove("active");
     }
-    var block = "p";
-    try {
-      var v = document.queryCommandValue("formatBlock");
-      if (v) block = String(v).toLowerCase().replace(/[<>]/g, "");
-    } catch (e) {}
-    var sel = $("blockType");
-    if (sel) {
-      var has = false;
-      for (var j = 0; j < sel.options.length; j++) {
-        if (sel.options[j].value === block) { has = true; break; }
-      }
-      if (has) sel.value = block;
-    }
+    updateDropCapState();
+    // Block-type dropdown removed — nothing else to sync.
   }
 
   /* ---------------- Save / Load (IndexedDB via EmeraldIDBStorage) ---------------- */
@@ -1478,6 +1534,8 @@
       content: combined.innerHTML,
       savedAt: Date.now(),
       theme: theme,
+      header: headerActive && hfHasContent(headerHTML) ? headerHTML : "",
+      footer: footerActive && hfHasContent(footerHTML) ? footerHTML : "",
     };
   }
 
@@ -1486,12 +1544,6 @@
     try { data = serialize(); } catch (e) {
       if (showToast) toast("Save failed", "error");
       return;
-    }
-    // If password protection is enabled, encrypt the content before saving
-    if (documentPassword) {
-      data.encrypted = true;
-      data.content = xorCipher(data.content, documentPassword);
-      data.title = xorCipher(data.title, documentPassword);
     }
     try {
       // Use IndexedDB if available, otherwise fall back to localStorage
@@ -1648,10 +1700,6 @@
         if (raw) data = JSON.parse(raw);
       }
       if (!data) return false;
-      // If the document is password-encrypted, don't load the scrambled
-      // content — checkPasswordOnLoad() will show the unlock modal.
-      if (data.encrypted) return false;
-
       ($("docTitle")?$("docTitle").value=data.title:null) || "Untitled Document";
       var wrapper = $(PAGES_WRAPPER_ID);
       wrapper.innerHTML = "";
@@ -1664,6 +1712,12 @@
         p.innerHTML = "<br>";
         content.appendChild(p);
       }
+      // Restore editable header/footer strips (syncHeaderFooter runs inside
+      // paginate() and creates them on every page).
+      headerActive = hfHasContent(data.header);
+      headerHTML = headerActive ? data.header : "";
+      footerActive = hfHasContent(data.footer);
+      footerHTML = footerActive ? data.footer : "";
       paginate();
       return true;
     } catch (e) { return false; }
@@ -1706,6 +1760,8 @@
     if (!window.confirm("Start a new document? Current content will be cleared.")) return;
     var wrapper = $(PAGES_WRAPPER_ID);
     wrapper.innerHTML = "";
+    headerActive = false; headerHTML = "";
+    footerActive = false; footerHTML = "";
     ensureFirstPage();
     ($("docTitle")?$("docTitle").value="Untitled Document":null);
     paginate();
@@ -1719,7 +1775,12 @@
 
   function printDocument() {
     saveDocument(false);
-    window.print();
+    // Force a paginate pass before printing so the latest content is split
+    // into pages correctly (otherwise the printout may use stale page breaks).
+    try { schedulePaginate(); } catch (e) {}
+    // Defer window.print() to the next tick so the paginate pass has a chance
+    // to flush DOM changes before the browser snapshots the page for printing.
+    setTimeout(function () { window.print(); }, 50);
   }
 
   function exportDocument(format) {
@@ -1767,13 +1828,13 @@
     });
   }
 
-  /* ---------------- Zoom ---------------- */
+  /* ---------------- Zoom (Slides-style buttons: fit / 100 / in / out) ---------------- */
+  var currentZoom = 100;
   function setZoom(percent) {
+    percent = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(percent)));
+    currentZoom = percent;
     var wrapper = $(PAGES_WRAPPER_ID);
     if (wrapper) wrapper.style.zoom = String(percent / 100);
-    $("zoomLabel").textContent = percent + "%";
-    var slider = $("zoom");
-    if (slider) slider.value = percent;
     var statusPct = $("statusZoomPct");
     if (statusPct) statusPct.textContent = percent + "%";
   }
@@ -1800,101 +1861,36 @@
     }
   }
 
-  /* ---------------- Theme ---------------- */
-  function applyTheme(t) {
-    theme = t;
-    document.documentElement.setAttribute("data-theme", t);
-    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
-    // re-apply color theme on top of light/dark
-    applyColorTheme(currentColorTheme);
+  /* ---------------- Theme ----------------
+     Dark mode and accent color switching have been removed.
+     The accent color is locked to cyan via the CSS :root variables,
+     and there is no dark theme anymore — the app is always in light mode. */
+  function applyTheme() {
+    /* no-op — kept for backward compat with older code that calls applyTheme("light") */
   }
 
   function toggleTheme() {
-    applyTheme(theme === "dark" ? "light" : "dark");
+    /* no-op — dark mode removed */
   }
 
-  /* Dark paper mode — true dark document canvas (only meaningful in dark theme) */
   function toggleDarkPaper() {
-    var app = $("app");
-    app.classList.toggle("dark-paper");
-    var isOn = app.classList.contains("dark-paper");
-    try { localStorage.setItem("zdocs.darkPaper", isOn ? "1" : "0"); } catch (e) {}
-    toast(isOn ? "Dark paper on" : "Dark paper off", "success");
+    /* no-op — dark paper removed */
   }
 
-  /* ---------------- Document color themes (accent presets) ---------------- */
-  var COLOR_THEME_KEY = "zdocs.colorTheme";
-  var currentColorTheme = "blue";
-  var COLOR_THEMES = {
-    blue: { accent: "#2563eb", accentHover: "#1d4ed8", ring: "#3b82f6", name: "Blue" },
-    ocean: { accent: "#0284c7", accentHover: "#0369a1", ring: "#38bdf8", name: "Ocean" },
-    indigo: { accent: "#4f46e5", accentHover: "#4338ca", ring: "#818cf8", name: "Indigo" },
-    cyan: { accent: "#0891b2", accentHover: "#0e7490", ring: "#22d3ee", name: "Cyan" },
-    emerald: { accent: "#239a4d", accentHover: "#1a7d3d", ring: "#2BD059", name: "Emerald" },
-    sunset: { accent: "#ea580c", accentHover: "#c2410c", ring: "#fb923c", name: "Sunset" },
-    rose: { accent: "#e11d48", accentHover: "#be123c", ring: "#fb7185", name: "Rose" },
-    violet: { accent: "#7c3aed", accentHover: "#6d28d9", ring: "#a78bfa", name: "Violet" },
-  };
-
-  function applyColorTheme(key) {
-    currentColorTheme = key || "blue";
-    var t = COLOR_THEMES[currentColorTheme] || COLOR_THEMES.blue;
-    var root = document.documentElement;
-    // override the accent CSS variables
-    root.style.setProperty("--ui-accent", t.accent);
-    root.style.setProperty("--ui-accent-hover", t.accentHover);
-    root.style.setProperty("--ui-accent-soft", hexToRgba(t.accent, 0.10));
-    root.style.setProperty("--ui-accent-selected", hexToRgba(t.accent, 0.15));
-    root.style.setProperty("--ui-accent-border", hexToRgba(t.accent, 0.30));
-    root.style.setProperty("--ui-accent-ring", hexToRgba(t.ring, 0.35));
-    root.style.setProperty("--ring", t.ring);
-    root.style.setProperty("--accent", t.accent);
-    root.style.setProperty("--accent-strong", t.accentHover);
-    root.style.setProperty("--accent-soft", hexToRgba(t.accent, 0.10));
-    root.setAttribute("data-color-theme", currentColorTheme);
-    try { localStorage.setItem(COLOR_THEME_KEY, currentColorTheme); } catch (e) {}
-  }
-
-  function loadColorTheme() {
-    try {
-      var k = localStorage.getItem(COLOR_THEME_KEY);
-      if (k && COLOR_THEMES[k]) currentColorTheme = k;
-      else currentColorTheme = "blue";
-    } catch (e) {}
-    applyColorTheme(currentColorTheme);
-  }
-
+  /* ---------------- Document color themes (accent presets) ----------------
+     All accent-color switching has been removed. The app uses cyan as the
+     single, locked accent color (defined in :root in docs.css). These stubs
+     exist only so older code paths that still call applyColorTheme() /
+     openColorThemeDialog() don't throw. */
+  function applyColorTheme() { /* no-op — cyan is locked via CSS */ }
+  function loadColorTheme()  { /* no-op */ }
+  function openColorThemeDialog() { /* no-op — modal removed */ }
   function hexToRgba(hex, alpha) {
     var m = hex.match(/^#([0-9a-f]{6})$/i);
     if (!m) return "rgba(0,0,0," + alpha + ")";
     var n = parseInt(m[1], 16);
     var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
     return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
-  }
-
-  function openColorThemeDialog() {
-    var grid = $("colorThemeGrid");
-    if (!grid) return;
-    grid.innerHTML = "";
-    var keys = Object.keys(COLOR_THEMES);
-    for (var i = 0; i < keys.length; i++) {
-      (function (key) {
-        var t = COLOR_THEMES[key];
-        var item = document.createElement("button");
-        item.className = "color-theme-option" + (key === currentColorTheme ? " active" : "");
-        item.innerHTML = '<span class="ct-swatch" style="background:' + t.accent + '"></span><span class="ct-name">' + escapeHtml(t.name) + "</span>";
-        item.addEventListener("click", function () {
-          applyColorTheme(key);
-          // update active states
-          var all = grid.querySelectorAll(".color-theme-option");
-          for (var j = 0; j < all.length; j++) all[j].classList.remove("active");
-          item.classList.add("active");
-          toast("Color theme: " + t.name, "success");
-        });
-        grid.appendChild(item);
-      })(keys[i]);
-    }
-    openModal("colorThemeModal");
   }
 
   /* ---------------- Clipboard history ---------------- */
@@ -1953,6 +1949,9 @@
   function openModal(id) {
     var m = $(id);
     if (m) {
+      // Cancel any in-flight closing animation (Slides re-opens instantly).
+      clearTimeout(m._closeTimer);
+      m.classList.remove("closing");
       m.classList.add("open");
       m.setAttribute("aria-hidden", "false");
       var first = m.querySelector("input[type='text'], input[type='url'], input:not([type])");
@@ -1962,17 +1961,23 @@
 
   function closeModal(id) {
     var m = $(id);
-    if (m) {
+    if (!m) return;
+    m.setAttribute("aria-hidden", "true");
+    if (!m.classList.contains("open")) return;
+    // Slides' close: add .closing (0.23s fadeOutOverlay/fadeOutModal), then
+    // drop .open 230ms later — same timing as the Slides app's modals.
+    clearTimeout(m._closeTimer);
+    m.classList.add("closing");
+    m._closeTimer = setTimeout(function () {
+      m.classList.remove("closing");
       m.classList.remove("open");
-      m.setAttribute("aria-hidden", "true");
-    }
+    }, 230);
   }
 
   function closeAllModals() {
     var modals = document.querySelectorAll(".modal-overlay");
     for (var i = 0; i < modals.length; i++) {
-      modals[i].classList.remove("open");
-      modals[i].setAttribute("aria-hidden", "true");
+      closeModal(modals[i].id);
     }
   }
 
@@ -2255,7 +2260,7 @@
   }
 
   function insertLink() {
-    var url = $("linkUrl").value.trim();
+    var url = normalizeExternalUrl($("linkUrl").value.trim());
     var text = $("linkText").value.trim();
     if (!url) { toast("Please enter a URL", "error"); return; }
     restoreEditorSelection();
@@ -2279,42 +2284,37 @@
 
   function escapeAttr(s) { return String(s).replace(/"/g, "&quot;"); }
 
-  /* ---------------- Insert Image ---------------- */
-  function openImageDialog() {
-    var sel = window.getSelection();
-    if (sel && sel.rangeCount) {
-      var node = sel.anchorNode;
-      if (node) {
-        var el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-        if (el && el.closest(".page-content")) {
-          lastEditorRange = sel.getRangeAt(0).cloneRange();
-        }
-      }
-    }
-    $("imgUrl").value = "";
-    $("imgFile").value = "";
-    $("imgAlt").value = "";
-    openModal("imageModal");
+  /* Bare domains typed into the Link dialog ("youtube.com") must NOT resolve
+     relative to the app origin (which produced http://127.0.0.1:5500/youtube.com).
+     Anything without an explicit scheme/anchor/root path gets https:// prefixed. */
+  function normalizeExternalUrl(url) {
+    var u = String(url || "").trim();
+    if (!u) return u;
+    if (/^(https?:\/\/|mailto:|tel:|ftp:|file:|#|\/)/i.test(u)) return u;
+    return "https://" + u;
   }
 
-  function insertImage() {
-    var url = $("imgUrl").value.trim();
-    var alt = $("imgAlt").value.trim();
-    var file = $("imgFile").files[0];
+  /* ---------------- Insert Image (Slides-style: OS file picker directly) ---------------- */
+  function openImagePicker() {
+    // Slides parity: no dialog — clicking the ribbon button opens the
+    // native file explorer straight away via a hidden <input type=file>.
+    var input = $("insertImageInput");
+    if (input) input.click();
+  }
 
-    if (file) {
-      var reader = new FileReader();
-      reader.onload = function (e) {
-        doInsertImage(e.target.result, alt);
-      };
-      reader.readAsDataURL(file);
-    } else if (url) {
-      doInsertImage(url, alt);
-    } else {
-      toast("Please provide a URL or file", "error");
-      return;
-    }
-    closeModal("imageModal");
+  function handleImageFileSelect(e) {
+    var input = e.target;
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      // Alt text defaults to the file name (without extension).
+      var alt = (file.name || "image").replace(/\.[^.]+$/, "");
+      doInsertImage(ev.target.result, alt);
+    };
+    reader.readAsDataURL(file);
+    // Reset so selecting the same file again still fires "change".
+    input.value = "";
   }
 
   function doInsertImage(src, alt) {
@@ -2567,9 +2567,16 @@
   }
 
   /* ---------------- Ribbon tab switching ----------------
-     EmeraldSuite pattern: clicking a tab animates a sliding
-     underline indicator to the active tab, and cross-fades the
-     corresponding ribbon-panel with a blur-out → blur-in transition. */
+     EmeraldSuite pattern (matches Slides): clicking a tab animates a sliding
+     underline indicator to the active tab, and cross-fades the corresponding
+     ribbon-panel with a blur-out → blur-in transition.
+
+     IMPORTANT: We listen for `transitionend` on the blur-out animation
+     rather than using a fixed setTimeout. The blur-out transition is 0.18s;
+     firing at 140ms (the old behaviour) left the panel at ~5% opacity when
+     its position flipped from `relative` (centered via margin:auto) to
+     `absolute; left:0` — causing a brief flash on the left edge of the
+     ribbon before the new panel appeared in the center. */
   function initRibbonTabs() {
     var tabs = document.querySelectorAll(".ribbon-tab");
     var panels = document.querySelectorAll(".ribbon-panel");
@@ -2603,16 +2610,36 @@
         // Move indicator (synced with the 0.3s CSS transition)
         moveIndicator(tab);
 
-        // Blur-out current panel, then activate target panel
         var currentActive = document.querySelector(".ribbon-panel.active");
         var targetPanel = document.querySelector('.ribbon-panel[data-panel="' + target + '"]');
+
+        var doSwitch = function () {
+          if (currentActive) currentActive.classList.remove("blur-out");
+          if (targetPanel) targetPanel.classList.add("active");
+        };
+
         if (currentActive && targetPanel && currentActive !== targetPanel) {
+          // Step 1: blur-out the current panel (keeps position: relative, no layout shift)
           currentActive.classList.add("blur-out");
           currentActive.classList.remove("active");
+
+          // Step 2: when the 0.18s blur-out transition finishes, swap classes
+          var onBlurred = function (e) {
+            // Only react to the opacity transition (filter & visibility also fire)
+            if (e.propertyName !== "opacity") return;
+            currentActive.removeEventListener("transitionend", onBlurred);
+            doSwitch();
+          };
+          currentActive.addEventListener("transitionend", onBlurred);
+
+          // Fallback: if transitionend never fires (e.g. panel hidden, pref-reduced-motion),
+          // force the switch at 220ms (just past the 0.18s transition + small buffer)
           setTimeout(function () {
-            currentActive.classList.remove("blur-out");
-            targetPanel.classList.add("active");
-          }, 140);
+            if (currentActive.classList.contains("blur-out")) {
+              currentActive.removeEventListener("transitionend", onBlurred);
+              doSwitch();
+            }
+          }, 220);
         } else if (targetPanel) {
           if (currentActive) currentActive.classList.remove("active");
           targetPanel.classList.add("active");
@@ -2883,14 +2910,14 @@
 
       // Milestone toasts at 25%, 50%, 75%
       if (pct >= 25 && !goalMilestones[25]) { goalMilestones[25] = true; toastMilestone("25% there — keep going!"); }
-      if (pct >= 50 && !goalMilestones[50]) { goalMilestones[50] = true; toastMilestone("Halfway there! 🚀"); }
+      if (pct >= 50 && !goalMilestones[50]) { goalMilestones[50] = true; toastMilestone("Halfway there!"); }
       if (pct >= 75 && !goalMilestones[75]) { goalMilestones[75] = true; toastMilestone("75% — almost done!"); }
 
       // Celebration: fire confetti once when goal is first reached
       if (current >= goalTarget && !goalCelebrated) {
         goalCelebrated = true;
         fireConfetti();
-        toastMilestone("Goal reached! Well done. 🎉");
+        toastMilestone("Goal reached! Well done.");
       } else if (current < goalTarget && goalCelebrated) {
         // reset so it can celebrate again if user dips below and re-reaches
         goalCelebrated = false;
@@ -2910,11 +2937,9 @@
   }
 
   function toastMilestone(msg) {
-    var el = $("toast");
-    el.textContent = msg;
-    el.className = "toast show milestone";
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.className = "toast"; }, 3000);
+    // Milestones reuse the standard Slides-style toast (white pill + award
+    // icon picked by _toastIcon) — no more special gradient styling.
+    toast(msg, "success");
   }
 
   /* ---------------- Stats chart ---------------- */
@@ -3886,39 +3911,48 @@
     setTimeout(function () { content.focus(); }, 100);
   }
 
-  /* ---------------- Symbols ---------------- */
-  var SYMBOL_SETS = {
-    common: "© ® ™ ¶ § • … — – “ ” ‘ ’ ° ± ÷ × ≠ ≤ ≥ ∞ √ ∑ ∫ π ∂ ∆ Ω ≈ ∼ ∝ ∈ ∉ ∪ ∩ ⊂ ⊃",
-    math: "± × ÷ ≠ ≈ ∼ ∝ ≤ ≥ ∞ √ ∑ ∫ ∏ ∂ ∆ ∇ π Σ Ω α β γ δ ε ζ η θ λ μ ν ξ ρ σ τ φ ψ ω ∴ ∵ ≅ ≡",
-    currency: "$ € £ ¥ ¢ ₹ ₽ ₩ ₪ ₫ ₴ ₸ ฿ ₺ ₼ ₡ ₨ ₦ ₱ ₤ ƒ",
-    arrows: "→ ← ↑ ↓ ↔ ↕ ⇒ ⇐ ⇑ ⇓ ⇔ ↗ ↘ ↙ ↖ ➜ ➝ ➞ ➟ ➠ ➡",
-    greek: "α β γ δ ε ζ η θ ι κ λ μ ν ξ ο π ρ σ τ υ φ χ ψ ω Α Β Γ Δ Ε Ζ Η Θ Ι Κ Λ Μ Ν Ξ Ο Π Ρ Σ Τ Υ Φ Χ Ψ Ω",
-  };
-
-  function buildSymbols(category) {
-    var grid = $("symbolGrid");
-    grid.innerHTML = "";
-    var chars = (SYMBOL_SETS[category] || "").split(/\s+/).filter(Boolean);
-    for (var i = 0; i < chars.length; i++) {
-      (function (ch) {
-        var cell = document.createElement("button");
-        cell.className = "symbol-cell";
-        cell.textContent = ch;
-        cell.title = ch;
-        cell.addEventListener("click", function () {
-          restoreEditorSelection();
-          document.execCommand("insertText", false, ch);
-          schedulePaginate();
-          scheduleAutosave();
-        });
-        grid.appendChild(cell);
-      })(chars[i]);
+  /* ---------------- Symbol bar (Slides-style floating bottom bar) ----------------
+     Ported from the Slides app's symbolToolbar: a bottom-docked floating
+     pill (no modal box) with grouped symbol buttons — Stars, Marks, Arrows,
+     Math, Greek, Numbers, Special. Clicking a symbol inserts it at the
+     caret; the bar STAYS OPEN so several symbols can be inserted in a row
+     (Slides parity). Done — or the ribbon button again — closes it. */
+  function toggleSymbolBar(force) {
+    var bar = $("symbolToolbar");
+    var btn = $("btnSymbols");
+    if (!bar) return;
+    var shouldOpen = force === undefined ? !bar.classList.contains("visible") : force;
+    if (shouldOpen) {
+      // Only one bottom toolbar at a time — exit draw mode if it is on.
+      if (drawMode) toggleDrawMode(false);
+      bar.classList.add("visible");
+      if (btn) btn.classList.add("active");
+    } else {
+      bar.classList.remove("visible");
+      if (btn) btn.classList.remove("active");
     }
   }
 
-  function openSymbols() {
-    buildSymbols("common");
-    openModal("symbolsModal");
+  function initSymbolBar() {
+    var bar = $("symbolToolbar");
+    if (!bar) return;
+    var buttons = bar.querySelectorAll(".sym-bar-btn");
+    for (var i = 0; i < buttons.length; i++) {
+      (function (btn) {
+        btn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          var sym = btn.getAttribute("data-s") || btn.textContent;
+          restoreEditorSelection();
+          document.execCommand("insertText", false, sym);
+          schedulePaginate();
+          scheduleAutosave();
+          toast('Inserted "' + sym + '"');
+        });
+      })(buttons[i]);
+    }
+    var done = $("symbolDoneBtn");
+    if (done) done.addEventListener("click", function () { toggleSymbolBar(false); });
   }
 
   /* ---------------- Go To ---------------- */
@@ -4037,25 +4071,30 @@
       toast("Place cursor in a paragraph", "error");
       return;
     }
+    var btnDropCap = $("btnDropCap");
     if (block.classList.contains("has-dropcap")) {
       block.classList.remove("has-dropcap");
+      if (btnDropCap) btnDropCap.classList.remove("active");
       toast("Drop cap removed", "success");
     } else {
       block.classList.add("has-dropcap");
+      if (btnDropCap) btnDropCap.classList.add("active");
       toast("Drop cap applied", "success");
     }
     schedulePaginate();
     scheduleAutosave();
   }
 
-  /* ---------------- Text Box ---------------- */
-  function insertTextBox() {
-    restoreEditorSelection();
-    var html = '<div class="zdocs-textbox" contenteditable="true" style="border:2px solid var(--ui-accent); border-radius:8px; padding:12px; margin:8px 0; background:var(--ui-accent-soft);"><p>Click to edit text box content.</p></div><p><br></p>';
-    document.execCommand("insertHTML", false, html);
-    schedulePaginate();
-    scheduleAutosave();
-    toast("Text box inserted", "success");
+  /* Sync the Drop Cap button's toggle-ON look with the paragraph under the
+     caret, so the button visually reflects the applied state (ON/OFF) while
+     moving through the document — same behavior as Bold/Italic buttons. */
+  function updateDropCapState() {
+    var btn = document.getElementById("btnDropCap");
+    if (!btn) return;
+    var block = getCurrentBlock();
+    var on = !!(block && block.tagName === "P" && block.classList.contains("has-dropcap"));
+    btn.classList.toggle("active", on);
+    btn.title = on ? "Drop cap (currently ON — click to remove)" : "Drop cap";
   }
 
   /* ---------------- Columns ---------------- */
@@ -4080,12 +4119,19 @@
   }
 
   /* ---------------- Orientation & Page Size ---------------- */
+  // Order matches the Layout -> Size dropdown (Letter ... Envelope).
+  // Dimensions are 96dpi CSS pixels: Letter 8.5x11", Legal 8.5x14",
+  // Executive 7.25x10.5", A4/A5/A6 ISO paper, Envelope #10 4.125x9.5".
   var PAGE_SIZES = {
-    A4: { w: 794, h: 1123 },
     Letter: { w: 816, h: 1056 },
     Legal: { w: 816, h: 1344 },
+    Executive: { w: 696, h: 1008 },
+    A4: { w: 794, h: 1123 },
     A5: { w: 559, h: 794 },
+    A6: { w: 397, h: 559 },
+    Envelope: { w: 396, h: 912 },
   };
+  var currentPageSizeName = "A4";
 
   function toggleOrientation() {
     var pages = getPages();
@@ -4106,17 +4152,33 @@
     toast(isLandscape ? "Portrait" : "Landscape", "success");
   }
 
-  function cyclePageSize() {
+  // Sync the Layout -> Size dropdown + status-bar label with the current
+  // size. Detection matches width AND height (Letter and Legal share a
+  // width, so width-only matching would confuse them). Falls back to the
+  // last chosen name when pages use a custom size (e.g. landscape).
+  function syncPageSizeUI() {
     var pages = getPages();
-    var currentW = pages[0].style.width || "794px";
-    var sizes = Object.keys(PAGE_SIZES);
-    var currentName = "A4";
-    for (var name in PAGE_SIZES) {
-      if (PAGE_SIZES[name].w + "px" === currentW) { currentName = name; break; }
+    if (pages[0]) {
+      var w = pages[0].style.width;
+      var h = pages[0].style.height;
+      for (var name in PAGE_SIZES) {
+        if (PAGE_SIZES[name].w + "px" === w && PAGE_SIZES[name].h + "px" === h) {
+          currentPageSizeName = name;
+          break;
+        }
+      }
     }
-    var idx = sizes.indexOf(currentName);
-    var next = sizes[(idx + 1) % sizes.length];
-    setPageSize(next);
+    var dd = $("pageSizeDropdown");
+    if (dd) {
+      var lbl = dd.querySelector(".dropdown-value");
+      if (lbl) lbl.textContent = currentPageSizeName;
+      var items = dd.querySelectorAll(".ms-dropdown-item[data-value]");
+      for (var it = 0; it < items.length; it++) {
+        items[it].classList.toggle("active", items[it].getAttribute("data-value") === currentPageSizeName);
+      }
+    }
+    var label = document.querySelector(".page-size-label");
+    if (label) label.textContent = currentPageSizeName;
   }
 
   function setPageSize(name) {
@@ -4126,95 +4188,248 @@
     for (var i = 0; i < pages.length; i++) {
       pages[i].style.width = dim.w + "px";
       pages[i].style.height = dim.h + "px";
+      pages[i].classList.remove("landscape"); // a named size is always portrait
     }
-    // update the status bar label
-    var label = document.querySelector(".page-size-label");
-    if (label) label.textContent = name;
-    // update the page-size menu active state
-    var menuBtns = document.querySelectorAll(".page-size-menu button");
-    for (var b = 0; b < menuBtns.length; b++) {
-      menuBtns[b].classList.toggle("active", menuBtns[b].getAttribute("data-psize") === name);
-    }
+    currentPageSizeName = name;
+    syncPageSizeUI();
     schedulePaginate();
     scheduleAutosave();
     toast("Page size: " + name, "success");
   }
 
-  var pageSizeMenu = null;
-  function togglePageSizeMenu(anchor) {
-    if (pageSizeMenu && pageSizeMenu.classList.contains("open")) {
-      pageSizeMenu.classList.remove("open");
-      return;
-    }
-    if (!pageSizeMenu) {
-      pageSizeMenu = document.createElement("div");
-      pageSizeMenu.className = "page-size-menu";
-      document.body.appendChild(pageSizeMenu);
-      document.addEventListener("click", function (e) {
-        if (pageSizeMenu && !e.target.closest(".page-size-menu") && !e.target.closest(".page-size-label")) {
-          pageSizeMenu.classList.remove("open");
-        }
-      });
-    }
-    pageSizeMenu.innerHTML = "";
-    var sizes = Object.keys(PAGE_SIZES);
-    var pages = getPages();
-    var currentW = (pages[0] && pages[0].style.width) || "794px";
-    var currentName = "A4";
-    for (var name in PAGE_SIZES) {
-      if (PAGE_SIZES[name].w + "px" === currentW) { currentName = name; break; }
-    }
-    for (var i = 0; i < sizes.length; i++) {
-      (function (psz) {
-        var b = document.createElement("button");
-        b.setAttribute("data-psize", psz);
-        b.textContent = psz + " (" + PAGE_SIZES[psz].w + "×" + PAGE_SIZES[psz].h + ")";
-        if (psz === currentName) b.classList.add("active");
-        b.addEventListener("click", function (e) {
-          e.stopPropagation();
-          setPageSize(psz);
-          pageSizeMenu.classList.remove("open");
-        });
-        pageSizeMenu.appendChild(b);
-      })(sizes[i]);
-    }
-    var rect = anchor.getBoundingClientRect();
-    pageSizeMenu.style.top = (rect.bottom + 4) + "px";
-    pageSizeMenu.style.right = (window.innerWidth - rect.right) + "px";
-    pageSizeMenu.classList.add("open");
+  /* ---------------- Header / Footer / Page Number ---------------- */
+  // Robust "is the selection inside X" check. anchorNode can BE the element
+  // itself (caret at (container, childCount)) — parentElement would then point
+  // ABOVE the container and closest() would miss it.
+  function selectionInside(sel, selector) {
+    if (!sel || !sel.rangeCount || !sel.anchorNode) return false;
+    var el = sel.anchorNode.nodeType === Node.ELEMENT_NODE
+      ? sel.anchorNode
+      : sel.anchorNode.parentElement;
+    return !!(el && el.closest && el.closest(selector));
   }
 
-  /* ---------------- Header / Footer / Page Number ---------------- */
-  function insertPageNumber() {
-    restoreEditorSelection();
-    var fc = getContent(getPages()[0]);
+  // When the caret is parked at a container's very end ((el, childCount)),
+  // execCommand insertHTML drops the new node as a SIBLING below the last
+  // paragraph — it then renders on its own line (outside a footer strip's
+  // height). Deepening the caret into the last line keeps inserts inline.
+  function deepenEndCaret(el) {
+    if (!el) return;
     var sel = window.getSelection();
-    if (!sel || !sel.rangeCount || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
-      if (fc) fc.focus();
+    if (!sel || !sel.isCollapsed || sel.anchorNode !== el ||
+        sel.anchorOffset !== el.childNodes.length) return;
+    var node = el.lastChild;
+    if (!node) return;
+    while (node.nodeType === Node.ELEMENT_NODE && node.lastChild && node.tagName !== "BR") {
+      node = node.lastChild;
     }
+    try {
+      var r = document.createRange();
+      r.setStart(node, node.nodeType === Node.TEXT_NODE ? node.textContent.length : node.childNodes.length);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    } catch (e) {}
+  }
+
+  // Move field spans that Chrome dropped as direct children of a header/
+  // footer strip (outside any <p>) into the strip's last paragraph, so they
+  // render INLINE like Word page numbers. Also refreshes the saved
+  // headerHTML/footerHTML state from the normalized strips.
+  function normalizeStrayHF() {
+    var strips = document.querySelectorAll(".page-header.editable, .page-footer.editable");
+    var firstH = null, firstF = null;
+    for (var i = 0; i < strips.length; i++) {
+      var strip = strips[i];
+      var strays = strip.querySelectorAll(":scope > .field-dynamic");
+      for (var s = 0; s < strays.length; s++) {
+        var ps = strip.querySelectorAll(":scope > p");
+        var last = ps.length ? ps[ps.length - 1] : null;
+        if (last) last.appendChild(strays[s]);
+        else {
+          var p = document.createElement("p");
+          p.appendChild(strays[s]);
+          strip.appendChild(p);
+        }
+      }
+      if (!firstH && strip.classList.contains("page-header")) firstH = strip;
+      if (!firstF && strip.classList.contains("page-footer")) firstF = strip;
+    }
+    if (firstH) headerHTML = firstH.innerHTML;
+    if (firstF) footerHTML = firstF.innerHTML;
+  }
+
+  function insertPageNumber() {
+    // If the caret is inside a header/footer strip, insert the field there
+    // (so "Page N" can live in the footer like real Word documents).
+    var sel = window.getSelection();
+    if (!selectionInside(sel, ".page-header.editable, .page-footer.editable")) {
+      restoreEditorSelection();
+      sel = window.getSelection();
+      if (!selectionInside(sel, ".page-content")) {
+        var fc = getContent(getPages()[0]);
+        if (fc) fc.focus();
+      }
+    }
+    // Caret at a container's end → deepen into the last line (inline insert)
+    var anchor = sel && sel.anchorNode ? sel.anchorNode : null;
+    deepenEndCaret(anchor && anchor.nodeType === Node.ELEMENT_NODE ? anchor : null);
     document.execCommand("insertHTML", false, '<span class="field-dynamic" contenteditable="false" data-field="PAGE">Page 1</span> ');
+    // Chrome drops contenteditable=false nodes AFTER the paragraph when the
+    // caret sits at a block's end — pull strays back inline + re-mirror.
+    normalizeStrayHF();
     updateDynamicFields();
     schedulePaginate();
     scheduleAutosave();
     toast("Page number field inserted", "success");
   }
 
-  function insertHeader() {
-    // Toggle a header on every page
+  /* MS Word-style editable header/footer strips:
+     - Layout -> Header / Footer toggles an editable strip on EVERY page.
+     - Strips mirror each other: editing any copy updates all of them.
+     - Page-number fields work inside them (Page # with the caret in the
+       strip inserts "Page N"; every page shows its own number).
+     - Clearing all text removes the strip when it loses focus (like Word).
+     - Content lives OUTSIDE .page-content so the paginator never moves it;
+       syncHeaderFooter() re-applies strips to pages the paginator creates. */
+  var headerActive = false;
+  var footerActive = false;
+  var headerHTML = "";
+  var footerHTML = "";
+
+  function isHFEmpty(el) {
+    if (!el) return true;
+    var text = el.textContent.replace(/\u200B/g, "").trim();
+    if (text !== "") return false;
+    return el.querySelectorAll("img, svg, table, hr, .field-dynamic").length === 0;
+  }
+
+  // Keep the .is-empty class in sync — CSS shows the grayed hint through it.
+  function refreshHFHint(el) {
+    if (el) el.classList.toggle("is-empty", isHFEmpty(el));
+  }
+
+  function hfHasContent(html) {
+    if (!html) return false;
+    var probe = document.createElement("div");
+    probe.innerHTML = html;
+    return !isHFEmpty(probe);
+  }
+
+  function makeHeaderFooter(kind, html) {
+    var el = document.createElement("div");
+    el.className = "page-" + kind + " editable";
+    el.setAttribute("contenteditable", "true");
+    el.setAttribute("spellcheck", "false");
+    el.setAttribute("role", "textbox");
+    el.setAttribute("aria-label", kind === "header" ? "Page header" : "Page footer");
+    // Hint text as a CSS variable so the grayed "Header"/"Footer" label can
+    // be rendered by CSS INSIDE the empty <p> (exactly where Word shows it).
+    el.style.setProperty("--hf-hint", kind === "header" ? "Header" : "Footer");
+    el.innerHTML = html || "";
+    refreshHFHint(el);
+
+    el.addEventListener("input", function () {
+      var html2 = el.innerHTML;
+      if (kind === "header") headerHTML = html2; else footerHTML = html2;
+      // Mirror to every other page's strip
+      var pages = getPages();
+      for (var i = 0; i < pages.length; i++) {
+        var peers = pages[i].querySelectorAll(":scope > .page-" + kind + ".editable");
+        for (var p = 0; p < peers.length; p++) {
+          if (peers[p] !== el && peers[p].innerHTML !== html2) {
+            peers[p].innerHTML = html2;
+            refreshHFHint(peers[p]);
+          }
+        }
+      }
+      refreshHFHint(el);
+      updateDynamicFields(); // re-number PAGE fields on every page
+      scheduleAutosave();
+    });
+
+    el.addEventListener("blur", function () {
+      // Word behavior: an emptied header/footer removes itself on blur.
+      if (isHFEmpty(el)) {
+        if (kind === "header") { headerActive = false; headerHTML = ""; }
+        else { footerActive = false; footerHTML = ""; }
+        removeAllHF(kind);
+        toast((kind === "header" ? "Header" : "Footer") + " removed", "info");
+        scheduleAutosave();
+      }
+    });
+
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        var first = getContent(getPages()[0]);
+        if (first) first.focus();
+      }
+    });
+
+    return el;
+  }
+
+  function removeAllHF(kind) {
     var pages = getPages();
-    var has = pages[0].querySelector(".page-header");
     for (var i = 0; i < pages.length; i++) {
-      var existing = pages[i].querySelector(".page-header");
-      if (existing) existing.remove();
-      else {
-        var header = document.createElement("div");
-        header.className = "page-header";
-        header.textContent = ($("docTitle") ? $("docTitle").value : "Document");
-        header.setAttribute("contenteditable", "false");
-        pages[i].insertBefore(header, pages[i].firstChild);
+      var els = pages[i].querySelectorAll(":scope > .page-" + kind + ".editable");
+      for (var k = 0; k < els.length; k++) els[k].remove();
+    }
+  }
+
+  // Re-apply strips to every page — called from paginate() so pages the
+  // paginator creates (or removes) stay in sync.
+  function syncHeaderFooter() {
+    var pages = getPages();
+    for (var i = 0; i < pages.length; i++) {
+      var page = pages[i];
+      var h = page.querySelector(":scope > .page-header.editable");
+      if (headerActive) {
+        if (!h) page.insertBefore(makeHeaderFooter("header", headerHTML), page.firstChild);
+      } else if (h) {
+        h.remove();
+      }
+      var f = page.querySelector(":scope > .page-footer.editable");
+      if (footerActive) {
+        if (!f) page.appendChild(makeHeaderFooter("footer", footerHTML));
+      } else if (f) {
+        f.remove();
       }
     }
-    toast(has ? "Header removed" : "Header added (document title)", "success");
+  }
+
+  // Layout -> Header / Footer button: create the strip (or jump to it).
+  function editHeaderFooter(kind) {
+    var isActive = kind === "header" ? headerActive : footerActive;
+    if (!isActive) {
+      if (kind === "header") { headerActive = true; headerHTML = "<p><br></p>"; }
+      else { footerActive = true; footerHTML = "<p><br></p>"; }
+      syncHeaderFooter();
+      scheduleAutosave();
+      toast((kind === "header" ? "Header" : "Footer") + " added — type in the " +
+            (kind === "header" ? "top" : "bottom") + " strip", "success");
+    } else {
+      toast((kind === "header" ? "Header" : "Footer") + " — edit the " +
+            (kind === "header" ? "top" : "bottom") + " strip of any page", "info");
+    }
+    // Jump to the first strip so the user can type right away
+    // (Word's "Edit Header" does the same).
+    var pages = getPages();
+    for (var i = 0; i < pages.length; i++) {
+      var el = pages[i].querySelector(":scope > .page-" + kind + ".editable");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: kind === "header" ? "start" : "end" });
+        el.focus();
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        break;
+      }
+    }
   }
 
   function updateDynamicFields() {
@@ -4281,7 +4496,10 @@
       underline: document.queryCommandState("underline"),
       color: document.queryCommandValue("foreColor"),
       fontName: document.queryCommandValue("fontName"),
-      fontSize: document.queryCommandValue("fontSize"),
+      fontSize: (function () {
+        // Computed px (works for both legacy <font> tags and exact-size spans)
+        try { return getComputedStyle(el).fontSize; } catch (e) { return null; }
+      })(),
     };
     document.body.classList.add("painter-active");
     toast("Format copied — select text to apply", "success");
@@ -4297,7 +4515,7 @@
     if (painterFormat.underline) document.execCommand("underline");
     if (painterFormat.color) document.execCommand("foreColor", false, painterFormat.color);
     if (painterFormat.fontName) document.execCommand("fontName", false, painterFormat.fontName);
-    if (painterFormat.fontSize) document.execCommand("fontSize", false, painterFormat.fontSize);
+    if (painterFormat.fontSize) applyFontSize(parseFloat(painterFormat.fontSize));
     schedulePaginate();
     scheduleAutosave();
   }
@@ -4630,13 +4848,104 @@
     return d.toLocaleString([], { hour: "2-digit", minute: "2-digit" });
   }
 
-  /* ---------------- Toast ---------------- */
+  /* ---------------- Toast (Slides design) ----------------
+     Same pattern as the Slides app's showToast + _toastIcon:
+     white glass pill, monochrome black 16px SVG icon, 10px gap,
+     3000ms duration. The old colored success/error variants were
+     removed to match Slides exactly. */
+  function _toastIcon(rawMsg, type) {
+    // Strip leading emoji/whitespace so the icon doesn't double up with
+    // a ✓ or ⚠ character that was baked into the message string.
+    var msg = String(rawMsg || "").replace(/^\s*[\u2705\u2714\u2716\u2728\u26a0\ufe0f\u2757\u2753\u2139]+\s*/u, "").trim();
+    var m = msg.toLowerCase();
+
+    // Monochrome black — matches the Slides app's toast icon color.
+    var INK = "#111";
+
+    // SVG stroke wrapper helper
+    var svg = function (paths) {
+      return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="' + INK + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + paths + "</svg>";
+    };
+
+    // 1. Loading / progress (reading, dictating, recording, generating…)
+    if (m.indexOf("generating") === 0 || m.indexOf("importing") === 0 || m.indexOf("recording") === 0 ||
+        m.indexOf("reading") === 0 || m.indexOf("dictating") === 0 || m.indexOf("previewing") === 0 ||
+        m.indexOf("searching") === 0 || m.indexOf("loading") === 0 || m.indexOf("this may take") !== -1) {
+      return { icon: svg('<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>'), msg: msg };
+    }
+
+    // 2. Clipboard / copied / pasted
+    if (m.indexOf("clipboard") !== -1 || m.indexOf("copied") !== -1 || m.indexOf("pasted") !== -1 || m.indexOf("paste ") !== -1) {
+      return { icon: svg('<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'), msg: msg };
+    }
+
+    // 3. Failed / error (hard errors)
+    if (m.indexOf("failed") !== -1 || m.indexOf("error") !== -1 || m.indexOf("could not") !== -1 ||
+        m.indexOf("not supported") !== -1 || m.indexOf("denied") !== -1 || m.indexOf("invalid") !== -1 ||
+        m.indexOf("skipping") !== -1 || m.indexOf("cancelled") === -1 && type === "error" && (
+          m.indexOf("do not match") !== -1)) {
+      return { icon: svg('<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'), msg: msg };
+    }
+
+    // 4. Warnings / hints: must / select first / no X found / enter a …
+    if (m.indexOf("must have") !== -1 || m.indexOf("must be") !== -1 || m.indexOf("select ") !== -1 ||
+        m.indexOf("place cursor") !== -1 || m.indexOf("no headings") !== -1 || m.indexOf("no captions") !== -1 ||
+        m.indexOf("no text") !== -1 || m.indexOf("no image") !== -1 || m.indexOf("no comments") !== -1 ||
+        m.indexOf("no bookmarks") !== -1 || m.indexOf("no footnote") !== -1 || m.indexOf("no tracked") !== -1 ||
+        m.indexOf("no quick parts") !== -1 || m.indexOf("no captions") !== -1 ||
+        m.indexOf("enter a ") !== -1 || m.indexOf("provide a url") !== -1 || m.indexOf("coming soon") !== -1) {
+      return { icon: svg('<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'), msg: msg };
+    }
+
+    // 5. Deleted / removed
+    if (m.indexOf("deleted") !== -1 || m.indexOf("removed") !== -1) {
+      return { icon: svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>'), msg: msg };
+    }
+
+    // 6. Milestones / goals (word-count goal celebrations)
+    if (m.indexOf("%") !== -1 || m.indexOf("halfway") !== -1 || m.indexOf("goal") !== -1 || m.indexOf("well done") !== -1) {
+      return { icon: svg('<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>'), msg: msg };
+    }
+
+    // 7. Modes toggled (focus / zen / draw / track changes / read-only)
+    if (m.indexOf("mode") !== -1 || m.indexOf("track changes") !== -1 || m.indexOf("read-only") !== -1 || m.indexOf("final") !== -1) {
+      return { icon: svg('<circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/><path d="M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>'), msg: msg };
+    }
+
+    // 8. Success confirmations (saved / inserted / applied / added / exported…)
+    if (m.indexOf("saved") !== -1 || m.indexOf("inserted") !== -1 || m.indexOf("applied") !== -1 ||
+        m.indexOf("added") !== -1 || m.indexOf("created") !== -1 || m.indexOf("restored") !== -1 ||
+        m.indexOf("exported") !== -1 || m.indexOf("merged") !== -1 || m.indexOf("complete") !== -1 ||
+        m.indexOf("finished") !== -1 || m.indexOf("fixed") !== -1 || m.indexOf("cleared") !== -1 ||
+        m.indexOf("unlocked") !== -1 || m.indexOf("updated") !== -1 || m.indexOf("jumped to") !== -1 ||
+        m.indexOf("toggled") !== -1 || m.indexOf("stopped") !== -1 || m.indexOf("reset") !== -1 ||
+        m.indexOf("protected") !== -1 || m.indexOf("marked") !== -1 || m.indexOf("protected") !== -1) {
+      return { icon: svg('<polyline points="20 6 9 17 4 12"/>'), msg: msg };
+    }
+
+    // 9. Default info icon
+    return { icon: svg('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'), msg: msg };
+  }
+
   function toast(message, type) {
     var el = $("toast");
-    el.textContent = message;
-    el.className = "toast show" + (type ? " " + type : "");
+    if (!el) return;
+    var pair = _toastIcon(message, type);
+    // Same structure as Slides' showToast: flex row, icon + message, 10px gap.
+    var outer = document.createElement("span");
+    outer.style.cssText = "display:flex;align-items:center;gap:10px;";
+    var iconSpan = document.createElement("span");
+    iconSpan.style.cssText = "display:inline-flex;flex-shrink:0;";
+    iconSpan.innerHTML = pair.icon;
+    var msgSpan = document.createElement("span");
+    msgSpan.textContent = pair.msg;
+    outer.appendChild(iconSpan);
+    outer.appendChild(msgSpan);
+    el.replaceChildren(outer);
+    el.className = "toast show";
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.className = "toast"; }, 2400);
+    // Slides' default duration: 3000ms.
+    toastTimer = setTimeout(function () { el.className = "toast"; }, 3000);
   }
 
   /* ---------------- Init ---------------- */
@@ -4648,12 +4957,8 @@
       try { await idb.ready(); } catch (e) {}
     }
 
-    // Theme
-    try {
-      var savedTheme = localStorage.getItem(THEME_KEY);
-      if (savedTheme) applyTheme(savedTheme);
-      else applyTheme("light");
-    } catch (e) { applyTheme("light"); }
+    // Theme — dark mode removed; cyan is the only accent color and is set via CSS.
+    // (The old THEME_KEY localStorage lookup is no longer needed.)
 
     ensureFirstPage();
 
@@ -4687,17 +4992,281 @@
       });
       sel.addEventListener("change", function (e) { handler(e.target.value); });
     }
-    hookSelect($("blockType"), applyBlock);
     hookSelect($("fontFamily"), applyFontFamily);
     hookSelect($("fontSize"), applyFontSize);
-    hookSelect($("lineSpacing"), applyLineSpacing);
 
-    // Colors
-    $("textColor").addEventListener("input", function (e) { applyTextColor(e.target.value); });
-    $("hiliteColor").addEventListener("input", function (e) { applyHiliteColor(e.target.value); });
+    // Colors (hidden native inputs kept for compatibility — Slides-style
+    // dropdown lists below drive them)
+    if ($("textColor")) $("textColor").addEventListener("input", function (e) { applyTextColor(e.target.value); });
+    if ($("hiliteColor")) $("hiliteColor").addEventListener("input", function (e) { applyHiliteColor(e.target.value); });
 
-    $("btnClearFormat").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnClearFormat").addEventListener("click", clearFormatting);
+    /* ---------------- Slides-style ms-dropdowns (portal-based) ----------------
+       Ported from slides.js: menus are appended to <body> while open so they
+       escape the ribbon's overflow, with the same open/close animations. */
+    var _portalDropdown = null, _portalMenu = null, _portalBtn = null;
+
+    function closePortalDropdown(animate) {
+      if (!_portalMenu) return;
+      var menu = _portalMenu, dropdown = _portalDropdown, btn = _portalBtn;
+      _portalMenu = null; _portalDropdown = null; _portalBtn = null;
+      if (dropdown) dropdown.classList.remove("active");
+      if (btn) btn.setAttribute("aria-expanded", "false");
+
+      var done = false;
+      var cleanup = function () {
+        if (done) return;
+        done = true;
+        menu.removeEventListener("animationend", cleanup);
+        menu.classList.remove("ms-portal-closing");
+        menu.style.cssText = "";
+        if (dropdown) dropdown.appendChild(menu);
+      };
+      if (animate === false) {
+        cleanup();
+      } else {
+        menu.classList.add("ms-portal-closing");
+        menu.addEventListener("animationend", cleanup);
+        setTimeout(cleanup, 220);
+      }
+    }
+
+    function openPortalDropdown(dropdown, btn, menu) {
+      closePortalDropdown(false);
+      document.body.appendChild(menu);
+      _portalMenu = menu;
+      _portalDropdown = dropdown;
+      _portalBtn = btn;
+      dropdown.classList.add("active");
+      btn.setAttribute("aria-expanded", "true");
+
+      var isColorList = menu.classList && menu.classList.contains("color-list-menu");
+      var isColorGrid = menu.classList && menu.classList.contains("color-grid-menu");
+      var cap = isColorList ? 240 : (isColorGrid ? 320 : 320);
+      var maxH = Math.min(cap, window.innerHeight * 0.6);
+      // First, measure invisibly
+      menu.style.cssText = "position:fixed;visibility:hidden;display:block;z-index:999999;margin:0;max-height:" + maxH + "px;overflow-y:auto;";
+      var btnRect = btn.getBoundingClientRect();
+      var mW = menu.offsetWidth || 200;
+      var mH = menu.offsetHeight || 280;
+      var vW = window.innerWidth;
+      var vH = window.innerHeight;
+      var top = btnRect.bottom + 4;
+      if (top + mH > vH - 8) top = btnRect.top - mH - 4;
+      if (top < 8) top = btnRect.bottom + 4;
+      var left = btnRect.left;
+      if (left + mW > vW - 8) left = vW - mW - 8;
+      if (left < 8) left = 8;
+      menu.style.cssText = "position:fixed;display:block;visibility:visible;z-index:999999;margin:0;left:" + left + "px;top:" + top + "px;max-height:" + maxH + "px;overflow-y:auto;animation:dropdownFadeIn 0.18s ease;";
+    }
+
+    function storeEditorSelectionFromContext() {
+      var s = window.getSelection();
+      if (s && s.rangeCount) {
+        var node = s.anchorNode;
+        if (node) {
+          var el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+          if (el && el.closest && el.closest(".page-content")) {
+            lastEditorRange = s.getRangeAt(0).cloneRange();
+          }
+        }
+      }
+    }
+
+    // Generic portal dropdown open/close for every .ms-dropdown in the ribbon
+    var msDropdowns = document.querySelectorAll(".ms-dropdown");
+    for (var d = 0; d < msDropdowns.length; d++) {
+      (function (dropdown) {
+        var btn = dropdown.querySelector(":scope > .ms-dropdown-btn, :scope > button.ribbon-btn.ms-dropdown-btn");
+        var menu = dropdown.querySelector(":scope > .ms-dropdown-menu");
+        if (!btn || !menu) return;
+
+        btn.setAttribute("aria-expanded", "false");
+        btn.setAttribute("aria-haspopup", "listbox");
+
+        btn.addEventListener("mousedown", function (e) {
+          // Same selection preservation hookSelect used for native selects
+          storeEditorSelectionFromContext();
+        });
+
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (_portalDropdown === dropdown) {
+            closePortalDropdown();
+            return;
+          }
+          openPortalDropdown(dropdown, btn, menu);
+        });
+
+        btn.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
+            e.preventDefault();
+            btn.click();
+          } else if (e.key === "Escape") {
+            closePortalDropdown();
+          }
+        });
+      })(msDropdowns[d]);
+    }
+
+    // Close portal on outside click
+    document.addEventListener("mousedown", function (e) {
+      if (_portalMenu &&
+        !_portalMenu.contains(e.target) &&
+        _portalBtn && !_portalBtn.contains(e.target)) {
+        closePortalDropdown();
+      }
+    });
+
+    // Close portal on scroll or resize — but NOT when scrolling inside the menu itself
+    window.addEventListener("scroll", function (e) {
+      if (_portalMenu && (e.target === _portalMenu || _portalMenu.contains(e.target))) return;
+      closePortalDropdown();
+    }, true);
+    window.addEventListener("resize", function () { closePortalDropdown(); });
+
+    // Helper: pick an item, keep the hidden native select in sync (so state
+    // sync and legacy change handlers keep working), update the label
+    function wireSelectDropdown(dropdownId, selectId) {
+      var dropdown = $(dropdownId);
+      var select = $(selectId);
+      if (!dropdown || !select) return;
+
+      var items = dropdown.querySelectorAll(".ms-dropdown-item[data-value]");
+      for (var i = 0; i < items.length; i++) {
+        (function (item) {
+          item.addEventListener("click", function () {
+            var val = item.getAttribute("data-value");
+            var label = item.getAttribute("data-label") || item.textContent;
+            if (select) {
+              // Only pick values the native select understands; if absent,
+              // extend the select so change handlers receive the right value.
+              var known = false;
+              for (var o = 0; o < select.options.length; o++) {
+                if (select.options[o].value === val) { known = true; break; }
+              }
+              if (!known) {
+                var opt = document.createElement("option");
+                opt.value = val;
+                opt.textContent = label;
+                select.appendChild(opt);
+              }
+              select.value = val;
+              select.dispatchEvent(new Event("change", { bubbles: true }));
+            } else {
+              var lbl = dropdown.querySelector(".dropdown-value");
+              if (lbl) lbl.textContent = label;
+            }
+            dropdown.classList.remove("active");
+            closePortalDropdown();
+          });
+        })(items[i]);
+      }
+
+      // Keep the button label in sync whenever the select changes (user pick,
+      // updateToolbarStates…)
+      select.addEventListener("change", function () {
+        var lbl = dropdown.querySelector(".dropdown-value");
+        if (!lbl) return;
+        var chosen = dropdown.querySelector('.ms-dropdown-item[data-value="' + select.value + '"]');
+        if (chosen) {
+          lbl.textContent = chosen.getAttribute("data-label") || chosen.textContent;
+        } else {
+          // Fallback: mirror the selected <option> text
+          var optSel = select.options[select.selectedIndex];
+          if (optSel) lbl.textContent = optSel.textContent;
+        }
+      });
+
+      // Initial label sync (directly from current select value)
+      var lbl0 = dropdown.querySelector(".dropdown-value");
+      if (lbl0) {
+        var chosen0 = dropdown.querySelector('.ms-dropdown-item[data-value="' + select.value + '"]');
+        if (chosen0) lbl0.textContent = chosen0.getAttribute("data-label") || chosen0.textContent;
+        else { var o0 = select.options[select.selectedIndex]; if (o0) lbl0.textContent = o0.textContent; }
+      }
+    }
+
+    wireSelectDropdown("fontFamilyDropdown", "fontFamily");
+    wireSelectDropdown("fontSizeDropdown", "fontSize");
+
+    // Font color — vertical list (same behavior as Slides)
+    var fontColorDd = $("fontColorDropdown");
+    if (fontColorDd) {
+      var fcItems = fontColorDd.querySelectorAll(".ms-dropdown-item[data-value]");
+      for (var f = 0; f < fcItems.length; f++) {
+        (function (item) {
+          item.addEventListener("click", function () {
+            var color = item.getAttribute("data-value");
+            var btn = fontColorDd.querySelector(".ms-dropdown-btn");
+            var swatch = btn ? btn.querySelector(".color-preview") : null;
+            var label = btn ? btn.querySelector(".dropdown-value") : null;
+            if (swatch) {
+              swatch.style.background = color === "transparent" ? "transparent" : color;
+              swatch.style.border = (color === "transparent") ? "1px solid #ccc" : "";
+            }
+            if (label) label.textContent = item.getAttribute("data-label") || "Text";
+            applyTextColor(color === "transparent" ? "#000000" : color);
+            fontColorDd.classList.remove("active");
+            closePortalDropdown();
+          });
+        })(fcItems[f]);
+      }
+    }
+
+    // Highlight color — vertical list (same behavior as Slides)
+    var hlColorDd = $("highlightColorDropdown");
+    if (hlColorDd) {
+      var hlItems = hlColorDd.querySelectorAll(".ms-dropdown-item[data-value]");
+      for (var h = 0; h < hlItems.length; h++) {
+        (function (item) {
+          item.addEventListener("click", function () {
+            var color = item.getAttribute("data-value");
+            var btn = hlColorDd.querySelector(".ms-dropdown-btn");
+            var swatch = btn ? btn.querySelector(".color-preview") : null;
+            var label = btn ? btn.querySelector(".dropdown-value") : null;
+            if (swatch) {
+              if (color === "transparent") {
+                swatch.style.background = "transparent";
+                swatch.style.border = "1px solid #ccc";
+              } else {
+                swatch.style.background = color;
+                swatch.style.border = "";
+              }
+            }
+            if (label) label.textContent = item.getAttribute("data-label") || "Highlight";
+            applyHiliteColor(color === "transparent" ? "transparent" : color);
+            hlColorDd.classList.remove("active");
+            closePortalDropdown();
+          });
+        })(hlItems[h]);
+      }
+    }
+
+    // Page size (Layout tab) — custom dropdown with no native select behind
+    // it. The generic .ms-dropdown portal code above handles open/close.
+    var psDd = $("pageSizeDropdown");
+    if (psDd) {
+      var psItems = psDd.querySelectorAll(".ms-dropdown-item[data-value]");
+      for (var psi = 0; psi < psItems.length; psi++) {
+        (function (item) {
+          item.addEventListener("click", function () {
+            var val = item.getAttribute("data-value");
+            setPageSize(val);
+            var lbl = psDd.querySelector(".dropdown-value");
+            if (lbl) lbl.textContent = val;
+            psDd.classList.remove("active");
+            closePortalDropdown();
+          });
+        })(psItems[psi]);
+      }
+      syncPageSizeUI();
+    }
+
+    var bClear = $("btnClearFormat");
+    if (bClear) {
+      bClear.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      bClear.addEventListener("click", clearFormatting);
+    }
 
     // Menubar / topbar actions (guarded — elements may have moved to ribbon)
     if ($("btnNew")) $("btnNew").addEventListener("click", newDocument);
@@ -4707,18 +5276,8 @@
     if ($("btnVersions")) { $("btnVersions").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnVersions").addEventListener("click", showVersions); }
     if ($("btnUndo")) { $("btnUndo").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnUndo").addEventListener("click", function () { exec("undo"); }); }
     if ($("btnRedo")) { $("btnRedo").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnRedo").addEventListener("click", function () { exec("redo"); }); }
-    if ($("btnTheme")) $("btnTheme").addEventListener("click", toggleTheme);
-    if ($("btnTheme2")) $("btnTheme2").addEventListener("click", toggleTheme);
-    if ($("btnColorTheme")) {
-      $("btnColorTheme").addEventListener("mousedown", function (e) { e.preventDefault(); });
-      $("btnColorTheme").addEventListener("click", openColorThemeDialog);
-    }
-    if ($("btnDarkPaper")) {
-      $("btnDarkPaper").addEventListener("mousedown", function (e) { e.preventDefault(); });
-      $("btnDarkPaper").addEventListener("click", toggleDarkPaper);
-    }
-    // Load saved dark paper state
-    try { if (localStorage.getItem("zdocs.darkPaper") === "1") $("app").classList.add("dark-paper"); } catch (e) {}
+    // Theme / color theme / dark paper buttons have been removed from the UI.
+    // (No click handlers to wire up — cyan is locked via CSS.)
     if ($("btnClipboardHistory")) {
       $("btnClipboardHistory").addEventListener("mousedown", function (e) { e.preventDefault(); });
       $("btnClipboardHistory").addEventListener("click", openClipboardHistory);
@@ -4770,7 +5329,9 @@
     $("btnLink").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnLink").addEventListener("click", openLinkDialog);
     $("btnImage").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnImage").addEventListener("click", openImageDialog);
+    $("btnImage").addEventListener("click", openImagePicker);
+    var imgInput = $("insertImageInput");
+    if (imgInput) imgInput.addEventListener("change", handleImageFileSelect);
     $("btnTable").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnTable").addEventListener("click", openTableDialog);
     $("btnHr").addEventListener("mousedown", function (e) { e.preventDefault(); });
@@ -4783,7 +5344,18 @@
     // Word count
     $("btnWordCount").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnWordCount").addEventListener("click", showWordCount);
-    $("wordCount").addEventListener("click", showWordCount);
+    // (The old #wordCount span in the ribbon-tabs-right has been replaced by
+    // the Print button — the live word counter is gone from the ribbon.
+    // Word count is still available via Review → Word Count.)
+    if ($("btnPrint")) {
+      $("btnPrint").addEventListener("mousedown", function (e) { e.preventDefault(); });
+      $("btnPrint").addEventListener("click", function () {
+        // Save first, then open the browser print dialog. togglePrintPreview
+        // is not used here because the user clicked Print directly — they
+        // want the OS print dialog, not the in-app preview bar.
+        printDocument();
+      });
+    }
     if ($("btnStatsExport")) $("btnStatsExport").addEventListener("click", exportStats);
 
     // Goal tracker input
@@ -4815,19 +5387,10 @@
     // Templates
     if ($("btnTemplates")) $("btnTemplates").addEventListener("click", function () { buildTemplates(); openModal("templatesModal"); });
 
-    // Symbols
+    // Symbols (Slides-style floating bottom bar — toggle, insert at caret)
     $("btnSymbols").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnSymbols").addEventListener("click", openSymbols);
-    var symTabs = document.querySelectorAll(".symbol-tab");
-    for (var st = 0; st < symTabs.length; st++) {
-      (function (t) {
-        t.addEventListener("click", function () {
-          document.querySelectorAll(".symbol-tab").forEach(function (x) { x.classList.remove("active"); });
-          t.classList.add("active");
-          buildSymbols(t.getAttribute("data-symtab"));
-        });
-      })(symTabs[st]);
-    }
+    $("btnSymbols").addEventListener("click", function () { toggleSymbolBar(); });
+    initSymbolBar();
 
     // Go To
     $("btnGoTo").addEventListener("mousedown", function (e) { e.preventDefault(); });
@@ -4853,17 +5416,9 @@
       wmPresets[wp].addEventListener("click", function () { $("watermarkText").value = this.getAttribute("data-wm"); });
     }
 
-    // Table of Contents
-    $("btnToc").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnToc").addEventListener("click", insertTOC);
-
     // Drop Cap
     $("btnDropCap").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnDropCap").addEventListener("click", toggleDropCap);
-
-    // Text Box
-    $("btnTextBox").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnTextBox").addEventListener("click", insertTextBox);
 
     // Columns
     var colBtns = document.querySelectorAll("[data-cols]");
@@ -4878,15 +5433,16 @@
     // default 1-column active
     document.querySelector("[data-cols='1']").classList.add("active");
 
-    // Orientation & Page Size
+    // Orientation & Page Size (size is a dropdown now — it is wired with
+    // the other ms-dropdowns above)
     $("btnOrientation").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnOrientation").addEventListener("click", toggleOrientation);
-    $("btnPageSize").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnPageSize").addEventListener("click", cyclePageSize);
 
-    // Header & Page Number
+    // Header / Footer / Page Number
     $("btnHeader").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnHeader").addEventListener("click", insertHeader);
+    $("btnHeader").addEventListener("click", function () { editHeaderFooter("header"); });
+    $("btnFooter").addEventListener("mousedown", function (e) { e.preventDefault(); });
+    $("btnFooter").addEventListener("click", function () { editHeaderFooter("footer"); });
     $("btnPageNum").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnPageNum").addEventListener("click", insertPageNumber);
 
@@ -4989,38 +5545,15 @@
     if ($("btnIndexEntry")) { $("btnIndexEntry").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnIndexEntry").addEventListener("click", function () { var sel = window.getSelection(); if (sel && !sel.isCollapsed) { toast("Index entry marked: " + sel.toString(), "success"); } else { toast("Select text first to mark an index entry", "error"); } }); }
     if ($("btnInsertIndex")) { $("btnInsertIndex").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnInsertIndex").addEventListener("click", function () { document.execCommand("insertHTML", false, '<h2>Index</h2><p>Term, Page</p>'); toast("Index inserted", "success"); schedulePaginate(); }); }
 
-    // Mailings panel buttons
-    if ($("btnStartMailMerge")) { $("btnStartMailMerge").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnStartMailMerge").addEventListener("click", function () { toast("Mail Merge started — use Insert → Field to add merge fields", "success"); }); }
-    if ($("btnSelectRecipients")) { $("btnSelectRecipients").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnSelectRecipients").addEventListener("click", function () { toast("Recipient list: type names separated by commas to set up a data source", "success"); }); }
-    if ($("btnInsertMergeField")) { $("btnInsertMergeField").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnInsertMergeField").addEventListener("click", function () { document.execCommand("insertHTML", false, '<span class="field-dynamic" contenteditable="false" data-field="MERGEFIELD">«Field»</span> '); toast("Merge field inserted", "success"); }); }
-    if ($("btnHighlightMerge")) { $("btnHighlightMerge").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnHighlightMerge").addEventListener("click", function () { toast("Merge field highlighting toggled", "success"); }); }
-    if ($("btnPreviewResults")) { $("btnPreviewResults").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnPreviewResults").addEventListener("click", function () { toast("Preview results — merge fields show sample data", "success"); }); }
-    if ($("btnFinishMerge")) { $("btnFinishMerge").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnFinishMerge").addEventListener("click", function () { toast("Merge complete — individual documents generated", "success"); }); }
-    if ($("btnEnvelopes")) { $("btnEnvelopes").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnEnvelopes").addEventListener("click", function () { toast("Envelope wizard — set address and envelope size", "success"); }); }
-    if ($("btnLabels")) { $("btnLabels").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnLabels").addEventListener("click", function () { toast("Label wizard — choose label format and print", "success"); }); }
-
-    // Developer panel buttons
-    if ($("btnViewSource")) { $("btnViewSource").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnViewSource").addEventListener("click", function () { var html = ""; var pages = getPages(); for (var i = 0; i < pages.length; i++) { html += getContent(pages[i]).innerHTML; } var w = window.open("", "_blank"); if (w) { w.document.write("<!DOCTYPE html><html><head><title>Source</title></head><body><pre>" + escapeHtml(html) + "</pre></body></html>"); } }); }
-    if ($("btnInsertField")) { $("btnInsertField").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnInsertField").addEventListener("click", insertPageNumber); }
-    if ($("btnCheckbox")) { $("btnCheckbox").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnCheckbox").addEventListener("click", function () { document.execCommand("insertHTML", false, '<input type="checkbox" contenteditable="false"> '); toast("Checkbox inserted", "success"); }); }
-    if ($("btnDatePicker")) { $("btnDatePicker").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnDatePicker").addEventListener("click", function () { document.execCommand("insertHTML", false, '<input type="date" contenteditable="false"> '); toast("Date picker inserted", "success"); }); }
-    if ($("btnDropdown")) { $("btnDropdown").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnDropdown").addEventListener("click", function () { document.execCommand("insertHTML", false, '<select contenteditable="false"><option>Option 1</option><option>Option 2</option></select> '); toast("Dropdown inserted", "success"); }); }
-    if ($("btnRestrictEdit")) { $("btnRestrictEdit").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnRestrictEdit").addEventListener("click", function () { toast("Restrict editing: document is now read-only (toggle to disable)", "success"); }); }
-    if ($("btnMarkFinal")) { $("btnMarkFinal").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnMarkFinal").addEventListener("click", function () { toast("Document marked as final", "success"); }); }
-
-    // Help panel buttons
-    if ($("btnHelpShortcuts")) { $("btnHelpShortcuts").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnHelpShortcuts").addEventListener("click", function () { openModal("shortcutsModal"); }); }
-    if ($("btnHelpAbout")) { $("btnHelpAbout").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnHelpAbout").addEventListener("click", function () { toast("EmeraldSuite: Docs v2.0 — a standalone word processor with real pagination", "success"); }); }
-    if ($("btnHelpTour")) { $("btnHelpTour").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnHelpTour").addEventListener("click", function () { toast("Tour: Click the ribbon tabs to explore formatting, insert, layout, and review tools!", "success"); }); }
-    if ($("btnAccessibility")) { $("btnAccessibility").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnAccessibility").addEventListener("click", function () { toast("Accessibility: all images should have alt text. Use Insert → Image to add alt text.", "success"); }); }
-    if ($("btnAltText")) { $("btnAltText").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnAltText").addEventListener("click", function () { var img = document.querySelector(".page-content img[data-selected='true']") || document.querySelector(".page-content img"); if (img) { var alt = window.prompt("Alt text:", img.alt || ""); if (alt !== null) { img.alt = alt; toast("Alt text updated", "success"); } } else { toast("No image found. Insert an image first.", "error"); } }); }
-
-    // Session timer (click to reset)
-    $("sessionTimer").addEventListener("click", function () {
-      if (sessionActive) {
-        if (window.confirm("Reset the writing session timer?")) resetSessionTimer();
-      }
-    });
+    // Session timer (click to reset) — element removed in Slides-style bar; guard.
+    var stBtn = $("sessionTimer");
+    if (stBtn) {
+      stBtn.addEventListener("click", function () {
+        if (sessionActive) {
+          if (window.confirm("Reset the writing session timer?")) resetSessionTimer();
+        }
+      });
+    }
 
     // Custom dictionary
     $("dictLink").addEventListener("click", openDictDialog);
@@ -5121,22 +5654,21 @@
       if (e.key === "Enter") { e.preventDefault(); insertLink(); }
     });
 
-    // Image dialog
-    $("imgConfirm").addEventListener("click", insertImage);
-    $("imgUrl").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); insertImage(); }
-    });
-
     // Table dialog
     $("tableConfirm").addEventListener("click", insertTable);
     buildTableGrid();
 
-    // Zoom
-    $("zoom").addEventListener("input", function (e) { setZoom(parseInt(e.target.value, 10)); });
+    // Zoom (Slides-style buttons — the old slider was removed)
+    $("zoomFitBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
+    $("zoomFitBtn").addEventListener("click", zoomFitToWindow);
+    $("zoom100Btn").addEventListener("mousedown", function (e) { e.preventDefault(); });
+    $("zoom100Btn").addEventListener("click", function () { setZoom(100); });
+    $("zoomInBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
+    $("zoomInBtn").addEventListener("click", function () { adjustZoom(10); });
+    $("zoomOutBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
+    $("zoomOutBtn").addEventListener("click", function () { adjustZoom(-10); });
 
-    // Page navigation
-    $("prevPage").addEventListener("click", function () { scrollToPage(getCurrentPageIndex()); });
-    $("nextPage").addEventListener("click", function () { scrollToPage(getCurrentPageIndex() + 2); });
+    // Page navigation buttons removed from status bar (no more ‹ › buttons).
 
     // Track editor selection
     document.addEventListener("selectionchange", function () {
@@ -5191,11 +5723,9 @@
     loadMargins();
     loadGoal();
     loadCustomDict();
-    loadBookmarks();
     loadFootnotes();
-    loadAutoText();
     loadFindHistory();
-    loadColorTheme();
+    // Color theme loading is a no-op now (cyan is locked via CSS).
     buildRulerTicks();
     initMarginDrag();
     initLinkPreview();
@@ -5206,7 +5736,6 @@
     updateStatus();
     initCrossTabSync();
     initNewFeatures();
-    checkPasswordOnLoad();
 
     setTimeout(function () {
       var firstContent = getContent(getPages()[0]);
@@ -5237,8 +5766,6 @@
       } else if (change.key === "zdocs.dictionary") {
         loadCustomDict();
         renderWritingIssues();
-      } else if (change.key === THEME_KEY) {
-        // theme is stored in localStorage by design; skip
       }
     });
   }
@@ -5266,6 +5793,10 @@
         p.innerHTML = "<br>";
         content.appendChild(p);
       }
+      headerActive = hfHasContent(data.header);
+      headerHTML = headerActive ? data.header : "";
+      footerActive = hfHasContent(data.footer);
+      footerHTML = footerActive ? data.footer : "";
       paginate();
       setAutosaveState("saved");
       // Restore caret if we had focus and the block still exists
@@ -5306,27 +5837,21 @@
 
   /* =========================================================
      EmeraldSuite: Docs — Feature additions
-     (bookmarks, internal links, cover pages, equations,
-      autotext, smartart, screenshot, ink, spellcheck,
-      footnotes, table of figures, compare, password,
-      restrict editing, real track changes, threaded comments)
+     (cover pages, equations, smartart, screenshot, draw mode,
+      spellcheck, footnotes, table of figures, compare,
+      real track changes, threaded comments)
      ========================================================= */
 
   /* ---------------- State ---------------- */
-  var bookmarks = [];
   var footnotes = [];
-  var autoTextParts = [];
-  var restricted = false;
-  var documentPassword = null; // null = no protection; string = password
-  var passwordEncryptedContent = null; // blob to restore
-  var inkCanvas = null;
-  var inkCtx = null;
-  var inkDrawing = false;
-  var inkMode = false;
-  var inkLastX = 0, inkLastY = 0;
-  var inkColor = "#239a4d";
-  var inkSize = 3;
-  var inkEraser = false;
+  var drawCanvas = null;
+  var drawCtx = null;
+  var isDrawing = false;
+  var drawMode = false;
+  var drawPoints = [];
+  var drawColor = "#000000";
+  var drawWidth = 2;
+  var drawTool = "pen";
   var coverPageStyle = "classic";
   var pendingInternalTarget = null;
   var BASIC_WORD_LIST = null;
@@ -5348,323 +5873,8 @@
     }
   }
 
-  /* ---------------- Restrict editing (real) ---------------- */
-  function toggleRestrictEdit() {
-    if (restricted) {
-      // turn off
-      setRestricted(false);
-      toast("Editing restriction removed", "success");
-    } else {
-      setRestricted(true);
-      toast("Document is now read-only. Click Restrict again to enable editing.", "success");
-    }
-  }
-
-  function setRestricted(on) {
-    restricted = on;
-    var app = $("app");
-    var btn = $("btnRestrictEdit");
-    var banner = $("restrictBanner");
-    if (on) {
-      app.classList.add("restricted");
-      if (btn) btn.classList.add("active");
-      if (banner) banner.classList.add("show");
-      // make all page-content non-editable
-      var contents = document.querySelectorAll(".page-content");
-      for (var i = 0; i < contents.length; i++) contents[i].setAttribute("contenteditable", "false");
-    } else {
-      app.classList.remove("restricted");
-      if (btn) btn.classList.remove("active");
-      if (banner) banner.classList.remove("show");
-      var contents2 = document.querySelectorAll(".page-content");
-      for (var j = 0; j < contents2.length; j++) contents2[j].setAttribute("contenteditable", "true");
-    }
-  }
-
-  /* ---------------- Password protection ---------------- */
-  var PASSWORD_KEY = "zdocs.password";
-  // Simple XOR-based scramble keyed by password. NOT secure crypto, but
-  // functionally obscures content so it cannot be read without the password.
-  function xorCipher(text, password) {
-    if (!password) return text;
-    var out = "";
-    var p = 0;
-    for (var i = 0; i < text.length; i++) {
-      var c = text.charCodeAt(i) ^ password.charCodeAt(p % password.length);
-      out += String.fromCharCode(c);
-      p++;
-    }
-    // base64-encode to keep it storage-safe
-    try { return btoa(unescape(encodeURIComponent(out))); } catch (e) { return out; }
-  }
-
-  function xorDecipher(blob, password) {
-    if (!password) return null;
-    var raw;
-    try { raw = decodeURIComponent(escape(atob(blob))); } catch (e) { return null; }
-    var out = "";
-    var p = 0;
-    for (var i = 0; i < raw.length; i++) {
-      var c = raw.charCodeAt(i) ^ password.charCodeAt(p % password.length);
-      out += String.fromCharCode(c);
-      p++;
-    }
-    return out;
-  }
-
-  function openPasswordDialog() {
-    openModal("passwordModal");
-  }
-
-  function protectDocument() {
-    var p1 = $("passwordInput").value;
-    var p2 = $("passwordConfirm").value;
-    if (!p1) { toast("Enter a password", "error"); return; }
-    if (p1 !== p2) { toast("Passwords do not match", "error"); return; }
-    documentPassword = p1;
-    // Save a marker so the next load prompts for password
-    try {
-      var marker = { protected: true, hint: "" };
-      if (idbAvailable()) idb.setJSON(PASSWORD_KEY, marker);
-      else localStorage.setItem(PASSWORD_KEY, JSON.stringify(marker));
-    } catch (e) {}
-    saveDocument(true);
-    closeModal("passwordModal");
-    toast("Document protected with password", "success");
-  }
-
-  function removePasswordProtection() {
-    documentPassword = null;
-    passwordEncryptedContent = null;
-    try {
-      if (idbAvailable()) idb.delete(PASSWORD_KEY);
-      else localStorage.removeItem(PASSWORD_KEY);
-    } catch (e) {}
-    saveDocument(false);
-    closeModal("passwordModal");
-    toast("Password protection removed", "success");
-  }
-
-  async function checkPasswordOnLoad() {
-    var marker = null;
-    try {
-      if (window.EmeraldIDBStorage) marker = await window.EmeraldIDBStorage.getJSON(PASSWORD_KEY);
-      if (!marker) { var raw = localStorage.getItem(PASSWORD_KEY); if (raw) marker = JSON.parse(raw); }
-    } catch (e) {}
-    if (marker && marker.protected) {
-      // Show unlock modal and blank the document until unlocked
-      var wrapper = $(PAGES_WRAPPER_ID);
-      wrapper.innerHTML = "";
-      ensureFirstPage();
-      openModal("passwordUnlockModal");
-      $("passwordUnlockError").setAttribute("hidden", "");
-      setTimeout(function () { $("passwordUnlock").focus(); }, 100);
-    }
-  }
-
-  async function attemptUnlock() {
-    var pwd = $("passwordUnlock").value;
-    var errEl = $("passwordUnlockError");
-    // Read the encrypted content from storage and try to decipher
-    var data = null;
-    if (window.EmeraldIDBStorage) data = await window.EmeraldIDBStorage.getJSON(STORAGE_KEY);
-    if (!data) { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); }
-    if (!data || !data.encrypted) {
-      // No encrypted content found — just unlock
-      documentPassword = pwd;
-      closeModal("passwordUnlockModal");
-      return;
-    }
-    var plain = xorDecipher(data.content, pwd);
-    if (plain === null) {
-      errEl.textContent = "Incorrect password. Try again.";
-      errEl.removeAttribute("hidden");
-      return;
-    }
-    documentPassword = pwd;
-    data.content = plain;
-    data.encrypted = false;
-    ($("docTitle")?$("docTitle").value=data.title:null) || "Untitled Document";
-    var wrapper = $(PAGES_WRAPPER_ID);
-    wrapper.innerHTML = "";
-    var page = createPage();
-    wrapper.appendChild(page);
-    var content = getContent(page);
-    content.innerHTML = data.content || "";
-    if (content.children.length === 0) {
-      var p = document.createElement("p");
-      p.innerHTML = "<br>";
-      content.appendChild(p);
-    }
-    paginate();
-    closeModal("passwordUnlockModal");
-    toast("Document unlocked", "success");
-  }
-
-  /* ---------------- Bookmarks ---------------- */
-  function addBookmark() {
-    var name = $("bookmarkName").value.trim().replace(/\s+/g, "_");
-    if (!name) { toast("Enter a bookmark name", "error"); return; }
-    restoreEditorSelection();
-    var sel = window.getSelection();
-    if (!sel || sel.isCollapsed) { toast("Select text or place the caret first", "error"); return; }
-    var id = "bm_" + name + "_" + Date.now().toString(36);
-    var html = '<a class="zdocs-bookmark" data-bookmark="' + escapeAttr(name) + '" id="' + id + '" contenteditable="false" title="Bookmark: ' + escapeAttr(name) + '"></a>';
-    document.execCommand("insertHTML", false, html);
-    bookmarks.push({ name: name, id: id, ts: Date.now() });
-    saveBookmarks();
-    renderBookmarks();
-    $("bookmarkName").value = "";
-    closeModal("bookmarksModal");
-    schedulePaginate();
-    scheduleAutosave();
-    toast("Bookmark added: " + name, "success");
-  }
-
-  function saveBookmarks() {
-    try {
-      if (idbAvailable()) idb.setJSON("zdocs.bookmarks", bookmarks);
-      else localStorage.setItem("zdocs.bookmarks", JSON.stringify(bookmarks));
-    } catch (e) {}
-  }
-
-  function loadBookmarks() {
-    try {
-      var b = null;
-      if (idbAvailable()) b = idb.getJSONSync("zdocs.bookmarks");
-      if (!b) { var raw = localStorage.getItem("zdocs.bookmarks"); if (raw) b = JSON.parse(raw); }
-      if (Array.isArray(b)) bookmarks = b;
-    } catch (e) {}
-    // Re-link to existing anchors if present
-    for (var i = bookmarks.length - 1; i >= 0; i--) {
-      if (bookmarks[i].id && !document.getElementById(bookmarks[i].id)) {
-        // Anchor gone — keep entry but it may not jump
-      }
-    }
-  }
-
-  function renderBookmarks() {
-    var list = $("bookmarksList");
-    list.innerHTML = "";
-    if (bookmarks.length === 0) {
-      var empty = document.createElement("p");
-      empty.className = "outline-empty";
-      empty.textContent = "No bookmarks yet. Select text and name a bookmark.";
-      list.appendChild(empty);
-      return;
-    }
-    for (var i = 0; i < bookmarks.length; i++) {
-      (function (b, idx) {
-        var item = document.createElement("div");
-        item.className = "at-item";
-        var name = document.createElement("span");
-        name.className = "at-name";
-        name.textContent = b.name;
-        var jump = document.createElement("button");
-        jump.className = "at-insert";
-        jump.textContent = "Go to";
-        jump.addEventListener("click", function () {
-          var el = document.getElementById(b.id);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            // flash
-            el.style.background = "var(--ui-accent-selected)";
-            setTimeout(function () { el.style.background = ""; }, 800);
-            closeModal("bookmarksModal");
-          } else {
-            toast("Bookmark anchor not found in document", "error");
-          }
-        });
-        var del = document.createElement("button");
-        del.className = "at-del";
-        del.textContent = "×";
-        del.title = "Delete bookmark";
-        del.addEventListener("click", function () {
-          var el = document.getElementById(b.id);
-          if (el && el.parentElement) el.parentElement.removeChild(el);
-          bookmarks.splice(idx, 1);
-          saveBookmarks();
-          renderBookmarks();
-          schedulePaginate();
-          scheduleAutosave();
-        });
-        item.appendChild(name);
-        item.appendChild(jump);
-        item.appendChild(del);
-        list.appendChild(item);
-      })(bookmarks[i], i);
-    }
-  }
-
   function escapeAttr(s) {
     return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  /* ---------------- Internal hyperlinks ---------------- */
-  function getInternalTargets() {
-    var targets = [];
-    var pages = getPages();
-    for (var i = 0; i < pages.length; i++) {
-      var heads = getContent(pages[i]).querySelectorAll("h1, h2, h3, h4");
-      for (var h = 0; h < heads.length; h++) {
-        var el = heads[h];
-        var text = (el.textContent || "").trim();
-        if (!text) continue;
-        if (!el.id) el.id = "hd_" + Date.now().toString(36) + "_" + h;
-        targets.push({ id: el.id, text: text, kind: el.tagName.toLowerCase() });
-      }
-    }
-    for (var b = 0; b < bookmarks.length; b++) {
-      targets.push({ id: bookmarks[b].id, text: bookmarks[b].name, kind: "bookmark" });
-    }
-    return targets;
-  }
-
-  function openInternalLinkDialog() {
-    var list = $("internalLinkTargets");
-    list.innerHTML = "";
-    pendingInternalTarget = null;
-    var targets = getInternalTargets();
-    if (targets.length === 0) {
-      var empty = document.createElement("div");
-      empty.className = "il-empty";
-      empty.textContent = "Add headings or bookmarks first.";
-      list.appendChild(empty);
-    } else {
-      for (var i = 0; i < targets.length; i++) {
-        (function (t) {
-          var opt = document.createElement("div");
-          opt.className = "il-option";
-          opt.innerHTML = '<span class="il-icon">¶</span><span class="il-text">' + escapeHtml(t.text) + '</span><span class="il-kind">' + escapeHtml(t.kind) + '</span>';
-          opt.addEventListener("click", function () {
-            var opts = list.querySelectorAll(".il-option");
-            for (var j = 0; j < opts.length; j++) opts[j].classList.remove("selected");
-            opt.classList.add("selected");
-            pendingInternalTarget = t;
-          });
-          list.appendChild(opt);
-        })(targets[i]);
-      }
-    }
-    openModal("internalLinkModal");
-    setTimeout(function () { $("internalLinkText").focus(); }, 100);
-  }
-
-  function insertInternalLink() {
-    if (!pendingInternalTarget) { toast("Select a target", "error"); return; }
-    var text = $("internalLinkText").value.trim();
-    restoreEditorSelection();
-    var sel = window.getSelection();
-    if (!text && sel && !sel.isCollapsed) text = sel.toString();
-    if (!text) text = pendingInternalTarget.text;
-    var html = '<a class="zdocs-internal-link" data-target="' + escapeAttr(pendingInternalTarget.id) + '" href="#' + escapeAttr(pendingInternalTarget.id) + '">' + escapeHtml(text) + '</a>';
-    document.execCommand("insertHTML", false, html);
-    closeModal("internalLinkModal");
-    $("internalLinkText").value = "";
-    pendingInternalTarget = null;
-    schedulePaginate();
-    scheduleAutosave();
-    toast("Internal link inserted", "success");
   }
 
   function handleInternalLinkClick(e) {
@@ -5970,49 +6180,6 @@
     toast("Equation inserted", "success");
   }
 
-  /* ---------------- AutoText / Quick Parts ---------------- */
-  function openAutoTextDialog() {
-    var text = window.prompt("Save current selection as a Quick Part.\nEnter a name:", "");
-    if (!text) return;
-    var sel = window.getSelection();
-    if (!sel || sel.isCollapsed) { toast("Select text first to save as a Quick Part", "error"); return; }
-    var content = sel.toString();
-    var name = text.trim();
-    autoTextParts.push({ name: name, content: content, ts: Date.now() });
-    saveAutoText();
-    toast("Quick Part saved: " + name, "success");
-  }
-
-  function saveAutoText() {
-    try {
-      if (idbAvailable()) idb.setJSON("zdocs.autotext", autoTextParts);
-      else localStorage.setItem("zdocs.autotext", JSON.stringify(autoTextParts));
-    } catch (e) {}
-  }
-
-  function loadAutoText() {
-    try {
-      var a = null;
-      if (idbAvailable()) a = idb.getJSONSync("zdocs.autotext");
-      if (!a) { var raw = localStorage.getItem("zdocs.autotext"); if (raw) a = JSON.parse(raw); }
-      if (Array.isArray(a)) autoTextParts = a;
-    } catch (e) {}
-  }
-
-  function insertAutoText() {
-    if (autoTextParts.length === 0) { toast("No Quick Parts saved. Select text and use this button to save one.", "error"); return; }
-    var opts = autoTextParts.map(function (p, i) { return (i + 1) + ". " + p.name; }).join("\n");
-    var choice = window.prompt("Insert Quick Part (number):\n" + opts, "1");
-    if (choice === null) { toast("Cancelled", "success"); return; }
-    var idx = parseInt(choice, 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= autoTextParts.length) { toast("Invalid choice", "error"); return; }
-    focusEditorAndRestore();
-    document.execCommand("insertText", false, autoTextParts[idx].content);
-    schedulePaginate();
-    scheduleAutosave();
-    toast("Quick Part inserted", "success");
-  }
-
   /* ---------------- SmartArt ---------------- */
   var SMARTART_TEMPLATES = [
     {
@@ -6108,6 +6275,12 @@
       var dataUrl = canvas.toDataURL("image/png");
       track.stop();
       document.body.removeChild(video);
+      // Bring the focus back to this Docs tab. When the user captured a
+      // different app/window the OS focus usually stays on that app after
+      // the native picker closes — browsers cannot fully "steal" focus
+      // back, but window.focus() restores it whenever the browser allows
+      // (same-window contexts), and the toast confirms the capture landed.
+      try { window.focus(); } catch (_) {}
       // Insert into doc
       restoreEditorSelection();
       document.execCommand("insertHTML", false, '<img class="screenshot-img" src="' + dataUrl + '" alt="Screenshot" style="max-width:100%" />');
@@ -6119,89 +6292,253 @@
     }
   }
 
-  /* ---------------- Ink annotations ---------------- */
-  function toggleInk(force) {
-    var toolbar = $("inkToolbar");
+  /* ---------------- Draw mode (Slides/Notes-style drawing toolbar) ----------------
+     Ported from the Slides/Notes apps: a bottom-docked toolbar with Pen,
+     Highlighter and Eraser tools, color presets, size presets, and
+     Clear/Done buttons. Strokes are drawn on a canvas overlaying the
+     document scroll area. The canvas STAYS in the DOM after Done so the
+     drawing remains visible on the page (like Slides persists per-slide
+     drawings); re-entering draw mode continues on top of it. */
+  function toggleDrawMode(force) {
+    var toolbar = $("drawToolbar");
     var app = $("app");
-    var shouldOpen = force === undefined ? !inkMode : force;
-    inkMode = shouldOpen;
+    var btn = $("btnDraw");
+    var shouldOpen = force === undefined ? !drawMode : force;
+    drawMode = shouldOpen;
     if (shouldOpen) {
-      app.classList.add("ink-mode");
-      toolbar.classList.add("open");
-      toolbar.setAttribute("aria-hidden", "false");
-      ensureInkCanvas();
-      var btn = $("btnInk"); if (btn) btn.classList.add("active");
-      toast("Ink mode on — draw on the document. Click Done when finished.", "success");
+      // Only one bottom toolbar at a time — close the symbol bar if open.
+      toggleSymbolBar(false);
+      app.classList.add("draw-mode");
+      toolbar.classList.add("visible");
+      ensureDrawCanvas();
+      if (btn) btn.classList.add("active");
+      // No "on" toast — the toolbar appearing IS the signal (user request);
+      // only the "Draw mode off." toast below is shown, on Done/Exit.
     } else {
-      app.classList.remove("ink-mode");
-      toolbar.classList.remove("open");
-      toolbar.setAttribute("aria-hidden", "true");
-      removeInkCanvas();
-      var btn2 = $("btnInk"); if (btn2) btn2.classList.remove("active");
+      app.classList.remove("draw-mode");
+      toolbar.classList.remove("visible");
+      // Canvas stays visible (pointer-events off) so the drawing persists.
+      if (drawCanvas) drawCanvas.style.pointerEvents = "none";
+      if (btn) btn.classList.remove("active");
+      toast("Draw mode off.");
     }
   }
 
-  function ensureInkCanvas() {
-    removeInkCanvas();
+  function ensureDrawCanvas() {
     var scroll = $("documentScroll");
-    inkCanvas = document.createElement("canvas");
-    inkCanvas.className = "ink-canvas";
-    inkCanvas.id = "inkCanvas";
-    scroll.style.position = "relative";
-    // size to scroll content
+    if (!drawCanvas) {
+      drawCanvas = document.createElement("canvas");
+      drawCanvas.className = "draw-canvas";
+      drawCanvas.id = "drawCanvas";
+      scroll.style.position = "relative";
+      scroll.appendChild(drawCanvas);
+      drawCtx = drawCanvas.getContext("2d");
+      drawCtx.lineCap = "round";
+      drawCtx.lineJoin = "round";
+      drawCtx.imageSmoothingEnabled = true;
+      drawCtx.imageSmoothingQuality = "high";
+      drawCanvas.addEventListener("mousedown", function (e) { drawStart(e); });
+      drawCanvas.addEventListener("mousemove", function (e) { drawLine(e); });
+      window.addEventListener("mouseup", function () { drawEnd(); });
+      drawCanvas.addEventListener("touchstart", function (e) { e.preventDefault(); drawStart(e.touches[0]); }, { passive: false });
+      drawCanvas.addEventListener("touchmove", function (e) { if (isDrawing) e.preventDefault(); drawLine(e.touches[0]); }, { passive: false });
+      drawCanvas.addEventListener("touchend", function () { drawEnd(); });
+    }
+    // Size the canvas to the full scrollable document area.
+    // NOTE: assigning canvas.width/height CLEARS the bitmap — only resize
+    // when the dimensions actually changed, and carry the strokes over.
     requestAnimationFrame(function () {
-      inkCanvas.width = scroll.scrollWidth;
-      inkCanvas.height = Math.max(scroll.scrollHeight, scroll.clientHeight);
-      inkCanvas.style.width = scroll.scrollWidth + "px";
-      inkCanvas.style.height = scroll.scrollHeight + "px";
+      var w = scroll.scrollWidth;
+      var h = Math.max(scroll.scrollHeight, scroll.clientHeight);
+      if (drawCanvas.width !== w || drawCanvas.height !== h) {
+        var snapshot = null;
+        try { if (drawCanvas.width > 0 && drawCanvas.height > 0) snapshot = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height); } catch (_) {}
+        drawCanvas.width = w;
+        drawCanvas.height = h;
+        drawCanvas.style.width = w + "px";
+        drawCanvas.style.height = h + "px";
+        // Resizing also resets context state — restore it.
+        drawCtx.lineCap = "round";
+        drawCtx.lineJoin = "round";
+        if (snapshot) {
+          try { drawCtx.putImageData(snapshot, 0, 0); } catch (_) {}
+        }
+      }
     });
-    scroll.appendChild(inkCanvas);
-    inkCtx = inkCanvas.getContext("2d");
-    inkCtx.lineCap = "round";
-    inkCtx.lineJoin = "round";
-    inkCanvas.addEventListener("pointerdown", inkStart);
-    inkCanvas.addEventListener("pointermove", inkMove);
-    inkCanvas.addEventListener("pointerup", inkEnd);
-    inkCanvas.addEventListener("pointerleave", inkEnd);
+    drawCanvas.style.pointerEvents = "all";
+    drawCanvas.style.display = "block";
   }
 
-  function removeInkCanvas() {
-    if (inkCanvas && inkCanvas.parentElement) inkCanvas.parentElement.removeChild(inkCanvas);
-    inkCanvas = null;
-    inkCtx = null;
+  function clearDrawing() {
+    // Silent clear — the canvas visibly emptying is its own feedback
+    // (user request: no "Drawing cleared" toast).
+    if (drawCtx && drawCanvas) drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
   }
 
-  function inkPos(e) {
-    var rect = inkCanvas.getBoundingClientRect();
+  function drawPos(e) {
+    var rect = drawCanvas.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
-  function inkStart(e) {
-    inkDrawing = true;
-    var p = inkPos(e);
-    inkLastX = p.x; inkLastY = p.y;
-    if (inkEraser) {
-      inkCtx.globalCompositeOperation = "destination-out";
+  function drawStart(e) {
+    if (!drawMode || !drawCtx) return;
+    isDrawing = true;
+    var p = drawPos(e);
+    drawPoints = [{ x: p.x, y: p.y }];
+    var tool = drawTool;
+    if (tool === "eraser") {
+      drawCtx.globalCompositeOperation = "destination-out";
+      drawCtx.lineWidth = (drawWidth || 2) * 5;
+      drawCtx.strokeStyle = "#000";
+      drawCtx.fillStyle = "#000";
+      drawCtx.globalAlpha = 1;
+    } else if (tool === "highlighter") {
+      drawCtx.globalCompositeOperation = "source-over";
+      drawCtx.strokeStyle = drawColor;
+      drawCtx.fillStyle = drawColor;
+      drawCtx.lineWidth = (drawWidth || 2) * 2.5;
+      drawCtx.globalAlpha = 0.4; // translucent, like a real highlighter
     } else {
-      inkCtx.globalCompositeOperation = "source-over";
-      inkCtx.strokeStyle = inkColor;
-      inkCtx.lineWidth = inkSize;
+      drawCtx.globalCompositeOperation = "source-over";
+      drawCtx.strokeStyle = drawColor;
+      drawCtx.fillStyle = drawColor;
+      drawCtx.lineWidth = drawWidth || 2;
+      drawCtx.globalAlpha = 1;
     }
-    inkCtx.beginPath();
-    inkCtx.moveTo(p.x, p.y);
-    e.preventDefault();
+    // Dot for single-click strokes
+    drawCtx.beginPath();
+    drawCtx.arc(p.x, p.y, Math.max(0.5, drawCtx.lineWidth / 2), 0, Math.PI * 2);
+    drawCtx.fill();
+    drawCtx.beginPath();
+    drawCtx.moveTo(p.x, p.y);
+    if (e.cancelable && e.preventDefault) e.preventDefault();
   }
-  function inkMove(e) {
-    if (!inkDrawing) return;
-    var p = inkPos(e);
-    inkCtx.lineTo(p.x, p.y);
-    inkCtx.stroke();
-    inkLastX = p.x; inkLastY = p.y;
-    e.preventDefault();
+
+  function drawLine(e) {
+    if (!drawMode || !isDrawing || !drawCtx) return;
+    var p = drawPos(e);
+    drawPoints.push({ x: p.x, y: p.y });
+    var pts = drawPoints;
+    // Quadratic-curve smoothing through midpoints (Slides-style natural strokes)
+    if (pts.length >= 3) {
+      var p0 = pts[pts.length - 3];
+      var p1 = pts[pts.length - 2];
+      var p2 = pts[pts.length - 1];
+      var mid1x = (p0.x + p1.x) / 2, mid1y = (p0.y + p1.y) / 2;
+      var mid2x = (p1.x + p2.x) / 2, mid2y = (p1.y + p2.y) / 2;
+      drawCtx.beginPath();
+      drawCtx.moveTo(mid1x, mid1y);
+      drawCtx.quadraticCurveTo(p1.x, p1.y, mid2x, mid2y);
+      drawCtx.stroke();
+    } else if (pts.length === 2) {
+      drawCtx.beginPath();
+      drawCtx.moveTo(pts[0].x, pts[0].y);
+      drawCtx.lineTo(pts[1].x, pts[1].y);
+      drawCtx.stroke();
+    }
+    if (e.cancelable && e.preventDefault) e.preventDefault();
   }
-  function inkEnd(e) {
-    inkDrawing = false;
-    if (e) e.preventDefault();
+
+  function drawEnd() {
+    if (!isDrawing) return;
+    isDrawing = false;
+    if (drawCtx) drawCtx.globalAlpha = 1;
+    // Final segment so the stroke doesn't stop mid-curve.
+    var pts = drawPoints;
+    if (pts.length >= 2 && drawCtx) {
+      var p1 = pts[pts.length - 2], p2 = pts[pts.length - 1];
+      var mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+      drawCtx.beginPath();
+      drawCtx.moveTo(mx, my);
+      drawCtx.lineTo(p2.x, p2.y);
+      drawCtx.stroke();
+    }
+    drawPoints = [];
+  }
+
+  function initDrawToolbar() {
+    var penBtn = $("drawPenBtn");
+    var highlighterBtn = $("drawHighlighterBtn");
+    var eraserBtn = $("drawEraserBtn");
+    var colorSection = document.querySelector(".draw-color-section");
+    var colorDivider = colorSection ? colorSection.previousElementSibling : null;
+    var setTool = function (tool) {
+      drawTool = tool;
+      [penBtn, highlighterBtn, eraserBtn].forEach(function (b) { if (b) b.classList.remove("active"); });
+      if (tool === "pen" && penBtn) penBtn.classList.add("active");
+      if (tool === "highlighter" && highlighterBtn) highlighterBtn.classList.add("active");
+      if (tool === "eraser" && eraserBtn) eraserBtn.classList.add("active");
+      // Hide the color section while the eraser is active (nothing to color).
+      var hideColor = (tool === "eraser");
+      if (colorSection) colorSection.classList.toggle("eraser-hidden", hideColor);
+      if (colorDivider && colorDivider.classList.contains("color-divider")) colorDivider.classList.toggle("eraser-hidden", hideColor);
+      if (drawCanvas) drawCanvas.classList.toggle("eraser-active", tool === "eraser");
+    };
+    if (penBtn) penBtn.addEventListener("click", function () { setTool("pen"); });
+    if (highlighterBtn) highlighterBtn.addEventListener("click", function () { setTool("highlighter"); });
+    if (eraserBtn) eraserBtn.addEventListener("click", function () { setTool("eraser"); });
+
+    // Color presets
+    var colorPresets = $("drawColorPresets");
+    if (colorPresets) {
+      colorPresets.addEventListener("click", function (e) {
+        var sw = e.target.closest(".draw-color-swatch");
+        if (!sw) return;
+        drawColor = sw.getAttribute("data-color");
+        var swatches = colorPresets.querySelectorAll(".draw-color-swatch");
+        for (var i = 0; i < swatches.length; i++) swatches[i].classList.remove("active");
+        sw.classList.add("active");
+        var picker = $("drawColorPicker");
+        if (picker) picker.value = drawColor;
+      });
+      // Custom color (white swatch opens the native color picker)
+      var whiteSwatch = colorPresets.querySelector('.draw-color-swatch[data-color="#ffffff"]');
+      if (whiteSwatch) {
+        whiteSwatch.addEventListener("click", function () {
+          var picker = $("drawColorPicker");
+          if (picker) picker.click();
+        });
+      }
+    }
+    var colorPicker = $("drawColorPicker");
+    if (colorPicker) {
+      colorPicker.addEventListener("input", function () {
+        drawColor = colorPicker.value;
+        var colorPresets2 = $("drawColorPresets");
+        if (colorPresets2) {
+          var swatches = colorPresets2.querySelectorAll(".draw-color-swatch");
+          for (var k = 0; k < swatches.length; k++) swatches[k].classList.remove("active");
+        }
+      });
+    }
+
+    // Size presets
+    var toolbar = $("drawToolbar");
+    if (toolbar) {
+      toolbar.addEventListener("click", function (e) {
+        var sizeBtn = e.target.closest(".draw-size-btn");
+        if (!sizeBtn) return;
+        drawWidth = parseInt(sizeBtn.getAttribute("data-size"), 10) || 2;
+        var sizeBtns = toolbar.querySelectorAll(".draw-size-btn");
+        for (var s = 0; s < sizeBtns.length; s++) sizeBtns[s].classList.remove("active");
+        sizeBtn.classList.add("active");
+        var slider = $("drawThickness");
+        if (slider) slider.value = drawWidth;
+      });
+    }
+
+    // Clear / Done
+    var clearBtn = $("drawClearBtn");
+    if (clearBtn) clearBtn.addEventListener("click", clearDrawing);
+    var doneBtn = $("drawDoneBtn");
+    if (doneBtn) doneBtn.addEventListener("click", function () { toggleDrawMode(false); });
+
+    // Ribbon button
+    var bDraw = $("btnDraw");
+    if (bDraw) {
+      bDraw.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      bDraw.addEventListener("click", function () { toggleDrawMode(); });
+    }
   }
 
   /* ---------------- Spellcheck ---------------- */
@@ -6688,7 +7025,7 @@
     // Use keydown for character insertion — preventDefault on keydown is
     // reliably honored by browsers (unlike beforeinput insertText).
     pagesWrap.addEventListener("keydown", function (e) {
-      if (!trackChangesOn || restricted) return;
+      if (!trackChangesOn) return;
       // Only act when the caret is inside the document
       var sel = window.getSelection();
       if (!sel || !sel.rangeCount) return;
@@ -6724,7 +7061,7 @@
     });
     // Paste: wrap inserted plain text in <ins> when track changes is on
     pagesWrap.addEventListener("paste", function (e) {
-      if (!trackChangesOn || restricted) return;
+      if (!trackChangesOn) return;
       var sel = window.getSelection();
       if (!sel || !sel.rangeCount) return;
       var node = sel.anchorNode;
@@ -6862,45 +7199,50 @@
   /* ---------------- Wire up new buttons in init ---------------- */
   // (called from init() via initNewFeatures below)
   function initNewFeatures() {
-    // Restrict edit
-    var bRe = $("btnRestrictEdit");
-    if (bRe) { bRe.addEventListener("mousedown", function (e) { e.preventDefault(); }); bRe.addEventListener("click", toggleRestrictEdit); }
-    var bRestrictOff = $("restrictOff");
-    if (bRestrictOff) bRestrictOff.addEventListener("click", function () { setRestricted(false); });
-    var bFinal = $("btnMarkFinal");
-    if (bFinal) { bFinal.addEventListener("mousedown", function (e) { e.preventDefault(); }); bFinal.addEventListener("click", function () { setRestricted(true); toast("Document marked as final — read-only", "success"); }); }
 
-    // Password
-    var bPwd = $("btnPassword");
-    if (bPwd) { bPwd.addEventListener("mousedown", function (e) { e.preventDefault(); }); bPwd.addEventListener("click", openPasswordDialog); }
-    var bPwdConfirm = $("passwordConfirmBtn");
-    if (bPwdConfirm) bPwdConfirm.addEventListener("click", protectDocument);
-    var bPwdRemove = $("passwordRemove");
-    if (bPwdRemove) bPwdRemove.addEventListener("click", removePasswordProtection);
-    var bUnlock = $("passwordUnlockBtn");
-    if (bUnlock) bUnlock.addEventListener("click", attemptUnlock);
-    var unlockInput = $("passwordUnlock");
-    if (unlockInput) unlockInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); attemptUnlock(); } });
-
-    // Bookmarks
-    var bBm = $("btnBookmark");
-    if (bBm) { bBm.addEventListener("mousedown", function (e) { e.preventDefault(); }); bBm.addEventListener("click", function () { renderBookmarks(); openModal("bookmarksModal"); setTimeout(function () { $("bookmarkName").focus(); }, 100); }); }
-    var bBmAdd = $("bookmarkAdd");
-    if (bBmAdd) bBmAdd.addEventListener("click", addBookmark);
-    var bmInput = $("bookmarkName");
-    if (bmInput) bmInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addBookmark(); } });
-
-    // Internal link
-    var bIL = $("btnInternalLink");
-    if (bIL) { bIL.addEventListener("mousedown", function (e) { e.preventDefault(); }); bIL.addEventListener("click", openInternalLinkDialog); }
-    var bILConfirm = $("internalLinkConfirm");
-    if (bILConfirm) bILConfirm.addEventListener("click", insertInternalLink);
-    var ilInput = $("internalLinkText");
-    if (ilInput) ilInput.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); insertInternalLink(); } });
-    // Click handler for internal links + footnote refs + bookmarks (delegated)
+    // Click handler for internal links + footnote refs (delegated)
     var scrollEl = $("documentScroll");
     if (scrollEl) {
       scrollEl.addEventListener("click", handleInternalLinkClick);
+      // External links: Ctrl/Cmd+click opens in a NEW TAB (links inside a
+      // contenteditable never navigate on their own — without this handler
+      // Ctrl+click did nothing at all).
+      scrollEl.addEventListener("click", function (e) {
+        var a = e.target.closest("a");
+        if (!a) return;
+        // Internal links / bookmarks / TOC anchors are handled by their own
+        // delegated handlers above — skip them here.
+        if (a.classList.contains("zdocs-internal-link") || a.classList.contains("zdocs-bookmark")) return;
+        if (a.closest(".zdocs-toc")) return;
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          var href = a.getAttribute("href");
+          if (href && href !== "#" && href.indexOf("javascript:") !== 0) {
+            // normalizeExternalUrl fixes links stored without a scheme
+            // (e.g. href="youtube.com") so they open https://youtube.com
+            // instead of a path under this app's origin.
+            window.open(normalizeExternalUrl(href), "_blank", "noopener");
+          }
+        } else {
+          // Plain click keeps the caret for editing (no navigation).
+          e.preventDefault();
+        }
+      });
+      // Page-break markers: click to remove (cancel the break).
+      scrollEl.addEventListener("click", function (e) {
+        var pb = e.target.closest(".zdocs-page-break");
+        if (!pb) return;
+        e.preventDefault();
+        if (pb.parentElement) {
+          // Remove the marker; the empty <p> that followed a manual page
+          // break is left alone — the paginator prunes trailing empties.
+          pb.parentElement.removeChild(pb);
+          schedulePaginate();
+          scheduleAutosave();
+          scheduleOutlineUpdate();
+          toast("Page break removed", "success");
+        }
+      });
       scrollEl.addEventListener("click", function (e) {
         var fn = e.target.closest("sup.footnote-ref, sup.endnote-ref");
         if (!fn) return;
@@ -6928,11 +7270,9 @@
       }); })(covPresets[cp]);
     }
 
-    // Section break (both insert + layout buttons)
+    // Section break (Insert tab only — the Layout tab's Breaks group was removed)
     var bSB = $("btnSectionBreak");
     if (bSB) { bSB.addEventListener("mousedown", function (e) { e.preventDefault(); }); bSB.addEventListener("click", insertSectionBreak); }
-    var bSBL = $("btnSectionBreakL");
-    if (bSBL) { bSBL.addEventListener("mousedown", function (e) { e.preventDefault(); }); bSBL.addEventListener("click", insertSectionBreak); }
     var bSBConfirm = $("sectionBreakConfirm");
     if (bSBConfirm) bSBConfirm.addEventListener("click", confirmSectionBreak);
     var secOrientBtns = document.querySelectorAll(".sec-orient-btn");
@@ -6962,18 +7302,6 @@
       }); })(eqPresets[ep]);
     }
 
-    // AutoText
-    var bAT = $("btnAutoText");
-    if (bAT) { bAT.addEventListener("mousedown", function (e) { e.preventDefault(); }); bAT.addEventListener("click", function () {
-      // First click: if there's a selection, offer to save; else insert
-      var sel = window.getSelection();
-      if (sel && !sel.isCollapsed) {
-        openAutoTextDialog();
-      } else {
-        insertAutoText();
-      }
-    }); }
-
     // SmartArt
     var bSA = $("btnSmartArt");
     if (bSA) { bSA.addEventListener("mousedown", function (e) { e.preventDefault(); }); bSA.addEventListener("click", openSmartArtDialog); }
@@ -6982,25 +7310,8 @@
     var bSS = $("btnScreenshot");
     if (bSS) { bSS.addEventListener("mousedown", function (e) { e.preventDefault(); }); bSS.addEventListener("click", takeScreenshot); }
 
-    // Ink
-    var bInk = $("btnInk");
-    if (bInk) { bInk.addEventListener("mousedown", function (e) { e.preventDefault(); }); bInk.addEventListener("click", function () { toggleInk(); }); }
-    var bInkDone = $("inkDone");
-    if (bInkDone) bInkDone.addEventListener("click", function () { toggleInk(false); });
-    var bInkClear = $("inkClear");
-    if (bInkClear) bInkClear.addEventListener("click", function () { if (inkCtx) { inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height); toast("Ink cleared", "success"); } });
-    var bInkEraser = $("inkEraser");
-    if (bInkEraser) { bInkEraser.addEventListener("click", function () { inkEraser = !inkEraser; bInkEraser.classList.toggle("active", inkEraser); }); }
-    var inkColorInput = $("inkColor");
-    if (inkColorInput) inkColorInput.addEventListener("input", function (e) {
-      inkColor = e.target.value;
-      $("inkColorSwatch").style.background = inkColor;
-    });
-    var inkSizeInput = $("inkSize");
-    if (inkSizeInput) inkSizeInput.addEventListener("input", function (e) {
-      inkSize = parseInt(e.target.value, 10);
-      $("inkSizeLabel").textContent = inkSize;
-    });
+    // Draw mode (Slides/Notes-style toolbar)
+    initDrawToolbar();
 
     // Spelling
     var bSpell = $("btnSpelling");
@@ -7051,19 +7362,46 @@
 
   /* =========================================================
      Round 2 — new features
-     (mail merge, content controls, immersive reader,
-      accessibility checker, document inspector, macros,
+     (mail merge, immersive reader,
+      accessibility checker, document inspector,
       status-bar zoom, language selector)
      ========================================================= */
 
   /* ---------------- Status bar zoom + language ---------------- */
   function initStatusBarControls() {
-    var zOut = $("statusZoomOut");
-    var zIn = $("statusZoomIn");
-    var zPct = $("statusZoomPct");
-    if (zOut) zOut.addEventListener("click", function () { adjustZoom(-10); });
-    if (zIn) zIn.addEventListener("click", function () { adjustZoom(10); });
-    if (zPct) zPct.addEventListener("click", function () { setZoom(100); });
+    // The zoom % label is NOT clickable — it's a plain informational span,
+    // exactly like Slides' #zoomStatus. Zoom is changed ONLY via Ctrl+Scroll
+    // (or the View → Zoom ribbon controls / keyboard shortcuts).
+
+    // Ctrl + Scroll to zoom in / out — matches the Slides editor behavior.
+    // Slides uses an 8% multiplicative step (factor 1.08) rather than a fixed
+    // ±10% additive step — this feels smoother at high zoom levels.
+    // Listens on the document scroll area first so we can stopPropagation()
+    // before the document-level handler double-fires.
+    var scrollEl = $("documentScroll");
+    if (scrollEl) {
+      scrollEl.addEventListener("wheel", function (e) {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        // deltaY > 0 = scroll down = zoom out; < 0 = zoom in.
+        var delta = e.deltaY > 0 ? -1 : 1;
+        var factor = 1 + (delta * 0.08); // 8% zoom step (same as Slides)
+        zoomByFactor(factor);
+      }, { passive: false });
+    }
+    // Also handle Ctrl+Scroll anywhere in the app (e.g. over the ribbon) so
+    // the user isn't surprised when they scroll over the wrong area.
+    document.addEventListener("wheel", function (e) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      // Don't hijack scrolling inside a modal or scrollable panel.
+      var target = e.target;
+      if (target && target.closest && target.closest(".modal-overlay, .outline-panel, .thumbnails-panel, .comments-panel, .spelling-panel, .footnotes-panel")) return;
+      e.preventDefault();
+      var delta = e.deltaY > 0 ? -1 : 1;
+      var factor = 1 + (delta * 0.08);
+      zoomByFactor(factor);
+    }, { passive: false });
 
     var langBtn = $("statusLang");
     if (langBtn) {
@@ -7075,19 +7413,46 @@
 
     var psLabel = $("pageSizeLabel");
     if (psLabel) {
-      psLabel.addEventListener("click", function (e) {
-        e.stopPropagation();
-        togglePageSizeMenu(psLabel);
-      });
+      // Informational only — no click handler. Page size is changed via
+      // Layout -> Size (the ms-dropdown drives setPageSize).
     }
   }
 
+  // Additive zoom step (Zoom In / Zoom Out buttons + Ctrl+= / Ctrl+- keys).
+  // Keeps the ±10 step, since that's what users expect.
   function adjustZoom(delta) {
-    var slider = $("zoom");
-    if (!slider) return;
-    var v = parseInt(slider.value, 10) + delta;
-    v = Math.max(50, Math.min(150, v));
-    setZoom(v);
+    setZoom(currentZoom + delta);
+  }
+
+  // Multiplicative zoom step (used by Ctrl+Scroll).
+  // Matches Slides' factor-based zoom: factor 1.08 = zoom in 8%, 0.9259 = out 8%.
+  function zoomByFactor(factor) {
+    setZoom(Math.round(currentZoom * factor));
+  }
+
+  // Base (un-zoomed) page size. CSS `zoom` inflates offsetWidth and
+  // getBoundingClientRect, so the authored inline size is read instead —
+  // falling back to the A4 default that .page gets from the stylesheet.
+  function getBasePageSize() {
+    var page = getPages()[0];
+    if (page) {
+      var w = parseFloat(page.style.width);
+      var h = parseFloat(page.style.height);
+      if (!isNaN(w) && w > 0 && !isNaN(h) && h > 0) return { w: w, h: h };
+    }
+    return { w: PAGE_WIDTH, h: PAGE_HEIGHT };
+  }
+
+  // Layout -> Zoom -> Fit To Window: scale the page so its width fits the
+  // visible scroll area (minus padding, scrollbar and a small margin).
+  function zoomFitToWindow() {
+    var scrollEl = $("documentScroll");
+    var base = getBasePageSize().w;
+    var avail = (scrollEl ? scrollEl.clientWidth : window.innerWidth) - 80;
+    if (avail < 100) avail = 100;
+    var fit = Math.floor((avail / base) * 100);
+    setZoom(fit);
+    toast("Fit to window · " + currentZoom + "%", "success");
   }
 
   function updateStatusZoom(v) {
@@ -7139,204 +7504,6 @@
     langMenu.style.top = (rect.bottom + 4) + "px";
     langMenu.style.right = (window.innerWidth - rect.right) + "px";
     langMenu.classList.add("open");
-  }
-
-  /* ---------------- Mail Merge (real CSV) ---------------- */
-  var mergeData = null; // { fields: [], rows: [[]] }
-
-  function openMailMergeDialog() {
-    openModal("mailMergeModal");
-    var csv = $("mergeCsv");
-    csv.oninput = parseMergeCsv;
-    parseMergeCsv();
-  }
-
-  function parseMergeCsv() {
-    var csv = $("mergeCsv").value.trim();
-    var fieldsList = $("mergeFieldsList");
-    var previewList = $("mergePreviewList");
-    fieldsList.innerHTML = "";
-    previewList.innerHTML = "";
-    mergeData = null;
-    if (!csv) {
-      fieldsList.innerHTML = '<span class="outline-empty">Paste CSV to see fields</span>';
-      return;
-    }
-    var lines = csv.split(/\r?\n/).filter(Boolean);
-    if (lines.length < 2) {
-      fieldsList.innerHTML = '<span class="outline-empty">Add a header row + at least one data row</span>';
-      return;
-    }
-    var fields = parseCsvLine(lines[0]);
-    var rows = [];
-    for (var i = 1; i < lines.length; i++) {
-      rows.push(parseCsvLine(lines[i]));
-    }
-    mergeData = { fields: fields, rows: rows };
-
-    // Render field chips
-    for (var f = 0; f < fields.length; f++) {
-      (function (field) {
-        var chip = document.createElement("span");
-        chip.className = "merge-field-chip";
-        chip.textContent = "«" + field + "»";
-        chip.title = "Click to insert this merge field at the caret";
-        chip.addEventListener("click", function () {
-          insertMergeField(field);
-        });
-        fieldsList.appendChild(chip);
-      })(fields[f]);
-    }
-    // Render preview (first 5)
-    var max = Math.min(5, rows.length);
-    for (var r = 0; r < max; r++) {
-      var item = document.createElement("div");
-      item.className = "merge-preview-item";
-      var html = '<span class="mpi-num">' + (r + 1) + '</span>';
-      for (var c = 0; c < fields.length; c++) {
-        html += '<strong>' + escapeHtml(fields[c]) + ':</strong> ' + escapeHtml(rows[r][c] || "") + '  ';
-      }
-      item.innerHTML = html;
-      previewList.appendChild(item);
-    }
-    if (rows.length > 5) {
-      var more = document.createElement("div");
-      more.className = "merge-preview-item";
-      more.style.color = "var(--text-faint)";
-      more.textContent = "…and " + (rows.length - 5) + " more";
-      previewList.appendChild(more);
-    }
-  }
-
-  function parseCsvLine(line) {
-    var out = [];
-    var cur = "";
-    var inQ = false;
-    for (var i = 0; i < line.length; i++) {
-      var ch = line[i];
-      if (inQ) {
-        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-        else if (ch === '"') { inQ = false; }
-        else { cur += ch; }
-      } else {
-        if (ch === ',') { out.push(cur); cur = ""; }
-        else if (ch === '"') { inQ = true; }
-        else { cur += ch; }
-      }
-    }
-    out.push(cur);
-    return out;
-  }
-
-  function insertMergeField(field) {
-    restoreEditorSelection();
-    document.execCommand("insertHTML", false, '<span class="field-dynamic merge-field" contenteditable="false" data-field="' + escapeAttr(field) + '">«' + escapeHtml(field) + '»</span> ');
-    schedulePaginate();
-    scheduleAutosave();
-    closeModal("mailMergeModal");
-    toast("Merge field «" + field + "» inserted", "success");
-  }
-
-  function runMailMerge() {
-    if (!mergeData || mergeData.rows.length === 0) {
-      toast("Paste CSV data with at least one recipient first", "error");
-      return;
-    }
-    // Build a merged HTML doc for each recipient, then export as a single HTML file
-    var pages = getPages();
-    var templateHtml = "";
-    for (var i = 0; i < pages.length; i++) {
-      templateHtml += getContent(pages[i]).innerHTML;
-    }
-    var blob = document.createElement("div");
-    var mergedHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + escapeHtml($("docTitle") ? $("docTitle").value : "Merged") + '</title><style>body{font-family:DM Sans,Arial,sans-serif;max-width:794px;margin:40px auto;padding:0 24px;line-height:1.6}h1,h2,h3{color:#1a1a1a}.merge-doc{page-break-after:always;padding:24px 0;border-bottom:2px solid #eee}</style></head><body>';
-    for (var r = 0; r < mergeData.rows.length; r++) {
-      var row = mergeData.rows[r];
-      var docHtml = templateHtml;
-      for (var f = 0; f < mergeData.fields.length; f++) {
-        var fieldName = mergeData.fields[f];
-        var value = row[f] || "";
-        // Replace «Field» spans AND bare «Field» text
-        var re1 = new RegExp('<span[^>]*data-field="' + fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + '"[^>]*>[^<]*</span>', "gi");
-        docHtml = docHtml.replace(re1, escapeHtml(value));
-        docHtml = docHtml.replace(new RegExp("«" + fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "»", "g"), escapeHtml(value));
-      }
-      mergedHtml += '<div class="merge-doc">' + docHtml + '</div>';
-    }
-    mergedHtml += '</body></html>';
-    var blob2 = new Blob([mergedHtml], { type: "text/html" });
-    var url = URL.createObjectURL(blob2);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = (($("docTitle")?$("docTitle").value:"merged") || "merged") + ".html";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-    toast("Merged " + mergeData.rows.length + " documents — exported as HTML", "success");
-  }
-
-  /* ---------------- Content controls ---------------- */
-  function openContentControlsDialog() {
-    openModal("contentControlsModal");
-  }
-
-  function insertContentControl(kind) {
-    var html = "";
-    var id = "cc_" + Date.now().toString(36);
-    // For kinds that need a prompt, ask BEFORE restoring selection (prompt
-    // steals focus and would invalidate the restored range).
-    var needsPrompt = kind === "dropdown" || kind === "picture";
-    var opts = null, url = null;
-    if (kind === "dropdown") {
-      opts = window.prompt("Dropdown options (comma-separated):", "Option 1, Option 2, Option 3");
-      if (opts === null) { closeModal("contentControlsModal"); return; }
-    } else if (kind === "picture") {
-      url = window.prompt("Picture URL:", "");
-      if (url === null) { closeModal("contentControlsModal"); return; }
-    }
-    // Now restore selection + focus (prompt may have stolen focus)
-    focusEditorAndRestore();
-    switch (kind) {
-      case "richtext":
-        html = '<span class="cc-richtext" id="' + id + '" contenteditable="true" data-cc="richtext"><span class="cc-placeholder">Click to enter rich text</span></span> ';
-        break;
-      case "plain":
-        html = '<span class="cc-plain" id="' + id + '" contenteditable="true" data-cc="plain" data-plain="true"><span class="cc-placeholder">Click to enter text</span></span> ';
-        break;
-      case "date":
-        html = '<input type="date" class="cc-date" id="' + id + '" data-cc="date" /> ';
-        break;
-      case "dropdown":
-        var optArr = (opts || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
-        var optHtml = optArr.map(function (o) { return '<option>' + escapeHtml(o) + '</option>'; }).join("");
-        html = '<select class="cc-dropdown" id="' + id + '" data-cc="dropdown">' + optHtml + '</select> ';
-        break;
-      case "checkbox":
-        html = '<input type="checkbox" class="cc-checkbox" id="' + id + '" data-cc="checkbox" /> ';
-        break;
-      case "picture":
-        html = '<img class="cc-picture" id="' + id + '" data-cc="picture" src="' + escapeAttr(url || "") + '" alt="" style="max-width:200px;border:1px dashed var(--ui-accent-border);border-radius:4px" /> ';
-        break;
-    }
-    document.execCommand("insertHTML", false, html);
-    // Wire placeholder clearing for text controls
-    var el = document.getElementById(id);
-    if (el && (kind === "richtext" || kind === "plain")) {
-      el.addEventListener("focus", function () {
-        var ph = el.querySelector(".cc-placeholder");
-        if (ph) ph.remove();
-      });
-      if (kind === "plain") {
-        el.addEventListener("keydown", function (e) {
-          if (e.key === "Enter") e.preventDefault(); // plain text = no line breaks
-        });
-      }
-    }
-    closeModal("contentControlsModal");
-    schedulePaginate();
-    scheduleAutosave();
-    toast("Content control inserted", "success");
   }
 
   /* ---------------- Immersive reader ---------------- */
@@ -7714,7 +7881,7 @@
     items.push({ name: "Comments", count: commentsCount + (commentsCount === 1 ? " comment" : " comments"), removable: commentsCount > 0, action: function () { comments = []; renderComments(); scheduleAutosave(); toast("Comments removed", "success"); } });
     items.push({ name: "Tracked changes (insertions)", count: trackedIns + " ins", removable: trackedIns > 0, action: function () { var all = document.querySelectorAll(".page-content ins.zdocs-ins"); for (var i = 0; i < all.length; i++) unwrapNode(all[i]); schedulePaginate(); scheduleAutosave(); toast("Insertions accepted", "success"); } });
     items.push({ name: "Tracked changes (deletions)", count: trackedDel + " del", removable: trackedDel > 0, action: function () { var all = document.querySelectorAll(".page-content del.zdocs-del"); for (var i = 0; i < all.length; i++) { var p = all[i].parentNode; if (p) p.removeChild(all[i]); } schedulePaginate(); scheduleAutosave(); toast("Deletions removed", "success"); } });
-    items.push({ name: "Bookmarks", count: hiddenBookmarks + (hiddenBookmarks === 1 ? " bookmark" : " bookmarks"), removable: hiddenBookmarks > 0, action: function () { var all = document.querySelectorAll(".page-content a.zdocs-bookmark"); for (var i = 0; i < all.length; i++) { var p = all[i].parentNode; if (p) p.removeChild(all[i]); } bookmarks = []; saveBookmarks(); schedulePaginate(); scheduleAutosave(); toast("Bookmarks removed", "success"); } });
+    items.push({ name: "Bookmarks", count: hiddenBookmarks + (hiddenBookmarks === 1 ? " bookmark" : " bookmarks"), removable: hiddenBookmarks > 0, action: function () { var all = document.querySelectorAll(".page-content a.zdocs-bookmark"); for (var i = 0; i < all.length; i++) { var p = all[i].parentNode; if (p) p.removeChild(all[i]); } schedulePaginate(); scheduleAutosave(); toast("Bookmarks removed", "success"); } });
     items.push({ name: "Footnotes", count: fnCount + (fnCount === 1 ? " footnote" : " footnotes"), removable: fnCount > 0, action: function () { var refs = document.querySelectorAll(".page-content sup.footnote-ref, .page-content sup.endnote-ref"); for (var i = 0; i < refs.length; i++) { var p = refs[i].parentNode; if (p) p.removeChild(refs[i]); } footnotes = []; saveFootnotes(); renderFootnotes(); renderFootnotesSection(); schedulePaginate(); scheduleAutosave(); toast("Footnotes removed", "success"); } });
     items.push({ name: "Last saved", count: lastSaved ? formatTime(lastSaved) : "never", removable: false });
     items.push({ name: "Page count", count: pages.length + (pages.length === 1 ? " page" : " pages"), removable: false });
@@ -7750,166 +7917,9 @@
     toast("All removable metadata cleared", "success");
   }
 
-  /* ---------------- Macros ---------------- */
-  var macroRecording = false;
-  var macroSteps = [];
-  var savedMacros = [];
-  var MACROS_KEY = "zdocs.macros";
-
-  function openMacrosDialog() {
-    loadMacros();
-    renderMacrosList();
-    openModal("macrosModal");
-  }
-
-  function startMacroRecording() {
-    macroRecording = true;
-    macroSteps = [];
-    $("macroRecord").classList.add("recording");
-    $("macroRecord").disabled = true;
-    $("macroStop").disabled = false;
-    toast("Recording… apply formatting now, then click Stop", "success");
-    // Hook exec commands
-    document.addEventListener("mousedown", captureMacroClick, true);
-  }
-
-  function captureMacroClick(e) {
-    if (!macroRecording) return;
-    var btn = e.target.closest("[data-cmd]");
-    if (btn) {
-      macroSteps.push({ type: "cmd", cmd: btn.getAttribute("data-cmd") });
-    } else {
-      var selBtn = e.target.closest("select");
-      if (selBtn && (selBtn.id === "fontFamily" || selBtn.id === "fontSize" || selBtn.id === "blockType" || selBtn.id === "lineSpacing")) {
-        // capture on change instead
-      }
-    }
-  }
-
-  function stopMacroRecording() {
-    macroRecording = false;
-    $("macroRecord").classList.remove("recording");
-    $("macroRecord").disabled = false;
-    $("macroStop").disabled = true;
-    $("macroPlay").disabled = macroSteps.length === 0;
-    $("macroSave").disabled = macroSteps.length === 0;
-    document.removeEventListener("mousedown", captureMacroClick, true);
-    toast("Recorded " + macroSteps.length + " steps", "success");
-  }
-
-  function playLastMacro() {
-    if (macroSteps.length === 0 && savedMacros.length === 0) { toast("No macro to play", "error"); return; }
-    playMacroSteps(macroSteps.length > 0 ? macroSteps : savedMacros[savedMacros.length - 1].steps);
-  }
-
-  function playMacroSteps(steps) {
-    if (!steps || steps.length === 0) return;
-    var i = 0;
-    function next() {
-      if (i >= steps.length) { toast("Macro playback complete", "success"); return; }
-      var s = steps[i++];
-      if (s.type === "cmd") {
-        restoreEditorSelection();
-        try { document.execCommand(s.cmd, false, null); } catch (e) {}
-        schedulePaginate();
-      }
-      setTimeout(next, 80);
-    }
-    next();
-  }
-
-  function saveCurrentMacro() {
-    if (macroSteps.length === 0) { toast("Nothing to save", "error"); return; }
-    var name = window.prompt("Macro name:", "Macro " + (savedMacros.length + 1));
-    if (!name) return;
-    savedMacros.push({ name: name, steps: macroSteps.slice(), ts: Date.now() });
-    saveMacros();
-    renderMacrosList();
-    toast("Macro saved: " + name, "success");
-  }
-
-  function saveMacros() {
-    try {
-      if (idbAvailable()) idb.setJSON(MACROS_KEY, savedMacros);
-      else localStorage.setItem(MACROS_KEY, JSON.stringify(savedMacros));
-    } catch (e) {}
-  }
-
-  function loadMacros() {
-    try {
-      var m = null;
-      if (idbAvailable()) m = idb.getJSONSync(MACROS_KEY);
-      if (!m) { var raw = localStorage.getItem(MACROS_KEY); if (raw) m = JSON.parse(raw); }
-      if (Array.isArray(m)) savedMacros = m;
-    } catch (e) {}
-  }
-
-  function renderMacrosList() {
-    var list = $("macrosList");
-    list.innerHTML = "";
-    if (savedMacros.length === 0) {
-      var empty = document.createElement("p");
-      empty.className = "outline-empty";
-      empty.textContent = "No saved macros. Record one and click Save as…";
-      list.appendChild(empty);
-      return;
-    }
-    for (var i = 0; i < savedMacros.length; i++) {
-      (function (m, idx) {
-        var item = document.createElement("div");
-        item.className = "macro-item";
-        var name = document.createElement("span");
-        name.className = "macro-name";
-        name.textContent = m.name;
-        var steps = document.createElement("span");
-        steps.className = "macro-steps";
-        steps.textContent = m.steps.length + " steps";
-        var play = document.createElement("button");
-        play.className = "macro-play";
-        play.textContent = "Play";
-        play.addEventListener("click", function () {
-          closeModal("macrosModal");
-          playMacroSteps(m.steps);
-        });
-        var del = document.createElement("button");
-        del.className = "macro-del";
-        del.textContent = "×";
-        del.title = "Delete macro";
-        del.addEventListener("click", function () {
-          savedMacros.splice(idx, 1);
-          saveMacros();
-          renderMacrosList();
-        });
-        item.appendChild(name);
-        item.appendChild(steps);
-        item.appendChild(play);
-        item.appendChild(del);
-        list.appendChild(item);
-      })(savedMacros[i], i);
-    }
-  }
-
   /* ---------------- Wire up round 2 features ---------------- */
   function initRound2Features() {
     initStatusBarControls();
-
-    // Mail merge
-    var bMM = $("btnStartMailMerge");
-    if (bMM) { bMM.addEventListener("mousedown", function (e) { e.preventDefault(); }); bMM.addEventListener("click", openMailMergeDialog); }
-    var bSR = $("btnSelectRecipients");
-    if (bSR) { bSR.addEventListener("mousedown", function (e) { e.preventDefault(); }); bSR.addEventListener("click", openMailMergeDialog); }
-    var bMergeRun = $("mergeRunBtn");
-    if (bMergeRun) bMergeRun.addEventListener("click", runMailMerge);
-    var bIMF = $("btnInsertMergeField");
-    if (bIMF) { bIMF.addEventListener("mousedown", function (e) { e.preventDefault(); }); bIMF.addEventListener("click", function () { openMailMergeDialog(); toast("Click a field chip to insert it", "success"); }); }
-
-    // Content controls
-    var bCC = $("btnContentControls");
-    if (bCC) { bCC.addEventListener("mousedown", function (e) { e.preventDefault(); }); bCC.addEventListener("click", openContentControlsDialog); }
-    var ccBtns = document.querySelectorAll(".cc-btn");
-    for (var c = 0; c < ccBtns.length; c++) {
-      (function (b) { b.addEventListener("click", function () { insertContentControl(b.getAttribute("data-cc")); }); })(ccBtns[c]);
-    }
 
     // Immersive reader
     var bIR = $("btnImmersiveReader");
@@ -7941,19 +7951,6 @@
     var bInsRm = $("inspectorRemoveAll");
     if (bInsRm) bInsRm.addEventListener("click", inspectorRemoveAll);
 
-    // Macros
-    var bMac = $("btnMacros");
-    if (bMac) { bMac.addEventListener("mousedown", function (e) { e.preventDefault(); }); bMac.addEventListener("click", openMacrosDialog); }
-    var bMacRec = $("macroRecord");
-    if (bMacRec) bMacRec.addEventListener("click", startMacroRecording);
-    var bMacStop = $("macroStop");
-    if (bMacStop) bMacStop.addEventListener("click", stopMacroRecording);
-    var bMacPlay = $("macroPlay");
-    if (bMacPlay) bMacPlay.addEventListener("click", playLastMacro);
-    var bMacSave = $("macroSave");
-    if (bMacSave) bMacSave.addEventListener("click", saveCurrentMacro);
-
-
     // Round 3: editor context menu + section break wiring done in initNewFeatures
     initEditorContextMenu();
     initRound4Features();
@@ -7963,8 +7960,7 @@
   }
 
   /* =========================================================
-     Round 4 — tooltips, live merge preview, macro select
-     recording, word count live
+     Round 4 — tooltips, live merge preview, word count live
      ========================================================= */
 
   /* ---------------- Rich tooltips ---------------- */
@@ -7975,8 +7971,8 @@
     richTip = document.createElement("div");
     richTip.className = "rich-tip";
     document.body.appendChild(richTip);
-    // Attach to all ribbon buttons, topbar actions, status bar buttons
-    var selectors = ".ribbon-btn, .topbar-action, .ribbon-tab, .page-nav, .session-timer, .version-count, .status-zoom-btn, .status-lang, .toolbar-stats";
+    // Attach to all ribbon buttons, topbar actions, status bar items
+    var selectors = ".ribbon-btn, .topbar-action, .ribbon-tab, .statbar-toggle, .session-timer, .status-lang, .toolbar-stats";
     var els = document.querySelectorAll(selectors);
     for (var i = 0; i < els.length; i++) {
       attachTooltip(els[i]);
@@ -8016,99 +8012,6 @@
     });
   }
 
-  /* ---------------- Live merge preview ---------------- */
-  var mergePreviewIndex = -1;
-  function previewMergeRecipient(delta) {
-    if (!mergeData || mergeData.rows.length === 0) {
-      toast("Paste CSV data first (Mailings → Start)", "error");
-      return;
-    }
-    if (delta === 0) {
-      // reset
-      clearMergePreview();
-      return;
-    }
-    mergePreviewIndex += delta;
-    if (mergePreviewIndex < 0) mergePreviewIndex = mergeData.rows.length - 1;
-    if (mergePreviewIndex >= mergeData.rows.length) mergePreviewIndex = 0;
-    applyMergePreview(mergeData.rows[mergePreviewIndex]);
-    toast("Previewing recipient " + (mergePreviewIndex + 1) + " of " + mergeData.rows.length, "success");
-  }
-
-  function applyMergePreview(row) {
-    if (!mergeData) return;
-    var fields = document.querySelectorAll(".merge-field[data-field]");
-    for (var i = 0; i < fields.length; i++) {
-      var fieldName = fields[i].getAttribute("data-field");
-      var idx = mergeData.fields.indexOf(fieldName);
-      var value = idx >= 0 ? (row[idx] || "") : "";
-      fields[i].textContent = "«" + fieldName + "» = " + value;
-      fields[i].classList.add("preview-active");
-    }
-  }
-
-  function clearMergePreview() {
-    mergePreviewIndex = -1;
-    var fields = document.querySelectorAll(".merge-field.preview-active");
-    for (var i = 0; i < fields.length; i++) {
-      var fieldName = fields[i].getAttribute("data-field");
-      fields[i].textContent = "«" + fieldName + "»";
-      fields[i].classList.remove("preview-active");
-    }
-  }
-
-  /* ---------------- Macro recording of select changes ---------------- */
-  // Enhance the existing macro recording to also capture select changes
-  // (font family, font size, paragraph style, line spacing).
-  function wireMacroSelectCapture() {
-    var selectIds = ["fontFamily", "fontSize", "blockType", "lineSpacing"];
-    for (var i = 0; i < selectIds.length; i++) {
-      var sel = $(selectIds[i]);
-      if (sel && !sel.getAttribute("data-macro-wired")) {
-        sel.setAttribute("data-macro-wired", "1");
-        (function (selEl, selId) {
-          selEl.addEventListener("change", function () {
-            if (!macroRecording) return;
-            macroSteps.push({ type: "select", id: selId, value: selEl.value });
-          });
-        })(sel, selectIds[i]);
-      }
-    }
-  }
-
-  // Override playMacroSteps to handle select steps
-  var _origPlayMacroSteps = playMacroSteps;
-  playMacroSteps = function (steps) {
-    if (!steps || steps.length === 0) return;
-    var i = 0;
-    function next() {
-      if (i >= steps.length) { toast("Macro playback complete", "success"); return; }
-      var s = steps[i++];
-      if (s.type === "cmd") {
-        restoreEditorSelection();
-        try { document.execCommand(s.cmd, false, null); } catch (e) {}
-        schedulePaginate();
-      } else if (s.type === "select") {
-        var sel = $(s.id);
-        if (sel) {
-          sel.value = s.value;
-          // trigger the change handler
-          var ev = new Event("change", { bubbles: true });
-          sel.dispatchEvent(ev);
-        }
-      } else if (s.type === "color") {
-        // replay color picks — temporarily disable recording to avoid loop
-        var wasRecording = macroRecording;
-        macroRecording = false;
-        if (s.target === "text") applyTextColor(s.value);
-        else if (s.target === "hilite") applyHiliteColor(s.value);
-        macroRecording = wasRecording;
-      }
-      setTimeout(next, 80);
-    }
-    next();
-  };
-
   /* ---------------- Live word count in status bar polish ---------------- */
   // The existing updateStatus handles word count; here we add a subtle
   // count-up animation when the word count changes.
@@ -8124,19 +8027,8 @@
   }
 
   function initRound4Features() {
-    initTooltips();
-    wireMacroSelectCapture();
-    // Wire merge preview buttons (Preview Results + Highlight Merge)
-    var bPreview = $("btnPreviewResults");
-    if (bPreview) {
-      bPreview.addEventListener("mousedown", function (e) { e.preventDefault(); });
-      bPreview.addEventListener("click", function () { previewMergeRecipient(1); });
-    }
-    var bHighlight = $("btnHighlightMerge");
-    if (bHighlight) {
-      bHighlight.addEventListener("mousedown", function (e) { e.preventDefault(); });
-      bHighlight.addEventListener("click", function () { clearMergePreview(); toast("Merge preview cleared", "success"); });
-    }
+    // Custom rich tooltips removed (Slides parity) — buttons keep their
+    // native title= tooltips.
 
     // Round 6: ripple effect + table cell right-click
     initRippleEffect();
@@ -8145,7 +8037,8 @@
 
   /* ---------------- Button ripple effect ---------------- */
   function initRippleEffect() {
-    var btns = document.querySelectorAll(".ribbon-btn, .topbar-action, .btn");
+    // Slides parity: no ripple on ribbon buttons — keep it for other chrome buttons only
+    var btns = document.querySelectorAll(".topbar-action, .btn");
     for (var i = 0; i < btns.length; i++) {
       (function (btn) {
         if (btn.getAttribute("data-ripple-wired")) return;

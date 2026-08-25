@@ -1,17 +1,19 @@
 <!DOCTYPE html>
+<!-- BUILD 2026-08-25.10 (Layout > Zoom: percentage counter label removed; 4 zoom buttons + status-bar % remain) -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EmeraldSuite: Docs — Word Processor</title>
+  <title>EmeraldSuite | Docs</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Caveat&family=Courier+Prime&family=Georgia&display=swap"
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&family=Caveat&family=Courier+Prime&family=Georgia&display=swap"
     rel="stylesheet"
   />
   <link rel="stylesheet" href="/assets/styles/style.css" />
   <link rel="stylesheet" href="/assets/styles/docs.css" />
+  <link rel="icon" type="image/x-icon" href="/assets/images/docsicon.webp">
 </head>
 <body>
   <div class="app" id="app">
@@ -42,7 +44,7 @@
     <header class="navbar sticky-top">
       <div class="navcontainer nav-container">
         <a href="/" class="logo">
-          <span class="brand-mark">E</span>
+          <img src="/assets/images/docsicon.webp" width="30" height="30" class="icon-primary" alt="Docs">
           <span class="logo-text">EmeraldSuite</span>
         </a>
         <nav class="nav-links">
@@ -61,15 +63,15 @@
         <button class="ribbon-tab" data-tab="insert">Insert</button>
         <button class="ribbon-tab" data-tab="layout">Layout</button>
         <button class="ribbon-tab" data-tab="references">References</button>
-        <button class="ribbon-tab" data-tab="mailings">Mailings</button>
         <button class="ribbon-tab" data-tab="review">Review</button>
         <button class="ribbon-tab" data-tab="view">View</button>
-        <button class="ribbon-tab" data-tab="developer">Developer</button>
-        <button class="ribbon-tab" data-tab="help">Help</button>
         <span class="ribbon-tab-indicator visible" id="ribbonTabIndicator" aria-hidden="true"></span>
       </div>
       <div class="ribbon-tabs-right">
-        <span class="toolbar-stats" id="wordCount" title="Word count">0 words</span>
+        <button class="ribbon-tab-action" id="btnPrint" title="Print (Ctrl+P)" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>Print</span>
+        </button>
       </div>
     </div>
 
@@ -95,11 +97,31 @@
             </div>
           </div>
 
-          <!-- Font -->
+          <!-- Clipboard -->
           <div class="ribbon-group">
+            <div class="group-label">Clipboard</div>
+            <div class="ribbon-controls">
+              <button class="ribbon-btn" data-cmd="cut" title="Cut (Ctrl+X)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                <span>Cut</span>
+              </button>
+              <button class="ribbon-btn" data-cmd="copy" title="Copy (Ctrl+C)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Copy</span>
+              </button>
+              <button class="ribbon-btn" data-cmd="paste" title="Paste (Ctrl+V)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                <span>Paste</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Font -->
+          <div class="ribbon-group" id="textFormatGroup">
             <div class="group-label">Font</div>
-            <div class="ribbon-controls ribbon-controls-row">
-              <select id="fontFamily" class="select" title="Font">
+            <div class="ribbon-controls">
+              <!-- hidden native selects kept for JS compatibility (state sync) -->
+              <select id="fontFamily" class="select" title="Font" hidden>
                 <option value="DM Sans, Arial, sans-serif">DM Sans</option>
                 <option value="Arial, sans-serif">Arial</option>
                 <option value="Georgia, serif">Georgia</option>
@@ -107,101 +129,194 @@
                 <option value="'Courier Prime', monospace">Courier</option>
                 <option value="Caveat, cursive">Caveat</option>
               </select>
-              <select id="fontSize" class="select narrow" title="Font size">
-                <option value="2">10</option>
-                <option value="3" selected>12</option>
-                <option value="4">14</option>
-                <option value="5">18</option>
-                <option value="6">24</option>
-                <option value="7">36</option>
+              <select id="fontSize" class="select narrow" title="Font size" hidden>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+                <option value="11">11</option>
+                <option value="12" selected>12</option>
+                <option value="14">14</option>
+                <option value="16">16</option>
+                <option value="18">18</option>
+                <option value="20">20</option>
+                <option value="24">24</option>
+                <option value="28">28</option>
+                <option value="32">32</option>
+                <option value="36">36</option>
+                <option value="48">48</option>
+                <option value="72">72</option>
               </select>
-            <div class="font-controls">
-              <button class="ribbon-btn" data-cmd="bold" title="Bold (Ctrl+B)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="italic" title="Italic (Ctrl+I)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="underline" title="Underline (Ctrl+U)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="strikeThrough" title="Strikethrough">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><path d="M16 6C14.5 4 12 4 12 4C9.5 4 7.5 5.5 7.5 7.5C7.5 9.5 9 10.5 12 11.5"/><path d="M8.5 16.5C9.5 18.5 12 20 12 20C14.5 20 16.5 18.5 16.5 16.5"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="subscript" title="Subscript">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5l8 8m0-8L4 13"/><text x="13" y="19" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="superscript" title="Superscript">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9l8 8m0-8L4 17"/><text x="13" y="9" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>
-              </button>
-            </div>
-              <label class="color-tool" title="Text color">
-                <span class="color-glyph">A</span>
-                <span class="color-bar" id="textColorBar"></span>
-                <input type="color" id="textColor" value="#1a1a1a" />
-              </label>
-              <label class="color-tool" title="Highlight color">
-                <span class="color-glyph hl-glyph">H</span>
-                <span class="color-bar" id="hiliteColorBar"></span>
-                <input type="color" id="hiliteColor" value="#fff59d" />
-              </label>
+
+              <div class="ms-dropdown" id="fontFamilyDropdown">
+                <button class="ms-dropdown-btn" type="button" style="min-width:110px;">
+                  <span class="dropdown-value">DM Sans</span>
+                </button>
+                <div class="ms-dropdown-menu" style="max-height:280px;">
+                  <div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">Sans-Serif</div>
+                  <div class="ms-dropdown-item" data-value="DM Sans, Arial, sans-serif" data-label="DM Sans" style="font-family:DM Sans,sans-serif;">DM Sans</div>
+                  <div class="ms-dropdown-item" data-value="Arial, sans-serif" data-label="Arial" style="font-family:Arial,sans-serif;">Arial</div>
+                  <div class="ms-dropdown-item" data-value="Helvetica, sans-serif" data-label="Helvetica" style="font-family:Helvetica,sans-serif;">Helvetica</div>
+                  <div class="ms-dropdown-item" data-value="Verdana, sans-serif" data-label="Verdana" style="font-family:Verdana,sans-serif;">Verdana</div>
+                  <div class="ms-dropdown-item" data-value="Roboto, sans-serif" data-label="Roboto" style="font-family:Roboto,sans-serif;">Roboto</div>
+                  <div class="ms-dropdown-item" data-value="Open Sans, sans-serif" data-label="Open Sans" style="font-family:Open Sans,sans-serif;">Open Sans</div>
+                  <div class="ms-dropdown-item" data-value="Lato, sans-serif" data-label="Lato" style="font-family:Lato,sans-serif;">Lato</div>
+                  <div class="ms-dropdown-item" data-value="Montserrat, sans-serif" data-label="Montserrat" style="font-family:Montserrat,sans-serif;">Montserrat</div>
+                  <div class="ms-dropdown-item" data-value="Poppins, sans-serif" data-label="Poppins" style="font-family:Poppins,sans-serif;">Poppins</div>
+                  <div class="ms-dropdown-item" data-value="Nunito, sans-serif" data-label="Nunito" style="font-family:Nunito,sans-serif;">Nunito</div>
+                  <div class="ms-dropdown-item" data-value="Ubuntu, sans-serif" data-label="Ubuntu" style="font-family:Ubuntu,sans-serif;">Ubuntu</div>
+                  <div class="ms-dropdown-item" data-value="Raleway, sans-serif" data-label="Raleway" style="font-family:Raleway,sans-serif;">Raleway</div>
+                  <div class="ms-dropdown-item" data-value="Oswald, sans-serif" data-label="Oswald" style="font-family:Oswald,sans-serif;">Oswald</div>
+                  <div class="ms-dropdown-item" data-value="Work Sans, sans-serif" data-label="Work Sans" style="font-family:Work Sans,sans-serif;">Work Sans</div>
+                  <div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">Serif</div>
+                  <div class="ms-dropdown-item" data-value="Georgia, serif" data-label="Georgia" style="font-family:Georgia,serif;">Georgia</div>
+                  <div class="ms-dropdown-item" data-value="'Times New Roman', serif" data-label="Times New Roman" style="font-family:Times New Roman,serif;">Times New Roman</div>
+                  <div class="ms-dropdown-item" data-value="Merriweather, serif" data-label="Merriweather" style="font-family:Merriweather,serif;">Merriweather</div>
+                  <div class="ms-dropdown-item" data-value="Lora, serif" data-label="Lora" style="font-family:Lora,serif;">Lora</div>
+                  <div class="ms-dropdown-item" data-value="Libre Baskerville, serif" data-label="Libre Baskerville" style="font-family:Libre Baskerville,serif;">Libre Baskerville</div>
+                  <div class="ms-dropdown-item" data-value="DM Serif Display, serif" data-label="DM Serif Display" style="font-family:DM Serif Display,serif;">DM Serif Display</div>
+                  <div class="ms-dropdown-item" data-value="Crimson Text, serif" data-label="Crimson Text" style="font-family:Crimson Text,serif;">Crimson Text</div>
+                  <div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">Monospace</div>
+                  <div class="ms-dropdown-item" data-value="'Courier Prime', monospace" data-label="Courier" style="font-family:Courier Prime,monospace;">Courier</div>
+                  <div class="ms-dropdown-item" data-value="Fira Code, monospace" data-label="Fira Code" style="font-family:Fira Code,monospace;">Fira Code</div>
+                  <div class="ms-dropdown-item" data-value="IBM Plex Mono, monospace" data-label="IBM Plex Mono" style="font-family:IBM Plex Mono,monospace;">IBM Plex Mono</div>
+                  <div class="ms-dropdown-item" data-value="Courier New, monospace" data-label="Courier New" style="font-family:Courier New,monospace;">Courier New</div>
+                  <div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">Handwriting</div>
+                  <div class="ms-dropdown-item" data-value="Dancing Script, cursive" data-label="Dancing Script" style="font-family:Dancing Script,cursive;">Dancing Script</div>
+                  <div class="ms-dropdown-item" data-value="Caveat, cursive" data-label="Caveat" style="font-family:Caveat,cursive;">Caveat</div>
+                  <div class="ms-dropdown-item" data-value="Pacifico, cursive" data-label="Pacifico" style="font-family:Pacifico,cursive;">Pacifico</div>
+                  <div class="ms-dropdown-item" data-value="Lobster, cursive" data-label="Lobster" style="font-family:Lobster,cursive;">Lobster</div>
+                  <div class="ms-dropdown-item" data-value="Permanent Marker, cursive" data-label="Permanent Marker" style="font-family:Permanent Marker,cursive;">Permanent Marker</div>
+                </div>
+              </div>
+              <div class="ms-dropdown" id="fontSizeDropdown">
+                <button class="ms-dropdown-btn" type="button" style="min-width:60px;">
+                  <span class="dropdown-value">12</span>
+                </button>
+                <div class="ms-dropdown-menu">
+                  <div class="ms-dropdown-item" data-value="8" data-label="8">8</div>
+                  <div class="ms-dropdown-item" data-value="9" data-label="9">9</div>
+                  <div class="ms-dropdown-item" data-value="10" data-label="10">10</div>
+                  <div class="ms-dropdown-item" data-value="11" data-label="11">11</div>
+                  <div class="ms-dropdown-item" data-value="12" data-label="12">12</div>
+                  <div class="ms-dropdown-item" data-value="14" data-label="14">14</div>
+                  <div class="ms-dropdown-item" data-value="16" data-label="16">16</div>
+                  <div class="ms-dropdown-item" data-value="18" data-label="18">18</div>
+                  <div class="ms-dropdown-item" data-value="20" data-label="20">20</div>
+                  <div class="ms-dropdown-item" data-value="24" data-label="24">24</div>
+                  <div class="ms-dropdown-item" data-value="28" data-label="28">28</div>
+                  <div class="ms-dropdown-item" data-value="32" data-label="32">32</div>
+                  <div class="ms-dropdown-item" data-value="36" data-label="36">36</div>
+                  <div class="ms-dropdown-item" data-value="48" data-label="48">48</div>
+                  <div class="ms-dropdown-item" data-value="72" data-label="72">72</div>
+                </div>
+              </div>
+              <div class="font-controls">
+                <button class="ribbon-btn format-btn" data-cmd="bold" title="Bold (Ctrl+B)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+                </button>
+                <button class="ribbon-btn format-btn" data-cmd="italic" title="Italic (Ctrl+I)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+                </button>
+                <button class="ribbon-btn format-btn" data-cmd="underline" title="Underline (Ctrl+U)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+                </button>
+                <button class="ribbon-btn format-btn" data-cmd="strikeThrough" title="Strikethrough">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><path d="M16 6C14.5 4 12 4 12 4C9.5 4 7.5 5.5 7.5 7.5C7.5 9.5 9 10.5 12 11.5"/><path d="M8.5 16.5C9.5 18.5 12 20 12 20C14.5 20 16.5 18.5 16.5 16.5"/></svg>
+                </button>
+                <button class="ribbon-btn format-btn" data-cmd="subscript" title="Subscript">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5l8 8m0-8L4 13"/><text x="13" y="19" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>
+                </button>
+                <button class="ribbon-btn format-btn" data-cmd="superscript" title="Superscript">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9l8 8m0-8L4 17"/><text x="13" y="9" font-size="8" fill="currentColor" stroke="none" font-weight="700">2</text></svg>
+                </button>
+              </div>
+              <!-- hidden native color inputs kept for JS compatibility -->
+              <input type="color" id="textColor" value="#1a1a1a" hidden />
+              <input type="color" id="hiliteColor" value="#fff59d" hidden />
+              <div class="ms-dropdown" id="fontColorDropdown">
+                <button class="ms-dropdown-btn" type="button" style="min-width: 80px;">
+                  <span class="color-preview" style="background: #000000; width: 12px; height: 12px; border-radius: 2px; display: inline-block; margin-right: 6px;"></span>
+                  <span class="dropdown-value">Text</span>
+                </button>
+                <div class="ms-dropdown-menu">
+                  <div class="ms-dropdown-item" data-value="#000000" data-label="Black"><span class="color-preview" style="background:#000000;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Black</div>
+                  <div class="ms-dropdown-item" data-value="#333333" data-label="Dark Gray"><span class="color-preview" style="background:#333333;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Dark Gray</div>
+                  <div class="ms-dropdown-item" data-value="#888888" data-label="Gray"><span class="color-preview" style="background:#888888;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Gray</div>
+                  <div class="ms-dropdown-item" data-value="#FF0000" data-label="Red"><span class="color-preview" style="background:#FF0000;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Red</div>
+                  <div class="ms-dropdown-item" data-value="#FF6600" data-label="Orange"><span class="color-preview" style="background:#FF6600;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Orange</div>
+                  <div class="ms-dropdown-item" data-value="#FFD700" data-label="Gold"><span class="color-preview" style="background:#FFD700;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Gold</div>
+                  <div class="ms-dropdown-item" data-value="#008000" data-label="Green"><span class="color-preview" style="background:#008000;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Green</div>
+                  <div class="ms-dropdown-item" data-value="#2ecc71" data-label="Lime"><span class="color-preview" style="background:#BFFF00;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Lime</div>
+                  <div class="ms-dropdown-item" data-value="#0000FF" data-label="Blue"><span class="color-preview" style="background:#0000FF;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Blue</div>
+                  <div class="ms-dropdown-item" data-value="#1E90FF" data-label="Cyan"><span class="color-preview" style="background:#00FFFF;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Cyan</div>
+                  <div class="ms-dropdown-item" data-value="#800080" data-label="Purple"><span class="color-preview" style="background:#800080;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Purple</div>
+                  <div class="ms-dropdown-item" data-value="#FF1493" data-label="Pink"><span class="color-preview" style="background:#FF1493;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Pink</div>
+                  <div class="ms-dropdown-item" data-value="#8B4513" data-label="Brown"><span class="color-preview" style="background:#8B4513;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Brown</div>
+                </div>
+              </div>
+              <div class="ms-dropdown" id="highlightColorDropdown">
+                <button class="ms-dropdown-btn" type="button" style="min-width: 90px;">
+                  <span class="color-preview" style="background: transparent; width: 12px; height: 12px; border-radius: 2px; border: 1px solid #ccc; display: inline-block; margin-right: 6px;"></span>
+                  <span class="dropdown-value">Highlight</span>
+                </button>
+                <div class="ms-dropdown-menu">
+                  <div class="ms-dropdown-item" data-value="#FFFF00" data-label="Yellow"><span class="color-preview" style="background:#FFFF00;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Yellow</div>
+                  <div class="ms-dropdown-item" data-value="#FFD700" data-label="Gold"><span class="color-preview" style="background:#FFD700;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Gold</div>
+                  <div class="ms-dropdown-item" data-value="#90EE90" data-label="Light Green"><span class="color-preview" style="background:#90EE90;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Light Green</div>
+                  <div class="ms-dropdown-item" data-value="#98FB98" data-label="Pale Green"><span class="color-preview" style="background:#98FB98;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Pale Green</div>
+                  <div class="ms-dropdown-item" data-value="#FFB6C1" data-label="Light Pink"><span class="color-preview" style="background:#FFB6C1;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Light Pink</div>
+                  <div class="ms-dropdown-item" data-value="#FF8C69" data-label="Salmon"><span class="color-preview" style="background:#FF8C69;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Salmon</div>
+                  <div class="ms-dropdown-item" data-value="#ADD8E6" data-label="Light Blue"><span class="color-preview" style="background:#ADD8E6;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Light Blue</div>
+                  <div class="ms-dropdown-item" data-value="#87CEFA" data-label="Sky Blue"><span class="color-preview" style="background:#87CEFA;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Sky Blue</div>
+                  <div class="ms-dropdown-item" data-value="#DDA0DD" data-label="Plum"><span class="color-preview" style="background:#DDA0DD;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Plum</div>
+                  <div class="ms-dropdown-item" data-value="#FFDAB9" data-label="Peach"><span class="color-preview" style="background:#FFDAB9;width:12px;height:12px;border-radius:2px;display:inline-block;margin-right:6px;"></span>Peach</div>
+                  <div class="ms-dropdown-item" data-value="transparent" data-label="Clear"><span class="color-preview" style="background:transparent;width:12px;height:12px;border:1px solid #ccc;border-radius:2px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#888;margin-right:6px;">&#10005;</span>Clear</div>
+                </div>
+              </div>
             </div>
           </div>
 
           <!-- Paragraph -->
-          <div class="ribbon-group">
+          <div class="ribbon-group" id="paragraphGroup">
             <div class="group-label">Paragraph</div>
-            <div class="ribbon-controls ribbon-controls-row">
-              <select id="blockType" class="select" title="Paragraph style">
-                <option value="p">Plain text</option>
-                <option value="h1">Title</option>
-                <option value="h2">Heading 1</option>
-                <option value="h3">Heading 2</option>
-                <option value="h4">Heading 3</option>
-                <option value="blockquote">Quote</option>
-                <option value="pre">Code block</option>
-              </select>
-              <button class="ribbon-btn" data-cmd="justifyLeft" title="Align left">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="justifyCenter" title="Align center">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="justifyRight" title="Align right">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="justifyFull" title="Justify">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="insertUnorderedList" title="Bullet list">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.5"/><circle cx="3.5" cy="12" r="1.5"/><circle cx="3.5" cy="18" r="1.5"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="insertOrderedList" title="Numbered list">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H3l2-3h1v3"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="outdent" title="Decrease indent">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><path d="M7 9l-3 3 3 3"/></svg>
-              </button>
-              <button class="ribbon-btn" data-cmd="indent" title="Increase indent">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><path d="M3 9l3 3-3 3"/></svg>
-              </button>
-              <select id="lineSpacing" class="select narrow" title="Line spacing">
-                <option value="1">1.0</option>
-                <option value="1.15">1.15</option>
-                <option value="1.5" selected>1.5</option>
-                <option value="2">2.0</option>
-                <option value="2.5">2.5</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Clear -->
-          <div class="ribbon-group">
-            <div class="group-label">Edit</div>
             <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnClearFormat" title="Clear formatting">
-                <svg viewBox="0 0 24 24"><path d="M4 7V5h16v2"/><path d="M9 19l4-9 4 9"/><line x1="7" y1="19" x2="19" y2="19"/><line x1="3" y1="3" x2="21" y2="21"/></svg>
-                <span>Clear</span>
+              <button class="ribbon-btn format-btn" data-cmd="justifyLeft" title="Align Left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+              </button>
+              <button class="ribbon-btn format-btn" data-cmd="justifyCenter" title="Align Center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
+              </button>
+              <button class="ribbon-btn format-btn" data-cmd="justifyRight" title="Align Right">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+              </button>
+              <button class="ribbon-btn format-btn" data-cmd="justifyFull" title="Justify">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
+              <button class="ribbon-btn format-btn" data-cmd="insertUnorderedList" title="Bullet List">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+              </button>
+              <button class="ribbon-btn format-btn" data-cmd="insertOrderedList" title="Numbered List">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="10" y1="6" x2="21" y2="6" />
+                  <line x1="10" y1="12" x2="21" y2="12" />
+                  <line x1="10" y1="18" x2="21" y2="18" />
+                  <path d="M4 6h1v4" />
+                  <path d="M4 10h2" />
+                  <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+                </svg>
+              </button>
+              <button class="ribbon-btn format-btn" data-cmd="outdent" title="Decrease Indent">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><path d="M7 9l-3 3 3 3"/></svg>
+              </button>
+              <button class="ribbon-btn format-btn" data-cmd="indent" title="Increase Indent">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><path d="M3 9l3 3-3 3"/></svg>
               </button>
             </div>
           </div>
@@ -256,19 +371,11 @@
                 <svg viewBox="0 0 24 24"><text x="3" y="20" font-size="20" font-weight="700" fill="currentColor">A</text><text x="13" y="20" font-size="11" fill="currentColor">bc</text></svg>
                 <span>Drop Cap</span>
               </button>
-              <button class="ribbon-btn" id="btnTextBox" title="Text box">
-                <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1"/><line x1="7" y1="11" x2="17" y2="11"/><line x1="7" y1="14" x2="14" y2="14"/></svg>
-                <span>Text Box</span>
-              </button>
             </div>
           </div>
           <div class="ribbon-group">
             <div class="group-label">Reference</div>
             <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnToc" title="Table of contents">
-                <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="11" x2="15" y2="11"/><line x1="3" y1="16" x2="17" y2="16"/><line x1="3" y1="21" x2="13" y2="21"/></svg>
-                <span>TOC</span>
-              </button>
               <button class="ribbon-btn" id="btnWatermark" title="Watermark">
                 <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1"/><text x="12" y="16" font-size="9" text-anchor="middle" fill="currentColor" opacity="0.4">DRAFT</text></svg>
                 <span>Watermark</span>
@@ -298,33 +405,11 @@
             </div>
           </div>
           <div class="ribbon-group">
-            <div class="group-label">Links</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnInternalLink" title="Link to heading or bookmark">
-                <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/><circle cx="6" cy="18" r="1.5" fill="currentColor"/></svg>
-                <span>Internal</span>
-              </button>
-              <button class="ribbon-btn" id="btnBookmark" title="Insert bookmark">
-                <svg viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                <span>Bookmark</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
             <div class="group-label">Equations</div>
             <div class="ribbon-controls">
               <button class="ribbon-btn" id="btnEquation" title="Insert equation">
                 <svg viewBox="0 0 24 24"><path d="M3 7h18M3 12h18M3 17h12"/><path d="M19 14l2 3-2 3M16 14l-2 3 2 3" opacity="0.6"/></svg>
                 <span>Equation</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Quick Parts</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnAutoText" title="AutoText / Quick Parts">
-                <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/><circle cx="17" cy="17" r="2" fill="currentColor"/></svg>
-                <span>Quick Part</span>
               </button>
             </div>
           </div>
@@ -339,9 +424,9 @@
                 <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                 <span>Screenshot</span>
               </button>
-              <button class="ribbon-btn" id="btnInk" title="Ink annotation (freehand draw)">
-                <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586" opacity="0.5"/><circle cx="11" cy="11" r="2"/></svg>
-                <span>Ink</span>
+              <button class="ribbon-btn" id="btnDraw" title="Toggle Drawing Mode">
+                <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span>Draw</span>
               </button>
             </div>
           </div>
@@ -360,10 +445,20 @@
                 <svg viewBox="0 0 24 24"><rect x="4" y="3" width="13" height="18" rx="1"/><rect x="17" y="6" width="4" height="12" rx="0.5" opacity="0.4"/></svg>
                 <span>Orient</span>
               </button>
-              <button class="ribbon-btn" id="btnPageSize" title="Page size">
-                <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><line x1="4" y1="8" x2="20" y2="8"/></svg>
-                <span>Size</span>
-              </button>
+              <div class="ms-dropdown" id="pageSizeDropdown">
+                <button class="ms-dropdown-btn" type="button" style="min-width:104px;" title="Page size">
+                  <span class="dropdown-value">A4</span>
+                </button>
+                <div class="ms-dropdown-menu">
+                  <div class="ms-dropdown-item" data-value="Letter" data-label="Letter">Letter &middot; 8.5" &times; 11"</div>
+                  <div class="ms-dropdown-item" data-value="Legal" data-label="Legal">Legal &middot; 8.5" &times; 14"</div>
+                  <div class="ms-dropdown-item" data-value="Executive" data-label="Executive">Executive &middot; 7.25" &times; 10.5"</div>
+                  <div class="ms-dropdown-item" data-value="A4" data-label="A4">A4 &middot; 21 &times; 29.7 cm</div>
+                  <div class="ms-dropdown-item" data-value="A5" data-label="A5">A5 &middot; 14.8 &times; 21 cm</div>
+                  <div class="ms-dropdown-item" data-value="A6" data-label="A6">A6 &middot; 10.5 &times; 14.8 cm</div>
+                  <div class="ms-dropdown-item" data-value="Envelope" data-label="Envelope">Envelope #10 &middot; 4.125" &times; 9.5"</div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="ribbon-group">
@@ -390,6 +485,10 @@
                 <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><rect x="5" y="6" width="14" height="4" rx="0.5" fill="currentColor" opacity="0.3"/><line x1="5" y1="13" x2="19" y2="13"/><line x1="5" y1="16" x2="15" y2="16"/></svg>
                 <span>Header</span>
               </button>
+              <button class="ribbon-btn" id="btnFooter" title="Edit footer">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><line x1="5" y1="8" x2="19" y2="8"/><line x1="5" y1="11" x2="15" y2="11"/><rect x="5" y="15" width="14" height="4" rx="0.5" fill="currentColor" opacity="0.3"/></svg>
+                <span>Footer</span>
+              </button>
               <button class="ribbon-btn" id="btnPageNum" title="Insert page number">
                 <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><text x="12" y="15" font-size="8" text-anchor="middle" fill="currentColor">#</text></svg>
                 <span>Page #</span>
@@ -399,16 +498,21 @@
           <div class="ribbon-group">
             <div class="group-label">Zoom</div>
             <div class="ribbon-controls ribbon-controls-row">
-              <span class="zoom-label" id="zoomLabel">100%</span>
-              <input type="range" id="zoom" min="50" max="150" value="100" class="zoom-slider" aria-label="Zoom" />
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Breaks</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnSectionBreakL" title="Insert section break">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="18" rx="1" opacity="0.5"/><rect x="13" y="3" width="8" height="18" rx="1" opacity="0.5"/><line x1="12" y1="3" x2="12" y2="21" stroke-dasharray="2 2"/></svg>
-                <span>Section</span>
+              <button class="ribbon-btn" id="zoomFitBtn" title="Fit to window">
+                <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+                <span>Fit To Window</span>
+              </button>
+              <button class="ribbon-btn" id="zoom100Btn" title="Zoom to 100%">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 11h6M9 14h6"/></svg>
+                <span>100%</span>
+              </button>
+              <button class="ribbon-btn" id="zoomInBtn" title="Zoom in">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                <span>Zoom In</span>
+              </button>
+              <button class="ribbon-btn" id="zoomOutBtn" title="Zoom out">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                <span>Zoom Out</span>
               </button>
             </div>
           </div>
@@ -554,18 +658,6 @@
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
                 <span>Zen</span>
               </button>
-              <button class="ribbon-btn" id="btnTheme2" title="Toggle dark mode">
-                <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-                <span>Theme</span>
-              </button>
-              <button class="ribbon-btn" id="btnColorTheme" title="Accent color themes">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20z" fill="currentColor"/></svg>
-                <span>Color</span>
-              </button>
-              <button class="ribbon-btn" id="btnDarkPaper" title="Dark paper — true dark document canvas">
-                <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><rect x="7" y="6" width="10" height="2" fill="currentColor" opacity="0.4"/><rect x="7" y="10" width="8" height="1" fill="currentColor" opacity="0.3"/><rect x="7" y="13" width="10" height="1" fill="currentColor" opacity="0.3"/></svg>
-                <span>Dark Paper</span>
-              </button>
             </div>
           </div>
           <div class="ribbon-group">
@@ -703,195 +795,13 @@
           </div>
         </div>
 
-        <!-- ============ MAILINGS PANEL ============ -->
-        <div class="ribbon-panel" data-panel="mailings">
-          <div class="ribbon-group">
-            <div class="group-label">Start</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnStartMailMerge" title="Start Mail Merge (CSV)">
-                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><polyline points="3,5 12,13 21,5"/></svg>
-                <span>Start</span>
-              </button>
-              <button class="ribbon-btn" id="btnSelectRecipients" title="Select recipients (paste CSV)">
-                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span>Recipients</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Write &amp; Insert</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnInsertMergeField" title="Insert merge field">
-                <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h14"/><circle cx="18" cy="17" r="2" fill="currentColor"/></svg>
-                <span>Field</span>
-              </button>
-              <button class="ribbon-btn" id="btnHighlightMerge" title="Highlight merge fields">
-                <svg viewBox="0 0 24 24"><path d="M9 11l-4 4v3h3l4-4M14 7l3 3M3 21l7-7"/><path d="M14 3l7 7-4 4-7-7z"/></svg>
-                <span>Highlight</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Preview &amp; Finish</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnPreviewResults" title="Preview results">
-                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                <span>Preview</span>
-              </button>
-              <button class="ribbon-btn" id="btnFinishMerge" title="Finish &amp; merge">
-                <svg viewBox="0 0 24 24"><path d="M22 11.08v-1.5a2.5 2.5 0 0 0-2.5-2.5H5l3-3"/><polyline points="22,13.5 14,21.5 11,18.5"/></svg>
-                <span>Finish</span>
-              </button>
-              <button class="ribbon-btn" id="btnEnvelopes" title="Envelopes">
-                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><polyline points="3,5 12,13 21,5"/></svg>
-                <span>Envelopes</span>
-              </button>
-              <button class="ribbon-btn" id="btnLabels" title="Labels">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
-                <span>Labels</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ============ DEVELOPER PANEL ============ -->
-        <div class="ribbon-panel" data-panel="developer">
-          <div class="ribbon-group">
-            <div class="group-label">Code</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnViewSource" title="View HTML source">
-                <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                <span>Source</span>
-              </button>
-              <button class="ribbon-btn" id="btnInsertField" title="Insert dynamic field">
-                <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h14"/><circle cx="18" cy="17" r="2" fill="currentColor"/></svg>
-                <span>Field</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Controls</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnCheckbox" title="Insert checkbox">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="8 12 11 15 16 9"/></svg>
-                <span>Checkbox</span>
-              </button>
-              <button class="ribbon-btn" id="btnDatePicker" title="Insert date picker field">
-                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
-                <span>Date</span>
-              </button>
-              <button class="ribbon-btn" id="btnDropdown" title="Insert dropdown field">
-                <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1"/><polyline points="8 10 12 14 16 10"/></svg>
-                <span>Dropdown</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Controls</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnContentControls" title="Content controls (form fields)">
-                <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="14" x2="13" y2="14"/></svg>
-                <span>Controls</span>
-              </button>
-              <button class="ribbon-btn" id="btnCheckbox" title="Insert checkbox">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="8 12 11 15 16 9"/></svg>
-                <span>Checkbox</span>
-              </button>
-              <button class="ribbon-btn" id="btnDatePicker" title="Insert date picker field">
-                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
-                <span>Date</span>
-              </button>
-              <button class="ribbon-btn" id="btnDropdown" title="Insert dropdown field">
-                <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1"/><polyline points="8 10 12 14 16 10"/></svg>
-                <span>Dropdown</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Macros</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnMacros" title="Record &amp; play macros">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
-                <span>Macros</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Protect</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnRestrictEdit" title="Restrict editing">
-                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <span>Restrict</span>
-              </button>
-              <button class="ribbon-btn" id="btnMarkFinal" title="Mark as final">
-                <svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
-                <span>Final</span>
-              </button>
-              <button class="ribbon-btn" id="btnPassword" title="Password protect document">
-                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5" fill="currentColor"/></svg>
-                <span>Password</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ============ HELP PANEL ============ -->
-        <div class="ribbon-panel" data-panel="help">
-          <div class="ribbon-group">
-            <div class="group-label">Help</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnHelpShortcuts" title="Keyboard shortcuts">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span>Shortcuts</span>
-              </button>
-              <button class="ribbon-btn" id="btnHelpAbout" title="About EmeraldSuite Docs">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <span>About</span>
-              </button>
-              <button class="ribbon-btn" id="btnHelpTour" title="Interactive tour">
-                <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                <span>Tour</span>
-              </button>
-            </div>
-          </div>
-          <div class="ribbon-group">
-            <div class="group-label">Accessibility</div>
-            <div class="ribbon-controls">
-              <button class="ribbon-btn" id="btnAccessibility" title="Accessibility checker">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M5 9l4 2-2 6M19 9l-4 2 2 6M9 22l3-6 3 6"/></svg>
-                <span>Check</span>
-              </button>
-              <button class="ribbon-btn" id="btnAltText" title="Alt text for images">
-                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <span>Alt Text</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
       </div>
-    </div>
-
-    <!-- ===================== Restrict Edit Banner ===================== -->
-    <div class="restrict-banner" id="restrictBanner" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      <span>Restricted editing is ON — document is read-only.</span>
-      <button class="btn ghost sm" id="restrictOff">Stop Protection</button>
     </div>
 
     <!-- ===================== Zen Mode Indicator ===================== -->
     <div class="zen-indicator" id="zenIndicator" aria-hidden="true">
       <span class="zi-dot"></span>
       <span>Zen mode</span>
-    </div>
-
-    <!-- ===================== Ruler ===================== -->
-    <div class="ruler-wrap" id="rulerWrap">
-      <div class="ruler" id="ruler">
-        <div class="ruler-margin ruler-margin-left"></div>
-        <div class="ruler-margin ruler-margin-right"></div>
-        <div class="ruler-ticks" id="rulerTicks"></div>
-      </div>
     </div>
 
     <!-- ===================== Document ===================== -->
@@ -901,41 +811,19 @@
       </div>
     </main>
 
-    <!-- ===================== Status Bar ===================== -->
+    <!-- ===================== Status Bar (Slides-style floating pill) ===================== -->
     <footer class="statusbar">
-      <div class="status-left">
-        <button class="page-nav" id="prevPage" title="Previous page">‹</button>
-        <span class="page-info" id="pageInfo">Page 1 of 1</span>
-        <button class="page-nav" id="nextPage" title="Next page">›</button>
-        <span class="sep">·</span>
-        <span id="charCount">0 characters</span>
-        <span class="sep">·</span>
-        <span id="caretPos" title="Cursor position (line:column)">Ln 1, Col 1</span>
-        <span class="sep">·</span>
-        <span class="autosave" id="autosave">Ready</span>
-        <span class="sep">·</span>
-        <button class="session-timer" id="sessionTimer" title="Writing session time (click to reset)">
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
-          <span id="sessionTimerText">0:00</span>
-        </button>
-        <span class="sep">·</span>
-        <button class="version-count" id="versionCount" title="Version history">
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 8v6M2 12h6m8 0h6"/><circle cx="12" cy="12" r="3"/></svg>
-          <span id="versionCountText">0</span>
-        </button>
-      </div>
-      <div class="status-right">
-        <button class="status-zoom-btn" id="statusZoomOut" title="Zoom out" aria-label="Zoom out">−</button>
-        <span class="status-zoom-pct" id="statusZoomPct" title="Zoom level">100%</span>
-        <button class="status-zoom-btn" id="statusZoomIn" title="Zoom in" aria-label="Zoom in">+</button>
-        <span class="sep">·</span>
-        <button class="status-lang" id="statusLang" title="Spellcheck language">
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-8 10-8 10 8 10 8-4 8-10 8-10-8-10-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          <span>EN</span>
-        </button>
-        <span class="sep">·</span>
-        <button class="page-size-label" id="pageSizeLabel" title="Page size — click to switch">A4</button>
-      </div>
+      <span class="statbar-item page-info" id="pageInfo">Page 1 of 1</span>
+      <span class="statbar-sep">|</span>
+      <span class="statbar-item" id="caretPos" title="Cursor position (line:column)">Ln 1, Col 1</span>
+      <span class="statbar-sep">|</span>
+      <span class="statbar-item" id="wordCount" title="Word count">0 words</span>
+      <span class="statbar-sep">|</span>
+      <span class="statbar-item" id="charCount" title="Character count">0 characters</span>
+      <span class="statbar-spacer"></span>
+      <span class="statbar-item" id="statusZoomPct" title="Zoom level (Ctrl+Scroll to zoom)">100%</span>
+      <span class="statbar-sep">|</span>
+      <span class="statbar-item page-size-label" id="pageSizeLabel">A4</span>
     </footer>
   </div>
 
@@ -943,8 +831,13 @@
   <div class="modal-overlay" id="findModal" aria-hidden="true">
     <div class="modal modal-find" role="dialog" aria-label="Find and replace">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
         <h3>Find &amp; Replace</h3>
-        <button class="modal-close" data-close="findModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="findModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="field">
@@ -981,8 +874,10 @@
   <div class="modal-overlay" id="linkModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Insert link">
       <div class="modal-head">
+        <div class="modal-icon" style="background:#2563eb;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </div>
         <h3>Insert Link</h3>
-        <button class="modal-close" data-close="linkModal" aria-label="Close">×</button>
       </div>
       <div class="modal-body">
         <div class="field">
@@ -1001,40 +896,17 @@
     </div>
   </div>
 
-  <!-- ===================== Insert Image Dialog ===================== -->
-  <div class="modal-overlay" id="imageModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Insert image">
-      <div class="modal-head">
-        <h3>Insert Image</h3>
-        <button class="modal-close" data-close="imageModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="field">
-          <label for="imgUrl">Image URL</label>
-          <input type="url" id="imgUrl" placeholder="https://…" autocomplete="off" />
-        </div>
-        <div class="field">
-          <label for="imgFile">Or upload from device</label>
-          <input type="file" id="imgFile" accept="image/*" />
-        </div>
-        <div class="field">
-          <label for="imgAlt">Alt text (optional)</label>
-          <input type="text" id="imgAlt" placeholder="Describe the image" autocomplete="off" />
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn ghost sm" data-close="imageModal">Cancel</button>
-        <button class="btn primary sm" id="imgConfirm">Insert</button>
-      </div>
-    </div>
-  </div>
+  <!-- Image insertion opens the OS file picker directly (Slides-style hidden input) -->
+  <input type="file" id="insertImageInput" accept="image/*" style="display:none;">
 
   <!-- ===================== Insert Table Dialog ===================== -->
   <div class="modal-overlay" id="tableModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Insert table">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+        </div>
         <h3>Insert Table</h3>
-        <button class="modal-close" data-close="tableModal" aria-label="Close">×</button>
       </div>
       <div class="modal-body">
         <div class="field">
@@ -1054,8 +926,13 @@
   <div class="modal-overlay" id="wordCountModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Document statistics">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
         <h3>Document Statistics</h3>
-        <button class="modal-close" data-close="wordCountModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="wordCountModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="stats-grid" id="statsGrid"></div>
@@ -1180,8 +1057,13 @@
   <div class="modal-overlay" id="marginsModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Page margins">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+        </div>
         <h3>Page Margins</h3>
-        <button class="modal-close" data-close="marginsModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="marginsModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="margin-preview-wrap">
@@ -1222,7 +1104,6 @@
       </div>
       <div class="modal-foot">
         <button class="btn ghost sm" id="btnMarginsReset">Reset to default</button>
-        <button class="btn primary sm" data-close="marginsModal">Done</button>
       </div>
     </div>
   </div>
@@ -1231,8 +1112,13 @@
   <div class="modal-overlay" id="shortcutsModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Keyboard shortcuts">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>
+        </div>
         <h3>Keyboard Shortcuts</h3>
-        <button class="modal-close" data-close="shortcutsModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="shortcutsModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="shortcuts-grid" id="shortcutsGrid"></div>
@@ -1247,8 +1133,13 @@
   <div class="modal-overlay" id="versionsModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Version history">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 14"/></svg>
+        </div>
         <h3>Version History</h3>
-        <button class="modal-close" data-close="versionsModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="versionsModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="versions-list" id="versionsList"></div>
@@ -1263,8 +1154,13 @@
   <div class="modal-overlay" id="dictModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Custom dictionary">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </div>
         <h3>Custom Dictionary</h3>
-        <button class="modal-close" data-close="dictModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="dictModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <p class="dict-hint">Words added here are ignored by the writing-issue checker. Useful for names, technical terms, or words you use often.</p>
@@ -1294,8 +1190,13 @@
   <div class="modal-overlay" id="templatesModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Templates">
       <div class="modal-head">
+        <div class="modal-icon" style="background:var(--ui-accent);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
         <h3>Choose a Template</h3>
-        <button class="modal-close" data-close="templatesModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="templatesModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="templates-grid" id="templatesGrid"></div>
@@ -1306,35 +1207,17 @@
     </div>
   </div>
 
-  <!-- ===================== Symbols Dialog ===================== -->
-  <div class="modal-overlay" id="symbolsModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Symbols">
-      <div class="modal-head">
-        <h3>Symbols &amp; Special Characters</h3>
-        <button class="modal-close" data-close="symbolsModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="symbol-tabs" id="symbolTabs">
-          <button class="symbol-tab active" data-symtab="common">Common</button>
-          <button class="symbol-tab" data-symtab="math">Math</button>
-          <button class="symbol-tab" data-symtab="currency">Currency</button>
-          <button class="symbol-tab" data-symtab="arrows">Arrows</button>
-          <button class="symbol-tab" data-symtab="greek">Greek</button>
-        </div>
-        <div class="symbol-grid" id="symbolGrid"></div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn primary sm" data-close="symbolsModal">Close</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ===================== Go To Dialog ===================== -->
   <div class="modal-overlay" id="gotoModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Go to">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+        </div>
         <h3>Go To</h3>
-        <button class="modal-close" data-close="gotoModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="gotoModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="field">
@@ -1361,8 +1244,10 @@
   <div class="modal-overlay" id="watermarkModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Watermark">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+        </div>
         <h3>Watermark</h3>
-        <button class="modal-close" data-close="watermarkModal" aria-label="Close">×</button>
       </div>
       <div class="modal-body">
         <div class="field">
@@ -1390,8 +1275,13 @@
   <div class="modal-overlay" id="pasteSpecialModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Paste special">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+        </div>
         <h3>Paste Special</h3>
-        <button class="modal-close" data-close="pasteSpecialModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="pasteSpecialModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="paste-special-options">
@@ -1423,62 +1313,14 @@
     </div>
   </aside>
 
-  <!-- ===================== Bookmarks Dialog ===================== -->
-  <div class="modal-overlay" id="bookmarksModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Bookmarks">
-      <div class="modal-head">
-        <h3>Bookmarks</h3>
-        <button class="modal-close" data-close="bookmarksModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="field">
-          <label for="bookmarkName">Bookmark name</label>
-          <div class="dict-add-row">
-            <input type="text" id="bookmarkName" placeholder="e.g. intro_summary" autocomplete="off" />
-            <button class="btn primary sm" id="bookmarkAdd">Add</button>
-          </div>
-        </div>
-        <div class="field">
-          <label>Saved bookmarks</label>
-          <div class="dict-words" id="bookmarksList"></div>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn ghost sm" data-close="bookmarksModal">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== Internal Link Dialog ===================== -->
-  <div class="modal-overlay" id="internalLinkModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Insert internal link">
-      <div class="modal-head">
-        <h3>Link to in document</h3>
-        <button class="modal-close" data-close="internalLinkModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="field">
-          <label for="internalLinkText">Link text (optional)</label>
-          <input type="text" id="internalLinkText" placeholder="Selected text will be used" autocomplete="off" />
-        </div>
-        <div class="field">
-          <label>Link to</label>
-          <div class="internal-link-list" id="internalLinkTargets"></div>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn ghost sm" data-close="internalLinkModal">Cancel</button>
-        <button class="btn primary sm" id="internalLinkConfirm">Insert</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ===================== Cover Page Dialog ===================== -->
   <div class="modal-overlay" id="coverPageModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Cover page">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
         <h3>Insert Cover Page</h3>
-        <button class="modal-close" data-close="coverPageModal" aria-label="Close">×</button>
       </div>
       <div class="modal-body">
         <div class="field">
@@ -1518,8 +1360,10 @@
   <div class="modal-overlay" id="equationModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Equation editor">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 5H7l6 7-6 7h11"/></svg>
+        </div>
         <h3>Equation Editor</h3>
-        <button class="modal-close" data-close="equationModal" aria-label="Close">×</button>
       </div>
       <div class="modal-body">
         <div class="equation-presets" id="equationPresets">
@@ -1558,8 +1402,13 @@
   <div class="modal-overlay" id="compareModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Compare documents">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/></svg>
+        </div>
         <h3>Compare Versions</h3>
-        <button class="modal-close" data-close="compareModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="compareModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <p class="dict-hint">Pick two saved versions to diff. Differences are shown as insertions (emerald) and deletions (red strikethrough).</p>
@@ -1576,51 +1425,6 @@
       <div class="modal-foot">
         <button class="btn ghost sm" data-close="compareModal">Close</button>
         <button class="btn primary sm" id="compareConfirm">Compare</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== Password Dialog ===================== -->
-  <div class="modal-overlay" id="passwordModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Password protect">
-      <div class="modal-head">
-        <h3>Password Protect</h3>
-        <button class="modal-close" data-close="passwordModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="dict-hint">The document content is encrypted with your password. You will need it to open the document again. This is a light client-side scramble — not military-grade crypto.</p>
-        <div class="field">
-          <label for="passwordInput">Password</label>
-          <input type="password" id="passwordInput" autocomplete="new-password" />
-        </div>
-        <div class="field">
-          <label for="passwordConfirm">Confirm password</label>
-          <input type="password" id="passwordConfirm" autocomplete="new-password" />
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn ghost sm" id="passwordRemove">Remove protection</button>
-        <button class="btn primary sm" id="passwordConfirmBtn">Protect</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== Password Unlock Prompt ===================== -->
-  <div class="modal-overlay" id="passwordUnlockModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Enter password">
-      <div class="modal-head">
-        <h3>Enter Password</h3>
-      </div>
-      <div class="modal-body">
-        <p class="dict-hint">This document is password-protected. Enter the password to open it.</p>
-        <div class="field">
-          <label for="passwordUnlock">Password</label>
-          <input type="password" id="passwordUnlock" autocomplete="current-password" />
-        </div>
-        <div id="passwordUnlockError" class="password-error" hidden></div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn primary sm" id="passwordUnlockBtn">Unlock</button>
       </div>
     </div>
   </div>
@@ -1650,96 +1454,253 @@
     </div>
   </aside>
 
-  <!-- ===================== Ink Annotation Toolbar ===================== -->
-  <div class="ink-toolbar" id="inkToolbar" aria-hidden="true">
-    <div class="ink-toolbar-inner">
-      <span class="ink-title">Ink</span>
-      <span class="ink-sep"></span>
-      <label class="ink-color-tool" title="Pen color">
-        <span class="ink-color-swatch" id="inkColorSwatch"></span>
-        <input type="color" id="inkColor" value="#239a4d" />
-      </label>
-      <label class="ink-size-tool" title="Pen size">
-        <input type="range" id="inkSize" min="1" max="16" value="3" />
-        <span id="inkSizeLabel">3</span>
-      </label>
-      <span class="ink-sep"></span>
-      <button class="btn ghost sm" id="inkEraser" title="Eraser">Eraser</button>
-      <button class="btn ghost sm" id="inkClear" title="Clear ink">Clear</button>
-      <button class="btn primary sm" id="inkDone" title="Done">Done</button>
+  <!-- ===================== Drawing Toolbar (bottom-docked, slides/notes style) ===================== -->
+  <div class="draw-toolbar" id="drawToolbar">
+    <button class="draw-tool-btn active" id="drawPenBtn" title="Pen">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+      </svg>
+      Pen
+    </button>
+    <button class="draw-tool-btn" id="drawHighlighterBtn" title="Highlighter">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 11l-6 6v3h3l6-6"/><path d="M22 7L17 2L9 10l5 5z"/>
+      </svg>
+      Highlighter
+    </button>
+    <button class="draw-tool-btn" id="drawEraserBtn" title="Eraser">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 20H7L3 16l11-11 6 6-3.5 3.5"/>
+        <path d="M6.0 11.0 L13 18"/>
+      </svg>
+      Eraser
+    </button>
+    <div class="draw-toolbar-divider color-divider"></div>
+    <div class="draw-color-section">
+      <span class="draw-section-label">Color</span>
+      <div class="draw-color-presets" id="drawColorPresets">
+        <button class="draw-color-swatch active" data-color="#000000" style="background:#000000;" title="Black"></button>
+        <button class="draw-color-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+        <button class="draw-color-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+        <button class="draw-color-swatch" data-color="#eab308" style="background:#eab308;" title="Yellow"></button>
+        <button class="draw-color-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+        <button class="draw-color-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+        <button class="draw-color-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Purple"></button>
+        <button class="draw-color-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+        <button class="draw-color-swatch" data-color="#ffffff" style="background:#ffffff; border:1.5px solid #ccc;" title="White"></button>
+        <input type="color" id="drawColorPicker" value="#000000" style="display:none;">
+      </div>
     </div>
+    <div class="draw-toolbar-divider"></div>
+    <div class="draw-size-section">
+      <span class="draw-section-label">Size</span>
+      <div class="draw-size-presets">
+        <button class="draw-size-btn active" data-size="2" title="Thin"><span style="width:2px;height:2px;border-radius:50%;background:currentColor;display:block;"></span></button>
+        <button class="draw-size-btn" data-size="5" title="Medium"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:block;"></span></button>
+        <button class="draw-size-btn" data-size="10" title="Thick"><span style="width:10px;height:10px;border-radius:50%;background:currentColor;display:block;"></span></button>
+        <button class="draw-size-btn" data-size="20" title="Extra Thick"><span style="width:16px;height:16px;border-radius:50%;background:currentColor;display:block;"></span></button>
+      </div>
+      <input type="range" id="drawThickness" min="1" max="30" value="2" title="Brush Size" style="width:60px;display:none;">
+    </div>
+    <div class="draw-toolbar-divider"></div>
+    <button class="draw-tool-btn draw-clear-btn" id="drawClearBtn" title="Clear Drawing">Clear</button>
+    <button class="draw-tool-btn draw-done-btn" id="drawDoneBtn" title="Done">&check; Done</button>
   </div>
 
-  <!-- ===================== Mail Merge Dialog ===================== -->
-  <div class="modal-overlay" id="mailMergeModal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-label="Mail merge">
-      <div class="modal-head">
-        <h3>Mail Merge</h3>
-        <button class="modal-close" data-close="mailMergeModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="dict-hint">Paste CSV data (first row = field names). Merge fields like «Name» in your document will be replaced for each recipient.</p>
-        <div class="field">
-          <label for="mergeCsv">CSV data source</label>
-          <textarea id="mergeCsv" class="merge-csv-input" rows="6" placeholder="Name,Email,City&#10;Alice,alice@example.com,NYC&#10;Bob,bob@example.com,LA"></textarea>
+  <!-- ===================== Symbol Bar (bottom-docked, slides style) =====================
+       Ported from the Slides app: floating pill at the bottom with grouped
+       symbols to click-insert. No modal box. Done closes it. -->
+<!-- ===== SYMBOL BAR ===== -->
+<div class="symbol-toolbar" id="symbolToolbar">
+    <div class="symbol-bar-scroll" id="symbolBarScroll">
+        <!-- Stars & Misc -->
+        <div class="symbol-toolbar-divider"></div>
+        <div class="symbol-group">
+            <span class="symbol-section-label">Stars</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="★">★</button>
+                <button class="sym-bar-btn" data-s="☆">☆</button>
+                <button class="sym-bar-btn" data-s="✦">✦</button>
+                <button class="sym-bar-btn" data-s="✧">✧</button>
+                <button class="sym-bar-btn" data-s="✩">✩</button>
+                <button class="sym-bar-btn" data-s="✪">✪</button>
+                <button class="sym-bar-btn" data-s="✫">✫</button>
+                <button class="sym-bar-btn" data-s="✬">✬</button>
+                <button class="sym-bar-btn" data-s="✭">✭</button>
+                <button class="sym-bar-btn" data-s="✮">✮</button>
+                <button class="sym-bar-btn" data-s="✯">✯</button>
+                <button class="sym-bar-btn" data-s="✰">✰</button>
+                <button class="sym-bar-btn" data-s="✱">✱</button>
+                <button class="sym-bar-btn" data-s="✲">✲</button>
+                <button class="sym-bar-btn" data-s="✳">✳</button>
+                <button class="sym-bar-btn" data-s="✴">✴</button>
+                <button class="sym-bar-btn" data-s="✹">✹</button>
+                <button class="sym-bar-btn" data-s="❂">❂</button>
+                <button class="sym-bar-btn" data-s="❃">❃</button>
+                <button class="sym-bar-btn" data-s="❊">❊</button>
+                <button class="sym-bar-btn" data-s="❋">❋</button>
+            </div>
         </div>
-        <div class="field">
-          <label for="mergeFieldList">Available fields</label>
-          <div class="merge-fields-list" id="mergeFieldsList"><span class="outline-empty">Paste CSV to see fields</span></div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Checkmarks & Hearts -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Marks</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="✓">✓</button>
+                <button class="sym-bar-btn" data-s="✔">✔</button>
+                <button class="sym-bar-btn" data-s="✗">✗</button>
+                <button class="sym-bar-btn" data-s="✘">✘</button>
+                <button class="sym-bar-btn" data-s="✚">✚</button>
+                <button class="sym-bar-btn" data-s="♥">♥</button>
+                <button class="sym-bar-btn" data-s="♦">♦</button>
+                <button class="sym-bar-btn" data-s="♣">♣</button>
+                <button class="sym-bar-btn" data-s="♠">♠</button>
+                <button class="sym-bar-btn" data-s="●">●</button>
+                <button class="sym-bar-btn" data-s="○">○</button>
+                <button class="sym-bar-btn" data-s="■">■</button>
+                <button class="sym-bar-btn" data-s="□">□</button>
+                <button class="sym-bar-btn" data-s="▲">▲</button>
+                <button class="sym-bar-btn" data-s="△">△</button>
+                <button class="sym-bar-btn" data-s="▼">▼</button>
+                <button class="sym-bar-btn" data-s="▽">▽</button>
+                <button class="sym-bar-btn" data-s="◆">◆</button>
+                <button class="sym-bar-btn" data-s="◇">◇</button>
+            </div>
         </div>
-        <div class="field">
-          <label>Recipients preview</label>
-          <div class="merge-preview-list" id="mergePreviewList"></div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Arrows -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Arrows</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="→">→</button>
+                <button class="sym-bar-btn" data-s="←">←</button>
+                <button class="sym-bar-btn" data-s="↑">↑</button>
+                <button class="sym-bar-btn" data-s="↓">↓</button>
+                <button class="sym-bar-btn" data-s="↔">↔</button>
+                <button class="sym-bar-btn" data-s="↕">↕</button>
+                <button class="sym-bar-btn" data-s="⇒">⇒</button>
+                <button class="sym-bar-btn" data-s="⇐">⇐</button>
+                <button class="sym-bar-btn" data-s="⇑">⇑</button>
+                <button class="sym-bar-btn" data-s="⇓">⇓</button>
+                <button class="sym-bar-btn" data-s="↗">↗</button>
+                <button class="sym-bar-btn" data-s="↘">↘</button>
+                <button class="sym-bar-btn" data-s="↙">↙</button>
+                <button class="sym-bar-btn" data-s="↖">↖</button>
+            </div>
         </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn ghost sm" data-close="mailMergeModal">Close</button>
-        <button class="btn primary sm" id="mergeRunBtn">Merge &amp; Export</button>
-      </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Math -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Math</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="∞">∞</button>
+                <button class="sym-bar-btn" data-s="≈">≈</button>
+                <button class="sym-bar-btn" data-s="≠">≠</button>
+                <button class="sym-bar-btn" data-s="≤">≤</button>
+                <button class="sym-bar-btn" data-s="≥">≥</button>
+                <button class="sym-bar-btn" data-s="±">±</button>
+                <button class="sym-bar-btn" data-s="×">×</button>
+                <button class="sym-bar-btn" data-s="÷">÷</button>
+                <button class="sym-bar-btn" data-s="∑">∑</button>
+                <button class="sym-bar-btn" data-s="∏">∏</button>
+                <button class="sym-bar-btn" data-s="∫">∫</button>
+                <button class="sym-bar-btn" data-s="∂">∂</button>
+                <button class="sym-bar-btn" data-s="∇">∇</button>
+                <button class="sym-bar-btn" data-s="√">√</button>
+                <button class="sym-bar-btn" data-s="∝">∝</button>
+                <button class="sym-bar-btn" data-s="∠">∠</button>
+                <button class="sym-bar-btn" data-s="⊥">⊥</button>
+                <button class="sym-bar-btn" data-s="≡">≡</button>
+                <button class="sym-bar-btn" data-s="∈">∈</button>
+                <button class="sym-bar-btn" data-s="∉">∉</button>
+                <button class="sym-bar-btn" data-s="⊂">⊂</button>
+                <button class="sym-bar-btn" data-s="⊃">⊃</button>
+                <button class="sym-bar-btn" data-s="∪">∪</button>
+                <button class="sym-bar-btn" data-s="∩">∩</button>
+                <button class="sym-bar-btn" data-s="∀">∀</button>
+                <button class="sym-bar-btn" data-s="∃">∃</button>
+                <button class="sym-bar-btn" data-s="∴">∴</button>
+                <button class="sym-bar-btn" data-s="∵">∵</button>
+                <button class="sym-bar-btn" data-s="∼">∼</button>
+                <button class="sym-bar-btn" data-s="ƒ">ƒ</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Greek -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Greek</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="α">α</button>
+                <button class="sym-bar-btn" data-s="β">β</button>
+                <button class="sym-bar-btn" data-s="γ">γ</button>
+                <button class="sym-bar-btn" data-s="δ">δ</button>
+                <button class="sym-bar-btn" data-s="ε">ε</button>
+                <button class="sym-bar-btn" data-s="μ">μ</button>
+                <button class="sym-bar-btn" data-s="λ">λ</button>
+                <button class="sym-bar-btn" data-s="σ">σ</button>
+                <button class="sym-bar-btn" data-s="φ">φ</button>
+                <button class="sym-bar-btn" data-s="ψ">ψ</button>
+                <button class="sym-bar-btn" data-s="ω">ω</button>
+                <button class="sym-bar-btn" data-s="π">π</button>
+                <button class="sym-bar-btn" data-s="Ω">Ω</button>
+                <button class="sym-bar-btn" data-s="Σ">Σ</button>
+                <button class="sym-bar-btn" data-s="Π">Π</button>
+                <button class="sym-bar-btn" data-s="Δ">Δ</button>
+                <button class="sym-bar-btn" data-s="Γ">Γ</button>
+                <button class="sym-bar-btn" data-s="Θ">Θ</button>
+                <button class="sym-bar-btn" data-s="Λ">Λ</button>
+                <button class="sym-bar-btn" data-s="Φ">Φ</button>
+                <button class="sym-bar-btn" data-s="Ψ">Ψ</button>
+                <button class="sym-bar-btn" data-s="ℵ">ℵ</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Numbers & Bullets -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Numbers</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="①">①</button>
+                <button class="sym-bar-btn" data-s="②">②</button>
+                <button class="sym-bar-btn" data-s="③">③</button>
+                <button class="sym-bar-btn" data-s="④">④</button>
+                <button class="sym-bar-btn" data-s="⑤">⑤</button>
+                <button class="sym-bar-btn" data-s="⑥">⑥</button>
+                <button class="sym-bar-btn" data-s="⑦">⑦</button>
+                <button class="sym-bar-btn" data-s="⑧">⑧</button>
+                <button class="sym-bar-btn" data-s="⑨">⑨</button>
+                <button class="sym-bar-btn" data-s="⑩">⑩</button>
+                <button class="sym-bar-btn" data-s="•">•</button>
+                <button class="sym-bar-btn" data-s="◦">◦</button>
+            </div>
+        </div>
+        <div class="symbol-toolbar-divider"></div>
+        <!-- Floral & Special -->
+        <div class="symbol-group">
+            <span class="symbol-section-label">Special</span>
+            <div class="symbol-group-row">
+                <button class="sym-bar-btn" data-s="✿">✿</button>
+                <button class="sym-bar-btn" data-s="❀">❀</button>
+                <button class="sym-bar-btn" data-s="❁">❁</button>
+                <button class="sym-bar-btn" data-s="✽">✽</button>
+                <button class="sym-bar-btn" data-s="❄">❄</button>
+                <button class="sym-bar-btn" data-s="❅">❅</button>
+                <button class="sym-bar-btn" data-s="❆">❆</button>
+                <button class="sym-bar-btn" data-s="❇">❇</button>
+                <button class="sym-bar-btn" data-s="❈">❈</button>
+                <button class="sym-bar-btn" data-s="❉">❉</button>
+                <button class="sym-bar-btn" data-s="✶">✶</button>
+                <button class="sym-bar-btn" data-s="✷">✷</button>
+                <button class="sym-bar-btn" data-s="✸">✸</button>
+                <button class="sym-bar-btn" data-s="✺">✺</button>
+                <button class="sym-bar-btn" data-s="✻">✻</button>
+                <button class="sym-bar-btn" data-s="✼">✼</button>
+                <button class="sym-bar-btn" data-s="✾">✾</button>
+            </div>
+        </div>
     </div>
-  </div>
-
-  <!-- ===================== Content Controls Dialog ===================== -->
-  <div class="modal-overlay" id="contentControlsModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Content controls">
-      <div class="modal-head">
-        <h3>Content Controls</h3>
-        <button class="modal-close" data-close="contentControlsModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="dict-hint">Insert reusable form fields. They behave like Word content controls — clickable, with placeholder text.</p>
-        <div class="content-control-grid">
-          <button class="cc-btn" data-cc="richtext">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5h16v2"/><path d="M9 19l4-9 4 9"/><line x1="7" y1="19" x2="19" y2="19"/></svg>
-            <span>Rich Text</span>
-          </button>
-          <button class="cc-btn" data-cc="plain">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg>
-            <span>Plain Text</span>
-          </button>
-          <button class="cc-btn" data-cc="date">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
-            <span>Date Picker</span>
-          </button>
-          <button class="cc-btn" data-cc="dropdown">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="1"/><polyline points="8 10 12 14 16 10"/></svg>
-            <span>Dropdown</span>
-          </button>
-          <button class="cc-btn" data-cc="checkbox">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="8 12 11 15 16 9"/></svg>
-            <span>Checkbox</span>
-          </button>
-          <button class="cc-btn" data-cc="picture">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            <span>Picture</span>
-          </button>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn ghost sm" data-close="contentControlsModal">Cancel</button>
-      </div>
-    </div>
-  </div>
+    <div class="symbol-toolbar-divider"></div>
+    <button class="draw-tool-btn draw-done-btn" id="symbolDoneBtn" title="Done">&check; Done</button>
+</div>
 
   <!-- ===================== Immersive Reader Overlay ===================== -->
   <div class="immersive-reader" id="immersiveReader" aria-hidden="true">
@@ -1778,8 +1739,13 @@
   <div class="modal-overlay" id="accessibilityModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Accessibility checker">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><line x1="6" y1="8" x2="18" y2="8"/><line x1="12" y1="10" x2="12" y2="14"/><polyline points="8 20 12 14 16 20"/></svg>
+        </div>
         <h3>Accessibility Checker</h3>
-        <button class="modal-close" data-close="accessibilityModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="accessibilityModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <p class="dict-hint">Scans for common accessibility issues: missing alt text, poor contrast, empty headings, ambiguous link text.</p>
@@ -1795,8 +1761,13 @@
   <div class="modal-overlay" id="inspectorModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Document inspector">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
         <h3>Document Inspector</h3>
-        <button class="modal-close" data-close="inspectorModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="inspectorModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <p class="dict-hint">Inspect hidden metadata and choose what to remove before sharing.</p>
@@ -1809,58 +1780,17 @@
     </div>
   </div>
 
-  <!-- ===================== Macros Dialog ===================== -->
-  <div class="modal-overlay" id="macrosModal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-label="Macros">
-      <div class="modal-head">
-        <h3>Macros</h3>
-        <button class="modal-close" data-close="macrosModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="dict-hint">Record a sequence of formatting actions, then play them back anywhere. Great for repetitive styling.</p>
-        <div class="macros-controls">
-          <button class="btn primary sm" id="macroRecord">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
-            <span>Record</span>
-          </button>
-          <button class="btn ghost sm" id="macroStop" disabled>Stop</button>
-          <button class="btn ghost sm" id="macroPlay" disabled>Play last</button>
-          <button class="btn ghost sm" id="macroSave" disabled>Save as…</button>
-        </div>
-        <div class="field">
-          <label>Saved macros</label>
-          <div class="macros-list" id="macrosList"></div>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn primary sm" data-close="macrosModal">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== Color Theme Dialog ===================== -->
-  <div class="modal-overlay" id="colorThemeModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Color themes">
-      <div class="modal-head">
-        <h3>Accent Color</h3>
-        <button class="modal-close" data-close="colorThemeModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="dict-hint">Pick an accent color. This changes the ribbon, buttons, active states, and highlights throughout the app. (The default Emerald is the brand color.)</p>
-        <div class="color-theme-grid" id="colorThemeGrid"></div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn primary sm" data-close="colorThemeModal">Done</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ===================== Clipboard History Dialog ===================== -->
   <div class="modal-overlay" id="clipboardHistoryModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Clipboard history">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </div>
         <h3>Clipboard History</h3>
-        <button class="modal-close" data-close="clipboardHistoryModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="clipboardHistoryModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <p class="dict-hint">Recent text you've cut or copied. Click any item to paste it at the caret. History is cleared when you close the tab.</p>
@@ -1877,15 +1807,17 @@
   <div class="modal-overlay" id="smartArtModal" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Insert SmartArt">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        </div>
         <h3>Choose a SmartArt</h3>
-        <button class="modal-close" data-close="smartArtModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="smartArtModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <p class="dict-hint">Pick a diagram type. You can edit the node text after inserting.</p>
         <div class="smartart-grid" id="smartArtGrid"></div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn ghost sm" data-close="smartArtModal">Cancel</button>
       </div>
     </div>
   </div>
@@ -1894,8 +1826,13 @@
   <div class="modal-overlay" id="sectionBreakModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Section break">
       <div class="modal-head">
+        <div class="modal-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+        </div>
         <h3>Section Break</h3>
-        <button class="modal-close" data-close="sectionBreakModal" aria-label="Close">×</button>
+        <button class="modal-close" data-close="sectionBreakModal" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
       <div class="modal-body">
         <p class="dict-hint">The new section starts on the next page. You can give it different margins and orientation from the previous section.</p>

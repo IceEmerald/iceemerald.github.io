@@ -1,4 +1,10 @@
 /* =========================================================
+   BUILD 2026-08-25.10 — ZOOM COUNTER REMOVED
+   (Layout > Zoom now shows only the 4 buttons; current
+   zoom % remains visible in the status bar)
+   If this line is missing from your docs.css, you are running
+   a stale copy — replace it with this file.
+   =========================================================
    Z Docs — Word Processor Styles
    EmeraldSuite design language:
    • DM Sans typography
@@ -10,14 +16,14 @@
    ========================================================= */
 
 :root {
-  /* Blue accent */
-  --ui-accent: #2563eb;
-  --ui-accent-hover: #1d4ed8;
-  --ui-accent-soft: rgba(37, 99, 235, 0.10);
-  --ui-accent-selected: rgba(37, 99, 235, 0.15);
-  --ui-accent-border: rgba(37, 99, 235, 0.30);
-  --ui-accent-ring: rgba(59, 130, 246, 0.35);
-  --ring: #3b82f6;
+  /* Cyan accent (default, locked — user cannot change) */
+  --ui-accent: #0891b2;
+  --ui-accent-hover: #0e7490;
+  --ui-accent-soft: rgba(8, 145, 178, 0.10);
+  --ui-accent-selected: rgba(8, 145, 178, 0.15);
+  --ui-accent-border: rgba(8, 145, 178, 0.30);
+  --ui-accent-ring: rgba(34, 211, 238, 0.35);
+  --ring: #22d3ee;
 
   /* App chrome — light */
   --bg-app: #f4f5f7;
@@ -46,14 +52,14 @@
   --paper-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 12px 32px rgba(15, 23, 42, 0.10);
   --paper-bg: #ffffff;
   --paper-ink: #1a1a1a;
-  --paper-margin-guide: rgba(37, 99, 235, 0.12);
-  --paper-selection: rgba(59, 130, 246, 0.20);
+  --paper-margin-guide: rgba(8, 145, 178, 0.12);
+  --paper-selection: rgba(34, 211, 238, 0.20);
 
   /* Ruler */
   --ruler-bg: #fbfbfc;
   --ruler-fg: #9ca3af;
   --ruler-line: #d8dce1;
-  --ruler-margin: rgba(37, 99, 235, 0.10);
+  --ruler-margin: rgba(8, 145, 178, 0.10);
 
   /* Page margins (dynamic — set by JS) */
   --page-margin-top: 96px;
@@ -95,56 +101,6 @@
   --ease-bouncy: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-[data-theme="dark"] {
-  --bg-app: #0f1115;
-  --bg-doc-canvas: #0a0c0f;
-  --bg-menubar: rgba(28, 32, 38, 0.92);
-  --bg-toolbar: rgba(28, 32, 38, 0.98);
-  --bg-statusbar: rgba(28, 32, 38, 0.92);
-  --bg-ruler: #16191d;
-  --bg-topbar: rgba(28, 32, 38, 0.9);
-  --border-chrome: #2a2f35;
-  --border-strong: #3a4048;
-
-  --text-strong: #f0f2f5;
-  --text-base: #c5ccd4;
-  --text-muted: #8a929c;
-  --text-faint: #5c636c;
-
-  --ui-accent: #3b82f6;
-  --ui-accent-hover: #2563eb;
-  --ui-accent-soft: rgba(59, 130, 246, 0.12);
-  --ui-accent-selected: rgba(59, 130, 246, 0.18);
-  --ui-accent-border: rgba(59, 130, 246, 0.35);
-  --ui-accent-ring: rgba(59, 130, 246, 0.30);
-  --ring: #3b82f6;
-
-  --accent: var(--ui-accent);
-  --accent-strong: var(--ui-accent-hover);
-  --accent-soft: var(--ui-accent-soft);
-  --accent-contrast: #0f1115;
-
-  --paper-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.35);
-  --paper-bg: #1f242a;
-  --paper-ink: #e8ebef;
-  --paper-margin-guide: rgba(59, 130, 246, 0.12);
-  --paper-selection: rgba(59, 130, 246, 0.22);
-
-  --ruler-bg: #16191d;
-  --ruler-fg: #5c636c;
-  --ruler-line: #2a2f35;
-  --ruler-margin: rgba(59, 130, 246, 0.10);
-
-  --modal-overlay: rgba(0, 0, 0, 0.6);
-  --modal-bg: rgba(35, 40, 48, 0.98);
-  --modal-border: #2a2f35;
-
-  --mark-bg: #6b5e1a;
-  --mark-current: #c8870a;
-  --hr-color: #3a4048;
-}
-
-
 * { box-sizing: border-box; }
 
 /* Scrollbar styling (from style.css) */
@@ -172,7 +128,7 @@ html, body {
 body {
   font-family: var(--font-ui);
   color: var(--text-base);
-  background: var(--bg-app);
+  background: rgb(245,245,245);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background 0.25s, color 0.25s;
@@ -192,27 +148,43 @@ body {
   border-bottom: transparent;
   background-color: transparent;
   flex-shrink: 0;
+  height: 4.5rem;
+}
+
+/* App icon in navbar — matching Slides (.icon-primary renders at 1.75rem = 28px
+   with margin-bottom 0.2rem in the Slides app via style.css) */
+.logo .icon-primary {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-bottom: 0.2rem;
+  flex-shrink: 0;
 }
 
 .navbar.sticky-top {
   z-index: 3000;
 }
 
-/* Brand mark (app-specific — the "E" icon) */
+/* Brand mark (app-specific — the "E" icon)
+   Sized to EXACTLY match the Slides navbar icon box: 1.75rem (28px) square with
+   0.2rem bottom margin. This makes the .logo line box (28 + 3.2 = 31.2px) and
+   therefore the "EmeraldSuite" text position pixel-identical to Slides:
+   text starts at icon-left + 28 + 12(gap) instead of +30 +12 (was 2px too far
+   right), and the logo block centers at the same y as Slides. */
 .brand-mark {
-  width: 30px;
-  height: 30px;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-bottom: 0.2rem;
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
   color: #fff;
   font-weight: 800;
-  font-size: 15px;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(8, 145, 178, 0.35);
 }
 
-/* Save indicator pill (matching slides.css: green=saved, yellow=saving, red=error) */
+/* Save indicator pill — byte-identical to slides.css */
 .save-indicator {
   background: rgba(35, 154, 77, 0.2);
   border: 1px solid rgba(35, 154, 77, 0.3);
@@ -223,10 +195,6 @@ body {
   cursor: default;
   font-weight: 500;
   transition: 0.2s;
-  font-family: var(--font-ui);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .save-indicator.saving {
@@ -247,43 +215,51 @@ body {
   color: rgb(217, 48, 37);
 }
 
-/* ===================== Buttons (shared) ===================== */
+/* ===================== Buttons (shared, Slides-style) ===================== */
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-base);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   font-family: var(--font-ui);
   cursor: pointer;
-  transition: background 0.18s var(--ease-fluid), color 0.18s var(--ease-fluid), border-color 0.18s var(--ease-fluid), box-shadow 0.18s var(--ease-fluid), transform 0.1s var(--ease-fluid);
+  transition: 0.2s;
   white-space: nowrap;
+  min-width: 100px;
 }
 
-.btn.sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.btn.sm { padding: 8px 18px; font-size: 13px; min-width: 90px; }
+
+.btn.ghost {
+  background: rgba(108, 117, 125, 0.1);
+  color: rgba(108, 117, 125, 0.9);
+  border: 1px solid rgba(108, 117, 125, 0.2);
+}
 
 .btn.ghost:hover {
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
+  background: rgba(108, 117, 125, 0.2);
+  color: rgb(108, 117, 125);
 }
 
 .btn.ghost:active { transform: scale(0.97); }
 
 .btn.primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: rgb(0, 95, 163);
   color: #fff;
-  border-color: transparent;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.30);
+  border: 1px solid rgba(0, 95, 163, 0.3);
+  box-shadow: none;
 }
 
 .btn.primary:hover {
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45);
+  background: rgb(0, 80, 140);
+  border-color: rgba(0, 95, 163, 0.5);
   transform: translateY(-1px);
 }
 
@@ -356,6 +332,7 @@ body {
   transition: 0.4s var(--ease-fluid);
   opacity: 1;
   transform: translateY(0);
+  box-sizing: border-box;
 }
 
 .ribbon-tabs::-webkit-scrollbar { display: none; }
@@ -393,11 +370,6 @@ body {
   white-space: nowrap;
   line-height: 1;
 }
-[data-theme="dark"] .ribbon-tab-action {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: #c5ccd4;
-}
 .ribbon-tab-action:hover {
   background: var(--ui-accent);
   color: #fff;
@@ -407,35 +379,39 @@ body {
 .ribbon-tab-action:active { transform: translateY(1px); }
 
 .ribbon-tab {
-  background: none;
-  border: none;
-  padding: 0 4px 4px;
-  margin: 0 8px 4px;
-  cursor: pointer;
-  font-size: 13px;
-  color: rgba(44, 62, 80, 0.7);
-  font-weight: 500;
-  font-family: var(--font-ui);
-  border-radius: 2px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  position: relative;
-  transition: background 0.2s, color 0.2s;
+    background: none;
+    border-width: medium;
+    border-style: none;
+    border-color: currentcolor;
+    border-image: none;
+    padding: 0px 4px 4px;
+    margin-left: 8px;
+    margin-right: 8px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: rgba(44, 62, 80, 0.7);
+    transition: background 0.2s, color 0.2s, background-color 0.2s, box-shadow 0.2s;
+    font-weight: 500;
+    font-family: "DM Sans", sans-serif;
+    border-radius: 2px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    position: relative;
 }
-[data-theme="dark"] .ribbon-tab { color: rgba(192, 204, 218, 0.7); }
 
 .ribbon-tab.active {
   background: transparent;
   color: var(--ui-accent);
-  font-weight: 600;
+  /* font-weight kept at base 500 — bolding on click made the tab wider
+     (layout shift). Active state is conveyed by accent color + the
+     sliding underline indicator, matching Word/Slides behavior. */
   box-shadow: none;
 }
 
 .ribbon-tab:not(.active):not([data-tab="file"]):hover {
   background: transparent;
-  color: var(--text-strong);
 }
-[data-theme="dark"] .ribbon-tab:not(.active):not([data-tab="file"]):hover { color: var(--text-strong); }
 
 .ribbon-tab:not(.active):not([data-tab="file"])::after {
   content: "";
@@ -451,9 +427,6 @@ body {
   transform-origin: left center;
   opacity: 0;
   transition: transform 0.22s var(--ease-fluid), opacity 0.18s;
-}
-[data-theme="dark"] .ribbon-tab:not(.active):not([data-tab="file"])::after {
-  background: rgba(192, 204, 218, 0.38);
 }
 .ribbon-tab:not(.active):not([data-tab="file"]):hover::after {
   transform: scaleX(1);
@@ -513,7 +486,7 @@ body {
   position: relative;
   z-index: 19;
   flex-shrink: 0;
-  min-height: 80px;
+  min-height: 100px;
   transition: 0.4s var(--ease-fluid);
   opacity: 1;
   transform: translateY(0);
@@ -523,20 +496,15 @@ body {
   animation: ribbonSlideDown 0.5s var(--ease-bouncy);
 }
 
-[data-theme="dark"] .ribbon {
-  background: rgba(28, 32, 38, 0.98);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
 @keyframes ribbonSlideDown {
   0% { opacity: 0; transform: translateY(-20px); }
   100% { opacity: 1; transform: translateY(0); }
 }
 
 .ribbon-content {
-  padding: 8px 12px;
-  min-height: 64px;
-  max-height: 76px;
+  padding: 12px;
+  min-height: 80px;
+  max-height: 96px;
   background: rgba(255, 255, 255, 0.95);
   display: flex;
   align-items: center;
@@ -545,10 +513,6 @@ body {
   margin: 0 auto;
   border-radius: 8px;
   overflow: auto hidden;
-}
-
-[data-theme="dark"] .ribbon-content {
-  background: rgba(28, 32, 38, 0.95);
 }
 
 .ribbon-panel {
@@ -594,15 +558,13 @@ body {
 .ribbon-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   border-right: 1px solid rgba(0, 0, 0, 0.08);
-  padding-right: 12px;
-  margin-right: 4px;
+  padding-right: 16px;
+  margin-right: 6px;
   flex-shrink: 0;
   min-width: max-content;
 }
-
-[data-theme="dark"] .ribbon-group { border-right-color: rgba(255, 255, 255, 0.08); }
 
 .ribbon-group:last-child {
   border-right: none;
@@ -618,14 +580,14 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   display: block;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   font-family: var(--font-ui);
 }
 
 .ribbon-controls {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   flex-wrap: nowrap;
   min-width: max-content;
 }
@@ -633,23 +595,23 @@ body {
 .ribbon-controls-row {
   flex-direction: row;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 /* Ribbon buttons — matching Slides (vertical icon-over-label) */
 .ribbon-btn {
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  min-width: 52px;
+  gap: 4px;
+  min-width: 60px;
   transition: 0.2s;
-  font-size: 10px;
+  font-size: 11px;
   color: rgba(44, 62, 80, 0.8);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -661,32 +623,17 @@ body {
   overflow: hidden;
 }
 
-[data-theme="dark"] .ribbon-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: rgba(192, 204, 218, 0.8);
-}
-
 .ribbon-btn:hover {
   background: rgba(255, 255, 255, 0.9);
   border-color: var(--ui-accent-border);
-  color: var(--ui-accent);
+  color: rgb(44, 62, 80);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
-
-[data-theme="dark"] .ribbon-btn:hover { background: rgba(255, 255, 255, 0.08); }
-
-.ribbon-btn:active { transform: scale(0.96); }
 
 .ribbon-btn.active {
   background: var(--ui-accent-soft);
   border-color: var(--ui-accent);
   color: var(--ui-accent);
-  box-shadow: inset 0 0 0 1px var(--ui-accent-border), 0 2px 8px var(--ui-accent-soft);
-}
-
-[data-theme="dark"] .ribbon-btn.active {
-  background: var(--ui-accent-selected);
   box-shadow: inset 0 0 0 1px var(--ui-accent-border), 0 2px 8px var(--ui-accent-soft);
 }
 
@@ -703,7 +650,7 @@ body {
 
 .ribbon-btn span {
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
   line-height: 1.2;
 }
@@ -717,12 +664,9 @@ body {
 
 .ribbon-btn-icon span { font-size: 12px; }
 
-/* Icon-only buttons (no span/label) — matching slides format-btn (32px) */
-.ribbon-btn:not(:has(span)) {
-  min-width: 32px;
-  padding: 6px 8px;
-  gap: 0;
-}
+/* Icon-only buttons (no span/label) — base .ribbon-btn sizing, matching Slides.
+   Slides keeps icon-only buttons at the default 60px min-width unless they live
+   inside .font-controls (see below). */
 
 /* Font controls wrapper (matching slides) */
 .font-controls {
@@ -730,6 +674,11 @@ body {
   align-items: center;
   gap: 2px;
   flex-wrap: nowrap;
+}
+
+.font-controls .ribbon-btn {
+  min-width: 32px;
+  padding: 4px 6px;
 }
 
 /* Selects */
@@ -778,8 +727,6 @@ body {
   background: rgba(255, 255, 255, 0.6);
   transition: background 0.12s, border-color 0.12s;
 }
-
-[data-theme="dark"] .color-tool { background: rgba(255, 255, 255, 0.04); }
 
 .color-tool:hover {
   border-color: var(--ui-accent);
@@ -866,22 +813,6 @@ body {
   color: var(--ui-accent);
 }
 
-/* Zoom (in Layout panel) */
-.zoom-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-base);
-  min-width: 38px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.zoom-slider {
-  width: 110px;
-  accent-color: var(--ui-accent);
-  cursor: pointer;
-}
-
 /* ===================== Document scroll area ===================== */
 .document-scroll {
   flex: 1;
@@ -913,24 +844,12 @@ body {
   padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
   box-sizing: border-box;
   background: var(--paper-bg);
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.08),
-    0 4px 10px rgba(15, 23, 42, 0.08),
-    0 16px 40px rgba(15, 23, 42, 0.14),
-    0 32px 64px rgba(15, 23, 42, 0.08);
-  border-radius: 2px;
+  box-shadow: rgba(0, 0, 0, 0.01) 0px 8px 12px, rgba(0, 0, 0, 0.08) 0px 2px 8px;
+  border-radius: 4px;
   flex-shrink: 0;
   overflow: hidden;
   animation: pageFadeIn 0.3s ease;
   transition: box-shadow 0.3s;
-}
-
-[data-theme="dark"] .page {
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 4px 10px rgba(0, 0, 0, 0.35),
-    0 16px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(43, 208, 89, 0.04);
 }
 
 @keyframes pageFadeIn {
@@ -938,31 +857,28 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Subtle margin guide (visual only) */
-.page::before {
-  content: "";
-  position: absolute;
-  top: var(--page-margin-top);
-  left: var(--page-margin-left);
-  right: var(--page-margin-right);
-  bottom: var(--page-margin-bottom);
-  pointer-events: none;
-  border: 1px dashed var(--paper-margin-guide);
-  z-index: 0;
+/* Modal animations — exact Slides' keyframes (entrance lifts + scales,
+   exit is a clean 0.23s opacity fade, removed 230ms after `.closing`). */
+@keyframes fadeInModal {
+  0% { opacity: 0; transform: translateY(10px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Page number badge */
+@keyframes fadeOutModal {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes fadeOutOverlay {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Margin guide removed (per user request) — clean paper like Slides */
+
+/* Page number badge removed (per user request) */
 .page-badge {
-  position: absolute;
-  bottom: calc(var(--page-margin-bottom) / 2.6);
-  right: calc(var(--page-margin-right) / 1.7);
-  font-size: 11px;
-  color: var(--text-faint);
-  font-family: var(--font-ui);
-  pointer-events: none;
-  user-select: none;
-  letter-spacing: 0.3px;
-  z-index: 2;
+  display: none !important;
 }
 
 .page-content {
@@ -1073,8 +989,6 @@ body {
   text-underline-offset: 2px;
 }
 
-[data-theme="dark"] .page-content a { color: var(--accent); }
-
 .page-content b, .page-content strong { font-weight: 700; }
 .page-content i, .page-content em { font-style: italic; }
 .page-content u { text-decoration: underline; }
@@ -1139,169 +1053,133 @@ body {
   color: #fff;
 }
 
-/* ===================== Status bar ===================== */
+/* ===================== Status bar (Slides-style floating pill) ===================== */
 .statusbar {
-  flex: 0 0 var(--statusbar-h);
-  height: var(--statusbar-h);
-  display: flex;
+  display: flex !important;
   align-items: center;
+  /* space-between keeps .status-right (zoom / lang / A4) pinned to the right
+     end of the pill, like the Slides statbar (which uses a flex:1 spacer). */
   justify-content: space-between;
-  padding: 0 14px;
-  background: var(--bg-statusbar);
-  border-top: 1px solid var(--border-chrome);
+  gap: 0;
+  margin: 10px;
+  padding: 0 20px;
+  background: rgb(241, 245, 249);
+  color: rgb(100, 116, 139);
   font-size: 12px;
-  color: var(--text-muted);
+  font-family: "DM Sans", system-ui, sans-serif;
+  user-select: none;
+  flex-shrink: 0;
+  min-height: 30px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: rgba(0, 0, 0, 0.03) 0px 2px 8px;
   z-index: 20;
-  gap: 12px;
-  transition: background 0.25s, border-color 0.25s;
 }
 
-.status-left,
-.status-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sep { color: var(--text-faint); }
-
-.page-info {
-  color: var(--text-base);
+/* Items / separators / toggle buttons — ported from slides .statbar-* */
+.statbar-item, .statusbar .statbar-item {
+  white-space: nowrap;
+  padding: 0 12px;
   font-weight: 500;
-  min-width: 92px;
-  text-align: center;
+  letter-spacing: 0.01em;
+  color: rgb(100, 116, 139);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 12px;
 }
 
-.page-nav {
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--border-chrome);
-  background: var(--bg-statusbar);
-  border-radius: 5px;
-  color: var(--text-base);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+.statbar-sep {
+  color: rgb(148, 163, 184);
+  flex-shrink: 0;
+  opacity: 1;
 }
 
-.page-nav:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent-strong);
-}
+.statbar-spacer { flex: 1 1 0; }
 
-[data-theme="dark"] .page-nav:hover { color: var(--accent); }
-
-.page-nav:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.autosave {
+.statbar-toggle {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-}
-
-.autosave::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #9aa1a8;
-}
-
-.autosave.saving::before { background: #e0a800; animation: pulse 1s ease-in-out infinite; }
-.autosave.saved::before { background: var(--accent); }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.page-size-label { font-weight: 500; color: var(--text-base); }
-
-/* Status bar zoom + language controls */
-.status-zoom-btn {
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--border-chrome);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--text-base);
-  font-size: 14px;
-  font-weight: 700;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  line-height: 1;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.status-zoom-btn:hover {
-  background: var(--ui-accent-soft);
-  border-color: var(--ui-accent-border);
-  color: var(--ui-accent);
-}
-.status-zoom-btn:active { transform: scale(0.92); }
-
-.status-zoom-pct {
+  font-family: "DM Sans", system-ui, sans-serif;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--text-base);
-  min-width: 38px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 3px;
-  transition: background 0.15s;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgb(100, 116, 139);
+  padding: 3px 10px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
 }
-.status-zoom-pct:hover { background: var(--ui-accent-soft); }
-
-.status-lang {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--border-chrome);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--text-base);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 6px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.status-lang:hover {
+.statbar-toggle:hover {
   background: var(--ui-accent-soft);
-  border-color: var(--ui-accent-border);
   color: var(--ui-accent);
+  border-color: var(--ui-accent-border);
 }
-.status-lang svg { color: var(--text-muted); }
-.status-lang:hover svg { color: var(--ui-accent); }
-
-.zoom-slider {
-  width: 96px;
-  accent-color: var(--accent);
-  cursor: pointer;
+.statbar-toggle.active {
+  background: var(--ui-accent-selected);
+  color: var(--ui-accent);
+  border-color: var(--ui-accent-border);
 }
 
-/* ===================== Modal / Dialog ===================== */
+/* Page info — let statbar-item style win */
+.page-info {
+  color: inherit;
+  font-weight: inherit;
+  min-width: auto;
+  text-align: left;
+  letter-spacing: inherit;
+}
+
+/* Zoom percentage — plain statbar-item, NOT clickable (matches Slides' #zoomStatus).
+   Zoom is changed via Ctrl+Scroll or the View → Zoom ribbon controls. */
+#statusZoomPct {
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+/* A4 page-size label — static, informational only.
+   NOT clickable: no pointer events, no hover affordance, no popup.
+   (The Slides status bar has no page-size switcher; clicking A4 in Docs
+   used to open a blue quick-switch menu — removed per user request.) */
+.page-size-label {
+  color: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  background: none;
+  border: none;
+  cursor: default;
+  padding: 0 8px;
+  border-radius: 4px;
+  pointer-events: none !important;
+  user-select: none;
+}
+.page-size-label:hover,
+.page-size-label:focus,
+.page-size-label:focus-visible,
+.page-size-label:active {
+  background: none;
+  color: inherit;
+  outline: none;
+  box-shadow: none;
+}
+
+/* ===================== Modal / Dialog (matching Slides link-modal) ===================== */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: var(--modal-overlay);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 100000;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s, visibility 0.2s;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  transition: opacity 0.3s, visibility 0.3s;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  padding: 20px;
 }
 
 .modal-overlay.open {
@@ -1310,115 +1188,185 @@ body {
 }
 
 .modal {
-  background: var(--modal-bg);
-  border: 1px solid var(--modal-border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  width: 440px;
-  max-width: calc(100vw - 32px);
+  position: relative;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: rgba(0, 0, 0, 0.3) 0px 20px 60px;
+  width: 480px;
+  max-width: 92%;
   max-height: calc(100vh - 64px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transform: scale(0.96) translateY(8px);
-  transition: transform 0.2s ease;
+  opacity: 0;
+  transition: opacity 0.3s;
+  will-change: opacity;
 }
 
-.modal-overlay.open .modal { transform: scale(1) translateY(0); }
+.modal-overlay.open .modal {
+  opacity: 1;
+  animation: 0.25s ease 0s 1 normal both running fadeInModal;
+}
+
+/* Closing — Slides' fadeOut (0.23s, removed 230ms after .closing is added). */
+.modal-overlay.closing {
+  animation: 0.23s ease 0s 1 normal forwards running fadeOutOverlay;
+  pointer-events: none;
+}
+
+.modal-overlay.closing .modal {
+  animation: 0.23s ease-in 0s 1 normal forwards running fadeOutModal;
+}
 
 .modal-sm { width: 380px; }
 .modal-find { width: 460px; }
 
+/* Header — centered title with a circular icon badge above it, stacked
+   vertically (exact Slides' .link-modal-header / .delete-modal-header
+   structure). The close button is pulled out of flow via position:absolute
+   so it floats at the top-right corner of the modal card, exactly like
+   Slides' .link-modal-close-btn. */
 .modal-head {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--modal-border);
+  justify-content: center;
+  padding: 24px 24px 0;
+  border-bottom: none;
+  position: relative;
 }
 
 .modal-head h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
-  color: var(--text-strong);
+  color: rgba(44, 62, 80, 0.9);
+  font-family: var(--font-ui);
+  text-align: center;
 }
 
+/* Icon badge — 48px colored circle with a white 24px stroke SVG, centered
+   above the title (exact Slides' .link-modal-icon / .delete-modal-icon). */
+.modal-icon {
+  width: 48px;
+  height: 48px;
+  background: rgb(0, 95, 163);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  color: white;
+  flex-shrink: 0;
+}
+
+/* Close button — floats at top-right corner of the modal (exact Slides'
+   .link-modal-close-btn: 30x30 hit target, 8px radius, 18px SVG glyph,
+   subtle hover). */
 .modal-close {
-  width: 28px;
-  height: 28px;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
-  font-size: 22px;
+  color: rgba(108, 117, 125, 0.5);
   line-height: 1;
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  display: grid;
-  place-items: center;
-  transition: background 0.12s, color 0.12s;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  z-index: 2;
+  padding: 0;
 }
 
 .modal-close:hover {
-  background: color-mix(in srgb, var(--text-base) 10%, transparent);
-  color: var(--text-strong);
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(44, 62, 80, 0.7);
 }
 
+/* Body — generous padding, matches Slides' .link-modal-content (24px). */
 .modal-body {
-  padding: 16px 18px;
+  padding: 20px 24px;
   overflow-y: auto;
   flex: 1;
 }
 
+/* Footer — centered buttons, no border bar (matches Slides' centered actions). */
 .modal-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 12px 18px;
-  border-top: 1px solid var(--modal-border);
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: none;
 }
 
 .modal-foot .modal-nav,
 .modal-foot .modal-actions {
   display: flex;
-  gap: 6px;
+  gap: 12px;
 }
 
-/* Form fields */
+/* Modal buttons — exact Slides' .link-modal-btn sizing (10px 24px padding,
+   14px font, 100px min-width) instead of the smaller .btn.sm chrome. */
+.modal-foot .btn {
+  padding: 10px 24px;
+  font-size: 14px;
+  min-width: 100px;
+}
+
+/* Slides' primary hover: flat darker blue, no lift. */
+.modal-foot .btn.primary:hover {
+  background: rgb(0, 77, 135);
+  border-color: rgba(0, 95, 163, 0.3);
+  transform: none;
+}
+
+.modal-foot .btn.primary:active {
+  transform: none;
+}
+
+/* Form fields — styled like Slides' .link-input */
 .field {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .field:last-child { margin-bottom: 0; }
 
 .field label {
   display: block;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-base);
-  margin-bottom: 5px;
+  color: rgba(44, 62, 80, 0.8);
+  margin-bottom: 8px;
+  font-family: var(--font-ui);
 }
 
 .field input[type="text"],
-.field input[type="url"],
-.field input[type="password"] {
+.field input[type="url"] {
   width: 100%;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--modal-bg);
-  color: var(--text-strong);
-  font-size: 13px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  color: rgba(44, 62, 80, 0.9);
+  font-size: 14px;
   font-family: var(--font-ui);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: 0.2s;
 }
 
 .field input:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: rgba(0, 122, 204, 0.5);
+  box-shadow: rgba(0, 122, 204, 0.1) 0px 0px 0px 3px;
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .field input[type="file"] {
@@ -1525,16 +1473,20 @@ body {
   height: 100dvh;
   background: var(--modal-bg);
   border-left: 1px solid var(--modal-border);
-  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
+  /* No box-shadow in the closed state — the panel sits off-screen at
+     translateX(100%) and its leftward shadow would bleed ~36px into the
+     viewport, painting a dark band down the right edge of the screen.
+     The shadow is applied only in the .open state below. */
   z-index: 150;
   transform: translateX(100%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
 }
 
 .outline-panel.open {
   transform: translateX(0);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
 }
 
 .outline-head {
@@ -1591,8 +1543,6 @@ body {
   color: var(--accent-strong);
 }
 
-[data-theme="dark"] .outline-item:hover { color: var(--accent); }
-
 .outline-item.level-h1 { font-weight: 600; font-size: 13.5px; color: var(--text-strong); padding-left: 10px; }
 .outline-item.level-h2 { padding-left: 24px; font-weight: 500; }
 .outline-item.level-h3 { padding-left: 38px; font-size: 12.5px; color: var(--text-muted); }
@@ -1609,8 +1559,6 @@ body {
   margin-right: 6px;
   vertical-align: middle;
 }
-
-[data-theme="dark"] .outline-item .outline-badge { color: var(--accent); }
 
 /* ===================== Shortcuts Grid ===================== */
 .shortcuts-grid {
@@ -1678,6 +1626,14 @@ body {
   border-top: 1px dashed var(--border-strong);
   border-bottom: 1px dashed var(--border-strong);
   color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.page-content .zdocs-page-break:hover {
+  color: var(--ui-accent);
+  border-top-color: var(--ui-accent-border);
+  border-bottom-color: var(--ui-accent-border);
+  background: var(--ui-accent-soft);
   font-size: 11px;
   font-family: var(--font-ui);
   text-transform: uppercase;
@@ -1710,12 +1666,12 @@ body {
   z-index: 250;
   background: var(--modal-bg);
   border: 1px solid var(--modal-border);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  font-size: 12px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
   color: var(--text-base);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-  max-width: 320px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  max-width: 420px;
   pointer-events: none;
   opacity: 0;
   transform: translateY(4px);
@@ -1730,15 +1686,14 @@ body {
 .link-preview .lp-url {
   color: var(--accent-strong);
   font-weight: 600;
+  font-size: 14px;
   word-break: break-all;
 }
 
-[data-theme="dark"] .link-preview .lp-url { color: var(--accent); }
-
 .link-preview .lp-hint {
   color: var(--text-faint);
-  font-size: 11px;
-  margin-top: 2px;
+  font-size: 13px;
+  margin-top: 4px;
 }
 
 /* ===================== Image resize handles ===================== */
@@ -1821,8 +1776,6 @@ body {
   margin-bottom: 2px;
 }
 
-[data-theme="dark"] .version-time { color: var(--accent); }
-
 .version-preview {
   font-size: 13px;
   color: var(--text-base);
@@ -1836,57 +1789,25 @@ body {
 }
 
 /* ===================== Ruler margin drag handles ===================== */
+/* NOTE: blue hover/drag highlights and the floating blue tooltip are disabled
+   to keep the ruler visually quiet. The drag handles still work via JS — they
+   just no longer render the accent-colored background, the inner edge line,
+   or the floating "Right margin: … cm (…px)" tooltip. */
 .ruler-margin {
   transition: background 0.15s;
 }
 
-.ruler-margin:hover {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
+.ruler-margin:hover,
 .ruler-margin.dragging {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: transparent;
 }
 
 .ruler-margin::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.ruler-margin-left::after { right: 0; }
-.ruler-margin-right::after { left: 0; }
-
-.ruler-margin:hover::after,
-.ruler-margin.dragging::after {
-  opacity: 1;
+  content: none;
 }
 
 .ruler-margin-tip {
-  position: fixed;
-  z-index: 220;
-  background: var(--accent-strong);
-  color: var(--accent-contrast);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 4px;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 0.12s, transform 0.12s;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.ruler-margin-tip.show {
-  opacity: 1;
-  transform: translateY(0);
+  display: none !important;
 }
 
 /* ===================== Goal tracker ===================== */
@@ -1915,8 +1836,6 @@ body {
 .goal-bar-value .goal-current {
   color: var(--accent-strong);
 }
-
-[data-theme="dark"] .goal-bar-value .goal-current { color: var(--accent); }
 
 .goal-bar-value .goal-divider {
   color: var(--text-faint);
@@ -2191,8 +2110,6 @@ body {
   color: var(--accent-strong);
 }
 
-[data-theme="dark"] .session-timer:hover { color: var(--accent); }
-
 .session-timer svg { opacity: 0.7; }
 
 /* ===================== Word cloud ===================== */
@@ -2214,8 +2131,6 @@ body {
   transition: transform 0.15s, color 0.15s;
   cursor: default;
 }
-
-[data-theme="dark"] .word-cloud-item { color: var(--accent); }
 
 .word-cloud-item:hover {
   transform: scale(1.15);
@@ -2246,8 +2161,6 @@ body {
   text-underline-offset: 2px;
   padding: 0;
 }
-
-[data-theme="dark"] .dict-link { color: var(--accent); }
 
 .dict-hint {
   font-size: 12.5px;
@@ -2302,8 +2215,6 @@ body {
   font-weight: 500;
 }
 
-[data-theme="dark"] .dict-word { color: var(--accent); }
-
 .dict-word-remove {
   display: grid;
   place-items: center;
@@ -2319,8 +2230,6 @@ body {
   font-family: var(--font-ui);
   transition: background 0.12s;
 }
-
-[data-theme="dark"] .dict-word-remove { color: var(--accent); }
 
 .dict-word-remove:hover {
   background: var(--accent);
@@ -2431,8 +2340,6 @@ body {
   border-color: var(--accent);
 }
 
-[data-theme="dark"] .ruler-margins-btn:hover { color: var(--accent); }
-
 .ruler-margins-btn span { white-space: nowrap; }
 
 /* ===================== Outline search ===================== */
@@ -2517,15 +2424,11 @@ body {
   border-color: var(--accent);
 }
 
-[data-theme="dark"] .preset-btn:hover { color: var(--accent); }
-
 .preset-btn.active {
   background: var(--accent-soft);
   color: var(--accent-strong);
   border-color: var(--accent);
 }
-
-[data-theme="dark"] .preset-btn.active { color: var(--accent); }
 
 .preset-hint {
   font-size: 10.5px;
@@ -2535,7 +2438,6 @@ body {
 }
 
 .preset-btn.active .preset-hint { color: var(--accent-strong); }
-[data-theme="dark"] .preset-btn.active .preset-hint { color: var(--accent); }
 
 .margin-inputs {
   display: grid;
@@ -2686,8 +2588,6 @@ body {
   color: var(--accent-strong);
   margin-bottom: 4px;
 }
-
-[data-theme="dark"] .readability-level { color: var(--accent); }
 
 .readability-level.hard { color: #c0392b; }
 .readability-level.medium { color: #e0a800; }
@@ -2859,8 +2759,6 @@ body {
   margin-left: 4px;
 }
 
-[data-theme="dark"] .issue-suggestion { color: var(--accent); }
-
 .issue-fix {
   flex-shrink: 0;
   font-size: 11px;
@@ -2873,8 +2771,6 @@ body {
   font-family: var(--font-ui);
   transition: background 0.12s, color 0.12s;
 }
-
-[data-theme="dark"] .issue-fix { color: var(--accent); }
 
 .issue-fix:hover {
   background: var(--accent);
@@ -2953,16 +2849,18 @@ body {
   height: 100dvh;
   background: var(--modal-bg);
   border-left: 1px solid var(--modal-border);
-  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
+  /* Shadow only when open — see .outline-panel note about the closed-state
+     shadow bleeding a dark band onto the right edge of the screen. */
   z-index: 150;
   transform: translateX(100%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
 }
 
 .thumbnails-panel.open {
   transform: translateX(0);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
 }
 
 .thumbnails-body {
@@ -3031,8 +2929,6 @@ body {
   font-weight: 600;
 }
 
-[data-theme="dark"] .thumbnail-item.active .thumbnail-label { color: var(--accent); }
-
 /* ===================== Brand sub-label ===================== */
 .brand-sub {
   display: block;
@@ -3084,8 +2980,6 @@ body {
   overflow: hidden;
 }
 
-[data-theme="dark"] .template-preview { background: #2a2f35; }
-
 .template-preview .tp-line { height: 3px; background: var(--text-faint); border-radius: 1px; opacity: 0.4; }
 .template-preview .tp-line.title { height: 6px; background: var(--ui-accent); opacity: 0.6; width: 60%; margin-bottom: 2px; }
 .template-preview .tp-line.short { width: 70%; }
@@ -3104,57 +2998,10 @@ body {
   line-height: 1.3;
 }
 
-/* ===================== Symbols picker ===================== */
-.symbol-tabs {
-  display: flex;
-  gap: 2px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--border-chrome);
-}
-
-.symbol-tab {
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--font-ui);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.symbol-tab:hover { color: var(--text-strong); }
-.symbol-tab.active { color: var(--ui-accent); border-bottom-color: var(--ui-accent); }
-
-.symbol-grid {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 2px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.symbol-cell {
-  display: grid;
-  place-items: center;
-  height: 32px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  font-size: 18px;
-  color: var(--text-strong);
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, transform 0.1s;
-  font-family: var(--font-mono);
-}
-
-.symbol-cell:hover {
-  background: var(--ui-accent-soft);
-  border-color: var(--ui-accent-border);
-  transform: scale(1.15);
-}
+/* ===================== Symbol picker =====================
+   The modal-box picker was replaced by the bottom-docked Symbol Bar
+   (Slides symbolToolbar parity) — see .symbol-toolbar styles near the
+   Draw mode section below. */
 
 /* ===================== Watermark ===================== */
 .watermark-presets {
@@ -3170,10 +3017,18 @@ body {
 }
 
 .page-watermark {
+  /* Robust centering: the page box is the containing block, so inset 0 +
+     margin auto + a flex-less one-liner keeps the text dead-center on the
+     PAGE regardless of margins/padding; rotate happens around the center. */
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(-30deg);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-30deg);
   font-size: 72px;
   font-weight: 800;
   color: var(--text-faint);
@@ -3215,15 +3070,19 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-left: 1px solid var(--modal-border);
-  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
+  /* Shadow only when open — see .outline-panel note about the closed-state
+     shadow bleeding a dark band onto the right edge of the screen. */
   z-index: 150;
   transform: translateX(100%);
-  transition: transform 0.28s var(--ease-bouncy);
+  transition: transform 0.28s var(--ease-bouncy), box-shadow 0.28s var(--ease-bouncy);
   display: flex;
   flex-direction: column;
 }
 
-.comments-panel.open { transform: translateX(0); }
+.comments-panel.open {
+  transform: translateX(0);
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
+}
 
 .comments-body {
   flex: 1;
@@ -3391,6 +3250,55 @@ body {
 .page-header { top: calc(var(--page-margin-top) / 2.6); }
 .page-footer { bottom: calc(var(--page-margin-bottom) / 2.6); text-align: center; }
 
+/* Editable header/footer strips (Layout -> Header / Footer, MS Word style).
+   Enabled strips are clickable, show a faint frame on hover and an accent
+   frame while focused, so inline editing is obvious. */
+.page-header.editable,
+.page-footer.editable {
+  pointer-events: auto;
+  user-select: text;
+  cursor: text;
+  min-height: 18px;
+  outline: none;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--paper-ink);
+  border-radius: 2px;
+  z-index: 5;
+  padding: 1px 2px;
+  margin: 0 -2px; /* negative margin keeps text aligned with the body edge */
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.page-header.editable:hover,
+.page-footer.editable:hover {
+  background: rgba(0, 0, 0, 0.025);
+  box-shadow: inset 0 0 0 1px var(--border-chrome);
+}
+
+.page-header.editable:focus,
+.page-footer.editable:focus {
+  background: rgba(0, 0, 0, 0.02);
+  box-shadow: inset 0 0 0 1px var(--ui-accent-border);
+}
+
+.page-header.editable p,
+.page-footer.editable p {
+  margin: 0 0 2px;
+}
+
+/* Word-like grayed hint inside an empty strip ("Header" / "Footer").
+   --hf-hint is set from JS; .is-empty is kept in sync on every edit. */
+.page-header.editable.is-empty:empty::before,
+.page-footer.editable.is-empty:empty::before,
+.page-header.editable.is-empty > p:only-child::before,
+.page-footer.editable.is-empty > p:only-child::before {
+  content: var(--hf-hint);
+  color: var(--text-faint);
+  font-style: italic;
+  pointer-events: none;
+}
+
 .field-dynamic {
   background: var(--ui-accent-soft);
   border-radius: 2px;
@@ -3416,33 +3324,34 @@ body {
   opacity: 0.7;
 }
 
-/* ===================== Toast (EmeraldSuite glassmorphism) ===================== */
+/* ===================== Toast (matching Slides design) ===================== */
+/* Always the white glass pill — Slides has no colored toast variants.
+   Success/error meaning is carried by the monochrome SVG icon that JS
+   injects (16px, #111 ink, 10px gap before the message), exactly like
+   Slides' showToast + _toastIcon pattern. */
 .toast {
   position: fixed;
-  bottom: 56px;
+  bottom: 24px;
   left: 50%;
-  transform: translateX(-50%) translateY(20px);
+  transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.95);
   color: #111;
-  border: 1px solid var(--border-chrome);
-  padding: 12px 22px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 14px 24px;
   border-radius: 12px;
-  font-size: 13.5px;
-  font-weight: 500;
-  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  z-index: 99999;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s var(--ease-fluid), transform 0.3s var(--ease-fluid);
-  z-index: 300;
+  transition: opacity 0.3s ease, transform 0.3s ease;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  white-space: normal;
+  word-break: break-word;
   max-width: 80vw;
-}
-
-[data-theme="dark"] .toast {
-  background: rgba(40, 46, 54, 0.95);
-  color: #f0f2f5;
+  text-align: left;
+  font-family: var(--font-ui);
 }
 
 .toast.show {
@@ -3450,25 +3359,60 @@ body {
   transform: translateX(-50%) translateY(-10px);
 }
 
-.toast.success { background: linear-gradient(135deg, #2BD059, #239a4d); color: #fff; border-color: transparent; }
-.toast.error { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; border-color: transparent; }
-
 /* ===================== Print ===================== */
 @media print {
+  /* Hide ALL app chrome — only the paper/page content should print.
+     The navbar (logo, EmeraldSuite, save-indicator), ribbon, status bar,
+     ruler, and all floating panels are hidden. */
+  .navbar, .topbar, .ribbon-tabs, .ribbon, .statusbar, .ruler-wrap,
+  .toast, .modal-overlay, .focus-bar, .print-preview-bar,
+  .draw-toolbar, .symbol-toolbar, .immersive-reader,
+  .outline-panel, .thumbnails-panel, .comments-panel,
+  .spelling-panel, .footnotes-panel,
+  .confetti-container, .rich-tip, .editor-context-menu,
+  .status-lang-menu, .find-history, .dictate-indicator,
+  .zen-indicator, .ir-topbar {
+    display: none !important;
+  }
   body { background: #fff; }
-  .topbar, .ribbon-tabs, .ribbon, .statusbar, .ruler-wrap, .toast, .modal-overlay, .focus-bar, .print-preview-bar { display: none !important; }
   .app { display: block; height: auto; overflow: visible; }
-  .document-scroll { overflow: visible; background: #fff; padding: 0; }
+  .document-scroll {
+    overflow: visible;
+    background: #fff;
+    background-image: none;
+    padding: 0;
+  }
   .pages-wrapper { gap: 0; transform: none !important; }
   .page {
     box-shadow: none;
     page-break-after: always;
     break-after: page;
     border-radius: 0;
+    margin: 0;
     animation: none;
   }
+  .page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
   .page::before { display: none; }
-  .page-badge { display: none; }
+  .page-badge { display: none !important; }
+  .zdocs-page-break { display: none !important; }
+  .section-break { display: none !important; }
+  /* Header/footer strips print as plain text — no editing frames. */
+  .page-header, .page-footer {
+    box-shadow: none !important;
+    background: none !important;
+  }
+  .page-content {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Preserve colors for tracked changes, highlights, etc. */
+  ins.zdocs-ins, del.zdocs-del, mark, .equation, .smartart, .cover-page {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   mark.zdocs-mark { background: transparent !important; color: inherit !important; }
 }
 
@@ -3479,6 +3423,10 @@ body {
   .brand-name { display: none; }
   .document-scroll { padding: 16px 8px 32px; }
   .toolbar-stats { display: none; }
+  /* On narrow screens, hide the "Print" text label but keep the icon — matches
+     Slides' behavior of keeping the Present action accessible on mobile. */
+  .ribbon-tab-action span { display: none; }
+  .ribbon-tab-action { padding: 7px 10px; }
   .ruler-wrap { display: none; }
   .ribbon-tabs { padding: 0 8px; }
   .ribbon-tab { margin: 0 4px; }
@@ -3487,6 +3435,8 @@ body {
 @media (max-width: 620px) {
   .doc-title { max-width: 140px; font-size: 13px; padding: 6px 8px; }
   .status-left .sep, .status-left #charCount { display: none; }
+  /* On very narrow screens, hide word/char counters — keep Page info, Ln/Col, zoom %. */
+  #wordCount, #charCount { display: none; }
   .page-size-label { display: none; }
   .modal { width: calc(100vw - 24px) !important; }
   .ribbon-btn-icon span { display: none; }
@@ -3496,46 +3446,6 @@ body {
 /* =========================================================
    EmeraldSuite: Docs — Feature additions
    ========================================================= */
-
-/* ---- Internal link dialog ---- */
-.internal-link-list {
-  max-height: 240px;
-  overflow-y: auto;
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius-sm);
-  padding: 4px;
-  background: rgba(255, 255, 255, 0.6);
-}
-[data-theme="dark"] .internal-link-list { background: rgba(255, 255, 255, 0.03); }
-.internal-link-list .il-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-base);
-  border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s;
-}
-.internal-link-list .il-option:hover { background: var(--ui-accent-soft); }
-.internal-link-list .il-option.selected {
-  background: var(--ui-accent-soft);
-  border-color: var(--ui-accent-border);
-  color: var(--ui-accent);
-}
-.internal-link-list .il-kind {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-faint);
-  margin-left: auto;
-  background: var(--bg-app);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.internal-link-list .il-empty { padding: 16px; text-align: center; color: var(--text-faint); font-size: 12px; }
 
 /* ---- Cover page presets ---- */
 .cover-presets { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -3620,7 +3530,6 @@ body {
   border-radius: 2px;
   padding: 0 2px;
 }
-[data-theme="dark"] .compare-out .diff-ins { color: #6ee787; background: rgba(43, 208, 89, 0.18); }
 .compare-out .diff-del {
   background: rgba(217, 48, 37, 0.14);
   color: #b91c1c;
@@ -3628,19 +3537,7 @@ body {
   border-radius: 2px;
   padding: 0 2px;
 }
-[data-theme="dark"] .compare-out .diff-del { color: #ff7a6b; background: rgba(217, 48, 37, 0.20); }
 .compare-out .diff-empty { color: var(--text-faint); font-style: italic; }
-
-/* ---- Password ---- */
-.password-error {
-  color: #b91c1c;
-  font-size: 12px;
-  margin-top: 8px;
-  padding: 8px 10px;
-  background: rgba(217, 48, 37, 0.08);
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(217, 48, 37, 0.2);
-}
 
 /* ---- Spelling panel ---- */
 .spelling-panel {
@@ -3655,16 +3552,19 @@ body {
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-chrome);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  /* No box-shadow in the closed state — the panel sits off-screen at
+     translateX(340px) and its leftward shadow would bleed onto the right
+     edge of the viewport, painting a faint dark band down the right side
+     of the screen. Shadow is applied only in the .open state below. */
   z-index: 40;
   display: flex;
   flex-direction: column;
   transform: translateX(340px);
   opacity: 0;
-  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s;
+  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s, box-shadow 0.28s var(--ease-bouncy);
   pointer-events: none;
 }
-.spelling-panel.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+.spelling-panel.open { transform: translateX(0); opacity: 1; pointer-events: auto; box-shadow: var(--shadow-lg); }
 .spelling-body { flex: 1; overflow-y: auto; padding: 8px; }
 .spell-item {
   padding: 10px 12px;
@@ -3678,7 +3578,6 @@ body {
   text-underline-offset: 3px;
   font-size: 14px;
 }
-[data-theme="dark"] .spell-word { color: #ff7a6b; text-decoration-color: #ff7a6b; }
 .spell-suggestions {
   margin-top: 6px;
   display: flex;
@@ -3727,16 +3626,17 @@ body {
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-chrome);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  /* No box-shadow in the closed state — same reason as .spelling-panel:
+     off-screen panel + always-on shadow = faint band on the right edge. */
   z-index: 40;
   display: flex;
   flex-direction: column;
   transform: translateX(360px);
   opacity: 0;
-  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s;
+  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s, box-shadow 0.28s var(--ease-bouncy);
   pointer-events: none;
 }
-.footnotes-panel.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+.footnotes-panel.open { transform: translateX(0); opacity: 1; pointer-events: auto; box-shadow: var(--shadow-lg); }
 .footnotes-body { flex: 1; overflow-y: auto; padding: 8px; }
 .footnotes-foot { padding: 8px; border-top: 1px solid var(--border-chrome); display: flex; justify-content: flex-end; }
 .fn-item {
@@ -3790,75 +3690,277 @@ sup.footnote-ref:hover, sup.endnote-ref:hover { text-decoration: underline; }
 .footnotes-section .fn-entry { margin: 4px 0; padding-left: 18px; text-indent: -18px; }
 .footnotes-section .fn-entry .fn-key { color: var(--ui-accent); font-weight: 700; }
 
-/* ---- Ink annotation toolbar ---- */
-.ink-toolbar {
+/* ---- Draw mode (bottom-docked toolbar, ported from Slides/Notes) ----
+   Accent colors follow the Docs cyan theme; Clear keeps the destructive
+   red and Done keeps the confirm green (Slides/Notes parity). */
+.draw-toolbar {
+  display: none;
   position: fixed;
-  top: calc(var(--topbar-h) + var(--ribbon-tabs-h) + var(--ribbon-h) + 8px);
+  bottom: 18px;
   left: 50%;
-  transform: translateX(-50%) translateY(-12px);
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: rgb(255, 255, 255);
+  border: 1px solid rgb(209, 213, 219);
+  border-radius: 16px;
+  box-shadow: rgba(0, 0, 0, 0.14) 0px 4px 5px;
+  z-index: 9000;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  animation: drawToolbarIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.draw-toolbar.visible { display: flex; }
+@keyframes drawToolbarIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.95); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0px) scale(1); }
+}
+.draw-toolbar-divider {
+  width: 1px;
+  height: 28px;
+  background: rgb(229, 231, 235);
+  flex-shrink: 0;
+  margin: 0px 2px;
+}
+.draw-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid rgb(229, 231, 235);
+  border-radius: 8px;
+  background: rgb(249, 250, 251);
+  color: rgb(55, 65, 81);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.draw-tool-btn:hover {
+  background: rgb(243, 244, 246);
+  border-color: rgb(209, 213, 219);
+  color: rgb(17, 24, 39);
+}
+.draw-tool-btn.active {
+  background: rgba(8, 145, 178, 0.10);
+  border-color: var(--ui-accent);
+  color: var(--ui-accent-hover);
+}
+.draw-clear-btn {
+  color: rgb(220, 38, 38);
+  border-color: rgb(254, 202, 202);
+  background: rgb(254, 242, 242);
+}
+.draw-clear-btn:hover {
+  background: rgb(254, 226, 226);
+  border-color: rgb(239, 68, 68);
+  color: rgb(185, 28, 28);
+}
+.draw-done-btn {
+  background: rgb(209, 250, 229);
+  border-color: rgb(46, 204, 113);
+  color: rgb(6, 95, 70);
+  font-weight: 600;
+}
+.draw-done-btn:hover {
+  background: rgb(167, 243, 208);
+  border-color: rgb(16, 185, 129);
+  color: rgb(6, 78, 59);
+}
+.draw-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgb(156, 163, 175);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-ui);
+}
+.draw-color-section, .draw-size-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.draw-color-section {
+  overflow: hidden;
+  max-width: 300px;
+  transition: max-width 0.3s, opacity 0.3s, padding 0.3s;
+  opacity: 1;
+}
+.draw-color-section.eraser-hidden {
+  max-width: 0px;
   opacity: 0;
   pointer-events: none;
-  z-index: 45;
-  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s;
+  padding: 0px;
+  gap: 0px;
 }
-.ink-toolbar.open { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
-.ink-toolbar-inner {
+.draw-toolbar-divider.color-divider {
+  transition: max-width 0.3s, opacity 0.3s;
+  overflow: hidden;
+  max-width: 10px;
+  opacity: 1;
+}
+.draw-toolbar-divider.color-divider.eraser-hidden {
+  max-width: 0px;
+  opacity: 0;
+}
+.draw-color-presets {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: var(--bg-toolbar);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--border-chrome);
-  border-radius: 999px;
-  padding: 6px 12px;
-  box-shadow: var(--shadow-lg);
+  gap: 4px;
 }
-.ink-title { font-weight: 700; font-size: 12px; color: var(--ui-accent); text-transform: uppercase; letter-spacing: 0.06em; }
-.ink-sep { width: 1px; height: 22px; background: var(--border-chrome); }
-.ink-color-tool { position: relative; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-.ink-color-swatch {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
+.draw-color-swatch {
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: #239a4d;
-  border: 2px solid var(--bg-toolbar);
-  box-shadow: 0 0 0 1px var(--border-strong);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+  padding: 0px;
 }
-.ink-color-tool input[type="color"] { width: 0; height: 0; padding: 0; border: none; opacity: 0; position: absolute; }
-.ink-size-tool { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
-.ink-size-tool input[type="range"] { width: 90px; }
-#inkSizeLabel { min-width: 14px; text-align: center; font-weight: 600; color: var(--text-base); }
+.draw-color-swatch:hover { transform: scale(1.15); }
+.draw-color-swatch.active {
+  border-color: rgb(55, 65, 81);
+  transform: scale(1.15);
+  box-shadow: rgb(255, 255, 255) 0px 0px 0px 1px inset;
+}
+.draw-size-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.draw-size-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgb(229, 231, 235);
+  background: rgb(249, 250, 251);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, border-color 0.12s;
+  color: rgb(55, 65, 81);
+  padding: 0px;
+}
+.draw-size-btn:hover {
+  background: rgb(243, 244, 246);
+  border-color: rgb(209, 213, 219);
+}
+.draw-size-btn.active {
+  background: rgba(8, 145, 178, 0.10);
+  border-color: var(--ui-accent);
+  color: var(--ui-accent-hover);
+}
 
-/* Ink canvas overlay (covers the document scroll area) */
-.ink-canvas {
+/* Draw canvas overlay (covers the document scroll area; persists after Done) */
+.draw-canvas {
   position: absolute;
   top: 0; left: 0;
-  width: 100%; height: 100%;
   z-index: 5;
-  pointer-events: auto;
+  pointer-events: none;
   cursor: crosshair;
 }
-.app.ink-mode .page-content { pointer-events: none; }
-.app.ink-mode .page-badge { pointer-events: none; }
+.app.draw-mode .page-content { pointer-events: none; }
+.app.draw-mode .page-badge { pointer-events: none; }
 
-/* ---- Restrict edit banner ---- */
-.restrict-banner {
-  flex: 0 0 auto;
+/* ---- Symbol bar (bottom-docked, ported from Slides) ----
+   Same floating pill as the Slides symbolToolbar: grouped symbol buttons
+   in a horizontally scrollable strip + Done. Hover/active accents use the
+   Docs cyan theme (Slides uses orange); Done reuses the green draw-done
+   button so both bottom toolbars match. */
+.symbol-toolbar {
   display: none;
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: var(--ui-accent-soft);
-  border-bottom: 1px solid var(--ui-accent-border);
-  color: var(--ui-accent);
-  font-size: 12px;
-  font-weight: 500;
+  gap: 0px;
+  padding: 10px 16px;
+  background: rgb(255, 255, 255);
+  border: 1px solid rgb(209, 213, 219);
+  border-radius: 16px;
+  box-shadow: rgba(0, 0, 0, 0.14) 0px 4px 5px;
+  z-index: 9000;
+  max-width: 94vw;
+  animation: drawToolbarIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.restrict-banner.show { display: flex; }
-.restrict-banner svg { color: var(--ui-accent); }
-.restrict-banner button { margin-left: auto; }
+.symbol-toolbar.visible { display: flex; }
+.symbol-bar-scroll {
+  display: flex;
+  align-items: center;
+  gap: 0px;
+  overflow: auto hidden;
+  flex: 1 1 0%;
+  padding: 0px 4px;
+  /* No custom scrollbar here — matches Slides: the global
+     style.css ::-webkit-scrollbar design (10px, #c1c1c1 rounded
+     thumb, #f1f1f1 track) applies. */
+}
+.symbol-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 0px 8px;
+  flex-shrink: 0;
+}
+.symbol-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgb(156, 163, 175);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--font-ui);
+  line-height: 1;
+}
+.symbol-group-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.sym-bar-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+  background: rgb(255, 255, 255);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+  font-size: 16px;
+  color: rgb(44, 62, 80);
+  padding: 0px;
+  outline: none;
+  font-family: var(--font-ui);
+  line-height: 1;
+}
+.sym-bar-btn:hover {
+  background: rgba(8, 145, 178, 0.08);
+  border-color: rgba(8, 145, 178, 0.2);
+  color: var(--ui-accent);
+  transform: scale(1.1);
+}
+.sym-bar-btn:active {
+  transform: scale(1);
+  background: rgba(8, 145, 178, 0.12);
+}
+.symbol-toolbar-divider {
+  width: 1px;
+  height: 28px;
+  background: rgb(229, 231, 235);
+  flex-shrink: 0;
+  margin: 0px 4px;
+}
 
 /* ---- Track changes marks (inline) ---- */
 ins.zdocs-ins {
@@ -3867,13 +3969,11 @@ ins.zdocs-ins {
   text-decoration: none;
   border-bottom: 1px solid rgba(35, 154, 77, 0.4);
 }
-[data-theme="dark"] ins.zdocs-ins { color: #6ee787; background: rgba(43, 208, 89, 0.18); }
 del.zdocs-del {
   background: rgba(217, 48, 37, 0.14);
   color: #b91c1c;
   text-decoration: line-through;
 }
-[data-theme="dark"] del.zdocs-del { color: #ff7a6b; background: rgba(217, 48, 37, 0.20); }
 ins.zdocs-ins, del.zdocs-del { border-radius: 2px; padding: 0 1px; }
 .zdocs-change-marker {
   display: inline-block;
@@ -3924,23 +4024,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 .cover-page.style-accent .cover-title { font-size: 44px; font-weight: 800; color: var(--ui-accent); margin-bottom: 14px; }
 .cover-page.style-accent .cover-subtitle { font-size: 17px; color: var(--text-muted); margin-bottom: 80px; }
 .cover-page .cover-accent-bar { height: 4px; width: 60px; background: var(--ui-accent); border-radius: 2px; margin: 0 auto 24px; }
-
-/* ---- AutoText / Quick Parts list ---- */
-.autotext-list .at-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border-chrome);
-  font-size: 13px;
-}
-.autotext-list .at-item:last-child { border-bottom: none; }
-.autotext-list .at-name { font-weight: 600; color: var(--text-strong); }
-.autotext-list .at-preview { color: var(--text-faint); font-size: 11px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.autotext-list .at-insert { font-size: 11px; padding: 3px 10px; border-radius: 4px; border: 1px solid var(--ui-accent-border); background: var(--ui-accent-soft); color: var(--ui-accent); cursor: pointer; }
-.autotext-list .at-insert:hover { background: var(--ui-accent); color: #fff; }
-.autotext-list .at-del { font-size: 11px; color: var(--text-faint); background: transparent; border: 1px solid var(--border-strong); border-radius: 4px; padding: 3px 6px; cursor: pointer; }
-.autotext-list .at-del:hover { color: #b91c1c; border-color: rgba(217, 48, 37, 0.4); }
 
 /* ---- SmartArt container ---- */
 .smartart {
@@ -3997,10 +4080,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 /* ---- Screenshot placeholder ---- */
 .screenshot-img { max-width: 100%; border: 1px solid var(--border-chrome); border-radius: var(--radius-sm); }
 
-/* ---- Restrict mode: dim the editor ---- */
-.app.restricted .page-content { background: var(--bg-app) !important; color: var(--text-muted) !important; cursor: not-allowed; }
-.app.restricted .page-content * { cursor: not-allowed !important; }
-
 /* ---- Refined modal fields spacing for new modals ---- */
 .cover-presets .preset-btn, .equation-presets .eq-preset { min-width: 0; }
 
@@ -4053,116 +4132,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 /* =========================================================
    Round 2 — new feature styling
    ========================================================= */
-
-/* ---- Mail merge dialog ---- */
-.merge-csv-input {
-  width: 100%;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--bg-toolbar);
-  color: var(--text-strong);
-  resize: vertical;
-  min-height: 100px;
-}
-.merge-fields-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px;
-  background: var(--bg-app);
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius-sm);
-  min-height: 36px;
-}
-.merge-field-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--ui-accent-soft);
-  border: 1px solid var(--ui-accent-border);
-  color: var(--ui-accent);
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.15s;
-}
-.merge-field-chip:hover { background: var(--ui-accent); color: #fff; }
-.merge-preview-list {
-  max-height: 160px;
-  overflow-y: auto;
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius-sm);
-  background: var(--bg-app);
-}
-.merge-preview-item {
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border-chrome);
-  font-size: 12px;
-  color: var(--text-base);
-}
-.merge-preview-item:last-child { border-bottom: none; }
-.merge-preview-item .mpi-num { font-weight: 700; color: var(--ui-accent); margin-right: 6px; }
-
-/* ---- Content controls dialog ---- */
-.content-control-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-.cc-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 8px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: 0.18s var(--ease-fluid);
-  color: var(--text-base);
-  font-size: 12px;
-  font-weight: 500;
-}
-[data-theme="dark"] .cc-btn { background: rgba(255, 255, 255, 0.04); }
-.cc-btn:hover {
-  border-color: var(--ui-accent-border);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  transform: translateY(-1px);
-}
-.cc-btn svg { color: var(--ui-accent); }
-
-/* Content control elements rendered in the document */
-.cc-richtext, .cc-plain, .cc-date, .cc-dropdown, .cc-checkbox, .cc-picture {
-  display: inline-block;
-  background: var(--ui-accent-soft);
-  border: 1px dashed var(--ui-accent-border);
-  border-radius: 4px;
-  padding: 2px 8px;
-  color: var(--ui-accent);
-  font-size: 13px;
-  min-width: 80px;
-  cursor: pointer;
-  transition: background 0.15s;
-  vertical-align: middle;
-}
-.cc-richtext:focus, .cc-plain:focus, .cc-date:focus, .cc-dropdown:focus {
-  outline: none;
-  background: var(--ui-accent-selected);
-  border-style: solid;
-}
-.cc-richtext::before, .cc-plain::before {
-  content: "✎ ";
-  opacity: 0.5;
-  font-size: 0.85em;
-}
-.cc-placeholder { color: var(--text-faint); font-style: italic; }
 
 /* ---- Immersive reader overlay ---- */
 .immersive-reader {
@@ -4335,43 +4304,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 .inspector-item-remove:hover { background: rgba(217, 48, 37, 0.14); }
 .inspector-item.empty .inspector-item-count { color: var(--ui-accent); }
 
-/* ---- Macros ---- */
-.macros-controls { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.macros-controls .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
-#macroRecord.recording {
-  background: #d93025;
-  border-color: #d93025;
-  animation: macroPulse 1.2s ease-in-out infinite;
-}
-@keyframes macroPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.5); }
-  50% { box-shadow: 0 0 0 6px rgba(217, 48, 37, 0); }
-}
-.macros-list { max-height: 240px; overflow-y: auto; }
-.macro-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border-chrome);
-  font-size: 13px;
-}
-.macro-item:last-child { border-bottom: none; }
-.macro-name { font-weight: 600; color: var(--text-strong); flex: 1; }
-.macro-steps { color: var(--text-faint); font-size: 11px; }
-.macro-play {
-  font-size: 11px;
-  padding: 3px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--ui-accent-border);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
-  cursor: pointer;
-}
-.macro-play:hover { background: var(--ui-accent); color: #fff; }
-.macro-del { color: var(--text-faint); background: transparent; border: 1px solid var(--border-strong); border-radius: 4px; padding: 3px 6px; cursor: pointer; font-size: 11px; }
-.macro-del:hover { color: #d93025; border-color: rgba(217, 48, 37, 0.3); }
-
 /* ---- Status bar polish: language selector dropdown ---- */
 .status-lang-menu {
   position: fixed;
@@ -4420,7 +4352,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   font-size: 12px;
   font-weight: 500;
 }
-[data-theme="dark"] .sec-orient-btn { background: rgba(255, 255, 255, 0.04); }
 .sec-orient-btn:hover { border-color: var(--ui-accent-border); color: var(--ui-accent); }
 .sec-orient-btn.active {
   background: var(--ui-accent-soft);
@@ -4589,7 +4520,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   transition: 0.18s var(--ease-fluid);
   text-align: center;
 }
-[data-theme="dark"] .smartart-option { background: rgba(255, 255, 255, 0.04); }
 .smartart-option:hover {
   border-color: var(--ui-accent-border);
   background: var(--ui-accent-soft);
@@ -4699,19 +4629,7 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 }
 .toolbar-stats:hover { background: var(--ui-accent-soft); }
 
-/* ---- Merge field highlight in document (when previewing) ---- */
-.merge-field.preview-active {
-  background: var(--ui-accent-selected);
-  border: 1px solid var(--ui-accent);
-  border-radius: 3px;
-  padding: 0 4px;
-  color: var(--ui-accent);
-}
-
-/* ---- Ribbon group hover: subtle bg lift ---- */
-.ribbon-group:hover .group-label {
-  color: var(--ui-accent);
-}
+/* ---- Ribbon group hover: group label stays neutral like Slides ---- */
 
 /* ---- Topbar: separator refinement ---- */
 .topbar-sep {
@@ -4724,17 +4642,33 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 
 /* ---- Round 5 polish ---- */
 
-/* Focus-visible rings for keyboard accessibility */
+/* Focus-visible rings for keyboard accessibility
+   NOTE: status-bar items (zoom %, lang, page-size-label) are intentionally
+   excluded from the blue focus ring so that clicking them with a mouse does
+   not leave a blue outline lingering on the bar. Keyboard users still get a
+   visible focus affordance via the browser default :focus ring, which we
+   also neutralize for these specific controls below. */
 .ribbon-btn:focus-visible,
 .topbar-action:focus-visible,
 .btn:focus-visible,
 .select:focus-visible,
-.ribbon-btn-icon:focus-visible,
-.page-nav:focus-visible,
-.status-zoom-btn:focus-visible,
-.status-lang:focus-visible {
+.ribbon-btn-icon:focus-visible {
   outline: 2px solid var(--ui-accent-ring);
   outline-offset: 2px;
+}
+
+/* Status-bar items: no blue focus ring on click OR keyboard focus,
+   to avoid the "weird blue line" lingering under A4.
+   (statusZoomPct no longer needs this — it's not interactive, but keep
+   the rule for status-lang and page-size-label.) */
+.status-lang:focus-visible,
+.page-size-label:focus-visible {
+  outline: none;
+}
+.status-lang:focus,
+.page-size-label:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 /* Ribbon button focus glow (subtle) */
@@ -4753,27 +4687,7 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 }
 .topbar-action:active { transform: translateY(0) scale(0.94); }
 
-/* Page badge polish — subtle pill */
-.page-badge {
-  position: absolute;
-  bottom: 8px;
-  right: 12px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-faint);
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(4px);
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border-chrome);
-  pointer-events: none;
-  transition: opacity 0.2s;
-}
-[data-theme="dark"] .page-badge {
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--text-muted);
-}
-.page:hover .page-badge { opacity: 0.4; }
+/* Page badge polish block removed — badges disabled globally (see base rule) */
 
 /* Find & Replace history dropdown */
 .find-history {
@@ -4832,15 +4746,8 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 .page:nth-child(5) { animation-delay: 0.2s; }
 .page:nth-child(n+6) { animation-delay: 0.25s; }
 
-/* Status bar polish */
-.statusbar {
-  background: var(--bg-statusbar);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-top: 1px solid var(--border-chrome);
-  box-shadow: 0 -1px 0 rgba(0,0,0,0.02);
-}
-.statusbar button:hover { color: var(--ui-accent); }
+/* Status bar polish — neutralized (floating-pill look from the base rule wins) */
+.statusbar button:hover { color: inherit; }
 
 /* Toolbar stats live update pulse */
 .toolbar-stats.updated {
@@ -4857,14 +4764,14 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   margin: 0 auto;
 }
 
-/* Better ribbon-content padding */
+/* Better ribbon-content padding (matching slides: 12px) */
 .ribbon-content {
-  padding: 10px 14px;
+  padding: 12px;
 }
 
-/* Modal head gradient (subtle) */
+/* Modal head gradient (subtle) — removed to match Slides clean white header */
 .modal-head {
-  background: linear-gradient(180deg, var(--ui-accent-soft), transparent 60%);
+  background: transparent;
 }
 
 /* Cover page preview text alignment fix */
@@ -4931,54 +4838,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   opacity: 0.8;
 }
 
-/* ---- Print stylesheet improvements ---- */
-@media print {
-  .topbar, .ribbon-tabs, .ribbon, .ruler-wrap, .statusbar,
-  .focus-bar, .print-preview-bar, .restrict-banner,
-  .ink-toolbar, .immersive-reader,
-  .outline-panel, .thumbnails-panel, .comments-panel,
-  .spelling-panel, .footnotes-panel, .modal-overlay,
-  .confetti-container, .toast, .rich-tip, .editor-context-menu,
-  .status-lang-menu, .find-history, .dictate-indicator {
-    display: none !important;
-  }
-  .app { display: block; height: auto; overflow: visible; }
-  .document-scroll {
-    overflow: visible;
-    padding: 0;
-    background: #fff;
-    background-image: none;
-  }
-  .pages-wrapper {
-    gap: 0;
-    transform: none !important;
-  }
-  .page {
-    box-shadow: none;
-    page-break-after: always;
-    break-after: page;
-    margin: 0;
-    animation: none;
-    border-radius: 0;
-  }
-  .page:last-child {
-    page-break-after: auto;
-    break-after: auto;
-  }
-  .page-badge { display: none !important; }
-  .page-content {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .zdocs-page-break { display: none !important; }
-  .section-break { display: none !important; }
-  /* Preserve colors for tracked changes, highlights, etc. */
-  ins.zdocs-ins, del.zdocs-del, mark, .equation, .smartart, .cover-page {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
-
 /* ---- Ruler refinement ---- */
 .ruler {
   background: linear-gradient(180deg, var(--ruler-bg), color-mix(in srgb, var(--ruler-bg) 95%, #000 5%));
@@ -4995,15 +4854,20 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 
 /* ---- More micro-interactions ---- */
 
-/* Button press ripple */
+/* Button press ripple — spans are injected by initRippleEffect() into
+   .topbar-action and .btn elements. The .ripple rule MUST be generic
+   (not scoped to .ribbon-btn): with no matching rule the span would be
+   position:static and sit in the flex layout, inflating the button to
+   ~max(w,h) square for 500ms on every click. position:absolute keeps
+   it out of layout flow so the button never changes size. */
 .ribbon-btn {
   position: relative;
   overflow: hidden;
 }
-.ribbon-btn .ripple {
+.ripple {
   position: absolute;
   border-radius: 50%;
-  background: rgba(35, 154, 77, 0.3);
+  background: rgba(8, 145, 178, 0.25);
   transform: scale(0);
   animation: rippleEffect 0.5s ease-out;
   pointer-events: none;
@@ -5081,20 +4945,9 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   text-align: center;
 }
 
-/* Milestone toast (word count goal) */
-.toast.milestone {
-  background: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-hover));
-  color: #fff;
-  font-weight: 700;
-  font-size: 14px;
-  padding: 14px 24px;
-  box-shadow: 0 8px 32px rgba(35, 154, 77, 0.4);
-}
-.toast.milestone::before {
-  content: "🎉";
-  margin-right: 8px;
-  font-size: 18px;
-}
+/* Milestone toasts now reuse the standard Slides-style white pill —
+   the 🎉 gradient variant was removed so every toast looks identical
+   to the Slides app (icon + message, monochrome). */
 
 /* Topbar brand refinement */
 .brand-mark {
@@ -5112,6 +4965,7 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   color: var(--text-faint);
   opacity: 0.5;
 }
+
 /* Page transition (when switching pages via nav) */
 .page.flash {
   animation: pageFlash 0.6s ease-out;
@@ -5198,7 +5052,6 @@ a.zdocs-bookmark.flash {
   font-size: 13px;
   font-weight: 500;
 }
-[data-theme="dark"] .color-theme-option { background: rgba(255, 255, 255, 0.04); }
 .color-theme-option:hover {
   border-color: var(--ui-accent-border);
   background: var(--ui-accent-soft);
@@ -5261,46 +5114,13 @@ a.zdocs-bookmark.flash {
   background: var(--bg-toolbar);
 }
 
-/* Status bar page-size quick switcher */
+/* Status bar page-size quick switcher — REMOVED.
+   The A4 label is informational only; the clickable chip and its blue
+   quick-switch menu are fully disabled. */
 .status-page-size {
-  cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 4px;
-  border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s;
+  display: none !important;
+  pointer-events: none !important;
 }
-.status-page-size:hover {
-  background: var(--ui-accent-soft);
-  border-color: var(--ui-accent-border);
-}
-
-/* Page-size quick menu */
-.page-size-menu {
-  position: fixed;
-  background: var(--bg-toolbar);
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg);
-  padding: 4px;
-  z-index: 250;
-  min-width: 120px;
-  display: none;
-}
-.page-size-menu.open { display: block; animation: ctxFadeIn 0.15s ease-out; }
-.page-size-menu button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-  color: var(--text-base);
-  font-size: 12px;
-  cursor: pointer;
-  border-radius: 4px;
-}
-.page-size-menu button:hover { background: var(--ui-accent-soft); color: var(--ui-accent); }
-.page-size-menu button.active { background: var(--ui-accent); color: #fff; }
 
 /* ---- Round 10 polish ---- */
 
@@ -5412,8 +5232,8 @@ a.zdocs-bookmark.flash {
   100% { background-position: 200% 0; }
 }
 
-/* Session timer + version count hover */
-.session-timer:hover, .version-count:hover {
+/* Session timer hover — (version-count badge removed from status bar) */
+.session-timer:hover {
   color: var(--ui-accent);
   background: var(--ui-accent-soft);
 }
@@ -5431,19 +5251,12 @@ a.zdocs-bookmark.flash {
 
 /* ---- Round 11 polish ---- */
 
-/* Caret position display in status bar */
+/* Caret position display in status bar — same style as other statbar-items.
+   (Removed the old mono-font / 11px / different-color override so it visually
+   matches "Page X of Y" and "NN words" etc.) */
 #caretPos {
-  font-size: 11px;
-  color: var(--text-muted);
+  /* inherits from .statbar-item: 12px DM Sans, color rgb(100,116,139), padding 0 12px */
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-mono);
-  padding: 2px 6px;
-  border-radius: 3px;
-  transition: background 0.15s;
-}
-#caretPos:hover {
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
 }
 
 /* Relative autosave time */
@@ -5518,52 +5331,179 @@ a.zdocs-bookmark.flash {
   overflow-y: auto;
   white-space: pre-wrap;
 }
-.app.dark-paper .page {
-  background: #1a1d23;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    0 4px 10px rgba(0, 0, 0, 0.3),
-    0 16px 40px rgba(0, 0, 0, 0.4);
+
+/* ===================== MS Dropdowns (ported from slides.css — 1:1) ===================== */
+.ms-dropdown {
+  position: relative;
+  display: inline-block;
 }
-.app.dark-paper .page-content,
-.app.dark-paper .page-content p,
-.app.dark-paper .page-content li,
-.app.dark-paper .page-content blockquote,
-.app.dark-paper .page-content td,
-.app.dark-paper .page-content th {
-  color: #d1d5db;
+
+.ms-dropdown-btn {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 6px 24px 6px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  color: rgba(44, 62, 80, 0.8);
+  transition: 0.2s;
+  position: relative;
+  min-width: 120px;
+  text-align: left;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  box-shadow: rgba(0, 0, 0, 0.05) 0px 1px 3px;
+  font-family: var(--font-ui);
+  display: flex;
+  align-items: center;
 }
-.app.dark-paper .page-content h1,
-.app.dark-paper .page-content h2,
-.app.dark-paper .page-content h3,
-.app.dark-paper .page-content h4 {
-  color: #f0f2f5;
+
+.color-preview {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-right: 6px;
+  transition: 0.2s;
+  box-shadow: rgba(255, 255, 255, 0.8) 0px 0px 0px 2px, transparent 0px 0px 0px 3px;
+  position: relative;
 }
-.app.dark-paper .page-content a {
+
+.color-preview[data-color="#ffffff"] {
+  border: 1px solid rgb(204, 204, 204);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 0 0 3px var(--ui-accent-ring), 0 1px 3px rgba(8, 145, 178, 0.2);
+}
+
+.ms-dropdown-btn::after {
+  content: "▼";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: rgba(44, 62, 80, 0.6);
+  transition: transform 0.2s;
+  font-family: "Segoe UI Symbol", "Arial Unicode MS", "DejaVu Sans", sans-serif;
+}
+
+.ms-dropdown-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--ui-accent-border);
+  box-shadow: rgba(0, 0, 0, 0.06) 0px 2px 6px;
+}
+
+.ms-dropdown-btn[aria-expanded="true"]::after,
+.ms-dropdown.active .ms-dropdown-btn::after {
+  transform: translateY(-50%) rotate(180deg);
   color: var(--ui-accent);
 }
-.app.dark-paper .page-content pre {
-  background: #0d0f12;
-  color: #a0a8b0;
+
+.ms-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 12px 40px;
+  min-width: 180px;
+  z-index: 10000;
+  display: none;
+  overflow: hidden;
+  margin-top: 4px;
 }
-.app.dark-paper .page-content blockquote {
-  border-left-color: var(--ui-accent);
-  color: #8a929c;
+
+.ms-dropdown.active .ms-dropdown-menu {
+  display: block;
+  animation: 0.2s ease 0s 1 normal none running dropdownFadeIn;
 }
-.app.dark-paper .page-badge {
-  background: rgba(0, 0, 0, 0.4);
-  color: #6b7280;
+
+.ms-dropdown-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: 0.15s;
+  color: rgba(44, 62, 80, 0.8);
+  font-size: 13px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-family: var(--font-ui);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-/* Dark paper should NOT affect printing — force white */
-@media print {
-  .app.dark-paper .page { background: #fff !important; }
-  .app.dark-paper .page-content,
-  .app.dark-paper .page-content p,
-  .app.dark-paper .page-content li,
-  .app.dark-paper .page-content td,
-  .app.dark-paper .page-content th { color: #1a1a1a !important; }
-  .app.dark-paper .page-content h1,
-  .app.dark-paper .page-content h2,
-  .app.dark-paper .page-content h3,
-  .app.dark-paper .page-content h4 { color: #1a1a1a !important; }
+
+.ms-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.ms-dropdown-item:hover {
+  background: var(--ui-accent-soft);
+  color: rgb(44, 62, 80);
+}
+
+.ms-dropdown-section-label {
+  padding: 6px 14px 4px;
+  font-size: 10px;
+  color: rgb(156, 163, 175);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.ms-dropdown-section-label:first-child {
+  border-top: none;
+}
+
+@keyframes dropdownFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+@keyframes dropdownFadeOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+.ms-portal-closing {
+  animation: 0.15s ease 0s 1 normal forwards running dropdownFadeOut !important;
+  pointer-events: none !important;
+}
+
+/* =====================================================================
+   SLIDES PARITY LOCK — navbar & ribbon tab strip geometry
+   These !important rules pin the chrome geometry to be identical with the
+   Slides app no matter what:
+     • stylesheet load order (e.g. style.css accidentally loaded after
+       docs.css — its .navbar { height: 4rem } would otherwise win),
+     • an older cached sheet still being served,
+     • font fallback metrics (line-height is pinned, not "normal").
+   Reference geometry (measured on the Slides app @ 100% zoom):
+     navbar 0–72px (4.5rem) · tab strip 72–104px (32px) · tab labels 79–100px
+   ===================================================================== */
+.app > .navbar,
+header.navbar,
+.navbar {
+  height: 4.5rem !important;
+  min-height: 4.5rem !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
+}
+
+.navbar .navcontainer,
+.navbar .nav-container {
+  height: 100% !important;
 }
