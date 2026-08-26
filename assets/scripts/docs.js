@@ -1,4 +1,4 @@
-/* BUILD 2026-08-25.10 (Layout > Zoom: removed the zoom-percentage counter label; 4 zoom buttons + status-bar % remain) */
+/* BUILD 2026-08-26.12 (References: Footnote/Endnote/Citation custom modals; proper endnote system — numbered refs, end-of-doc section, panel management; Styles group (Title/H1-H3/Normal via formatBlock); Caption/Cross-ref/Table-of-Figures removed) */
 /* =========================================================
    Z Docs — Word Processor  (v2)
    Real pagination engine: content is distributed across real
@@ -24,9 +24,16 @@
   var PAGES_WRAPPER_ID = "pagesWrapper";
   var CARET_BLOCK_ATTR = "data-caret-block";
   var CARET_OFFSET_ATTR = "data-caret-offset";
+  // Legacy single-document key (pre-multi-document builds). Kept only to
+  // migrate an existing document into the new model on first run.
   var STORAGE_KEY = "zdocs.document.v3";
+  // Multi-document storage: one index of metadata + one key per document,
+  // mirroring the Slides app (emeraldslides_index / emeraldslides_pres_<id>).
+  var DOC_INDEX_KEY = "emeralddocs_index";
+  function docDataKey(id) { return "emeralddocs_doc_" + id; }
   // THEME_KEY removed — dark mode is no longer supported.
-  var VERSIONS_KEY = "zdocs.versions";
+  var LEGACY_VERSIONS_KEY = "zdocs.versions";
+  function versionsKey(id) { return "zdocs.versions." + id; }
   var MARGINS_KEY = "zdocs.margins";
   var GOAL_KEY = "zdocs.goal";
   var MAX_VERSIONS = 10;
@@ -52,6 +59,13 @@
   var findIndex = -1;
   var pageMargins = { top: 96, right: 96, bottom: 96, left: 96 };
   var goalTarget = 0;
+  // Multi-document state (Slides pattern)
+  var documents = [];        // metadata index [{id, title, updatedAt, wordCount}]
+  var currentDocId = null;   // id of the document loaded in the editor (null → welcome screen)
+  var currentTitle = "Untitled Document";
+  var _welcomeRenderToken = 0;
+  var _deleteTargetId = null;
+  var _legacyMigratedId = null; // id of the document created from the legacy single-document key
 
   /* ---------------- DOM helpers ---------------- */
   function $(id) { return document.getElementById(id); }
@@ -1343,6 +1357,7 @@
   }
 
   function scheduleAutosave() {
+    if (!currentDocId) return; // nothing open (welcome screen)
     // Show "Saving…" immediately (matching slides pattern)
     setAutosaveState("saving");
     clearTimeout(autosaveTimer);
@@ -1530,7 +1545,8 @@
       }
     }
     return {
-      title: ($("docTitle") ? $("docTitle").value : "Untitled Document"),
+      id: currentDocId,
+      title: currentTitle,
       content: combined.innerHTML,
       savedAt: Date.now(),
       theme: theme,
@@ -1539,19 +1555,151 @@
     };
   }
 
+  /* ---------------- Multi-document index (Slides pattern) ---------------- */
+  async function loadIndex() {
+    try {
+      var idx = null;
+      if (window.EmeraldIDBStorage) {
+        idx = await window.EmeraldIDBStorage.getJSON(DOC_INDEX_KEY);
+        if (!idx) idx = await window.EmeraldIDBStorage.migrateLocalJSON(DOC_INDEX_KEY);
+      }
+      if (!idx) {
+        var raw = localStorage.getItem(DOC_INDEX_KEY);
+        if (raw) idx = JSON.parse(raw);
+      }
+      documents = Array.isArray(idx) ? idx : [];
+      // De-duplicate by id, newest first (same defensive cleanup as Slides)
+      var seen = {};
+      var cleaned = [];
+      for (var i = 0; i < documents.length; i++) {
+        var m = documents[i];
+        if (!m || !m.id || seen[m.id]) continue;
+        seen[m.id] = true;
+        cleaned.push(m);
+      }
+      cleaned.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+      documents = cleaned;
+    } catch (e) {
+      documents = [];
+    }
+  }
+
+  async function saveIndex() {
+    try {
+      // EmeraldIDBStorage.setJSON removes the localStorage copy of the key
+      // (IDB is primary), so mirror to localStorage only afterwards —
+      // same pattern as slides.js saveIndex().
+      if (window.EmeraldIDBStorage) await window.EmeraldIDBStorage.setJSON(DOC_INDEX_KEY, documents);
+      localStorage.setItem(DOC_INDEX_KEY, JSON.stringify(documents));
+    } catch (e) {}
+  }
+
+  async function loadDocData(id) {
+    try {
+      var data = null;
+      if (window.EmeraldIDBStorage) {
+        data = await window.EmeraldIDBStorage.getJSON(docDataKey(id));
+        if (!data) data = await window.EmeraldIDBStorage.migrateLocalJSON(docDataKey(id));
+      }
+      if (!data) {
+        var raw = localStorage.getItem(docDataKey(id));
+        if (raw) data = JSON.parse(raw);
+      }
+      return data;
+    } catch (e) { return null; }
+  }
+
+  async function writeDocData(data) {
+    try {
+      // IDB first, localStorage mirror second (setJSON removes the LS copy)
+      if (window.EmeraldIDBStorage) await window.EmeraldIDBStorage.setJSON(docDataKey(data.id), data);
+      localStorage.setItem(docDataKey(data.id), JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  async function deleteDocData(id) {
+    try {
+      localStorage.removeItem(docDataKey(id));
+      if (window.EmeraldIDBStorage) await window.EmeraldIDBStorage.delete(docDataKey(id));
+    } catch (e) {}
+  }
+
+  // Strip tags → plain text (for card snippets). Block elements become line
+  // breaks so headings/paragraphs don't run together. Never throws.
+  function htmlToText(html) {
+    if (!html) return "";
+    var d = document.createElement("div");
+    d.innerHTML = String(html).replace(/<\/(p|h[1-6]|li|blockquote|pre|div|tr|figcaption)>/gi, "\n");
+    return (d.textContent || "")
+      .split("\n")
+      .map(function (s) { return s.replace(/\s+/g, " ").trim(); })
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  // Random hex id, identical scheme to Slides'/Notes' generateSecureId()
+  function generateSecureId(length) {
+    var arr = new Uint8Array(Math.ceil(length / 2));
+    crypto.getRandomValues(arr);
+    return Array.from(arr, function (b) { return b.toString(16).padStart(2, "0"); }).join("").slice(0, length);
+  }
+
+  // Same id format as Slides (pres_<ms>_<hex9>) and Notes (note_<ms>_<hex9>):
+  // doc_<decimal timestamp>_<9 hex chars>  →  ?owned=doc_1734567890123_a1b2c3d4e
+  function makeDocId() {
+    return "doc_" + Date.now() + "_" + generateSecureId(9);
+  }
+
+  // Sequential "Untitled Document" titles so multiple fresh documents don't
+  // show up as identical cards on the welcome screen (same as Slides).
+  function nextUntitledTitle() {
+    var base = "Untitled Document";
+    var maxN = 0;
+    for (var i = 0; i < documents.length; i++) {
+      var t = documents[i] && documents[i].title;
+      if (!t) continue;
+      if (t === base) { maxN = Math.max(maxN, 1); continue; }
+      var m = /^Untitled Document\s+(\d+)$/.exec(t);
+      if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+    }
+    return maxN === 0 ? base : base + " " + (maxN + 1);
+  }
+
+  function updateOwnedUrl() {
+    try {
+      if (currentDocId) {
+        var url = new URL(location.href);
+        url.searchParams.set("owned", currentDocId);
+        history.replaceState({}, document.title, url);
+      } else if (location.search) {
+        history.replaceState({}, document.title, location.pathname);
+      }
+    } catch (e) {}
+  }
+
   function saveDocument(showToast) {
+    if (!currentDocId) return;
     var data;
     try { data = serialize(); } catch (e) {
       if (showToast) toast("Save failed", "error");
       return;
     }
     try {
-      // Use IndexedDB if available, otherwise fall back to localStorage
-      if (idbAvailable()) {
-        idb.setJSON(STORAGE_KEY, data);
-      } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      // Update the index entry first so the welcome screen metadata stays
+      // in sync even if the content write is still in flight.
+      var meta = null;
+      for (var i = 0; i < documents.length; i++) {
+        if (documents[i].id === currentDocId) { meta = documents[i]; break; }
       }
+      if (!meta) {
+        meta = { id: currentDocId, title: currentTitle, updatedAt: Date.now(), wordCount: 0 };
+        documents.unshift(meta);
+      }
+      meta.title = currentTitle;
+      meta.updatedAt = Date.now();
+      try { meta.wordCount = getStats().words; } catch (e) {}
+      saveIndex();
+      writeDocData(data);
       setAutosaveState("saved");
       if (showToast) {
         // Explicit save → also push to version history (store plaintext for versions)
@@ -1564,8 +1712,9 @@
     }
   }
 
-  /* ---------------- Version history (IndexedDB) ---------------- */
+  /* ---------------- Version history (per document, IndexedDB-backed) ---------------- */
   function pushVersion(data) {
+    if (!currentDocId) return;
     var versions = getVersions();
 
     // Don't add a duplicate if the content is unchanged from the last version
@@ -1583,25 +1732,33 @@
     if (versions.length > MAX_VERSIONS) versions = versions.slice(0, MAX_VERSIONS);
     try {
       if (idbAvailable()) {
-        idb.setJSON(VERSIONS_KEY, versions);
+        idb.setJSON(versionsKey(currentDocId), versions);
       } else {
-        localStorage.setItem(VERSIONS_KEY, JSON.stringify(versions));
+        localStorage.setItem(versionsKey(currentDocId), JSON.stringify(versions));
       }
     } catch (e) {}
   }
 
   function getVersions() {
+    if (!currentDocId) return [];
     try {
       var raw = null;
       if (idbAvailable()) {
-        raw = idb.getJSONSync(VERSIONS_KEY);
+        raw = idb.getJSONSync(versionsKey(currentDocId));
         // getJSONSync returns parsed object, not string
         if (raw) return raw;
       }
       // fallback to localStorage
-      raw = localStorage.getItem(VERSIONS_KEY);
-      if (!raw) return [];
-      return JSON.parse(raw) || [];
+      raw = localStorage.getItem(versionsKey(currentDocId));
+      if (raw) return JSON.parse(raw) || [];
+      // Legacy fallback: documents migrated from the old single-document
+      // builds adopt the old global version list until they create their own.
+      if (currentDocId === _legacyMigratedId) {
+        raw = localStorage.getItem(LEGACY_VERSIONS_KEY);
+        if (raw) return JSON.parse(raw) || [];
+        if (idbAvailable()) return idb.getJSONSync(LEGACY_VERSIONS_KEY) || [];
+      }
+      return [];
     } catch (e) { return []; }
   }
 
@@ -1609,7 +1766,8 @@
     var versions = getVersions();
     if (index < 0 || index >= versions.length) return;
     var v = versions[index];
-    ($("docTitle")?$("docTitle").value=v.title:null) || "Untitled Document";
+    currentTitle = v.title || "Untitled Document";
+    syncFileModalNameInput();
     var wrapper = $(PAGES_WRAPPER_ID);
     wrapper.innerHTML = "";
     var page = createPage();
@@ -1683,44 +1841,366 @@
     return months[d.getMonth()] + " " + d.getDate() + ", " + hh + ":" + mm;
   }
 
-  async function loadDocument() {
-    try {
-      var data = null;
-      // Try IndexedDB first (async)
-      if (window.EmeraldIDBStorage) {
-        data = await window.EmeraldIDBStorage.getJSON(STORAGE_KEY);
-        // If not in IDB, try migrating from localStorage
-        if (!data) {
-          data = await window.EmeraldIDBStorage.migrateLocalJSON(STORAGE_KEY);
+  /* ---------------- Document lifecycle (open / close / new / delete) ---------------- */
+
+  // Put a serialized document's content into the editor pages.
+  function applyDocData(data) {
+    currentTitle = data.title || "Untitled Document";
+    var wrapper = $(PAGES_WRAPPER_ID);
+    wrapper.innerHTML = "";
+    var page = createPage();
+    wrapper.appendChild(page);
+    var content = getContent(page);
+    content.innerHTML = data.content || "";
+    if (content.children.length === 0) {
+      var p = document.createElement("p");
+      p.innerHTML = "<br>";
+      content.appendChild(p);
+    }
+    // Restore editable header/footer strips (syncHeaderFooter runs inside
+    // paginate() and creates them on every page).
+    headerActive = hfHasContent(data.header);
+    headerHTML = headerActive ? data.header : "";
+    footerActive = hfHasContent(data.footer);
+    footerHTML = footerActive ? data.footer : "";
+    paginate();
+  }
+
+  async function openDocument(id) {
+    var data = await loadDocData(id);
+    if (!data) { toast("Could not open document", "error"); return; }
+    // Exit any immersive chrome states left over from the previous document
+    try { if ($("app").classList.contains("focus-mode")) toggleFocusMode(false); } catch (e) {}
+    try { if ($("app").classList.contains("zen-mode")) toggleZenMode(false); } catch (e) {}
+    try { togglePrintPreview(false); } catch (e) {}
+    currentDocId = id;
+    applyDocData(data);
+    // Re-render footnote/endnote areas for the freshly-loaded content
+    try { renderFootnotesSection(); renderEndnotesSection(); } catch (e) {}
+    document.body.classList.remove("no-active-doc");
+    showWelcomeScreen(false);
+    switchRibbonTab("home");
+    // Ribbon just became visible — re-measure the tab underline (it may have
+    // been measured while display:none, leaving a 0-width indicator).
+    refreshRibbonIndicator();
+    updateOwnedUrl();
+    updateStatus();
+    toast("Opened \u201C" + currentTitle + "\u201D", "success");
+  }
+
+  function closeDocument() {
+    if (currentDocId) saveDocument(false);
+    currentDocId = null;
+    currentTitle = "Untitled Document";
+    syncFileModalNameInput();
+    // Leave a fresh blank page behind so status/interval code that touches
+    // the pages never runs against an empty wrapper.
+    var wrapper = $(PAGES_WRAPPER_ID);
+    wrapper.innerHTML = "";
+    headerActive = false; headerHTML = "";
+    footerActive = false; footerHTML = "";
+    ensureFirstPage();
+    paginate();
+    updateStatus();
+    history.replaceState({}, document.title, location.pathname);
+    document.body.classList.add("no-active-doc");
+    showWelcomeScreen(true);
+  }
+
+  async function createNewDocument() {
+    var id = makeDocId();
+    var title = nextUntitledTitle();
+    documents.unshift({ id: id, title: title, updatedAt: Date.now(), wordCount: 0 });
+    await saveIndex();
+    await writeDocData({
+      id: id,
+      title: title,
+      content: "<p><br></p>",
+      savedAt: Date.now(),
+      theme: theme,
+      header: "",
+      footer: "",
+    });
+    await openDocument(id);
+    setTimeout(function () {
+      var c = getContent(getPages()[0]);
+      if (c) c.focus();
+    }, 80);
+  }
+
+  function confirmDeleteCurrentDoc() {
+    if (!currentDocId) return;
+    _deleteTargetId = currentDocId;
+    var modal = $("deleteDocModal");
+    if (modal) modal.classList.add("show");
+  }
+
+  function closeDeleteDocModal() {
+    var modal = $("deleteDocModal");
+    if (!modal) { _deleteTargetId = null; return; }
+    modal.classList.add("closing");
+    setTimeout(function () {
+      modal.classList.remove("show");
+      modal.classList.remove("closing");
+    }, 230);
+    _deleteTargetId = null;
+  }
+
+  async function deleteDocument(id) {
+    documents = documents.filter(function (d) { return d.id !== id; });
+    await saveIndex();
+    await deleteDocData(id);
+    if (currentDocId === id) {
+      currentDocId = null; // prevent saveDocument() from re-writing it
+      closeDocument();
+    }
+    renderWelcomeCards();
+    toast("Document deleted", "success");
+  }
+
+  /* ---------------- File modal (Backstage-style, Slides pattern) ---------------- */
+  function syncFileModalNameInput() {
+    var nameInput = $("fileModalNameInput");
+    if (nameInput) nameInput.value = currentTitle;
+  }
+
+  function openFileModal() {
+    var modal = $("fileModal");
+    if (!modal || !currentDocId) return;
+    syncFileModalNameInput();
+    modal.classList.add("show");
+  }
+
+  function fileModalOpen() {
+    var modal = $("fileModal");
+    return !!(modal && modal.classList.contains("show"));
+  }
+
+  function closeFileModal() {
+    var modal = $("fileModal");
+    if (!modal) return;
+    // Commit the (possibly renamed) title before closing
+    commitFileModalRename();
+    modal.classList.add("closing");
+    setTimeout(function () {
+      modal.classList.remove("show");
+      modal.classList.remove("closing");
+    }, 250);
+    // Return to the Home tab so no tab is stuck on File
+    switchRibbonTab("home");
+  }
+
+  function commitFileModalRename() {
+    var nameInput = $("fileModalNameInput");
+    if (!nameInput || !currentDocId) return;
+    var newTitle = nameInput.value.trim() || "Untitled Document";
+    if (newTitle !== currentTitle) {
+      currentTitle = newTitle;
+      scheduleAutosave(); // persists title + updates index meta
+    }
+  }
+
+  /* ---------------- Legacy migration (single → multi document) ----------------
+     Old builds stored one document at STORAGE_KEY. If it exists and holds real
+     content, adopt it as the first card on the welcome screen. Completely empty
+     untitled leftovers are ignored so new users get a clean welcome screen. */
+  async function migrateLegacyDocument() {
+    var legacy = null;
+    if (window.EmeraldIDBStorage) {
+      legacy = await window.EmeraldIDBStorage.getJSON(STORAGE_KEY);
+      if (!legacy) legacy = await window.EmeraldIDBStorage.migrateLocalJSON(STORAGE_KEY);
+    }
+    if (!legacy) {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) { try { legacy = JSON.parse(raw); } catch (e) {} }
+    }
+    if (!legacy) return;
+
+    var text = htmlToText(legacy.content);
+    var isEmpty = !text && (!legacy.title || legacy.title === "Untitled Document");
+    if (isEmpty) return; // nothing meaningful to carry over
+
+    var id = makeDocId();
+    _legacyMigratedId = id;
+    var title = legacy.title || "Untitled Document";
+    documents.unshift({
+      id: id,
+      title: title,
+      updatedAt: legacy.savedAt || Date.now(),
+      wordCount: text ? text.split(/\s+/).filter(Boolean).length : 0,
+    });
+    await saveIndex();
+    await writeDocData({
+      id: id,
+      title: title,
+      content: legacy.content || "<p><br></p>",
+      savedAt: legacy.savedAt || Date.now(),
+      theme: legacy.theme || theme,
+      header: legacy.header || "",
+      footer: legacy.footer || "",
+    });
+  }
+
+  /* ---------------- Welcome screen (home) ---------------- */
+  function showWelcomeScreen(show) {
+    var ws = $("welcomeScreen");
+    if (!ws) return;
+    ws.style.display = show ? "flex" : "none";
+    if (show) renderWelcomeCards();
+  }
+
+  function formatCardDate(ts) {
+    if (!ts) return "";
+    return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  // Slides-style welcome cards: parallel data loads + a single atomic DOM
+  // commit guarded by a render token (prevents stale/duplicate cards).
+  function renderWelcomeCards() {
+    var container = $("documentsDisplay");
+    var noContainer = $("noDocsContainer");
+    if (!container) return;
+
+    var myToken = (_welcomeRenderToken = (_welcomeRenderToken || 0) + 1);
+
+    function applyEmpty(empty) {
+      // Hide the card grid entirely when empty so it doesn't reserve space
+      // (matches Slides, where the image sits right under the section title)
+      container.style.display = empty ? "none" : "";
+      if (noContainer) noContainer.style.display = empty ? "flex" : "none";
+    }
+
+    if (documents.length === 0) {
+      container.innerHTML = "";
+      applyEmpty(true);
+      return;
+    }
+    applyEmpty(false);
+
+    var snapshot = documents.slice(0, 12);
+    Promise.all(snapshot.map(async function (meta) {
+      var data = await loadDocData(meta.id);
+      return { meta: meta, data: data };
+    })).then(function (results) {
+      if (myToken !== _welcomeRenderToken) return; // a newer render started
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < results.length; i++) {
+        (function (r) {
+          var meta = r.meta, data = r.data;
+          var snippet = data ? htmlToText(data.content) : "";
+          var words = meta.wordCount || (snippet ? snippet.split(/\s+/).filter(Boolean).length : 0);
+
+          var card = document.createElement("div");
+          card.className = "document-card";
+
+          var thumb = document.createElement("div");
+          thumb.className = "document-card-thumb";
+          var snip = document.createElement("div");
+          snip.className = "document-card-snippet" + (snippet ? "" : " is-empty");
+          snip.textContent = snippet ? snippet.slice(0, 220) : "Empty page";
+          thumb.appendChild(snip);
+
+          var info = document.createElement("div");
+          info.className = "document-card-info";
+          info.innerHTML =
+            '<div class="document-card-title"></div>' +
+            '<div class="document-card-meta"></div>';
+          info.querySelector(".document-card-title").textContent = meta.title || "Untitled Document";
+          info.querySelector(".document-card-meta").textContent =
+            words + (words === 1 ? " word \u00B7 " : " words \u00B7 ") + formatCardDate(meta.updatedAt);
+
+          card.appendChild(thumb);
+          card.appendChild(info);
+          card.addEventListener("click", function () { openDocument(meta.id); });
+          frag.appendChild(card);
+        })(results[i]);
+      }
+      container.innerHTML = "";
+      container.appendChild(frag);
+    }).catch(function () {});
+  }
+
+  /* ---------------- Import (.txt / .md / .html) ---------------- */
+  function importTextToHtml(text, isMarkdown) {
+    var lines = String(text).replace(/\r\n?/g, "\n").split("\n");
+    var out = [];
+    var inCode = false;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (isMarkdown && /^\s*```/.test(line)) { inCode = !inCode; continue; }
+      if (inCode) { out.push("<pre>" + escapeHtml(line) + "</pre>"); continue; }
+      if (line.trim() === "") { out.push("<p><br></p>"); continue; }
+      if (isMarkdown) {
+        var h = /^(#{1,4})\s+(.*)$/.exec(line);
+        if (h) { out.push("<h" + h[1].length + ">" + escapeHtml(h[2]) + "</h" + h[1].length + ">"); continue; }
+        if (/^\s*(---+|\*\*\*+)\s*$/.test(line)) { out.push("<hr>"); continue; }
+        if (/^\s*>\s?/.test(line)) {
+          out.push("<blockquote>" + escapeHtml(line.replace(/^\s*>\s?/, "")) + "</blockquote>");
+          continue;
         }
+        var li = /^\s*[-*+]\s+(.*)$/.exec(line);
+        if (li) { out.push("<ul><li>" + escapeHtml(li[1]) + "</li></ul>"); continue; }
+        var ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+        if (ol) { out.push("<ol><li>" + escapeHtml(ol[1]) + "</li></ol>"); continue; }
+        out.push("<p>" + escapeHtml(line) + "</p>");
+      } else {
+        out.push("<p>" + escapeHtml(line) + "</p>");
       }
-      // Fallback to localStorage
-      if (!data) {
-        var raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) data = JSON.parse(raw);
-      }
-      if (!data) return false;
-      ($("docTitle")?$("docTitle").value=data.title:null) || "Untitled Document";
-      var wrapper = $(PAGES_WRAPPER_ID);
-      wrapper.innerHTML = "";
-      var page = createPage();
-      wrapper.appendChild(page);
-      var content = getContent(page);
-      content.innerHTML = data.content || "";
-      if (content.children.length === 0) {
-        var p = document.createElement("p");
-        p.innerHTML = "<br>";
-        content.appendChild(p);
-      }
-      // Restore editable header/footer strips (syncHeaderFooter runs inside
-      // paginate() and creates them on every page).
-      headerActive = hfHasContent(data.header);
-      headerHTML = headerActive ? data.header : "";
-      footerActive = hfHasContent(data.footer);
-      footerHTML = footerActive ? data.footer : "";
-      paginate();
-      return true;
-    } catch (e) { return false; }
+    }
+    return out.join("");
+  }
+
+  function importHtmlToContent(htmlText) {
+    var parsed = new DOMParser().parseFromString(htmlText, "text/html");
+    // Drop anything executable or page-structural before taking the body.
+    var bad = parsed.querySelectorAll("script, iframe, object, embed, link, meta, style");
+    for (var i = 0; i < bad.length; i++) bad[i].remove();
+    var html = parsed.body ? parsed.body.innerHTML : "";
+    return html && html.replace(/\S/g, "") ? html : "<p><br></p>";
+  }
+
+  async function importDocumentFromFile(file) {
+    var ext = (file.name.toLowerCase().split(".").pop() || "");
+    var baseName = file.name.replace(/\.[^.]+$/, "").trim() || "Imported Document";
+
+    var contentPromise;
+    if (ext === "html" || ext === "htm") {
+      contentPromise = file.text().then(function (t) { return importHtmlToContent(t); });
+    } else if (ext === "md" || ext === "markdown") {
+      contentPromise = file.text().then(function (t) { return importTextToHtml(t, true); });
+    } else if (ext === "txt" || ext === "text" || file.type.indexOf("text/") === 0) {
+      contentPromise = file.text().then(function (t) { return importTextToHtml(t, false); });
+    } else {
+      toast("Unsupported file type. Please use .txt, .md or .html.", "error");
+      return;
+    }
+
+    var content;
+    try { content = await contentPromise; } catch (e) {
+      toast("Could not read file", "error");
+      return;
+    }
+
+    var id = makeDocId();
+    var plain = htmlToText(content);
+    documents.unshift({
+      id: id,
+      title: baseName,
+      updatedAt: Date.now(),
+      wordCount: plain ? plain.split(/\s+/).filter(Boolean).length : 0,
+    });
+    await saveIndex();
+    await writeDocData({
+      id: id,
+      title: baseName,
+      content: content,
+      savedAt: Date.now(),
+      theme: theme,
+      header: "",
+      footer: "",
+    });
+    toast("Imported \u201C" + baseName + "\u201D", "success");
+    await openDocument(id);
   }
 
   function setAutosaveState(state) {
@@ -1756,23 +2236,6 @@
     }
   }
   /* ---------------- New / Print / Export ---------------- */
-  function newDocument() {
-    if (!window.confirm("Start a new document? Current content will be cleared.")) return;
-    var wrapper = $(PAGES_WRAPPER_ID);
-    wrapper.innerHTML = "";
-    headerActive = false; headerHTML = "";
-    footerActive = false; footerHTML = "";
-    ensureFirstPage();
-    ($("docTitle")?$("docTitle").value="Untitled Document":null);
-    paginate();
-    saveDocument(false);
-    toast("New document created", "success");
-    setTimeout(function () {
-      var c = getContent(getPages()[0]);
-      if (c) c.focus();
-    }, 50);
-  }
-
   function printDocument() {
     saveDocument(false);
     // Force a paginate pass before printing so the latest content is split
@@ -1784,7 +2247,7 @@
   }
 
   function exportDocument(format) {
-    var title = ($("docTitle") ? $("docTitle").value : "document").replace(/[^\w\-]+/g, "_").toLowerCase() || "document";
+    var title = (currentTitle || "document").replace(/[^\w\-]+/g, "_").toLowerCase() || "document";
     if (format === "txt") {
       var text = getAllText();
       downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), title + ".txt");
@@ -1797,7 +2260,7 @@
         bodyHtml += getContent(pages[i]).innerHTML;
       }
       var html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>" +
-        escapeHtml($("docTitle") ? $("docTitle").value : "Document") +
+        escapeHtml(currentTitle || "Document") +
         "</title><style>body{font-family:Georgia,serif;max-width:794px;margin:40px auto;padding:0 24px;line-height:1.6;color:#1a1d21}h1{font-size:28px}h2{font-size:22px}blockquote{border-left:3px solid #0f9d6e;margin:8px 0;padding:4px 16px;background:#e6f6ef;font-style:italic}pre{background:#f4f6f8;padding:10px;border-radius:6px;overflow:auto}img{max-width:100%}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px 10px}</style></head><body>" +
         bodyHtml + "</body></html>";
       downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), title + ".html");
@@ -2508,7 +2971,7 @@
   function exportStats() {
     var stats = getStats();
     var streak = loadStreak();
-    var title = ($("docTitle")?$("docTitle").value:"Untitled Document") || "Untitled Document";
+    var title = currentTitle || "Untitled Document";
     var date = formatTime(Date.now());
     var sentences = countSentences();
     var avgWordsPerSentence = sentences > 0 ? Math.round(stats.words / sentences) : 0;
@@ -2577,81 +3040,136 @@
      its position flipped from `relative` (centered via margin:auto) to
      `absolute; left:0` — causing a brief flash on the left edge of the
      ribbon before the new panel appeared in the center. */
+  /* ---------------- Ribbon tab indicator helpers ---------------- */
+  // Position the sliding underline under a tab. No-ops safely when the
+  // ribbon is hidden (welcome screen) — the rect is just 0×0 then.
+  function moveRibbonIndicatorTo(tab) {
+    var indicator = $("ribbonTabIndicator");
+    if (!indicator || !tab) return;
+    var rect = tab.getBoundingClientRect();
+    var parentRect = tab.parentElement.getBoundingClientRect();
+    indicator.style.width = rect.width + "px";
+    indicator.style.transform = "translateX(" + (rect.left - parentRect.left) + "px)";
+  }
+
+  // Re-measure the active tab's underline after the ribbon becomes visible
+  // (opening a document, fonts loading, resize…). Double rAF so layout has
+  // settled — measuring while display:none yields a 0-width underline.
+  function refreshRibbonIndicator() {
+    if (window.requestAnimationFrame) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          var active = document.querySelector(".ribbon-tab.active");
+          if (active) moveRibbonIndicatorTo(active);
+        });
+      });
+    } else {
+      setTimeout(function () {
+        var active = document.querySelector(".ribbon-tab.active");
+        if (active) moveRibbonIndicatorTo(active);
+      }, 50);
+    }
+  }
+
   function initRibbonTabs() {
     var tabs = document.querySelectorAll(".ribbon-tab");
     var panels = document.querySelectorAll(".ribbon-panel");
     var indicator = $("ribbonTabIndicator");
     if (!tabs.length || !indicator) return;
 
-    function moveIndicator(tab) {
-      var rect = tab.getBoundingClientRect();
-      var parentRect = tab.parentElement.getBoundingClientRect();
-      indicator.style.width = rect.width + "px";
-      indicator.style.transform = "translateX(" + (rect.left - parentRect.left) + "px)";
-    }
-
-    // Position under the initially-active tab after layout settles
+    // Position under the initially-active tab after layout settles. If the
+    // ribbon is hidden at that point (welcome screen) the measure is skipped
+    // — refreshRibbonIndicator() re-runs it when a document opens.
     setTimeout(function () {
       var active = document.querySelector(".ribbon-tab.active");
-      if (active) moveIndicator(active);
+      if (active && active.getBoundingClientRect().width > 0) moveRibbonIndicatorTo(active);
     }, 100);
+
+    // Re-align when fonts finish loading (tab widths can shift) — same as Slides
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(refreshRibbonIndicator);
+    }
+
+    // Activate a tab's classes + move the indicator (no panel logic).
+    function activateTabClasses(tab) {
+      for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("active");
+      tab.classList.add("active");
+      moveRibbonIndicatorTo(tab);
+    }
+
+    // Blur-out whatever panel is active, then run `mid` when invisible.
+    function blurOutActivePanel(mid) {
+      var currentActive = document.querySelector(".ribbon-panel.active");
+      if (!currentActive) { mid(); return; }
+      currentActive.classList.add("blur-out");
+      currentActive.classList.remove("active");
+      var onBlurred = function (e) {
+        if (e.propertyName !== "opacity") return;
+        currentActive.removeEventListener("transitionend", onBlurred);
+        currentActive.classList.remove("blur-out");
+        mid();
+      };
+      currentActive.addEventListener("transitionend", onBlurred);
+      // Fallback: force at 220ms (past the 0.18s transition + buffer)
+      setTimeout(function () {
+        if (currentActive.classList.contains("blur-out")) {
+          currentActive.removeEventListener("transitionend", onBlurred);
+          currentActive.classList.remove("blur-out");
+          mid();
+        }
+      }, 220);
+    }
 
     for (var i = 0; i < tabs.length; i++) {
       tabs[i].addEventListener("click", function () {
         var tab = this;
         var target = tab.getAttribute("data-tab");
         // already active?
-        if (tab.classList.contains("active")) return;
+        if (tab.classList.contains("active") && target !== "file") return;
 
-        // Update tab states immediately so indicator slides smoothly
-        for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("active");
-        tab.classList.add("active");
+        // FILE TAB → Backstage-style File modal (Slides behaviour).
+        // The File tab has no inline ribbon panel; clicking it opens the
+        // file modal overlay over the editor instead.
+        if (target === "file") {
+          blurOutActivePanel(function () {});
+          activateTabClasses(tab);
+          openFileModal();
+          return;
+        }
 
-        // Move indicator (synced with the 0.3s CSS transition)
-        moveIndicator(tab);
+        activateTabClasses(tab);
 
-        var currentActive = document.querySelector(".ribbon-panel.active");
         var targetPanel = document.querySelector('.ribbon-panel[data-panel="' + target + '"]');
 
-        var doSwitch = function () {
-          if (currentActive) currentActive.classList.remove("blur-out");
+        blurOutActivePanel(function () {
           if (targetPanel) targetPanel.classList.add("active");
-        };
-
-        if (currentActive && targetPanel && currentActive !== targetPanel) {
-          // Step 1: blur-out the current panel (keeps position: relative, no layout shift)
-          currentActive.classList.add("blur-out");
-          currentActive.classList.remove("active");
-
-          // Step 2: when the 0.18s blur-out transition finishes, swap classes
-          var onBlurred = function (e) {
-            // Only react to the opacity transition (filter & visibility also fire)
-            if (e.propertyName !== "opacity") return;
-            currentActive.removeEventListener("transitionend", onBlurred);
-            doSwitch();
-          };
-          currentActive.addEventListener("transitionend", onBlurred);
-
-          // Fallback: if transitionend never fires (e.g. panel hidden, pref-reduced-motion),
-          // force the switch at 220ms (just past the 0.18s transition + small buffer)
-          setTimeout(function () {
-            if (currentActive.classList.contains("blur-out")) {
-              currentActive.removeEventListener("transitionend", onBlurred);
-              doSwitch();
-            }
-          }, 220);
-        } else if (targetPanel) {
-          if (currentActive) currentActive.classList.remove("active");
-          targetPanel.classList.add("active");
-        }
+        });
       });
     }
 
     // Reposition indicator on resize
     window.addEventListener("resize", function () {
       var active = document.querySelector(".ribbon-tab.active");
-      if (active) moveIndicator(active);
+      if (active) moveRibbonIndicatorTo(active);
     });
+  }
+
+  /* ---------------- Programmatic tab switch (used by the File modal) ---------------- */
+  function switchRibbonTab(name) {
+    var tab = document.querySelector('.ribbon-tab[data-tab="' + name + '"]');
+    if (!tab) return;
+    var active = document.querySelector(".ribbon-tab.active");
+    if (active === tab) return;
+    var panels = document.querySelectorAll(".ribbon-panel");
+    var targetPanel = document.querySelector('.ribbon-panel[data-panel="' + name + '"]');
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].classList.remove("active");
+      panels[j].classList.remove("blur-out");
+    }
+    var tabsAll = document.querySelectorAll(".ribbon-tab");
+    for (var t = 0; t < tabsAll.length; t++) tabsAll[t].classList.toggle("active", tabsAll[t] === tab);
+    if (targetPanel) targetPanel.classList.add("active");
+    moveRibbonIndicatorTo(tab);
   }
 
   /* ---------------- Page margins (drag to resize via ruler) ---------------- */
@@ -3904,7 +4422,8 @@
     wrapper.appendChild(page);
     var content = getContent(page);
     content.innerHTML = t.html || "<p><br></p>";
-    ($("docTitle")?$("docTitle").value=t.name:null);
+    currentTitle = t.name;
+    syncFileModalNameInput();
     paginate();
     saveDocument(false);
     toast(t.name + " template applied", "success");
@@ -4961,11 +5480,35 @@
     // (The old THEME_KEY localStorage lookup is no longer needed.)
 
     ensureFirstPage();
+    paginate();
 
-    // Load document from IDB (async) or fall back to localStorage
-    var loaded = false;
-    try { loaded = await loadDocument(); } catch (e) { loaded = false; }
-    if (!loaded) { ensureFirstPage(); paginate(); }
+    // Load footnote/endnote arrays BEFORE any document open — the deep-link
+    // ?owned= path below opens a document immediately, and openDocument
+    // renders the per-page footnote areas + end-of-doc endnotes section.
+    loadFootnotes();
+    loadEndnotes();
+
+    // Multi-document model: load the index, adopt a legacy single document
+    // if one exists, then land on the welcome screen unless a specific
+    // document is requested via ?owned=<docId>.
+    await loadIndex();
+    try { await migrateLegacyDocument(); } catch (e) {}
+    showWelcomeScreen(true);
+
+    var ownedParam = null;
+    try { ownedParam = new URLSearchParams(location.search).get("owned"); } catch (e) {}
+    if (ownedParam) {
+      var meta = null;
+      for (var mi = 0; mi < documents.length; mi++) {
+        if (documents[mi].id === ownedParam) { meta = documents[mi]; break; }
+      }
+      if (meta) {
+        await openDocument(ownedParam);
+      } else {
+        // Stale URL — clean it so a refresh lands on the welcome screen
+        history.replaceState({}, document.title, location.pathname);
+      }
+    }
 
     // Toolbar command buttons
     var cmdButtons = document.querySelectorAll("[data-cmd]");
@@ -5268,6 +5811,21 @@
       bClear.addEventListener("click", clearFormatting);
     }
 
+    // Styles group — Title / Heading 1-3 / Normal (formatBlock; feeds TOC + outline)
+    var styleBtns = document.querySelectorAll("#stylesGroup .style-btn");
+    for (var sb = 0; sb < styleBtns.length; sb++) {
+      (function (btn) {
+        btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        btn.addEventListener("click", function () {
+          if (!currentDocId) { toast("Open a document first", "error"); return; }
+          applyBlock(btn.getAttribute("data-block"));
+          schedulePaginate();
+          scheduleAutosave();
+          toast("Style applied: " + btn.textContent.trim(), "success");
+        });
+      })(styleBtns[sb]);
+    }
+
     // Menubar / topbar actions (guarded — elements may have moved to ribbon)
     if ($("btnNew")) $("btnNew").addEventListener("click", newDocument);
     if ($("btnFind")) $("btnFind").addEventListener("click", openFind);
@@ -5300,7 +5858,6 @@
     document.addEventListener("input", function () { if (typeof zenShowControls === "function") zenShowControls(); });
     document.addEventListener("mousemove", function () { if (typeof zenShowControls === "function") zenShowControls(); });
     $("documentScroll").addEventListener("scroll", function () { if (typeof zenShowControls === "function") zenShowControls(); });
-    if ($("docTitle")) $("docTitle").addEventListener("input", scheduleAutosave);
 
     // Ribbon tabs — switching with sliding indicator + blur/fade panel transition
     initRibbonTabs();
@@ -5497,51 +6054,109 @@
     });
     $("commentAddFromPanel").addEventListener("click", addComment);
 
-    // File panel buttons
-    if ($("btnNewDoc")) { $("btnNewDoc").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnNewDoc").addEventListener("click", newDocument); }
-    if ($("btnOpenFile")) { $("btnOpenFile").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnOpenFile").addEventListener("click", function () { toast("Open: use Ctrl+O to load from file (coming soon)", "success"); }); }
-    if ($("btnSaveFile")) { $("btnSaveFile").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnSaveFile").addEventListener("click", function () { saveDocument(true); }); }
-    if ($("btnExportTxt")) { $("btnExportTxt").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnExportTxt").addEventListener("click", function () { exportDocument("txt"); }); }
-    if ($("btnExportHtml")) { $("btnExportHtml").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnExportHtml").addEventListener("click", function () { exportDocument("html"); }); }
-    if ($("btnExportPrint")) { $("btnExportPrint").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnExportPrint").addEventListener("click", function () { exportDocument("print"); }); }
-    if ($("btnFileInfo")) { $("btnFileInfo").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnFileInfo").addEventListener("click", showWordCount); }
-    if ($("btnFileVersions")) { $("btnFileVersions").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnFileVersions").addEventListener("click", showVersions); }
+    // ── FILE MODAL (opened from the File ribbon tab) ──
+    // Close X button + backdrop click
+    if ($("fileModalCloseXBtn")) $("fileModalCloseXBtn").addEventListener("click", closeFileModal);
+    $("fileModal").addEventListener("click", function (e) {
+      if (e.target === $("fileModal")) closeFileModal();
+    });
+    // Actions
+    if ($("fileSaveBtn")) $("fileSaveBtn").addEventListener("click", function () {
+      commitFileModalRename();
+      saveDocument(true);
+      syncFileModalNameInput();
+    });
+    if ($("fileDeleteBtn")) $("fileDeleteBtn").addEventListener("click", function () {
+      var wasCurrent = currentDocId;
+      closeFileModal();
+      if (wasCurrent) confirmDeleteCurrentDoc();
+    });
+    if ($("fileCloseBtn")) $("fileCloseBtn").addEventListener("click", function () {
+      closeFileModal();
+      closeDocument();
+    });
+    // Export (Docs-supported formats)
+    if ($("fileExportTxtBtn")) $("fileExportTxtBtn").addEventListener("click", function () { closeFileModal(); exportDocument("txt"); });
+    if ($("fileExportHtmlBtn")) $("fileExportHtmlBtn").addEventListener("click", function () { closeFileModal(); exportDocument("html"); });
+    if ($("fileExportPrintBtn")) $("fileExportPrintBtn").addEventListener("click", function () { closeFileModal(); exportDocument("print"); });
+    // Tools (Docs-specific)
+    if ($("fileStatsBtn")) $("fileStatsBtn").addEventListener("click", showWordCount);
+    if ($("fileVersionsBtn")) $("fileVersionsBtn").addEventListener("click", showVersions);
+    if ($("fileInspectorBtn")) $("fileInspectorBtn").addEventListener("click", runDocumentInspector);
+    // Rename input: Enter commits + closes; typing renames live
+    var nameInput = $("fileModalNameInput");
+    if (nameInput) {
+      nameInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); e.target.blur(); closeFileModal(); }
+      });
+      nameInput.addEventListener("input", function () {
+        if (!currentDocId) return;
+        currentTitle = nameInput.value.trim() || "Untitled Document";
+        scheduleAutosave();
+      });
+    }
+
+    // ── WELCOME SCREEN (home) ──
+    if ($("welcomeNewBtn")) $("welcomeNewBtn").addEventListener("click", createNewDocument);
+    if ($("welcomeImportBtn")) $("welcomeImportBtn").addEventListener("click", function () { $("fileImportInput").click(); });
+    var importInput = $("fileImportInput");
+    if (importInput) importInput.addEventListener("change", function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      importDocumentFromFile(file);
+      e.target.value = "";
+    });
+
+    // ── DELETE DOCUMENT CONFIRMATION (Slides/Notes-style) ──
+    if ($("deleteDocConfirm")) $("deleteDocConfirm").addEventListener("click", function () {
+      var target = _deleteTargetId;
+      // Animate the dialog out first, then delete once it's gone (Slides pattern)
+      closeDeleteDocModal();
+      if (target) setTimeout(function () { deleteDocument(target); }, 250);
+    });
+    if ($("deleteDocCancel")) $("deleteDocCancel").addEventListener("click", closeDeleteDocModal);
+    var delModal = $("deleteDocModal");
+    if (delModal) delModal.addEventListener("click", function (e) {
+      if (e.target === delModal) closeDeleteDocModal();
+    });
+
+    // ── FOOTNOTE / ENDNOTE / CITATION MODALS ──
+    if ($("footnoteInsert")) $("footnoteInsert").addEventListener("click", function () {
+      var note = ($("footnoteText").value || "").trim();
+      if (!note) { toast("Enter footnote text", "error"); return; }
+      closeModal("footnoteModal");
+      performInsertFootnote(note);
+    });
+    if ($("endnoteInsert")) $("endnoteInsert").addEventListener("click", function () {
+      var note = ($("endnoteText").value || "").trim();
+      if (!note) { toast("Enter endnote text", "error"); return; }
+      closeModal("endnoteModal");
+      performInsertEndnote(note);
+    });
+    if ($("citeInsert")) $("citeInsert").addEventListener("click", function () {
+      var cite = ($("citeText").value || "").trim();
+      if (!cite) { toast("Enter citation text", "error"); return; }
+      closeModal("citeModal");
+      performInsertCite(cite);
+    });
+    // Ctrl/⌘+Enter inside the textarea = Insert; plain Enter in the cite input = Insert
+    [["footnoteText", "footnoteInsert"], ["endnoteText", "endnoteInsert"]].forEach(function (pair) {
+      var ta = $(pair[0]);
+      if (ta) ta.addEventListener("keydown", function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); $(pair[1]).click(); }
+      });
+    });
+    var citeInput = $("citeText");
+    if (citeInput) citeInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); $("citeInsert").click(); }
+    });
 
     // References panel buttons
     if ($("btnTocRef")) { $("btnTocRef").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnTocRef").addEventListener("click", insertTOC); }
-    if ($("btnFootnote")) { $("btnFootnote").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnFootnote").addEventListener("click", function () { document.execCommand("insertHTML", false, '<sup class="footnote-ref">¹</sup>'); toast("Footnote inserted", "success"); schedulePaginate(); }); }
-    if ($("btnEndnote")) { $("btnEndnote").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnEndnote").addEventListener("click", function () { document.execCommand("insertHTML", false, '<sup class="endnote-ref">¹</sup>'); toast("Endnote inserted", "success"); schedulePaginate(); }); }
-    if ($("btnCitation")) { $("btnCitation").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnCitation").addEventListener("click", function () { var c = window.prompt("Citation (APA/MLA/Chicago):", ""); if (c) { document.execCommand("insertHTML", false, '<span class="citation">(' + escapeHtml(c) + ')</span>'); toast("Citation inserted", "success"); } }); }
+    if ($("btnFootnote")) { $("btnFootnote").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnFootnote").addEventListener("click", openFootnoteModal); }
+    if ($("btnEndnote")) { $("btnEndnote").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnEndnote").addEventListener("click", openEndnoteModal); }
+    if ($("btnCitation")) { $("btnCitation").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnCitation").addEventListener("click", openCiteModal); }
     if ($("btnBibliography")) { $("btnBibliography").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnBibliography").addEventListener("click", function () { document.execCommand("insertHTML", false, '<h2>Bibliography</h2><p>Entry 1. Author, Title, Publisher, Year.</p>'); toast("Bibliography inserted", "success"); schedulePaginate(); }); }
-    if ($("btnCaption")) {
-      $("btnCaption").addEventListener("mousedown", function (e) { e.preventDefault(); });
-      $("btnCaption").addEventListener("click", function () {
-        var c = window.prompt("Caption:", "Figure 1");
-        if (c === null) return;
-        // If an image is selected, wrap it in a figure with the caption below
-        var selImg = document.querySelector(".page-content img[data-selected='true']");
-        if (selImg) {
-          var figure = document.createElement("figure");
-          figure.style.textAlign = "center";
-          figure.style.margin = "12px 0";
-          figure.appendChild(selImg.cloneNode(false));
-          var cap = document.createElement("figcaption");
-          cap.className = "caption";
-          cap.style.cssText = "font-size:11px;color:var(--text-muted);font-style:italic;margin-top:4px";
-          cap.textContent = c;
-          figure.appendChild(cap);
-          selImg.parentNode.replaceChild(figure, selImg);
-          schedulePaginate();
-          scheduleAutosave();
-          toast("Image caption added", "success");
-        } else {
-          focusEditorAndRestore();
-          document.execCommand("insertHTML", false, '<p class="caption" style="text-align:center;font-size:11px;color:var(--text-muted);font-style:italic;">' + escapeHtml(c) + '</p>');
-          toast("Caption inserted", "success");
-        }
-      });
-    }
-    if ($("btnCrossRef")) { $("btnCrossRef").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnCrossRef").addEventListener("click", function () { toast("Cross-reference: click a heading in the outline to jump to it", "success"); }); }
     if ($("btnIndexEntry")) { $("btnIndexEntry").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnIndexEntry").addEventListener("click", function () { var sel = window.getSelection(); if (sel && !sel.isCollapsed) { toast("Index entry marked: " + sel.toString(), "success"); } else { toast("Select text first to mark an index entry", "error"); } }); }
     if ($("btnInsertIndex")) { $("btnInsertIndex").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnInsertIndex").addEventListener("click", function () { document.execCommand("insertHTML", false, '<h2>Index</h2><p>Term, Page</p>'); toast("Index inserted", "success"); schedulePaginate(); }); }
 
@@ -5704,6 +6319,16 @@
         e.preventDefault();
         openClipboardHistory();
       }
+      // Escape → close the File modal or delete dialog if open
+      if (e.key === "Escape") {
+        if (fileModalOpen()) { e.preventDefault(); closeFileModal(); return; }
+        var delModalOpen = $("deleteDocModal");
+        if (delModalOpen && delModalOpen.classList.contains("show")) {
+          e.preventDefault();
+          closeDeleteDocModal();
+          return;
+        }
+      }
       // ? → shortcut overlay (document-level so it works even if focus is elsewhere)
       if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         var ae = document.activeElement;
@@ -5723,7 +6348,6 @@
     loadMargins();
     loadGoal();
     loadCustomDict();
-    loadFootnotes();
     loadFindHistory();
     // Color theme loading is a no-op now (cyan is locked via CSS).
     buildRulerTicks();
@@ -5738,6 +6362,9 @@
     initNewFeatures();
 
     setTimeout(function () {
+      // Only auto-focus the editor when a document is actually open —
+      // on the welcome screen the user may be about to click a card.
+      if (!currentDocId) return;
       var firstContent = getContent(getPages()[0]);
       if (firstContent) firstContent.focus();
     }, 120);
@@ -5753,9 +6380,15 @@
       // Ignore our own writes for a short window (we broadcast on every setJSON)
       if (change.at && change.at < crossTabIgnoreUntil) return;
 
-      if (change.key === STORAGE_KEY) {
-        // Another tab changed the document — reload it softly (only if this
-        // tab is not actively being edited, to avoid clobbering the caret).
+      if (change.key === DOC_INDEX_KEY) {
+        // Another tab changed the document index (created/deleted/renamed a
+        // document) — refresh the welcome screen cards if it is visible.
+        loadIndex().then(function () {
+          if (!currentDocId) renderWelcomeCards();
+        });
+      } else if (currentDocId && change.key === docDataKey(currentDocId)) {
+        // Another tab changed the open document — reload it softly (only if
+        // this tab is not actively being edited, to avoid clobbering the caret).
         reloadFromStorageQuietly();
       } else if (change.key === MARGINS_KEY) {
         loadMargins();
@@ -5771,17 +6404,19 @@
   }
 
   // Reload document content from storage WITHOUT stealing focus. Called when
-  // another tab saved the document. Saves our own in-flight caret to restore.
+  // another tab saved the open document. Saves our own in-flight caret to restore.
   async function reloadFromStorageQuietly() {
     try {
+      if (!currentDocId) return;
       var data = null;
-      if (window.EmeraldIDBStorage) data = await window.EmeraldIDBStorage.getJSON(STORAGE_KEY);
+      if (window.EmeraldIDBStorage) data = await window.EmeraldIDBStorage.getJSON(docDataKey(currentDocId));
       if (!data) return;
       var sel = window.getSelection();
       var hadFocus = document.activeElement && document.activeElement.closest && document.activeElement.closest(".page-content");
       var caretInfo = hadFocus && sel && sel.rangeCount ? saveCaretSnapshot() : null;
 
-      ($("docTitle")?$("docTitle").value=data.title:null) || $("docTitle").value;
+      currentTitle = data.title || currentTitle;
+      syncFileModalNameInput();
       var wrapper = $(PAGES_WRAPPER_ID);
       wrapper.innerHTML = "";
       var page = createPage();
@@ -5844,6 +6479,7 @@
 
   /* ---------------- State ---------------- */
   var footnotes = [];
+  var endnotes = [];
   var drawCanvas = null;
   var drawCtx = null;
   var isDrawing = false;
@@ -5894,7 +6530,7 @@
   /* ---------------- Cover pages ---------------- */
   function openCoverPageDialog() {
     // Pre-fill title from doc title
-    $("coverTitle").value = ($("docTitle")?$("docTitle").value:"Document Title") || "Document Title";
+    $("coverTitle").value = currentTitle || "Document Title";
     openModal("coverPageModal");
   }
 
@@ -6706,11 +7342,15 @@
     return dp[m][n];
   }
 
-  /* ---------------- Footnotes (proper) ---------------- */
-  function insertFootnote() {
-    var note = window.prompt("Footnote text:", "");
-    if (note === null) return;
-    if (!note) { toast("Enter footnote text", "error"); return; }
+  /* ---------------- Footnotes & Endnotes (proper) ---------------- */
+  function openFootnoteModal() {
+    var t = $("footnoteText");
+    if (t) t.value = "";
+    openModal("footnoteModal");
+    setTimeout(function () { if (t) t.focus(); }, 60);
+  }
+
+  function performInsertFootnote(note) {
     var num = footnotes.length + 1;
     var refId = "fn_ref_" + num + "_" + Date.now().toString(36);
     restoreEditorSelection();
@@ -6723,10 +7363,73 @@
     saveFootnotes();
     renderFootnotes();
     renderFootnotesSection();
+    renumberFootnoteRefs();
     schedulePaginate();
     scheduleAutosave();
     toggleFootnotes(true);
     toast("Footnote " + num + " inserted", "success");
+  }
+
+  function openEndnoteModal() {
+    var t = $("endnoteText");
+    if (t) t.value = "";
+    openModal("endnoteModal");
+    setTimeout(function () { if (t) t.focus(); }, 60);
+  }
+
+  function performInsertEndnote(note) {
+    var num = endnotes.length + 1;
+    var refId = "en_ref_" + num + "_" + Date.now().toString(36);
+    restoreEditorSelection();
+    var sel = window.getSelection();
+    if (!sel || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
+      var fc = getContent(getPages()[0]); if (fc) fc.focus();
+    }
+    document.execCommand("insertHTML", false, '<sup class="endnote-ref" data-en="' + num + '" id="' + refId + '" contenteditable="false">' + num + '</sup> ');
+    endnotes.push({ num: num, text: note, refId: refId, ts: Date.now() });
+    saveEndnotes();
+    renderFootnotes();
+    renderEndnotesSection();
+    schedulePaginate();
+    scheduleAutosave();
+    toggleFootnotes(true);
+    toast("Endnote " + num + " inserted", "success");
+  }
+
+  function saveEndnotes() {
+    try {
+      if (idbAvailable()) idb.setJSON("zdocs.endnotes", endnotes);
+      else localStorage.setItem("zdocs.endnotes", JSON.stringify(endnotes));
+    } catch (e) {}
+  }
+
+  /* ---------------- Citation (modal) ---------------- */
+  function openCiteModal() {
+    var t = $("citeText");
+    if (t) t.value = "";
+    openModal("citeModal");
+    setTimeout(function () { if (t) t.focus(); }, 60);
+  }
+
+  function performInsertCite(text) {
+    restoreEditorSelection();
+    var sel = window.getSelection();
+    if (!sel || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
+      var fc = getContent(getPages()[0]); if (fc) fc.focus();
+    }
+    document.execCommand("insertHTML", false, '<span class="citation">(' + escapeHtml(text) + ')</span>');
+    schedulePaginate();
+    scheduleAutosave();
+    toast("Citation inserted", "success");
+  }
+
+  function loadEndnotes() {
+    try {
+      var f = null;
+      if (idbAvailable()) f = idb.getJSONSync("zdocs.endnotes");
+      if (!f) { var raw = localStorage.getItem("zdocs.endnotes"); if (raw) f = JSON.parse(raw); }
+      if (Array.isArray(f)) endnotes = f;
+    } catch (e) {}
   }
 
   function saveFootnotes() {
@@ -6749,10 +7452,10 @@
     var body = $("footnotesBody");
     if (!body) return;
     body.innerHTML = "";
-    if (footnotes.length === 0) {
+    if (footnotes.length === 0 && endnotes.length === 0) {
       var empty = document.createElement("p");
       empty.className = "outline-empty";
-      empty.textContent = "No footnotes yet. Use References → Footnote to add one.";
+      empty.textContent = "No footnotes or endnotes yet. Use References → Footnote / Endnote to add one.";
       body.appendChild(empty);
       return;
     }
@@ -6773,7 +7476,9 @@
         del.addEventListener("click", function (e) {
           e.stopPropagation();
           footnotes.splice(idx, 1);
-          // renumber
+          // remove the superscript ref from the text, then renumber the rest
+          var refEl = document.getElementById(fn.refId);
+          if (refEl && refEl.parentNode) refEl.parentNode.removeChild(refEl);
           for (var k = 0; k < footnotes.length; k++) footnotes[k].num = k + 1;
           saveFootnotes();
           renderFootnotes();
@@ -6791,6 +7496,57 @@
         });
         body.appendChild(item);
       })(footnotes[i], i);
+    }
+
+    // Endnotes — listed below footnotes in the same panel
+    if (endnotes.length > 0) {
+      var enHead = document.createElement("p");
+      enHead.className = "outline-empty";
+      enHead.style.fontWeight = "700";
+      enHead.style.textTransform = "uppercase";
+      enHead.style.fontSize = "10px";
+      enHead.style.letterSpacing = "0.06em";
+      enHead.style.margin = "10px 0 2px";
+      enHead.textContent = "Endnotes";
+      body.appendChild(enHead);
+      for (var e2 = 0; e2 < endnotes.length; e2++) {
+        (function (en, idx) {
+          var item = document.createElement("div");
+          item.className = "fn-item";
+          var numEl = document.createElement("span");
+          numEl.className = "fn-num";
+          numEl.textContent = en.num;
+          var txt = document.createElement("span");
+          txt.style.marginLeft = "6px";
+          txt.textContent = en.text;
+          var del = document.createElement("button");
+          del.className = "fn-del";
+          del.textContent = "×";
+          del.title = "Delete endnote";
+          del.addEventListener("click", function (e) {
+            e.stopPropagation();
+            endnotes.splice(idx, 1);
+            // remove the superscript ref from the text, then renumber the rest
+            var refEl = document.getElementById(en.refId);
+            if (refEl && refEl.parentNode) refEl.parentNode.removeChild(refEl);
+            for (var k = 0; k < endnotes.length; k++) endnotes[k].num = k + 1;
+            saveEndnotes();
+            renderFootnotes();
+            renderEndnotesSection();
+            renumberEndnoteRefs();
+            schedulePaginate();
+            scheduleAutosave();
+          });
+          item.appendChild(numEl);
+          item.appendChild(txt);
+          item.appendChild(del);
+          item.addEventListener("click", function () {
+            var el = document.getElementById(en.refId);
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+          });
+          body.appendChild(item);
+        })(endnotes[e2], e2);
+      }
     }
   }
 
@@ -6883,35 +7639,47 @@
     }
   }
 
-  /* ---------------- Table of Figures ---------------- */
-  function insertTableOfFigures() {
-    var captions = [];
+  /* ---------------- Endnotes (collected at end of document) ---------------- */
+  function renderEndnotesSection() {
+    // Remove any existing end-of-document endnotes section
+    var existing = document.querySelectorAll(".endnotes-section");
+    for (var i = 0; i < existing.length; i++) {
+      if (existing[i].parentElement) existing[i].parentElement.removeChild(existing[i]);
+    }
+    if (endnotes.length === 0) return;
     var pages = getPages();
-    for (var i = 0; i < pages.length; i++) {
-      var caps = getContent(pages[i]).querySelectorAll("p.caption");
-      for (var c = 0; c < caps.length; c++) {
-        var text = (caps[c].textContent || "").trim();
-        if (text) {
-          if (!caps[c].id) caps[c].id = "cap_" + Date.now().toString(36) + "_" + c;
-          captions.push({ text: text, id: caps[c].id });
-        }
-      }
+    var lastPage = pages[pages.length - 1];
+    if (!lastPage) return;
+    var content = getContent(lastPage);
+    var section = document.createElement("div");
+    section.className = "endnotes-section";
+    var heading = document.createElement("p");
+    heading.style.fontWeight = "700";
+    heading.style.fontSize = "11px";
+    heading.style.textTransform = "uppercase";
+    heading.style.letterSpacing = "0.06em";
+    heading.style.color = "var(--text-faint)";
+    heading.textContent = "Endnotes";
+    section.appendChild(heading);
+    for (var f = 0; f < endnotes.length; f++) {
+      var entry = document.createElement("div");
+      entry.className = "fn-entry";
+      entry.innerHTML = '<span class="fn-key">' + endnotes[f].num + '.</span> ' + escapeHtml(endnotes[f].text);
+      section.appendChild(entry);
     }
-    if (captions.length === 0) {
-      toast("No captions found. Use References → Caption to add figure captions first.", "error");
-      return;
-    }
-    var html = '<h2>Table of Figures</h2><div class="toc-figures">';
-    for (var f = 0; f < captions.length; f++) {
-      html += '<p><a class="zdocs-internal-link" data-target="' + escapeAttr(captions[f].id) + '" href="#' + escapeAttr(captions[f].id) + '">' + escapeHtml(captions[f].text) + '</a></p>';
-    }
-    html += '</div><p><br></p>';
-    restoreEditorSelection();
-    document.execCommand("insertHTML", false, html);
-    schedulePaginate();
-    scheduleAutosave();
-    toast("Table of figures inserted (" + captions.length + " captions)", "success");
+    content.appendChild(section);
   }
+
+  function renumberEndnoteRefs() {
+    var refs = document.querySelectorAll("sup.endnote-ref[data-en]");
+    for (var i = 0; i < refs.length; i++) {
+      var n = i + 1;
+      refs[i].setAttribute("data-en", n);
+      refs[i].textContent = n;
+    }
+  }
+
+  /* ---------------- Table of Figures — removed (feature cut) ---------------- */
 
   /* ---------------- Compare documents ---------------- */
   function openCompareDialog() {
@@ -7321,15 +8089,13 @@
 
     // Footnotes
     var bFn = $("btnFootnote");
-    if (bFn) { bFn.addEventListener("mousedown", function (e) { e.preventDefault(); }); bFn.addEventListener("click", insertFootnote); }
+    if (bFn) { bFn.addEventListener("mousedown", function (e) { e.preventDefault(); }); bFn.addEventListener("click", openFootnoteModal); }
     var bFnPanel = $("footnoteAddFromPanel");
-    if (bFnPanel) bFnPanel.addEventListener("click", insertFootnote);
+    if (bFnPanel) bFnPanel.addEventListener("click", openFootnoteModal);
+    var bEnPanel = $("endnoteAddFromPanel");
+    if (bEnPanel) bEnPanel.addEventListener("click", openEndnoteModal);
     var bFnClose = $("footnotesClose");
     if (bFnClose) bFnClose.addEventListener("click", function () { toggleFootnotes(false); });
-
-    // Table of figures
-    var bToF = $("btnTableOfFigures");
-    if (bToF) { bToF.addEventListener("mousedown", function (e) { e.preventDefault(); }); bToF.addEventListener("click", insertTableOfFigures); }
 
     // Compare
     var bCmp = $("btnCompare");
@@ -7874,15 +8640,15 @@
     var trackedDel = document.querySelectorAll(".page-content del.zdocs-del").length;
     var hiddenBookmarks = document.querySelectorAll(".page-content a.zdocs-bookmark").length;
     var fnCount = footnotes.length;
-    var personalInfo = ($("docTitle")?$("docTitle").value:"Untitled") || "Untitled";
+    var personalInfo = currentTitle || "Untitled";
     var lastSaved = lastSavedAt;
 
-    items.push({ name: "Document title", count: personalInfo, removable: true, action: function () { ($("docTitle")?$("docTitle").value="Untitled Document":null); scheduleAutosave(); toast("Title cleared", "success"); } });
+    items.push({ name: "Document title", count: personalInfo, removable: true, action: function () { currentTitle = "Untitled Document"; syncFileModalNameInput(); scheduleAutosave(); toast("Title cleared", "success"); } });
     items.push({ name: "Comments", count: commentsCount + (commentsCount === 1 ? " comment" : " comments"), removable: commentsCount > 0, action: function () { comments = []; renderComments(); scheduleAutosave(); toast("Comments removed", "success"); } });
     items.push({ name: "Tracked changes (insertions)", count: trackedIns + " ins", removable: trackedIns > 0, action: function () { var all = document.querySelectorAll(".page-content ins.zdocs-ins"); for (var i = 0; i < all.length; i++) unwrapNode(all[i]); schedulePaginate(); scheduleAutosave(); toast("Insertions accepted", "success"); } });
     items.push({ name: "Tracked changes (deletions)", count: trackedDel + " del", removable: trackedDel > 0, action: function () { var all = document.querySelectorAll(".page-content del.zdocs-del"); for (var i = 0; i < all.length; i++) { var p = all[i].parentNode; if (p) p.removeChild(all[i]); } schedulePaginate(); scheduleAutosave(); toast("Deletions removed", "success"); } });
     items.push({ name: "Bookmarks", count: hiddenBookmarks + (hiddenBookmarks === 1 ? " bookmark" : " bookmarks"), removable: hiddenBookmarks > 0, action: function () { var all = document.querySelectorAll(".page-content a.zdocs-bookmark"); for (var i = 0; i < all.length; i++) { var p = all[i].parentNode; if (p) p.removeChild(all[i]); } schedulePaginate(); scheduleAutosave(); toast("Bookmarks removed", "success"); } });
-    items.push({ name: "Footnotes", count: fnCount + (fnCount === 1 ? " footnote" : " footnotes"), removable: fnCount > 0, action: function () { var refs = document.querySelectorAll(".page-content sup.footnote-ref, .page-content sup.endnote-ref"); for (var i = 0; i < refs.length; i++) { var p = refs[i].parentNode; if (p) p.removeChild(refs[i]); } footnotes = []; saveFootnotes(); renderFootnotes(); renderFootnotesSection(); schedulePaginate(); scheduleAutosave(); toast("Footnotes removed", "success"); } });
+    items.push({ name: "Footnotes & endnotes", count: fnCount + (fnCount === 1 ? " footnote" : " footnotes"), removable: fnCount > 0 || endnotes.length > 0, action: function () { var refs = document.querySelectorAll(".page-content sup.footnote-ref, .page-content sup.endnote-ref"); for (var i = 0; i < refs.length; i++) { var p = refs[i].parentNode; if (p) p.removeChild(refs[i]); } footnotes = []; endnotes = []; saveFootnotes(); saveEndnotes(); renderFootnotes(); renderFootnotesSection(); renderEndnotesSection(); schedulePaginate(); scheduleAutosave(); toast("Footnotes removed", "success"); } });
     items.push({ name: "Last saved", count: lastSaved ? formatTime(lastSaved) : "never", removable: false });
     items.push({ name: "Page count", count: pages.length + (pages.length === 1 ? " page" : " pages"), removable: false });
 
