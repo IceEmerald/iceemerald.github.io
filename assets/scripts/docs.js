@@ -1,6 +1,6 @@
-/* BUILD 2026-08-26.12 (References: Footnote/Endnote/Citation custom modals; proper endnote system — numbered refs, end-of-doc section, panel management; Styles group (Title/H1-H3/Normal via formatBlock); Caption/Cross-ref/Table-of-Figures removed) */
+﻿/* BUILD 2026-08-26.12 (References: Footnote/Endnote/Citation custom modals; proper endnote system â€” numbered refs, end-of-doc section, panel management; Styles group (Title/H1-H3/Normal via formatBlock); Caption/Cross-ref/Table-of-Figures removed) */
 /* =========================================================
-   Z Docs — Word Processor  (v2)
+   Z Docs â€” Word Processor  (v2)
    Real pagination engine: content is distributed across real
    A4 page DOM elements. Paragraphs move whole between pages;
    a single block taller than a page is split at a word boundary
@@ -31,7 +31,7 @@
   // mirroring the Slides app (emeraldslides_index / emeraldslides_pres_<id>).
   var DOC_INDEX_KEY = "emeralddocs_index";
   function docDataKey(id) { return "emeralddocs_doc_" + id; }
-  // THEME_KEY removed — dark mode is no longer supported.
+  // THEME_KEY removed â€” dark mode is no longer supported.
   var LEGACY_VERSIONS_KEY = "zdocs.versions";
   function versionsKey(id) { return "zdocs.versions." + id; }
   var MARGINS_KEY = "zdocs.margins";
@@ -44,7 +44,7 @@
   var PAGE_HEIGHT = 1123;
   var MIN_MARGIN = 32;
   var MAX_MARGIN = 300;
-  // Zoom limits match Slides: 20% – 400% (Slides uses clamp(scale, 0.2, 4)).
+  // Zoom limits match Slides: 20% â€“ 400% (Slides uses clamp(scale, 0.2, 4)).
   var MIN_ZOOM = 20;
   var MAX_ZOOM = 400;
 
@@ -61,7 +61,7 @@
   var goalTarget = 0;
   // Multi-document state (Slides pattern)
   var documents = [];        // metadata index [{id, title, updatedAt, wordCount}]
-  var currentDocId = null;   // id of the document loaded in the editor (null → welcome screen)
+  var currentDocId = null;   // id of the document loaded in the editor (null â†’ welcome screen)
   var currentTitle = "Untitled Document";
   var _welcomeRenderToken = 0;
   var _deleteTargetId = null;
@@ -208,7 +208,7 @@
      we split it FIRST (at a word boundary) rather than pushing
      the whole block to the next page. The old logic pushed the
      only block down, leaving an empty page and moving the
-     overflow unchanged — producing cascades of empty pages.
+     overflow unchanged â€” producing cascades of empty pages.
      ---------------------------------------------------------
      KEY FIX (v3): TRUE hard page break. A `.zdocs-page-break`
      element forces ALL content after it onto the next page.
@@ -240,14 +240,14 @@
         var guard = 0;
         while (isOverflow(content) && guard++ < 300) {
           if (content.children.length === 1) {
-            // Single overflowing block → SPLIT it (don't push whole)
+            // Single overflowing block â†’ SPLIT it (don't push whole)
             if (splitOverflowingBlock(content, pages[i])) {
               changed = true;
               continue;
             }
             break; // cannot split further (e.g. one giant word)
           }
-          // Multiple blocks → push the last block down
+          // Multiple blocks â†’ push the last block down
           if (!pushOverflowDown(pages[i])) break;
           changed = true;
         }
@@ -301,7 +301,7 @@
       }
 
       if (toMove.length === 0) {
-        // Break is already the last block on this page — nothing to move.
+        // Break is already the last block on this page â€” nothing to move.
         // But if there are MULTIPLE breaks on this page, the later ones
         // need to go to the next page (a break with nothing after it still
         // means "the next page starts here").
@@ -363,7 +363,7 @@
 
   function normalizeContent(content) {
     // Wrap stray non-empty text nodes in <p>, drop empty text nodes.
-    // NOTE: do NOT auto-add an empty <p> to a childless page here — that
+    // NOTE: do NOT auto-add an empty <p> to a childless page here â€” that
     // would make removeTrailingEmptyPages think a genuinely-empty trailing
     // page still has content, so it would never clean up pages the user
     // emptied. ensureFirstPage() guarantees the first page stays editable.
@@ -423,7 +423,7 @@
           node.textContent = tokens.slice(0, 1).join("");
           if (isOverflow(content)) {
             node.textContent = text;
-            return false; // single token too big — give up
+            return false; // single token too big â€” give up
           }
           var lo = 1, hi = tokens.length, best = 1;
           while (lo <= hi) {
@@ -471,11 +471,11 @@
     var first = nextContent.firstElementChild;
     if (!first) return false;
 
-    // Never pull a page-break marker up — it must stay as a boundary.
+    // Never pull a page-break marker up â€” it must stay as a boundary.
     if (first.classList && first.classList.contains("zdocs-page-break")) return false;
 
     // If the current page already ends with a page-break marker,
-    // content after it belongs on the next page — don't pull across.
+    // content after it belongs on the next page â€” don't pull across.
     var lastHere = currentContent.lastElementChild;
     if (lastHere && lastHere.classList && lastHere.classList.contains("zdocs-page-break")) {
       return false;
@@ -495,7 +495,7 @@
 
     // A page is "empty" only if it has NO block-level children at all.
     // An empty <p> (created by pressing Enter) IS a legitimate block and
-    // must NOT cause its page to be deleted — otherwise pressing Enter on
+    // must NOT cause its page to be deleted â€” otherwise pressing Enter on
     // the last line of a full page (which pushes the new empty paragraph
     // onto a fresh next page) would have that page immediately removed,
     // making Enter appear to do nothing.
@@ -603,7 +603,7 @@
     if (!el) return;
     var sel = window.getSelection();
     if (!sel || !sel.rangeCount) {
-      // No selection — reset to "Ln 1, Col 1" (e.g. when the editor loses focus
+      // No selection â€” reset to "Ln 1, Col 1" (e.g. when the editor loses focus
       // or the page is empty and nothing is selected).
       el.textContent = "Ln 1, Col 1";
       return;
@@ -625,7 +625,7 @@
       return;
     }
 
-    // Find the block element containing the caret — i.e. the direct child of
+    // Find the block element containing the caret â€” i.e. the direct child of
     // .page-content (typically a <p>, <h1>, <ul>, <blockquote>, etc.).
     // We walk UP from the anchor node until the parent has .page-content.
     var block = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
@@ -633,7 +633,7 @@
       block = block.parentElement;
     }
     // Guard: if block walked PAST .page-content (happens when the selection is
-    // directly on the .page-content element itself — e.g. an empty page with no
+    // directly on the .page-content element itself â€” e.g. an empty page with no
     // <p> child yet), the walk escapes to <body> and `selectNodeContents(block)`
     // would grab the entire document, producing a bogus column like "Col 15733".
     // In that case, default to line 1, col 1.
@@ -764,7 +764,7 @@
     if (!mod) return;
     var k = e.key.toLowerCase();
 
-    // Ctrl+Enter → page break
+    // Ctrl+Enter â†’ page break
     if (e.key === "Enter") { e.preventDefault(); insertPageBreak(); return; }
 
     if (k === "s") { e.preventDefault(); saveDocument(true); return; }
@@ -781,17 +781,17 @@
     if (k === "n" && e.shiftKey) { e.preventDefault(); toggleZenMode(); return; }
     if (k === "/" && e.shiftKey) { e.preventDefault(); openShortcutOverlay(); return; }
 
-    // Ctrl++ / Ctrl+= → zoom in
+    // Ctrl++ / Ctrl+= â†’ zoom in
     if (k === "+" || k === "=") { e.preventDefault(); adjustZoom(10); return; }
-    // Ctrl+- → zoom out
+    // Ctrl+- â†’ zoom out
     if (k === "-") { e.preventDefault(); adjustZoom(-10); return; }
-    // Ctrl+0 → reset zoom
+    // Ctrl+0 â†’ reset zoom
     if (k === "0") { e.preventDefault(); setZoom(100); return; }
     if (k === "z" && !e.shiftKey) { e.preventDefault(); exec("undo"); return; }
     if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); exec("redo"); return; }
   }
 
-  /* Cycle through margin presets in order: default → narrow → moderate → wide → default */
+  /* Cycle through margin presets in order: default â†’ narrow â†’ moderate â†’ wide â†’ default */
   function cycleMarginPreset() {
     var presets = ["default", "narrow", "moderate", "wide"];
     // Find current preset (or default if custom)
@@ -886,7 +886,7 @@
     }
     // Insert a page-break marker element followed by an empty paragraph.
     // The marker is clickable afterwards to remove (cancel) the break.
-    var html = '<div class="zdocs-page-break" contenteditable="false" title="Click to remove this page break"><span class="pb-label">— Page Break —</span></div><p><br></p>';
+    var html = '<div class="zdocs-page-break" contenteditable="false" title="Click to remove this page break"><span class="pb-label">â€” Page Break â€”</span></div><p><br></p>';
     document.execCommand("insertHTML", false, html);
     schedulePaginate();
     scheduleAutosave();
@@ -928,7 +928,7 @@
     if (headings.length === 0) {
       var empty = document.createElement("p");
       empty.className = "outline-empty";
-      empty.textContent = "Add headings (Title, Heading 1–3) to see them here.";
+      empty.textContent = "Add headings (Title, Heading 1â€“3) to see them here.";
       body.appendChild(empty);
       return;
     }
@@ -1046,7 +1046,7 @@
         '<div class="shortcut-overlay-content">' +
           '<div class="shortcut-overlay-head">' +
             '<h3>Keyboard Shortcuts</h3>' +
-            '<button class="modal-close" id="shortcutOverlayClose" aria-label="Close">×</button>' +
+            '<button class="modal-close" id="shortcutOverlayClose" aria-label="Close">Ã—</button>' +
           '</div>' +
           '<div class="shortcut-overlay-body" id="shortcutOverlayBody"></div>' +
           '<div class="shortcut-overlay-hint">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</div>' +
@@ -1073,7 +1073,7 @@
   function buildShortcuts() {
     var grid = $("shortcutsGrid");
     grid.innerHTML = "";
-    var modKey = navigator.platform.indexOf("Mac") >= 0 ? "⌘" : "Ctrl";
+    var modKey = navigator.platform.indexOf("Mac") >= 0 ? "âŒ˜" : "Ctrl";
     var sections = [
       {
         title: "File",
@@ -1200,7 +1200,7 @@
     var text = a.textContent || "";
     linkPreviewEl.innerHTML =
       '<div class="lp-url">' + escapeHtml(href) + "</div>" +
-      '<div class="lp-hint">' + (text ? "“" + escapeHtml(text) + "” · " : "") + "Ctrl+click to open</div>";
+      '<div class="lp-hint">' + (text ? "â€œ" + escapeHtml(text) + "â€ Â· " : "") + "Ctrl+click to open</div>";
     positionLinkPreview(e);
     linkPreviewEl.classList.add("show");
   }
@@ -1358,7 +1358,7 @@
 
   function scheduleAutosave() {
     if (!currentDocId) return; // nothing open (welcome screen)
-    // Show "Saving…" immediately (matching slides pattern)
+    // Show "Savingâ€¦" immediately (matching slides pattern)
     setAutosaveState("saving");
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(function () {
@@ -1367,7 +1367,7 @@
     }, 800);
   }
 
-  // Periodic version snapshots — every 5 minutes, push a version snapshot
+  // Periodic version snapshots â€” every 5 minutes, push a version snapshot
   // so the user can roll back to an earlier point in their writing session.
   function startAutosaveSnapshots() {
     if (autosaveSnapshotTimer) return; // already running
@@ -1375,7 +1375,7 @@
       try {
         var data = serialize();
         pushVersion(data);
-        // (Version count badge removed from status bar — no UI to update.)
+        // (Version count badge removed from status bar â€” no UI to update.)
       } catch (e) {}
     }, AUTOSAVE_SNAPSHOT_MS);
   }
@@ -1399,7 +1399,7 @@
   }
 
   // Focus the first page-content and re-apply the last saved selection.
-  // Used after modal/prompt dialogs steal focus — execCommand('insertHTML')
+  // Used after modal/prompt dialogs steal focus â€” execCommand('insertHTML')
   // only works when the editor is focused and has a selection inside it.
   function focusEditorAndRestore() {
     var firstContent = getContent(getPages()[0]);
@@ -1410,7 +1410,7 @@
   }
 
   function exec(cmd, value) {
-    // Indent/Outdent: plain margin-left indentation — NOT execCommand's
+    // Indent/Outdent: plain margin-left indentation â€” NOT execCommand's
     // blockquote wrapper (which rendered as a blue quote block).
     if (cmd === "indent" || cmd === "outdent") {
       applyIndent(cmd === "indent" ? 1 : -1);
@@ -1449,13 +1449,13 @@
   function applyFontFamily(value) { exec("fontName", value); }
 
   /* Exact pixel font sizes (Slides parity): execCommand only supports a
-     coarse 1–7 scale, so we wrap the selection with <font size="7"> and then
+     coarse 1â€“7 scale, so we wrap the selection with <font size="7"> and then
      convert that wrapper into a <span style="font-size:Npx"> carrying the
      exact size picked in the dropdown. */
   function applyFontSize(value) {
     var v = parseFloat(value);
     if (isNaN(v) || v <= 0) return;
-    // Legacy 1–7 values (old macros / format painter) still pass straight through
+    // Legacy 1â€“7 values (old macros / format painter) still pass straight through
     if (v >= 1 && v <= 7) { exec("fontSize", String(Math.round(v))); return; }
 
     // Remember pre-existing size="7" wrappers so only the new one is converted
@@ -1489,6 +1489,7 @@
     if (bar) bar.style.background = color;
     var input = $("textColor");
     if (input) input.value = color;
+    exec("foreColor", color);
   }
 
   function applyHiliteColor(color) {
@@ -1497,6 +1498,7 @@
     var input = $("hiliteColor");
     if (input) input.value = color;
     try { document.execCommand("styleWithCSS", false, true); } catch (e) {}
+    exec("hiliteColor", color);
   }
 
   function clearFormatting() { exec("removeFormat"); }
@@ -1524,7 +1526,7 @@
       if (active) btn.classList.add("active"); else btn.classList.remove("active");
     }
     updateDropCapState();
-    // Block-type dropdown removed — nothing else to sync.
+    // Block-type dropdown removed â€” nothing else to sync.
   }
 
   /* ---------------- Save / Load (IndexedDB via EmeraldIDBStorage) ---------------- */
@@ -1552,6 +1554,8 @@
       theme: theme,
       header: headerActive && hfHasContent(headerHTML) ? headerHTML : "",
       footer: footerActive && hfHasContent(footerHTML) ? footerHTML : "",
+      footnotes: footnotes,
+      endnotes: endnotes,
     };
   }
 
@@ -1587,7 +1591,7 @@
   async function saveIndex() {
     try {
       // EmeraldIDBStorage.setJSON removes the localStorage copy of the key
-      // (IDB is primary), so mirror to localStorage only afterwards —
+      // (IDB is primary), so mirror to localStorage only afterwards â€”
       // same pattern as slides.js saveIndex().
       if (window.EmeraldIDBStorage) await window.EmeraldIDBStorage.setJSON(DOC_INDEX_KEY, documents);
       localStorage.setItem(DOC_INDEX_KEY, JSON.stringify(documents));
@@ -1624,7 +1628,7 @@
     } catch (e) {}
   }
 
-  // Strip tags → plain text (for card snippets). Block elements become line
+  // Strip tags â†’ plain text (for card snippets). Block elements become line
   // breaks so headings/paragraphs don't run together. Never throws.
   function htmlToText(html) {
     if (!html) return "";
@@ -1645,7 +1649,7 @@
   }
 
   // Same id format as Slides (pres_<ms>_<hex9>) and Notes (note_<ms>_<hex9>):
-  // doc_<decimal timestamp>_<9 hex chars>  →  ?owned=doc_1734567890123_a1b2c3d4e
+  // doc_<decimal timestamp>_<9 hex chars>  â†’  ?owned=doc_1734567890123_a1b2c3d4e
   function makeDocId() {
     return "doc_" + Date.now() + "_" + generateSecureId(9);
   }
@@ -1702,7 +1706,7 @@
       writeDocData(data);
       setAutosaveState("saved");
       if (showToast) {
-        // Explicit save → also push to version history (store plaintext for versions)
+        // Explicit save â†’ also push to version history (store plaintext for versions)
         pushVersion(serialize());
         toast("Document saved", "success");
       }
@@ -1863,13 +1867,18 @@
     headerHTML = headerActive ? data.header : "";
     footerActive = hfHasContent(data.footer);
     footerHTML = footerActive ? data.footer : "";
+    // Footnotes/endnotes are per-document. Docs saved before this existed
+    // have no field â€” keep whatever loadFootnotes()/loadEndnotes() loaded
+    // from the legacy global store so their notes aren't lost.
+    if (Array.isArray(data.footnotes)) footnotes = data.footnotes;
+    if (Array.isArray(data.endnotes)) endnotes = data.endnotes;
     paginate();
   }
 
   async function openDocument(id) {
     var data = await loadDocData(id);
     if (!data) { toast("Could not open document", "error"); return; }
-    // Exit any immersive chrome states left over from the previous document
+    // Exit any focus/zen/print states left over from the previous document
     try { if ($("app").classList.contains("focus-mode")) toggleFocusMode(false); } catch (e) {}
     try { if ($("app").classList.contains("zen-mode")) toggleZenMode(false); } catch (e) {}
     try { togglePrintPreview(false); } catch (e) {}
@@ -1880,12 +1889,11 @@
     document.body.classList.remove("no-active-doc");
     showWelcomeScreen(false);
     switchRibbonTab("home");
-    // Ribbon just became visible — re-measure the tab underline (it may have
+    // Ribbon just became visible â€” re-measure the tab underline (it may have
     // been measured while display:none, leaving a 0-width indicator).
     refreshRibbonIndicator();
     updateOwnedUrl();
     updateStatus();
-    toast("Opened \u201C" + currentTitle + "\u201D", "success");
   }
 
   function closeDocument() {
@@ -1920,6 +1928,8 @@
       theme: theme,
       header: "",
       footer: "",
+      footnotes: [],
+      endnotes: [],
     });
     await openDocument(id);
     setTimeout(function () {
@@ -1947,13 +1957,18 @@
   }
 
   async function deleteDocument(id) {
+    var wasCurrent = (currentDocId === id);
+    if (wasCurrent) {
+      // Detach BEFORE any awaits so a pending debounced autosave can't fire
+      // mid-delete and resurrect this document via saveDocument()'s
+      // re-create-missing-meta branch.
+      currentDocId = null;
+      if (autosaveTimer) { clearTimeout(autosaveTimer); autosaveTimer = null; }
+    }
     documents = documents.filter(function (d) { return d.id !== id; });
     await saveIndex();
     await deleteDocData(id);
-    if (currentDocId === id) {
-      currentDocId = null; // prevent saveDocument() from re-writing it
-      closeDocument();
-    }
+    if (wasCurrent) closeDocument();
     renderWelcomeCards();
     toast("Document deleted", "success");
   }
@@ -2000,7 +2015,7 @@
     }
   }
 
-  /* ---------------- Legacy migration (single → multi document) ----------------
+  /* ---------------- Legacy migration (single â†’ multi document) ----------------
      Old builds stored one document at STORAGE_KEY. If it exists and holds real
      content, adopt it as the first card on the welcome screen. Completely empty
      untitled leftovers are ignored so new users get a clean welcome screen. */
@@ -2198,6 +2213,8 @@
       theme: theme,
       header: "",
       footer: "",
+      footnotes: [],
+      endnotes: [],
     });
     toast("Imported \u201C" + baseName + "\u201D", "success");
     await openDocument(id);
@@ -2211,7 +2228,7 @@
       pill.classList.remove("saving", "error");
       if (state === "saving") {
         pill.classList.add("saving");
-        if (pillText) pillText.textContent = "Saving…";
+        if (pillText) pillText.textContent = "Savingâ€¦";
       } else if (state === "error") {
         pill.classList.add("error");
         if (pillText) pillText.textContent = "Save failed";
@@ -2225,7 +2242,7 @@
       el.classList.remove("saving", "saved");
       if (state === "saving") {
         el.classList.add("saving");
-        el.textContent = "Saving…";
+        el.textContent = "Savingâ€¦";
       } else if (state === "error") {
         el.textContent = "Save failed";
       } else {
@@ -2327,17 +2344,17 @@
   /* ---------------- Theme ----------------
      Dark mode and accent color switching have been removed.
      The accent color is locked to cyan via the CSS :root variables,
-     and there is no dark theme anymore — the app is always in light mode. */
+     and there is no dark theme anymore â€” the app is always in light mode. */
   function applyTheme() {
-    /* no-op — kept for backward compat with older code that calls applyTheme("light") */
+    /* no-op â€” kept for backward compat with older code that calls applyTheme("light") */
   }
 
   function toggleTheme() {
-    /* no-op — dark mode removed */
+    /* no-op â€” dark mode removed */
   }
 
   function toggleDarkPaper() {
-    /* no-op — dark paper removed */
+    /* no-op â€” dark paper removed */
   }
 
   /* ---------------- Document color themes (accent presets) ----------------
@@ -2345,9 +2362,9 @@
      single, locked accent color (defined in :root in docs.css). These stubs
      exist only so older code paths that still call applyColorTheme() /
      openColorThemeDialog() don't throw. */
-  function applyColorTheme() { /* no-op — cyan is locked via CSS */ }
+  function applyColorTheme() { /* no-op â€” cyan is locked via CSS */ }
   function loadColorTheme()  { /* no-op */ }
-  function openColorThemeDialog() { /* no-op — modal removed */ }
+  function openColorThemeDialog() { /* no-op â€” modal removed */ }
   function hexToRgba(hex, alpha) {
     var m = hex.match(/^#([0-9a-f]{6})$/i);
     if (!m) return "rgba(0,0,0," + alpha + ")";
@@ -2362,7 +2379,7 @@
 
   function captureClipboard(text) {
     if (!text || text.length < 1) return;
-    // dedupe — if the same text is already the most recent, skip
+    // dedupe â€” if the same text is already the most recent, skip
     if (clipboardHistory.length > 0 && clipboardHistory[0] === text) return;
     // remove older duplicates
     var idx = clipboardHistory.indexOf(text);
@@ -2384,7 +2401,7 @@
         (function (text, idx) {
           var item = document.createElement("div");
           item.className = "clipboard-history-item";
-          var preview = text.length > 60 ? text.slice(0, 60) + "…" : text;
+          var preview = text.length > 60 ? text.slice(0, 60) + "â€¦" : text;
           item.innerHTML = '<span class="ch-preview">' + escapeHtml(preview) + '</span><span class="ch-len">' + text.length + ' chars</span>';
           item.title = "Click to paste at caret";
           item.addEventListener("click", function () {
@@ -2428,7 +2445,7 @@
     m.setAttribute("aria-hidden", "true");
     if (!m.classList.contains("open")) return;
     // Slides' close: add .closing (0.23s fadeOutOverlay/fadeOutModal), then
-    // drop .open 230ms later — same timing as the Slides app's modals.
+    // drop .open 230ms later â€” same timing as the Slides app's modals.
     clearTimeout(m._closeTimer);
     m.classList.add("closing");
     m._closeTimer = setTimeout(function () {
@@ -2491,7 +2508,7 @@
       findHistoryDropdown.className = "find-history";
       input.parentElement.style.position = "relative";
       input.parentElement.appendChild(findHistoryDropdown);
-      // show on focus — rebuild items each time so new searches appear
+      // show on focus â€” rebuild items each time so new searches appear
       input.addEventListener("focus", function () {
         populateFindHistoryItems();
         if (findHistory.length > 0) findHistoryDropdown.classList.add("open");
@@ -2759,7 +2776,7 @@
 
   /* ---------------- Insert Image (Slides-style: OS file picker directly) ---------------- */
   function openImagePicker() {
-    // Slides parity: no dialog — clicking the ribbon button opens the
+    // Slides parity: no dialog â€” clicking the ribbon button opens the
     // native file explorer straight away via a hidden <input type=file>.
     var input = $("insertImageInput");
     if (input) input.click();
@@ -2878,7 +2895,7 @@
       if (r <= tableDims.rows && c <= tableDims.cols) cells[i].classList.add("hover");
       else cells[i].classList.remove("hover");
     }
-    $("tableGridLabel").textContent = tableDims.rows + " × " + tableDims.cols;
+    $("tableGridLabel").textContent = tableDims.rows + " Ã— " + tableDims.cols;
   }
 
   function openTableDialog() {
@@ -2916,7 +2933,7 @@
     closeModal("tableModal");
     schedulePaginate();
     scheduleAutosave();
-    toast("Table inserted (" + tableDims.rows + "×" + tableDims.cols + ")", "success");
+    toast("Table inserted (" + tableDims.rows + "Ã—" + tableDims.cols + ")", "success");
   }
 
   /* ---------------- Insert HR ---------------- */
@@ -2982,7 +2999,7 @@
     var overlay = document.createElement("div");
     overlay.className = "stats-printable";
     overlay.innerHTML =
-      '<h1>' + escapeHtml(title) + ' — Statistics Report</h1>' +
+      '<h1>' + escapeHtml(title) + ' â€” Statistics Report</h1>' +
       '<p style="color:#666;font-size:12px">Generated: ' + escapeHtml(date) + '</p>' +
       '<h2>Document Summary</h2>' +
       '<div class="stat-row"><span class="stat-label">Words</span><span class="stat-val">' + stats.words.toLocaleString() + '</span></div>' +
@@ -2998,7 +3015,7 @@
       '<div class="stat-row"><span class="stat-label">Current streak</span><span class="stat-val">' + (streak.current || 0) + ' day' + ((streak.current||0) === 1 ? "" : "s") + '</span></div>' +
       '<div class="stat-row"><span class="stat-label">Longest streak</span><span class="stat-val">' + (streak.longest || 0) + ' day' + ((streak.longest||0) === 1 ? "" : "s") + '</span></div>' +
       '<div class="stat-row"><span class="stat-label">Active days (last 60)</span><span class="stat-val">' + (streak.days ? streak.days.length : 0) + '</span></div>' +
-      '<p style="margin-top:32px;color:#999;font-size:11px">EmeraldSuite: Docs — generated automatically</p>';
+      '<p style="margin-top:32px;color:#999;font-size:11px">EmeraldSuite: Docs â€” generated automatically</p>';
     document.body.appendChild(overlay);
 
     // Close the modal, then print, then remove the overlay
@@ -3032,17 +3049,17 @@
   /* ---------------- Ribbon tab switching ----------------
      EmeraldSuite pattern (matches Slides): clicking a tab animates a sliding
      underline indicator to the active tab, and cross-fades the corresponding
-     ribbon-panel with a blur-out → blur-in transition.
+     ribbon-panel with a blur-out â†’ blur-in transition.
 
      IMPORTANT: We listen for `transitionend` on the blur-out animation
      rather than using a fixed setTimeout. The blur-out transition is 0.18s;
      firing at 140ms (the old behaviour) left the panel at ~5% opacity when
      its position flipped from `relative` (centered via margin:auto) to
-     `absolute; left:0` — causing a brief flash on the left edge of the
+     `absolute; left:0` â€” causing a brief flash on the left edge of the
      ribbon before the new panel appeared in the center. */
   /* ---------------- Ribbon tab indicator helpers ---------------- */
   // Position the sliding underline under a tab. No-ops safely when the
-  // ribbon is hidden (welcome screen) — the rect is just 0×0 then.
+  // ribbon is hidden (welcome screen) â€” the rect is just 0Ã—0 then.
   function moveRibbonIndicatorTo(tab) {
     var indicator = $("ribbonTabIndicator");
     if (!indicator || !tab) return;
@@ -3053,8 +3070,8 @@
   }
 
   // Re-measure the active tab's underline after the ribbon becomes visible
-  // (opening a document, fonts loading, resize…). Double rAF so layout has
-  // settled — measuring while display:none yields a 0-width underline.
+  // (opening a document, fonts loading, resizeâ€¦). Double rAF so layout has
+  // settled â€” measuring while display:none yields a 0-width underline.
   function refreshRibbonIndicator() {
     if (window.requestAnimationFrame) {
       requestAnimationFrame(function () {
@@ -3079,13 +3096,13 @@
 
     // Position under the initially-active tab after layout settles. If the
     // ribbon is hidden at that point (welcome screen) the measure is skipped
-    // — refreshRibbonIndicator() re-runs it when a document opens.
+    // â€” refreshRibbonIndicator() re-runs it when a document opens.
     setTimeout(function () {
       var active = document.querySelector(".ribbon-tab.active");
       if (active && active.getBoundingClientRect().width > 0) moveRibbonIndicatorTo(active);
     }, 100);
 
-    // Re-align when fonts finish loading (tab widths can shift) — same as Slides
+    // Re-align when fonts finish loading (tab widths can shift) â€” same as Slides
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(refreshRibbonIndicator);
     }
@@ -3127,7 +3144,7 @@
         // already active?
         if (tab.classList.contains("active") && target !== "file") return;
 
-        // FILE TAB → Backstage-style File modal (Slides behaviour).
+        // FILE TAB â†’ Backstage-style File modal (Slides behaviour).
         // The File tab has no inline ribbon panel; clicking it opens the
         // file modal overlay over the editor instead.
         if (target === "file") {
@@ -3427,9 +3444,9 @@
       if (current > goalTarget) fillEl.classList.add("over");
 
       // Milestone toasts at 25%, 50%, 75%
-      if (pct >= 25 && !goalMilestones[25]) { goalMilestones[25] = true; toastMilestone("25% there — keep going!"); }
+      if (pct >= 25 && !goalMilestones[25]) { goalMilestones[25] = true; toastMilestone("25% there â€” keep going!"); }
       if (pct >= 50 && !goalMilestones[50]) { goalMilestones[50] = true; toastMilestone("Halfway there!"); }
-      if (pct >= 75 && !goalMilestones[75]) { goalMilestones[75] = true; toastMilestone("75% — almost done!"); }
+      if (pct >= 75 && !goalMilestones[75]) { goalMilestones[75] = true; toastMilestone("75% â€” almost done!"); }
 
       // Celebration: fire confetti once when goal is first reached
       if (current >= goalTarget && !goalCelebrated) {
@@ -3445,7 +3462,7 @@
       if (pct < 50) goalMilestones[50] = false;
       if (pct < 25) goalMilestones[25] = false;
     } else {
-      targetEl.textContent = "—";
+      targetEl.textContent = "â€”";
       fillEl.style.width = "0%";
       fillEl.className = "goal-bar-fill";
       if (inputEl && document.activeElement !== inputEl) inputEl.value = "";
@@ -3456,7 +3473,7 @@
 
   function toastMilestone(msg) {
     // Milestones reuse the standard Slides-style toast (white pill + award
-    // icon picked by _toastIcon) — no more special gradient styling.
+    // icon picked by _toastIcon) â€” no more special gradient styling.
     toast(msg, "success");
   }
 
@@ -3519,7 +3536,7 @@
     "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
   ];
 
-  /* Smart sentence tokenizer — protects abbreviations and decimals. */
+  /* Smart sentence tokenizer â€” protects abbreviations and decimals. */
   function getSentences() {
     var text = getAllText();
     if (!text) return [];
@@ -3569,7 +3586,7 @@
     var sentences = getSentences();
     var text = getAllText();
     if (!text || sentences.length === 0) {
-      return { score: 0, grade: "—", level: "—", desc: "Not enough text to analyze.", words: 0, sentences: 0, syllables: 0 };
+      return { score: 0, grade: "â€”", level: "â€”", desc: "Not enough text to analyze.", words: 0, sentences: 0, syllables: 0 };
     }
     var words = text.split(/\s+/).filter(function (w) { return /[a-zA-Z]/.test(w); });
     var wordCount = words.length;
@@ -3590,8 +3607,8 @@
     if (score >= 90) { level = "Very Easy"; desc = "5th-grade level. Easily understood by an 11-year-old."; }
     else if (score >= 80) { level = "Easy"; desc = "6th-grade level. Conversational English for consumers."; }
     else if (score >= 70) { level = "Fairly Easy"; desc = "7th-grade level. Fairly easy to read."; }
-    else if (score >= 60) { level = "Standard"; desc = "8th–9th grade. Plain English. Good for most content."; }
-    else if (score >= 50) { level = "Fairly Difficult"; desc = "10th–12th grade. Fairly difficult to read."; }
+    else if (score >= 60) { level = "Standard"; desc = "8thâ€“9th grade. Plain English. Good for most content."; }
+    else if (score >= 50) { level = "Fairly Difficult"; desc = "10thâ€“12th grade. Fairly difficult to read."; }
     else if (score >= 30) { level = "Difficult"; desc = "College level. Difficult to read."; }
     else { level = "Very Difficult"; desc = "College graduate level. Best for professional/academic."; }
 
@@ -3761,7 +3778,7 @@
   }
 
   /* ---------------- Writing issues checker ---------------- */
-  // A small curated list of common misspellings → corrections
+  // A small curated list of common misspellings â†’ corrections
   var COMMON_MISSPELLINGS = {
     "recieve": "receive",
     "definately": "definitely",
@@ -3822,7 +3839,7 @@
           type: "repeat",
           word: tokens[j],
           suggestion: "remove duplicate",
-          context: "…" + tokens[j - 1] + " " + tokens[j] + "…",
+          context: "â€¦" + tokens[j - 1] + " " + tokens[j] + "â€¦",
           fixType: "removeDuplicate",
         });
       }
@@ -3840,7 +3857,7 @@
           type: "spelling",
           word: match[0],
           suggestion: COMMON_MISSPELLINGS[misspelling],
-          context: "…" + match[0] + "…",
+          context: "â€¦" + match[0] + "â€¦",
           fixType: "replace",
           fixFrom: match[0],
           fixTo: COMMON_MISSPELLINGS[misspelling],
@@ -3875,9 +3892,9 @@
         var text = document.createElement("div");
         text.className = "issue-text";
         if (issue.type === "repeat") {
-          text.innerHTML = 'Repeated word: <span class="issue-highlight">' + escapeHtml(issue.word) + '</span> — <span class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</span>';
+          text.innerHTML = 'Repeated word: <span class="issue-highlight">' + escapeHtml(issue.word) + '</span> â€” <span class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</span>';
         } else {
-          text.innerHTML = 'Possible misspelling: <span class="issue-highlight">' + escapeHtml(issue.word) + '</span> → <span class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</span>';
+          text.innerHTML = 'Possible misspelling: <span class="issue-highlight">' + escapeHtml(issue.word) + '</span> â†’ <span class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</span>';
         }
         content.appendChild(text);
         var fixBtn = document.createElement("button");
@@ -4025,7 +4042,7 @@
     if (on === undefined) on = !app.classList.contains("focus-mode");
     if (on) {
       app.classList.add("focus-mode");
-      toast("Focus mode on — press Esc to exit", "success");
+      toast("Focus mode on â€” press Esc to exit", "success");
       setTimeout(function () {
         var fc = getContent(getPages()[0]);
         if (fc) fc.focus();
@@ -4036,7 +4053,7 @@
   }
 
   /* ---------------- Zen mode (auto-hide chrome on typing) ---------------- */
-  // Zen mode is a softer Focus Mode: when enabled via View → Zen (or Ctrl+Shift+Z),
+  // Zen mode is a softer Focus Mode: when enabled via View â†’ Zen (or Ctrl+Shift+Z),
   // the topbar/ribbon/ruler/statusbar fade out after 2s of no typing/mouse
   // movement, and reappear the instant the user types or moves the mouse.
   var zenMode = false;
@@ -4048,7 +4065,7 @@
     if (on) {
       app.classList.add("zen-mode");
       scheduleZenHide();
-      toast("Zen mode on — type or move mouse to show controls", "success");
+      toast("Zen mode on â€” type or move mouse to show controls", "success");
       setTimeout(function () {
         var fc = getContent(getPages()[0]);
         if (fc) fc.focus();
@@ -4192,7 +4209,7 @@
     var daySet = {};
     for (var i = 0; i < days.length; i++) daySet[days[i]] = true;
     var today = new Date();
-    // render last 35 days as 5 rows × 7 cols (5 weeks)
+    // render last 35 days as 5 rows Ã— 7 cols (5 weeks)
     var cells = 35;
     var start = new Date(today);
     start.setDate(start.getDate() - (cells - 1));
@@ -4202,7 +4219,7 @@
       var ds = d.toISOString().slice(0, 10);
       var cell = document.createElement("div");
       cell.className = "streak-cell" + (daySet[ds] ? " streak-cell-active" : "");
-      cell.title = ds + (daySet[ds] ? " — wrote" : " — no activity");
+      cell.title = ds + (daySet[ds] ? " â€” wrote" : " â€” no activity");
       container.appendChild(cell);
     }
   }
@@ -4300,7 +4317,7 @@
         chip.appendChild(document.createTextNode(word));
         var remove = document.createElement("button");
         remove.className = "dict-word-remove";
-        remove.textContent = "×";
+        remove.textContent = "Ã—";
         remove.title = "Remove";
         remove.addEventListener("click", function () {
           delete customDict[word];
@@ -4331,19 +4348,19 @@
   }
 
   /* ===================================================================
-     EMERALDSUITE: DOCS — additional features
+     EMERALDSUITE: DOCS â€” additional features
      =================================================================== */
 
   /* ---------------- Templates ---------------- */
   var TEMPLATES = [
     { id: "blank", name: "Blank Document", desc: "Start from scratch", html: "<p><br></p>" },
     { id: "resume", name: "Resume", desc: "Clean professional CV", html:
-      "<h1>First Last</h1><p>email@example.com · (555) 123-4567 · City, Country</p>" +
+      "<h1>First Last</h1><p>email@example.com Â· (555) 123-4567 Â· City, Country</p>" +
       "<h2>Summary</h2><p>Experienced professional with a track record of...</p>" +
-      "<h2>Experience</h2><p><strong>Job Title</strong> — Company, 2020–Present</p><p>Description of role and achievements.</p>" +
-      "<p><strong>Previous Role</strong> — Company, 2017–2020</p><p>Description.</p>" +
-      "<h2>Education</h2><p><strong>Degree</strong> — University, Year</p>" +
-      "<h2>Skills</h2><p>Skill · Skill · Skill · Skill</p>"
+      "<h2>Experience</h2><p><strong>Job Title</strong> â€” Company, 2020â€“Present</p><p>Description of role and achievements.</p>" +
+      "<p><strong>Previous Role</strong> â€” Company, 2017â€“2020</p><p>Description.</p>" +
+      "<h2>Education</h2><p><strong>Degree</strong> â€” University, Year</p>" +
+      "<h2>Skills</h2><p>Skill Â· Skill Â· Skill Â· Skill</p>"
     },
     { id: "letter", name: "Letter", desc: "Formal business letter", html:
       "<p>Sender Name<br/>123 Street Address<br/>City, State ZIP</p>" +
@@ -4366,11 +4383,11 @@
       "<p><strong>Date:</strong> " + new Date().toLocaleDateString() + "<br/><strong>Attendees:</strong> <br/><strong>Objective:</strong> </p>" +
       "<h2>Agenda</h2><p>1. <br/>2. <br/>3. </p>" +
       "<h2>Discussion</h2><p>Key points discussed.</p>" +
-      "<h2>Action Items</h2><p>· Task — Owner — Due date</p>"
+      "<h2>Action Items</h2><p>Â· Task â€” Owner â€” Due date</p>"
     },
     { id: "essay", name: "Essay", desc: "Academic 5-paragraph", html:
       "<h1>Essay Title</h1>" +
-      "<p><em>Introduction</em> — Hook, context, and thesis statement that previews three main points.</p>" +
+      "<p><em>Introduction</em> â€” Hook, context, and thesis statement that previews three main points.</p>" +
       "<h2>Body Paragraph 1</h2><p>First point with supporting evidence.</p>" +
       "<h2>Body Paragraph 2</h2><p>Second point with supporting evidence.</p>" +
       "<h2>Body Paragraph 3</h2><p>Third point with supporting evidence.</p>" +
@@ -4432,17 +4449,17 @@
 
   /* ---------------- Symbol bar (Slides-style floating bottom bar) ----------------
      Ported from the Slides app's symbolToolbar: a bottom-docked floating
-     pill (no modal box) with grouped symbol buttons — Stars, Marks, Arrows,
+     pill (no modal box) with grouped symbol buttons â€” Stars, Marks, Arrows,
      Math, Greek, Numbers, Special. Clicking a symbol inserts it at the
      caret; the bar STAYS OPEN so several symbols can be inserted in a row
-     (Slides parity). Done — or the ribbon button again — closes it. */
+     (Slides parity). Done â€” or the ribbon button again â€” closes it. */
   function toggleSymbolBar(force) {
     var bar = $("symbolToolbar");
     var btn = $("btnSymbols");
     if (!bar) return;
     var shouldOpen = force === undefined ? !bar.classList.contains("visible") : force;
     if (shouldOpen) {
-      // Only one bottom toolbar at a time — exit draw mode if it is on.
+      // Only one bottom toolbar at a time â€” exit draw mode if it is on.
       if (drawMode) toggleDrawMode(false);
       bar.classList.add("visible");
       if (btn) btn.classList.add("active");
@@ -4606,14 +4623,14 @@
 
   /* Sync the Drop Cap button's toggle-ON look with the paragraph under the
      caret, so the button visually reflects the applied state (ON/OFF) while
-     moving through the document — same behavior as Bold/Italic buttons. */
+     moving through the document â€” same behavior as Bold/Italic buttons. */
   function updateDropCapState() {
     var btn = document.getElementById("btnDropCap");
     if (!btn) return;
     var block = getCurrentBlock();
     var on = !!(block && block.tagName === "P" && block.classList.contains("has-dropcap"));
     btn.classList.toggle("active", on);
-    btn.title = on ? "Drop cap (currently ON — click to remove)" : "Drop cap";
+    btn.title = on ? "Drop cap (currently ON â€” click to remove)" : "Drop cap";
   }
 
   /* ---------------- Columns ---------------- */
@@ -4718,7 +4735,7 @@
 
   /* ---------------- Header / Footer / Page Number ---------------- */
   // Robust "is the selection inside X" check. anchorNode can BE the element
-  // itself (caret at (container, childCount)) — parentElement would then point
+  // itself (caret at (container, childCount)) â€” parentElement would then point
   // ABOVE the container and closest() would miss it.
   function selectionInside(sel, selector) {
     if (!sel || !sel.rangeCount || !sel.anchorNode) return false;
@@ -4730,7 +4747,7 @@
 
   // When the caret is parked at a container's very end ((el, childCount)),
   // execCommand insertHTML drops the new node as a SIBLING below the last
-  // paragraph — it then renders on its own line (outside a footer strip's
+  // paragraph â€” it then renders on its own line (outside a footer strip's
   // height). Deepening the caret into the last line keeps inserts inline.
   function deepenEndCaret(el) {
     if (!el) return;
@@ -4790,12 +4807,12 @@
         if (fc) fc.focus();
       }
     }
-    // Caret at a container's end → deepen into the last line (inline insert)
+    // Caret at a container's end â†’ deepen into the last line (inline insert)
     var anchor = sel && sel.anchorNode ? sel.anchorNode : null;
     deepenEndCaret(anchor && anchor.nodeType === Node.ELEMENT_NODE ? anchor : null);
     document.execCommand("insertHTML", false, '<span class="field-dynamic" contenteditable="false" data-field="PAGE">Page 1</span> ');
     // Chrome drops contenteditable=false nodes AFTER the paragraph when the
-    // caret sits at a block's end — pull strays back inline + re-mirror.
+    // caret sits at a block's end â€” pull strays back inline + re-mirror.
     normalizeStrayHF();
     updateDynamicFields();
     schedulePaginate();
@@ -4823,7 +4840,7 @@
     return el.querySelectorAll("img, svg, table, hr, .field-dynamic").length === 0;
   }
 
-  // Keep the .is-empty class in sync — CSS shows the grayed hint through it.
+  // Keep the .is-empty class in sync â€” CSS shows the grayed hint through it.
   function refreshHFHint(el) {
     if (el) el.classList.toggle("is-empty", isHFEmpty(el));
   }
@@ -4897,7 +4914,7 @@
     }
   }
 
-  // Re-apply strips to every page — called from paginate() so pages the
+  // Re-apply strips to every page â€” called from paginate() so pages the
   // paginator creates (or removes) stay in sync.
   function syncHeaderFooter() {
     var pages = getPages();
@@ -4926,10 +4943,10 @@
       else { footerActive = true; footerHTML = "<p><br></p>"; }
       syncHeaderFooter();
       scheduleAutosave();
-      toast((kind === "header" ? "Header" : "Footer") + " added — type in the " +
+      toast((kind === "header" ? "Header" : "Footer") + " added â€” type in the " +
             (kind === "header" ? "top" : "bottom") + " strip", "success");
     } else {
-      toast((kind === "header" ? "Header" : "Footer") + " — edit the " +
+      toast((kind === "header" ? "Header" : "Footer") + " â€” edit the " +
             (kind === "header" ? "top" : "bottom") + " strip of any page", "info");
     }
     // Jump to the first strip so the user can type right away
@@ -4975,7 +4992,7 @@
     var app = $("app");
     app.classList.remove("view-web", "view-draft", "view-read", "focus-mode", "print-preview");
     if (mode === "print") {
-      // default — no class needed
+      // default â€” no class needed
     } else if (mode === "web") {
       app.classList.add("view-web");
     } else if (mode === "draft") {
@@ -5021,7 +5038,7 @@
       })(),
     };
     document.body.classList.add("painter-active");
-    toast("Format copied — select text to apply", "success");
+    toast("Format copied â€” select text to apply", "success");
   }
 
   function applyPainterFormat() {
@@ -5059,12 +5076,12 @@
         if (fc) fc.focus();
       }
       if (mode === "plain" || mode === "match") {
-        // strip all formatting → plain text
+        // strip all formatting â†’ plain text
         document.execCommand("insertText", false, text);
       } else if (mode === "html") {
         document.execCommand("insertHTML", false, escapeHtml(text));
       } else {
-        // keep source — try insertFromPaste, fallback to text
+        // keep source â€” try insertFromPaste, fallback to text
         document.execCommand("insertText", false, text);
       }
       schedulePaginate();
@@ -5072,8 +5089,8 @@
       closeModal("pasteSpecialModal");
       toast("Pasted (" + mode + ")", "success");
     }).catch(function () {
-      // clipboard read denied — use last clipboard text if available
-      toast("Clipboard access denied — use Ctrl+V", "error");
+      // clipboard read denied â€” use last clipboard text if available
+      toast("Clipboard access denied â€” use Ctrl+V", "error");
       closeModal("pasteSpecialModal");
     });
   }
@@ -5087,7 +5104,7 @@
     "havent": "haven't", "didnt": "didn't", "wouldnt": "wouldn't",
     "shouldnt": "shouldn't", "couldnt": "couldn't", "im": "I'm",
     "ive": "I've", "ill": "I'll", "id": "I'd",
-    ":-)": "😊", ":-(": "😞", "<3": "❤",
+    ":-)": "ðŸ˜Š", ":-(": "ðŸ˜ž", "<3": "â¤",
   };
 
   function checkAutoCorrect() {
@@ -5146,7 +5163,7 @@
     if (!text) return;
     var c = {
       id: ++commentId,
-      quote: quote.substring(0, 80) + (quote.length > 80 ? "…" : ""),
+      quote: quote.substring(0, 80) + (quote.length > 80 ? "â€¦" : ""),
       text: text,
       resolved: false,
       ts: Date.now(),
@@ -5176,7 +5193,7 @@
     if (comments.length === 0) {
       var empty = document.createElement("p");
       empty.className = "outline-empty";
-      empty.textContent = "No comments yet. Select text and use Review → Comment.";
+      empty.textContent = "No comments yet. Select text and use Review â†’ Comment.";
       body.appendChild(empty);
       return;
     }
@@ -5186,7 +5203,7 @@
         item.className = "comment-item" + (c.resolved ? " resolved" : "");
         var quote = document.createElement("div");
         quote.className = "comment-quote";
-        quote.textContent = "“" + c.quote + "”";
+        quote.textContent = "â€œ" + c.quote + "â€";
         var text = document.createElement("div");
         text.className = "comment-text";
         text.textContent = c.text;
@@ -5242,123 +5259,7 @@
     readAloudUtter.rate = 1;
     readAloudUtter.onend = function () { readAloudUtter = null; toast("Finished reading", "success"); };
     window.speechSynthesis.speak(readAloudUtter);
-    toast("Reading aloud…", "success");
-  }
-
-  /* ---------------- Dictate (Speech to Text) ---------------- */
-  var dictateRecognition = null;
-
-  // Dictate language mapping (status bar selector → BCP-47)
-  var DICTATE_LANGS = {
-    "EN": "en-US",
-    "EN-GB": "en-GB",
-    "ES": "es-ES",
-    "FR": "fr-FR",
-    "DE": "de-DE",
-    "IT": "it-IT",
-    "PT": "pt-PT",
-    "NL": "nl-NL"
-  };
-  var dictateIndicator = null;
-
-  function dictate() {
-    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      toast("Speech recognition not supported. Try Chrome/Edge.", "error");
-      return;
-    }
-    if (dictateRecognition) {
-      dictateRecognition.stop();
-      dictateRecognition = null;
-      var btn = $("btnDictate");
-      if (btn) btn.classList.remove("active");
-      hideDictateIndicator();
-      toast("Dictation stopped", "success");
-      return;
-    }
-    dictateRecognition = new SR();
-    dictateRecognition.continuous = true;
-    dictateRecognition.interimResults = true;
-    dictateRecognition.lang = DICTATE_LANGS[spellLang] || "en-US";
-    var fc = getContent(getPages()[0]);
-    fc.focus();
-    dictateRecognition.onresult = function (event) {
-      var final = "";
-      for (var i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript + " ";
-        }
-      }
-      if (final) {
-        // Process punctuation commands (e.g. "period", "comma", "new line")
-        final = processDictateCommands(final);
-        document.execCommand("insertText", false, final);
-        schedulePaginate();
-        scheduleAutosave();
-      }
-    };
-    dictateRecognition.onerror = function (e) {
-      toast("Dictation error: " + e.error, "error");
-      hideDictateIndicator();
-    };
-    dictateRecognition.onend = function () {
-      dictateRecognition = null;
-      var btn = $("btnDictate");
-      if (btn) btn.classList.remove("active");
-      hideDictateIndicator();
-    };
-    dictateRecognition.start();
-    var btn = $("btnDictate");
-    if (btn) btn.classList.add("active");
-    showDictateIndicator(dictateRecognition.lang);
-    toast("Dictating in " + (dictateRecognition.lang) + " — say \"period\", \"comma\", \"new line\", \"new paragraph\"", "success");
-  }
-
-  // Convert spoken punctuation commands into actual punctuation.
-  function processDictateCommands(text) {
-    var replacements = [
-      [/\bperiod\b/gi, "."],
-      [/\bfull stop\b/gi, "."],
-      [/\bcomma\b/gi, ","],
-      [/\bquestion mark\b/gi, "?"],
-      [/\bexclamation (mark|point)\b/gi, "!"],
-      [/\bexclamation\b/gi, "!"],
-      [/\bcolon\b/gi, ":"],
-      [/\bsemicolon\b/gi, ";"],
-      [/\bhyphen\b/gi, "-"],
-      [/\bdash\b/gi, "—"],
-      [/\bopen (quote|quotation)\b/gi, "\u201C"],
-      [/\bclose (quote|quotation)\b/gi, "\u201D"],
-      [/\bopen paren\b/gi, "("],
-      [/\bclose paren\b/gi, ")"],
-      [/\bnew line\b/gi, "\n"],
-      [/\bnew paragraph\b/gi, "\n\n"],
-      [/\btab\b/gi, "\t"],
-      [/\bcap\b/gi, function (m) { return ""; }], // capitalize next — handled by browser usually
-    ];
-    var out = text;
-    for (var i = 0; i < replacements.length; i++) {
-      out = out.replace(replacements[i][0], replacements[i][1]);
-    }
-    // Capitalize the first letter after a period + space
-    out = out.replace(/(^|[.!?]\s+)([a-z])/g, function (m, p1, p2) {
-      return p1 + p2.toUpperCase();
-    });
-    return out;
-  }
-
-  function showDictateIndicator(lang) {
-    if (!dictateIndicator) {
-      dictateIndicator = document.createElement("div");
-      dictateIndicator.className = "dictate-indicator";
-      dictateIndicator.innerHTML = '<span class="di-pulse"></span><span class="di-text">Dictating…</span>';
-      document.body.appendChild(dictateIndicator);
-    }
-    dictateIndicator.querySelector(".di-text").textContent = "Dictating (" + lang + ")…";
-    dictateIndicator.classList.add("active");
-  }
-  function hideDictateIndicator() {
-    if (dictateIndicator) dictateIndicator.classList.remove("active");
+    toast("Reading aloudâ€¦", "success");
   }
 
   function formatTime(ts) {
@@ -5374,11 +5275,11 @@
      removed to match Slides exactly. */
   function _toastIcon(rawMsg, type) {
     // Strip leading emoji/whitespace so the icon doesn't double up with
-    // a ✓ or ⚠ character that was baked into the message string.
+    // a &#10003; or âš  character that was baked into the message string.
     var msg = String(rawMsg || "").replace(/^\s*[\u2705\u2714\u2716\u2728\u26a0\ufe0f\u2757\u2753\u2139]+\s*/u, "").trim();
     var m = msg.toLowerCase();
 
-    // Monochrome black — matches the Slides app's toast icon color.
+    // Monochrome black â€” matches the Slides app's toast icon color.
     var INK = "#111";
 
     // SVG stroke wrapper helper
@@ -5386,9 +5287,9 @@
       return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="' + INK + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + paths + "</svg>";
     };
 
-    // 1. Loading / progress (reading, dictating, recording, generating…)
+    // 1. Loading / progress (reading, recording, generatingâ€¦)
     if (m.indexOf("generating") === 0 || m.indexOf("importing") === 0 || m.indexOf("recording") === 0 ||
-        m.indexOf("reading") === 0 || m.indexOf("dictating") === 0 || m.indexOf("previewing") === 0 ||
+        m.indexOf("reading") === 0 || m.indexOf("previewing") === 0 ||
         m.indexOf("searching") === 0 || m.indexOf("loading") === 0 || m.indexOf("this may take") !== -1) {
       return { icon: svg('<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>'), msg: msg };
     }
@@ -5406,7 +5307,7 @@
       return { icon: svg('<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'), msg: msg };
     }
 
-    // 4. Warnings / hints: must / select first / no X found / enter a …
+    // 4. Warnings / hints: must / select first / no X found / enter a â€¦
     if (m.indexOf("must have") !== -1 || m.indexOf("must be") !== -1 || m.indexOf("select ") !== -1 ||
         m.indexOf("place cursor") !== -1 || m.indexOf("no headings") !== -1 || m.indexOf("no captions") !== -1 ||
         m.indexOf("no text") !== -1 || m.indexOf("no image") !== -1 || m.indexOf("no comments") !== -1 ||
@@ -5431,7 +5332,7 @@
       return { icon: svg('<circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/><path d="M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>'), msg: msg };
     }
 
-    // 8. Success confirmations (saved / inserted / applied / added / exported…)
+    // 8. Success confirmations (saved / inserted / applied / added / exportedâ€¦)
     if (m.indexOf("saved") !== -1 || m.indexOf("inserted") !== -1 || m.indexOf("applied") !== -1 ||
         m.indexOf("added") !== -1 || m.indexOf("created") !== -1 || m.indexOf("restored") !== -1 ||
         m.indexOf("exported") !== -1 || m.indexOf("merged") !== -1 || m.indexOf("complete") !== -1 ||
@@ -5476,13 +5377,13 @@
       try { await idb.ready(); } catch (e) {}
     }
 
-    // Theme — dark mode removed; cyan is the only accent color and is set via CSS.
+    // Theme â€” dark mode removed; cyan is the only accent color and is set via CSS.
     // (The old THEME_KEY localStorage lookup is no longer needed.)
 
     ensureFirstPage();
     paginate();
 
-    // Load footnote/endnote arrays BEFORE any document open — the deep-link
+    // Load footnote/endnote arrays BEFORE any document open â€” the deep-link
     // ?owned= path below opens a document immediately, and openDocument
     // renders the per-page footnote areas + end-of-doc endnotes section.
     loadFootnotes();
@@ -5505,7 +5406,7 @@
       if (meta) {
         await openDocument(ownedParam);
       } else {
-        // Stale URL — clean it so a refresh lands on the welcome screen
+        // Stale URL â€” clean it so a refresh lands on the welcome screen
         history.replaceState({}, document.title, location.pathname);
       }
     }
@@ -5538,7 +5439,7 @@
     hookSelect($("fontFamily"), applyFontFamily);
     hookSelect($("fontSize"), applyFontSize);
 
-    // Colors (hidden native inputs kept for compatibility — Slides-style
+    // Colors (hidden native inputs kept for compatibility â€” Slides-style
     // dropdown lists below drive them)
     if ($("textColor")) $("textColor").addEventListener("input", function (e) { applyTextColor(e.target.value); });
     if ($("hiliteColor")) $("hiliteColor").addEventListener("input", function (e) { applyHiliteColor(e.target.value); });
@@ -5660,7 +5561,7 @@
       }
     });
 
-    // Close portal on scroll or resize — but NOT when scrolling inside the menu itself
+    // Close portal on scroll or resize â€” but NOT when scrolling inside the menu itself
     window.addEventListener("scroll", function (e) {
       if (_portalMenu && (e.target === _portalMenu || _portalMenu.contains(e.target))) return;
       closePortalDropdown();
@@ -5706,7 +5607,7 @@
       }
 
       // Keep the button label in sync whenever the select changes (user pick,
-      // updateToolbarStates…)
+      // updateToolbarStatesâ€¦)
       select.addEventListener("change", function () {
         var lbl = dropdown.querySelector(".dropdown-value");
         if (!lbl) return;
@@ -5732,7 +5633,7 @@
     wireSelectDropdown("fontFamilyDropdown", "fontFamily");
     wireSelectDropdown("fontSizeDropdown", "fontSize");
 
-    // Font color — vertical list (same behavior as Slides)
+    // Font color â€” vertical list (same behavior as Slides)
     var fontColorDd = $("fontColorDropdown");
     if (fontColorDd) {
       var fcItems = fontColorDd.querySelectorAll(".ms-dropdown-item[data-value]");
@@ -5756,7 +5657,7 @@
       }
     }
 
-    // Highlight color — vertical list (same behavior as Slides)
+    // Highlight color â€” vertical list (same behavior as Slides)
     var hlColorDd = $("highlightColorDropdown");
     if (hlColorDd) {
       var hlItems = hlColorDd.querySelectorAll(".ms-dropdown-item[data-value]");
@@ -5785,7 +5686,7 @@
       }
     }
 
-    // Page size (Layout tab) — custom dropdown with no native select behind
+    // Page size (Layout tab) â€” custom dropdown with no native select behind
     // it. The generic .ms-dropdown portal code above handles open/close.
     var psDd = $("pageSizeDropdown");
     if (psDd) {
@@ -5811,7 +5712,7 @@
       bClear.addEventListener("click", clearFormatting);
     }
 
-    // Styles group — Title / Heading 1-3 / Normal (formatBlock; feeds TOC + outline)
+    // Styles group â€” Title / Heading 1-3 / Normal (formatBlock; feeds TOC + outline)
     var styleBtns = document.querySelectorAll("#stylesGroup .style-btn");
     for (var sb = 0; sb < styleBtns.length; sb++) {
       (function (btn) {
@@ -5826,7 +5727,7 @@
       })(styleBtns[sb]);
     }
 
-    // Menubar / topbar actions (guarded — elements may have moved to ribbon)
+    // Menubar / topbar actions (guarded â€” elements may have moved to ribbon)
     if ($("btnNew")) $("btnNew").addEventListener("click", newDocument);
     if ($("btnFind")) $("btnFind").addEventListener("click", openFind);
     if ($("btnFind2")) $("btnFind2").addEventListener("click", openFind);
@@ -5835,7 +5736,7 @@
     if ($("btnUndo")) { $("btnUndo").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnUndo").addEventListener("click", function () { exec("undo"); }); }
     if ($("btnRedo")) { $("btnRedo").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnRedo").addEventListener("click", function () { exec("redo"); }); }
     // Theme / color theme / dark paper buttons have been removed from the UI.
-    // (No click handlers to wire up — cyan is locked via CSS.)
+    // (No click handlers to wire up â€” cyan is locked via CSS.)
     if ($("btnClipboardHistory")) {
       $("btnClipboardHistory").addEventListener("mousedown", function (e) { e.preventDefault(); });
       $("btnClipboardHistory").addEventListener("click", openClipboardHistory);
@@ -5859,10 +5760,10 @@
     document.addEventListener("mousemove", function () { if (typeof zenShowControls === "function") zenShowControls(); });
     $("documentScroll").addEventListener("scroll", function () { if (typeof zenShowControls === "function") zenShowControls(); });
 
-    // Ribbon tabs — switching with sliding indicator + blur/fade panel transition
+    // Ribbon tabs â€” switching with sliding indicator + blur/fade panel transition
     initRibbonTabs();
 
-    // Export dropdown (guarded — may not exist if moved)
+    // Export dropdown (guarded â€” may not exist if moved)
     var exportToggle = $("btnExportToggle");
     var exportMenu = $("exportMenu");
     if (exportToggle && exportMenu) {
@@ -5902,13 +5803,13 @@
     $("btnWordCount").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnWordCount").addEventListener("click", showWordCount);
     // (The old #wordCount span in the ribbon-tabs-right has been replaced by
-    // the Print button — the live word counter is gone from the ribbon.
-    // Word count is still available via Review → Word Count.)
+    // the Print button â€” the live word counter is gone from the ribbon.
+    // Word count is still available via Review â†’ Word Count.)
     if ($("btnPrint")) {
       $("btnPrint").addEventListener("mousedown", function (e) { e.preventDefault(); });
       $("btnPrint").addEventListener("click", function () {
         // Save first, then open the browser print dialog. togglePrintPreview
-        // is not used here because the user clicked Print directly — they
+        // is not used here because the user clicked Print directly â€” they
         // want the OS print dialog, not the in-app preview bar.
         printDocument();
       });
@@ -5940,11 +5841,11 @@
     if ($("btnFocus")) { $("btnFocus").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnFocus").addEventListener("click", function () { toggleFocusMode(); }); }
     $("btnFocusExit").addEventListener("click", function () { toggleFocusMode(false); });
 
-    // EmeraldSuite: Docs — new feature wiring
+    // EmeraldSuite: Docs â€” new feature wiring
     // Templates
     if ($("btnTemplates")) $("btnTemplates").addEventListener("click", function () { buildTemplates(); openModal("templatesModal"); });
 
-    // Symbols (Slides-style floating bottom bar — toggle, insert at caret)
+    // Symbols (Slides-style floating bottom bar â€” toggle, insert at caret)
     $("btnSymbols").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnSymbols").addEventListener("click", function () { toggleSymbolBar(); });
     initSymbolBar();
@@ -5990,7 +5891,7 @@
     // default 1-column active
     document.querySelector("[data-cols='1']").classList.add("active");
 
-    // Orientation & Page Size (size is a dropdown now — it is wired with
+    // Orientation & Page Size (size is a dropdown now â€” it is wired with
     // the other ms-dropdowns above)
     $("btnOrientation").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnOrientation").addEventListener("click", toggleOrientation);
@@ -6033,11 +5934,9 @@
     $("btnPasteSpecial").addEventListener("click", openPasteSpecial);
     $("pasteSpecialConfirm").addEventListener("click", performPasteSpecial);
 
-    // Read Aloud & Dictate
+    // Read Aloud
     $("btnReadAloud").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnReadAloud").addEventListener("click", readAloud);
-    $("btnDictate").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnDictate").addEventListener("click", dictate);
 
     // Track Changes
     $("btnTrackChanges").addEventListener("mousedown", function (e) { e.preventDefault(); });
@@ -6054,7 +5953,7 @@
     });
     $("commentAddFromPanel").addEventListener("click", addComment);
 
-    // ── FILE MODAL (opened from the File ribbon tab) ──
+    // â”€â”€ FILE MODAL (opened from the File ribbon tab) â”€â”€
     // Close X button + backdrop click
     if ($("fileModalCloseXBtn")) $("fileModalCloseXBtn").addEventListener("click", closeFileModal);
     $("fileModal").addEventListener("click", function (e) {
@@ -6096,7 +5995,7 @@
       });
     }
 
-    // ── WELCOME SCREEN (home) ──
+    // â”€â”€ WELCOME SCREEN (home) â”€â”€
     if ($("welcomeNewBtn")) $("welcomeNewBtn").addEventListener("click", createNewDocument);
     if ($("welcomeImportBtn")) $("welcomeImportBtn").addEventListener("click", function () { $("fileImportInput").click(); });
     var importInput = $("fileImportInput");
@@ -6107,7 +6006,7 @@
       e.target.value = "";
     });
 
-    // ── DELETE DOCUMENT CONFIRMATION (Slides/Notes-style) ──
+    // â”€â”€ DELETE DOCUMENT CONFIRMATION (Slides/Notes-style) â”€â”€
     if ($("deleteDocConfirm")) $("deleteDocConfirm").addEventListener("click", function () {
       var target = _deleteTargetId;
       // Animate the dialog out first, then delete once it's gone (Slides pattern)
@@ -6120,7 +6019,7 @@
       if (e.target === delModal) closeDeleteDocModal();
     });
 
-    // ── FOOTNOTE / ENDNOTE / CITATION MODALS ──
+    // â”€â”€ FOOTNOTE / ENDNOTE / CITATION MODALS â”€â”€
     if ($("footnoteInsert")) $("footnoteInsert").addEventListener("click", function () {
       var note = ($("footnoteText").value || "").trim();
       if (!note) { toast("Enter footnote text", "error"); return; }
@@ -6139,7 +6038,7 @@
       closeModal("citeModal");
       performInsertCite(cite);
     });
-    // Ctrl/⌘+Enter inside the textarea = Insert; plain Enter in the cite input = Insert
+    // Ctrl/âŒ˜+Enter inside the textarea = Insert; plain Enter in the cite input = Insert
     [["footnoteText", "footnoteInsert"], ["endnoteText", "endnoteInsert"]].forEach(function (pair) {
       var ta = $(pair[0]);
       if (ta) ta.addEventListener("keydown", function (e) {
@@ -6160,7 +6059,7 @@
     if ($("btnIndexEntry")) { $("btnIndexEntry").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnIndexEntry").addEventListener("click", function () { var sel = window.getSelection(); if (sel && !sel.isCollapsed) { toast("Index entry marked: " + sel.toString(), "success"); } else { toast("Select text first to mark an index entry", "error"); } }); }
     if ($("btnInsertIndex")) { $("btnInsertIndex").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnInsertIndex").addEventListener("click", function () { document.execCommand("insertHTML", false, '<h2>Index</h2><p>Term, Page</p>'); toast("Index inserted", "success"); schedulePaginate(); }); }
 
-    // Session timer (click to reset) — element removed in Slides-style bar; guard.
+    // Session timer (click to reset) â€” element removed in Slides-style bar; guard.
     var stBtn = $("sessionTimer");
     if (stBtn) {
       stBtn.addEventListener("click", function () {
@@ -6273,7 +6172,7 @@
     $("tableConfirm").addEventListener("click", insertTable);
     buildTableGrid();
 
-    // Zoom (Slides-style buttons — the old slider was removed)
+    // Zoom (Slides-style buttons â€” the old slider was removed)
     $("zoomFitBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("zoomFitBtn").addEventListener("click", zoomFitToWindow);
     $("zoom100Btn").addEventListener("mousedown", function (e) { e.preventDefault(); });
@@ -6283,7 +6182,7 @@
     $("zoomOutBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("zoomOutBtn").addEventListener("click", function () { adjustZoom(-10); });
 
-    // Page navigation buttons removed from status bar (no more ‹ › buttons).
+    // Page navigation buttons removed from status bar (no more â€¹ â€º buttons).
 
     // Track editor selection
     document.addEventListener("selectionchange", function () {
@@ -6313,13 +6212,13 @@
         if (sel && !sel.isCollapsed) captureClipboard(sel.toString());
       } catch (err) {}
     });
-    // Ctrl+Shift+V → clipboard history
+    // Ctrl+Shift+V â†’ clipboard history
     document.addEventListener("keydown", function (e) {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "v") {
         e.preventDefault();
         openClipboardHistory();
       }
-      // Escape → close the File modal or delete dialog if open
+      // Escape â†’ close the File modal or delete dialog if open
       if (e.key === "Escape") {
         if (fileModalOpen()) { e.preventDefault(); closeFileModal(); return; }
         var delModalOpen = $("deleteDocModal");
@@ -6329,7 +6228,7 @@
           return;
         }
       }
-      // ? → shortcut overlay (document-level so it works even if focus is elsewhere)
+      // ? â†’ shortcut overlay (document-level so it works even if focus is elsewhere)
       if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         var ae = document.activeElement;
         if (!ae || (ae.tagName !== "INPUT" && ae.tagName !== "TEXTAREA")) {
@@ -6362,7 +6261,7 @@
     initNewFeatures();
 
     setTimeout(function () {
-      // Only auto-focus the editor when a document is actually open —
+      // Only auto-focus the editor when a document is actually open â€”
       // on the welcome screen the user may be about to click a card.
       if (!currentDocId) return;
       var firstContent = getContent(getPages()[0]);
@@ -6382,12 +6281,12 @@
 
       if (change.key === DOC_INDEX_KEY) {
         // Another tab changed the document index (created/deleted/renamed a
-        // document) — refresh the welcome screen cards if it is visible.
+        // document) â€” refresh the welcome screen cards if it is visible.
         loadIndex().then(function () {
           if (!currentDocId) renderWelcomeCards();
         });
       } else if (currentDocId && change.key === docDataKey(currentDocId)) {
-        // Another tab changed the open document — reload it softly (only if
+        // Another tab changed the open document â€” reload it softly (only if
         // this tab is not actively being edited, to avoid clobbering the caret).
         reloadFromStorageQuietly();
       } else if (change.key === MARGINS_KEY) {
@@ -6471,7 +6370,7 @@
   }
 
   /* =========================================================
-     EmeraldSuite: Docs — Feature additions
+     EmeraldSuite: Docs â€” Feature additions
      (cover pages, equations, smartart, screenshot, draw mode,
       spellcheck, footnotes, table of figures, compare,
       real track changes, threaded comments)
@@ -6490,24 +6389,6 @@
   var drawTool = "pen";
   var coverPageStyle = "classic";
   var pendingInternalTarget = null;
-  var BASIC_WORD_LIST = null;
-
-  function initBasicWordList() {
-    // A compact list of frequent English words for the spelling checker.
-    // Anything not in this list (and not in the custom dictionary) is
-    // flagged as a potential issue. False positives can be suppressed via
-    // "Add to dictionary".
-    var s = ("a about above after again against all am an and any are aren't as at be because been before being below between both but by can't cannot could couldn't did didn't do does doesn't doing don't down during each few for from further had hadn't has hasn't have haven't having he he'd he'll he's her here here's hers herself him himself his how how's i i'd i'll i'm i've if in into is isn't it it's its itself let's me more most mustn't my myself no nor not of off on once only or other ought our ours ourselves out over own same shan't she she'd she'll she's should shouldn't so some such than that that's the their theirs them themselves then there there's these they they'd they'll they're they've this those through to too under until up very was wasn't we we'd we'll we're we've were weren't what what's when when's where where's which while who who's whom why why's with won't would wouldn't you you'd you'll you're you've your yours yourself yourselves " +
-      "able above accept access according account act action active actual actually add address admit advance affect afford after again age ago agree agreement ahead aid air all allow almost alone along already also always among amount and animal another answer any anyone appear apply approach area arise arm around arrange arrive art ask aspect assist assume attack attempt attention attract available avoid away back bad balance base basis bear beat beautiful become bed before begin behind belief believe below benefit beside best better between beyond big bill bird birth bit black block blood blue board body book born both bottom box boy break breakfast bridge bright bring brother brown build building business busy but buy call calm can cancel capital car card care carry case catch cause center central century certain certainly chair change character charge cheap check child choice choose church city civil claim class clean clear close clothes club coach coast code coffee cold collect college color come comfort command comment common company compare complete computer concern condition conference consider contain continue control corner correct cost could council count country couple course court cover create credit critical cross crowd current customer cut dance dark data daughter day dead deal death debate decade decide decision deep degree deliver demand depend describe design despite detail determine develop development die difference different difficult dinner direct direction director discover discuss disease distance district divide do doctor document dog dollar door down draw dream drive drop drug dry due during each early east easy eat economic economy edge education effect effort eight either elect election else emerge employee end enemy energy enjoy enough enter entire environment episode equal error escape especially even evening event ever every everyone evidence exactly example excellent except exchange exist expect experience experiment expert explain explore express extra eye face fact factor fail fall false family far farm father fear feed feel female few field fight figure file fill final find fine finger finish fire first fish five fix flat floor flow flower fly focus follow food foot for force foreign forest forget form former forward four free friend from front full fun function future game garden gather general generation get girl give glass go goal god gold good govern government great green ground group grow growth guard guess guide gun guy hair half hand happen happy hard hate have head health hear heart heat heavy help her here hero high history hit hold home hope hospital host hour house how huge human hundred husband idea identify imagine impact important improve include increase indeed industry information inside instead institution interest international interview into introduce investigation investment involve issue item job join just justice keep key kid kill kind king kitchen know knowledge land language large last late later law lawyer lay lead learn least leave left less let letter level life light like likely line link list listen little live local long look lose loss lot love low machine main maintain major make man manage management many map mark market marriage material matter may maybe mean measure media medical meet meeting member memory mention message method middle might might mile mind minister minute miss mission model modern moment money month more morning most mother mountain mouth move movement much music must name nation national natural nature near nearly necessary need network never new news next nice night nine no none normal north not note nothing notice now number obvious of off offer office officer official often oil old once one only open operation opportunity option order organization other others our out outside over own page pain paper parent part participant particular partner party pass past patient pay peace people per perform perhaps period person personal phone physical pick picture piece place plan plant play player please point police policy political politics poor population position positive possible power practice prepare present president press pressure pretty prevent price private probably problem process produce product production professional program project property proposal protect prove provide public pull purpose push put quality question quite race radio raise range rate rather reach read ready real reality reason receive recent recently recognize record reflect region relate relationship religious remain remember remove report represent require research resource respond response responsibility rest result return reveal rich right rise risk road role room round rule run safe same save say school science scientist score sea season seat second section security see seem self sell send sense series serious serve service set settle seven several shade share she sheet shift short shoot shot should shoulder show side sign significant similar simple simply since sister situation six size skill skin small smile social society some someone something sometimes son song soon sort sound source south space speak special specific speech spirit sport spread spring staff stage stand standard star start state statement station stay step still stock stop store story straight strategy street strength stress strike strong structure student study stuff style subject success such suddenly suffer suggest summer support sure surface system table take talk task teach teacher team technology tell ten tend term test than thank that the their them then theory there these they thing think third this those though thought thousand threat through throughout throw thus time today together tomorrow too tool top topic total touch toward town trade traditional traffic train training travel treat treatment tree trial trip trouble true truth try turn twice two type under understand union unit until up upon use used user usual valley value variety various very victim view violence visit voice vote wait walk wall want war watch water way we weak wear weather week well west what when where whether which while white who whole whom whose why wide wife will win wind window wish with within without woman wonder wood word work worker world worry would write writer wrong year yes yesterday yet you young your yourself zone " +
-      "absence absolutely accept access accommodate achieve acquire adjust administration advance affect alternate alternative analysis analyze announce annual anyone apparent appear appropriate approximate arbitrary architecture arise array assess assign assume assure attach attempt attribute audience author authority auto available average avoid background balance basic behalf benefit bias biology boundary brief broad capable carefully ceiling challenge characterize chemical circle circumstance cite civil clarify classification clearly coalition code coherent collaborate collapse colleague combination commission common community compile complex compute concept conclude concrete condition conduct conference confidence confirm confront consensus consequence conservative consider consist constant constitute construct consume contain contest context continuity contract contrast contribute controversy convene coordinate corporate correlation council count counterpart country creation critique crucial culture debate decade declare decline define definite deliver demonstrate density department dependent depict derive describe designate despite detail detect determine develop deviate dictate differ dimension diminish direct discipline discourse distinct distinguish distribute diverse document domain domestic dominant draft drama duration earn edition emerge emphasis enable encounter encourage endorse endure energy engage enormous ensure entity equate equivalent establish estimate ethic evaluate event eventually evident evolve examine exceed exception exclude execute exempt exhibit exist expand expectation expenditure experiment expertise explicit exploit exposure extension external facility factor faculty familiar fault feature federal figure finance flexible focus formal formulate foundation framework function fundamental generate generation given global grade gradual graduate happen hence highlight hierarchy historical however identify ideology ignore illustrate imagine impact impose incident incorporate indicate indication individual industry inevitable influence inform inherent initial initiative injury innovate insight inspect instance integrate interaction interpret interval introduce inventory investigate involve isolate issue journal judge landscape largely latter legislation legitimate limit logical maintain majority manipulate manual margin material maximum meaning measure mechanism medical medium methodology minimum minority minute modify monitor mutual narrative negotiate neutral normally notable notion objective obscure observe obtain obvious occur offer official often operating operation opinion opportunity optimal option organize orientation original outcome overcome overview parameter participate particular passive perceive percent period permanent permit perspective phenomenon physical plugin policy popular portion positive possess potential practitioner preceding predict preliminary preserve primarily priority prior probability proceed process produce profession profile profit prominent promote proportion proposal propose prospect protect prove provision publication purchase pursue qualitative quantitative radical random range rarely rate ratio rational react readily receive recognize recommend recover reduce refer reference reflect reform regime region regulate reinforce reject relate relevant release relevant rely remain remove repeat represent reproduce require research resemble reserve resolve resource respond response restriction retain reveal reverse review reward route scenario schedule scheme scholar scientific screen seek segment select sequence series session settle setting significant similar simulate solution somewhat source spatial specific specify speculate stable statistics status statute straight strategy strength stress structure subject subsequent substantial sufficiently suggest summary superior survey survive sustain systematic technique technology tendency term theoretical theory thereby thesis topic trace tradition transfer transform transition translate transport trigger typically underlying undertake utility valid validate valuable variable variation variety various vehicle version via victim violate virtual visible vision volume voluntary welfare whereas widely witness " +
-      "apple banana orange computer keyboard screen document paragraph sentence word letter format font bold italic underline table image picture color margin page ruler ribbon button dialog menu window cursor click select copy paste undo redo save load print file folder text title heading number bullet list quote link search find replace spell check grammar review view zoom layout insert delete edit format style align center left right justify indent space line height width height size small medium large normal heading paragraph ");
-    BASIC_WORD_LIST = {};
-    var arr = s.split(/\s+/);
-    for (var i = 0; i < arr.length; i++) {
-      var w = arr[i];
-      if (w) BASIC_WORD_LIST[w.toLowerCase()] = true;
-    }
-  }
 
   function escapeAttr(s) {
     return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -6548,7 +6429,7 @@
     if (author) html += '<div class="cover-author">' + escapeHtml(author) + '</div>';
     if (dateStr) html += '<div class="cover-date">' + escapeHtml(dateStr) + '</div>';
     if (style === "modern") html += '</div>';
-    html += '</div><p><br></p><div class="zdocs-page-break" contenteditable="false"><span class="pb-label">— Page Break —</span></div><p><br></p>';
+    html += '</div><p><br></p><div class="zdocs-page-break" contenteditable="false"><span class="pb-label">â€” Page Break â€”</span></div><p><br></p>';
     // Insert at the very beginning of the document
     var firstPage = getPages()[0];
     var content = getContent(firstPage);
@@ -6589,7 +6470,7 @@
     var mb = parseFloat($("secMarginBottom").value) || 2.54;
     var ml = parseFloat($("secMarginLeft").value) || 2.54;
     var mr = parseFloat($("secMarginRight").value) || 2.54;
-    // convert cm → px (1cm ≈ 37.8px at 96dpi)
+    // convert cm â†’ px (1cm â‰ˆ 37.8px at 96dpi)
     var config = {
       orientation: orient,
       margins: {
@@ -6634,7 +6515,7 @@
             currentConfig = JSON.parse(breaks[0].getAttribute("data-section-config") || "null");
           } catch (e) {}
         } else {
-          // break is later in the page — apply to next pages
+          // break is later in the page â€” apply to next pages
           try {
             var nextConfig = JSON.parse(breaks[breaks.length - 1].getAttribute("data-section-config") || "null");
             // store for next page iteration
@@ -6685,32 +6566,32 @@
     out = out.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, function (m, a, b) {
       return '<span style="display:inline-block;vertical-align:middle;text-align:center"><span style="display:block;border-bottom:1px solid currentColor;padding:0 4px">' + a + '</span><span style="display:block;padding:0 4px">' + b + '</span></span>';
     });
-    // \binom{n}{k} → (n choose k) rendered as stacked fraction in parens
+    // \binom{n}{k} â†’ (n choose k) rendered as stacked fraction in parens
     out = out.replace(/\\binom\{([^{}]*)\}\{([^{}]*)\}/g, function (m, a, b) {
       return '(<span style="display:inline-block;vertical-align:middle;text-align:center"><span style="display:block;padding:0 2px">' + a + '</span><span style="display:block;border-top:1px solid currentColor;padding:0 2px">' + b + '</span></span>)';
     });
     // \sqrt{x}
     out = out.replace(/\\sqrt\{([^{}]*)\}/g, function (m, a) {
-      return '<span style="white-space:nowrap">√<span style="border-top:1px solid currentColor;padding:0 2px">' + a + '</span></span>';
+      return '<span style="white-space:nowrap">âˆš<span style="border-top:1px solid currentColor;padding:0 2px">' + a + '</span></span>';
     });
     // \sum_{i=1}^{n}  (with optional braces)
     out = out.replace(/\\sum_\{([^{}]*)\}\^\{([^{}]*)\}/g, function (m, lo, hi) {
-      return '<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:1.4em">∑<span style="display:block;font-size:0.5em">' + lo + '..' + hi + '</span></span>';
+      return '<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:1.4em">âˆ‘<span style="display:block;font-size:0.5em">' + lo + '..' + hi + '</span></span>';
     });
-    out = out.replace(/\\sum/g, "∑");
+    out = out.replace(/\\sum/g, "âˆ‘");
     // \prod_{i=1}^{n}
     out = out.replace(/\\prod_\{([^{}]*)\}\^\{([^{}]*)\}/g, function (m, lo, hi) {
-      return '<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:1.4em">∏<span style="display:block;font-size:0.5em">' + lo + '..' + hi + '</span></span>';
+      return '<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:1.4em">âˆ<span style="display:block;font-size:0.5em">' + lo + '..' + hi + '</span></span>';
     });
-    out = out.replace(/\\prod/g, "∏");
+    out = out.replace(/\\prod/g, "âˆ");
     // \int_a^b
     out = out.replace(/\\int_\{?([^{}]*?)\}?\^\{?([^{}]*?)\}?/g, function (m, lo, hi) {
-      return '<span style="font-size:1.4em">∫</span><sub>' + lo + '</sub><sup>' + hi + '</sup>';
+      return '<span style="font-size:1.4em">âˆ«</span><sub>' + lo + '</sub><sup>' + hi + '</sup>';
     });
-    out = out.replace(/\\int/g, "∫");
+    out = out.replace(/\\int/g, "âˆ«");
     // \lim_{x \to 0}
     out = out.replace(/\\lim_\{([^{}]*)\}/g, function (m, sub) {
-      return 'lim<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:0.7em"><span style="display:block">' + sub.replace(/\\to/g, "→") + '</span></span>';
+      return 'lim<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:0.7em"><span style="display:block">' + sub.replace(/\\to/g, "â†’") + '</span></span>';
     });
     out = out.replace(/\\lim/g, "lim");
     // \log_{10}(x)
@@ -6724,69 +6605,69 @@
     });
     // \sin, \cos, \tan, \cot, \sec, \csc
     out = out.replace(/\\(sin|cos|tan|cot|sec|csc)\b/g, function (m, fn) { return fn; });
-    // \to →
-    out = out.replace(/\\to/g, "→");
+    // \to â†’
+    out = out.replace(/\\to/g, "â†’");
     // \pm
-    out = out.replace(/\\pm/g, "±");
-    out = out.replace(/\\mp/g, "∓");
-    out = out.replace(/\\times/g, "×");
-    out = out.replace(/\\div/g, "÷");
-    out = out.replace(/\\cdot/g, "·");
-    out = out.replace(/\\leq/g, "≤");
-    out = out.replace(/\\geq/g, "≥");
-    out = out.replace(/\\neq/g, "≠");
-    out = out.replace(/\\approx/g, "≈");
-    out = out.replace(/\\infty/g, "∞");
-    out = out.replace(/\\partial/g, "∂");
-    out = out.replace(/\\nabla/g, "∇");
-    out = out.replace(/\\forall/g, "∀");
-    out = out.replace(/\\exists/g, "∃");
-    out = out.replace(/\\in/g, "∈");
-    out = out.replace(/\\notin/g, "∉");
-    out = out.replace(/\\subset/g, "⊂");
-    out = out.replace(/\\supset/g, "⊃");
-    out = out.replace(/\\cup/g, "∪");
-    out = out.replace(/\\cap/g, "∩");
-    out = out.replace(/\\emptyset/g, "∅");
-    out = out.replace(/\\rightarrow/g, "→");
-    out = out.replace(/\\leftarrow/g, "←");
-    out = out.replace(/\\Rightarrow/g, "⇒");
-    out = out.replace(/\\Leftarrow/g, "⇐");
-    out = out.replace(/\\leftrightarrow/g, "↔");
+    out = out.replace(/\\pm/g, "Â±");
+    out = out.replace(/\\mp/g, "âˆ“");
+    out = out.replace(/\\times/g, "Ã—");
+    out = out.replace(/\\div/g, "Ã·");
+    out = out.replace(/\\cdot/g, "Â·");
+    out = out.replace(/\\leq/g, "â‰¤");
+    out = out.replace(/\\geq/g, "â‰¥");
+    out = out.replace(/\\neq/g, "â‰ ");
+    out = out.replace(/\\approx/g, "â‰ˆ");
+    out = out.replace(/\\infty/g, "âˆž");
+    out = out.replace(/\\partial/g, "âˆ‚");
+    out = out.replace(/\\nabla/g, "âˆ‡");
+    out = out.replace(/\\forall/g, "âˆ€");
+    out = out.replace(/\\exists/g, "âˆƒ");
+    out = out.replace(/\\in/g, "âˆˆ");
+    out = out.replace(/\\notin/g, "âˆ‰");
+    out = out.replace(/\\subset/g, "âŠ‚");
+    out = out.replace(/\\supset/g, "âŠƒ");
+    out = out.replace(/\\cup/g, "âˆª");
+    out = out.replace(/\\cap/g, "âˆ©");
+    out = out.replace(/\\emptyset/g, "âˆ…");
+    out = out.replace(/\\rightarrow/g, "â†’");
+    out = out.replace(/\\leftarrow/g, "â†");
+    out = out.replace(/\\Rightarrow/g, "â‡’");
+    out = out.replace(/\\Leftarrow/g, "â‡");
+    out = out.replace(/\\leftrightarrow/g, "â†”");
     // Greek letters
-    out = out.replace(/\\alpha/g, "α");
-    out = out.replace(/\\beta/g, "β");
-    out = out.replace(/\\gamma/g, "γ");
-    out = out.replace(/\\delta/g, "δ");
-    out = out.replace(/\\epsilon/g, "ε");
-    out = out.replace(/\\varepsilon/g, "ε");
-    out = out.replace(/\\zeta/g, "ζ");
-    out = out.replace(/\\eta/g, "η");
-    out = out.replace(/\\theta/g, "θ");
-    out = out.replace(/\\iota/g, "ι");
-    out = out.replace(/\\kappa/g, "κ");
-    out = out.replace(/\\lambda/g, "λ");
-    out = out.replace(/\\mu/g, "μ");
-    out = out.replace(/\\nu/g, "ν");
-    out = out.replace(/\\xi/g, "ξ");
-    out = out.replace(/\\pi/g, "π");
-    out = out.replace(/\\rho/g, "ρ");
-    out = out.replace(/\\sigma/g, "σ");
-    out = out.replace(/\\tau/g, "τ");
-    out = out.replace(/\\upsilon/g, "υ");
-    out = out.replace(/\\phi/g, "φ");
-    out = out.replace(/\\chi/g, "χ");
-    out = out.replace(/\\psi/g, "ψ");
-    out = out.replace(/\\omega/g, "ω");
-    out = out.replace(/\\Gamma/g, "Γ");
-    out = out.replace(/\\Delta/g, "Δ");
-    out = out.replace(/\\Theta/g, "Θ");
-    out = out.replace(/\\Lambda/g, "Λ");
-    out = out.replace(/\\Pi/g, "Π");
-    out = out.replace(/\\Sigma/g, "Σ");
-    out = out.replace(/\\Phi/g, "Φ");
-    out = out.replace(/\\Psi/g, "Ψ");
-    out = out.replace(/\\Omega/g, "Ω");
+    out = out.replace(/\\alpha/g, "Î±");
+    out = out.replace(/\\beta/g, "Î²");
+    out = out.replace(/\\gamma/g, "Î³");
+    out = out.replace(/\\delta/g, "Î´");
+    out = out.replace(/\\epsilon/g, "Îµ");
+    out = out.replace(/\\varepsilon/g, "Îµ");
+    out = out.replace(/\\zeta/g, "Î¶");
+    out = out.replace(/\\eta/g, "Î·");
+    out = out.replace(/\\theta/g, "Î¸");
+    out = out.replace(/\\iota/g, "Î¹");
+    out = out.replace(/\\kappa/g, "Îº");
+    out = out.replace(/\\lambda/g, "Î»");
+    out = out.replace(/\\mu/g, "Î¼");
+    out = out.replace(/\\nu/g, "Î½");
+    out = out.replace(/\\xi/g, "Î¾");
+    out = out.replace(/\\pi/g, "Ï€");
+    out = out.replace(/\\rho/g, "Ï");
+    out = out.replace(/\\sigma/g, "Ïƒ");
+    out = out.replace(/\\tau/g, "Ï„");
+    out = out.replace(/\\upsilon/g, "Ï…");
+    out = out.replace(/\\phi/g, "Ï†");
+    out = out.replace(/\\chi/g, "Ï‡");
+    out = out.replace(/\\psi/g, "Ïˆ");
+    out = out.replace(/\\omega/g, "Ï‰");
+    out = out.replace(/\\Gamma/g, "Î“");
+    out = out.replace(/\\Delta/g, "Î”");
+    out = out.replace(/\\Theta/g, "Î˜");
+    out = out.replace(/\\Lambda/g, "Î›");
+    out = out.replace(/\\Pi/g, "Î ");
+    out = out.replace(/\\Sigma/g, "Î£");
+    out = out.replace(/\\Phi/g, "Î¦");
+    out = out.replace(/\\Psi/g, "Î¨");
+    out = out.replace(/\\Omega/g, "Î©");
     // superscripts ^{..} or ^x
     out = out.replace(/\^\{([^{}]*)\}/g, "<sup>$1</sup>");
     out = out.replace(/\^([^\s\\{}])/g, "<sup>$1</sup>");
@@ -6822,15 +6703,15 @@
       id: "flow3",
       name: "Flow (3 steps)",
       desc: "Linear process, left-to-right",
-      preview: '<div class="sa-mini"><span class="sa-m-node">Start</span><span class="sa-m-arrow">→</span><span class="sa-m-node">Mid</span><span class="sa-m-arrow">→</span><span class="sa-m-node">End</span></div>',
-      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">Start</span><span class="sa-arrow">→</span><span class="sa-node">Process</span><span class="sa-arrow">→</span><span class="sa-node">End</span></div><p><br></p>'
+      preview: '<div class="sa-mini"><span class="sa-m-node">Start</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">Mid</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">End</span></div>',
+      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">Start</span><span class="sa-arrow">â†’</span><span class="sa-node">Process</span><span class="sa-arrow">â†’</span><span class="sa-node">End</span></div><p><br></p>'
     },
     {
       id: "flow5",
       name: "Process (5 steps)",
       desc: "Detailed sequential workflow",
-      preview: '<div class="sa-mini"><span class="sa-m-node">1</span><span class="sa-m-arrow">→</span><span class="sa-m-node">2</span><span class="sa-m-arrow">→</span><span class="sa-m-node">3</span><span class="sa-m-arrow">→</span><span class="sa-m-node">4</span><span class="sa-m-arrow">→</span><span class="sa-m-node">5</span></div>',
-      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">1</span><span class="sa-arrow">→</span><span class="sa-node">2</span><span class="sa-arrow">→</span><span class="sa-node">3</span><span class="sa-arrow">→</span><span class="sa-node">4</span><span class="sa-arrow">→</span><span class="sa-node">5</span></div><p><br></p>'
+      preview: '<div class="sa-mini"><span class="sa-m-node">1</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">2</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">3</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">4</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">5</span></div>',
+      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">1</span><span class="sa-arrow">â†’</span><span class="sa-node">2</span><span class="sa-arrow">â†’</span><span class="sa-node">3</span><span class="sa-arrow">â†’</span><span class="sa-node">4</span><span class="sa-arrow">â†’</span><span class="sa-node">5</span></div><p><br></p>'
     },
     {
       id: "hierarchy",
@@ -6843,8 +6724,8 @@
       id: "cycle",
       name: "Cycle (4 stages)",
       desc: "Continuous / iterative process",
-      preview: '<div class="sa-mini cycle"><span class="sa-m-node">Plan</span><span class="sa-m-arrow">→</span><span class="sa-m-node">Do</span><span class="sa-m-arrow">→</span><span class="sa-m-node">Check</span><span class="sa-m-arrow">→</span><span class="sa-m-node">Act</span></div>',
-      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">Plan</span><span class="sa-arrow">→</span><span class="sa-node">Do</span><span class="sa-arrow">→</span><span class="sa-node">Check</span><span class="sa-arrow">→</span><span class="sa-node">Act</span><span class="sa-arrow">↻</span></div><p><br></p>'
+      preview: '<div class="sa-mini cycle"><span class="sa-m-node">Plan</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">Do</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">Check</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">Act</span></div>',
+      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">Plan</span><span class="sa-arrow">â†’</span><span class="sa-node">Do</span><span class="sa-arrow">â†’</span><span class="sa-node">Check</span><span class="sa-arrow">â†’</span><span class="sa-node">Act</span><span class="sa-arrow">â†»</span></div><p><br></p>'
     },
     {
       id: "pyramid",
@@ -6913,7 +6794,7 @@
       document.body.removeChild(video);
       // Bring the focus back to this Docs tab. When the user captured a
       // different app/window the OS focus usually stays on that app after
-      // the native picker closes — browsers cannot fully "steal" focus
+      // the native picker closes â€” browsers cannot fully "steal" focus
       // back, but window.focus() restores it whenever the browser allows
       // (same-window contexts), and the toast confirms the capture landed.
       try { window.focus(); } catch (_) {}
@@ -6942,13 +6823,13 @@
     var shouldOpen = force === undefined ? !drawMode : force;
     drawMode = shouldOpen;
     if (shouldOpen) {
-      // Only one bottom toolbar at a time — close the symbol bar if open.
+      // Only one bottom toolbar at a time â€” close the symbol bar if open.
       toggleSymbolBar(false);
       app.classList.add("draw-mode");
       toolbar.classList.add("visible");
       ensureDrawCanvas();
       if (btn) btn.classList.add("active");
-      // No "on" toast — the toolbar appearing IS the signal (user request);
+      // No "on" toast â€” the toolbar appearing IS the signal (user request);
       // only the "Draw mode off." toast below is shown, on Done/Exit.
     } else {
       app.classList.remove("draw-mode");
@@ -6981,7 +6862,7 @@
       drawCanvas.addEventListener("touchend", function () { drawEnd(); });
     }
     // Size the canvas to the full scrollable document area.
-    // NOTE: assigning canvas.width/height CLEARS the bitmap — only resize
+    // NOTE: assigning canvas.width/height CLEARS the bitmap â€” only resize
     // when the dimensions actually changed, and carry the strokes over.
     requestAnimationFrame(function () {
       var w = scroll.scrollWidth;
@@ -6993,7 +6874,7 @@
         drawCanvas.height = h;
         drawCanvas.style.width = w + "px";
         drawCanvas.style.height = h + "px";
-        // Resizing also resets context state — restore it.
+        // Resizing also resets context state â€” restore it.
         drawCtx.lineCap = "round";
         drawCtx.lineJoin = "round";
         if (snapshot) {
@@ -7006,7 +6887,7 @@
   }
 
   function clearDrawing() {
-    // Silent clear — the canvas visibly emptying is its own feedback
+    // Silent clear â€” the canvas visibly emptying is its own feedback
     // (user request: no "Drawing cleared" toast).
     if (drawCtx && drawCanvas) drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
   }
@@ -7178,170 +7059,6 @@
   }
 
   /* ---------------- Spellcheck ---------------- */
-  function openSpellingPanel() {
-    if (!BASIC_WORD_LIST) initBasicWordList();
-    runSpellCheck();
-    var panel = $("spellingPanel");
-    panel.classList.add("open");
-    panel.setAttribute("aria-hidden", "false");
-  }
-
-  function closeSpellingPanel() {
-    var panel = $("spellingPanel");
-    panel.classList.remove("open");
-    panel.setAttribute("aria-hidden", "true");
-  }
-
-  function isMisspelled(word) {
-    if (!word) return false;
-    if (!/^[a-z]+$/i.test(word)) return false; // only check pure-alpha words
-    var w = word.toLowerCase();
-    if (w.length < 3) return false;
-    if (BASIC_WORD_LIST[w]) return false;
-    if (customDict && customDict[w]) return false;
-    return true;
-  }
-
-  function runSpellCheck() {
-    var body = $("spellingBody");
-    body.innerHTML = "";
-    var issues = [];
-    var pages = getPages();
-    for (var pi = 0; pi < pages.length; pi++) {
-      var content = getContent(pages[pi]);
-      var walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null);
-      var node;
-      while ((node = walker.nextNode())) {
-        var text = node.textContent;
-        var re = /[A-Za-z]+/g;
-        var m;
-        while ((m = re.exec(text)) !== null) {
-          var word = m[0];
-          if (isMisspelled(word)) {
-            // build context
-            var start = Math.max(0, m.index - 20);
-            var end = Math.min(text.length, m.index + word.length + 20);
-            var ctx = (start > 0 ? "…" : "") + text.slice(start, end) + (end < text.length ? "…" : "");
-            issues.push({ word: word, context: ctx.trim(), node: node, offset: m.index, length: word.length });
-          }
-        }
-      }
-    }
-    if (issues.length === 0) {
-      var empty = document.createElement("p");
-      empty.className = "outline-empty";
-      empty.textContent = "No spelling issues found. 🎉";
-      body.appendChild(empty);
-      return;
-    }
-    var seen = {};
-    for (var i = 0; i < issues.length; i++) {
-      (function (issue) {
-        if (seen[issue.word.toLowerCase()]) {
-          // still show, but mark as duplicate
-        }
-        seen[issue.word.toLowerCase()] = true;
-        var item = document.createElement("div");
-        item.className = "spell-item";
-        var wordEl = document.createElement("div");
-        wordEl.className = "spell-word";
-        wordEl.textContent = issue.word;
-        var ctxEl = document.createElement("div");
-        ctxEl.className = "spell-context";
-        ctxEl.textContent = '"' + issue.context + '"';
-        var sugs = document.createElement("div");
-        sugs.className = "spell-suggestions";
-        var sugList = suggestWords(issue.word);
-        if (sugList.length === 0) {
-          var ns = document.createElement("span");
-          ns.className = "spell-context";
-          ns.textContent = "No suggestions";
-          sugs.appendChild(ns);
-        }
-        for (var s = 0; s < sugList.length; s++) {
-          (function (sug) {
-            var b = document.createElement("button");
-            b.className = "spell-sug";
-            b.textContent = sug;
-            b.addEventListener("click", function () {
-              replaceWordInNode(issue.node, issue.offset, issue.length, sug);
-              runSpellCheck();
-            });
-            sugs.appendChild(b);
-          })(sugList[s]);
-        }
-        var actions = document.createElement("div");
-        actions.className = "spell-actions";
-        var addBtn = document.createElement("button");
-        addBtn.textContent = "Add to dictionary";
-        addBtn.addEventListener("click", function () {
-          customDict[issue.word.toLowerCase()] = true;
-          saveCustomDict();
-          renderWritingIssues();
-          runSpellCheck();
-          toast("Added to dictionary: " + issue.word, "success");
-        });
-        var ignoreBtn = document.createElement("button");
-        ignoreBtn.textContent = "Ignore";
-        ignoreBtn.addEventListener("click", function () {
-          item.parentElement && item.parentElement.removeChild(item);
-        });
-        actions.appendChild(addBtn);
-        actions.appendChild(ignoreBtn);
-        item.appendChild(wordEl);
-        item.appendChild(ctxEl);
-        item.appendChild(sugs);
-        item.appendChild(actions);
-        body.appendChild(item);
-      })(issues[i]);
-    }
-  }
-
-  function replaceWordInNode(node, start, length, replacement) {
-    try {
-      var text = node.textContent;
-      var newText = text.slice(0, start) + replacement + text.slice(start + length);
-      node.textContent = newText;
-      schedulePaginate();
-      scheduleAutosave();
-    } catch (e) {}
-  }
-
-  function suggestWords(word) {
-    // simple edit-distance suggestions against the basic word list keys
-    var w = word.toLowerCase();
-    var candidates = Object.keys(BASIC_WORD_LIST);
-    var best = [];
-    var bestDist = 3;
-    for (var i = 0; i < candidates.length; i++) {
-      var c = candidates[i];
-      if (Math.abs(c.length - w.length) > 2) continue;
-      var d = editDistance(w, c);
-      if (d < bestDist) {
-        best = [c];
-        bestDist = d;
-      } else if (d === bestDist && best.length < 4) {
-        best.push(c);
-      }
-    }
-    // also try common suffix fixes
-    return best.slice(0, 4);
-  }
-
-  function editDistance(a, b) {
-    var m = a.length, n = b.length;
-    var dp = [];
-    for (var i = 0; i <= m; i++) dp[i] = [i];
-    for (var j = 0; j <= n; j++) dp[0][j] = j;
-    for (var x = 1; x <= m; x++) {
-      for (var y = 1; y <= n; y++) {
-        var cost = a.charAt(x - 1) === b.charAt(y - 1) ? 0 : 1;
-        dp[x][y] = Math.min(dp[x - 1][y] + 1, dp[x][y - 1] + 1, dp[x - 1][y - 1] + cost);
-      }
-    }
-    return dp[m][n];
-  }
-
   /* ---------------- Footnotes & Endnotes (proper) ---------------- */
   function openFootnoteModal() {
     var t = $("footnoteText");
@@ -7455,7 +7172,7 @@
     if (footnotes.length === 0 && endnotes.length === 0) {
       var empty = document.createElement("p");
       empty.className = "outline-empty";
-      empty.textContent = "No footnotes or endnotes yet. Use References → Footnote / Endnote to add one.";
+      empty.textContent = "No footnotes or endnotes yet. Use References â†’ Footnote / Endnote to add one.";
       body.appendChild(empty);
       return;
     }
@@ -7471,7 +7188,7 @@
         txt.textContent = fn.text;
         var del = document.createElement("button");
         del.className = "fn-del";
-        del.textContent = "×";
+        del.textContent = "Ã—";
         del.title = "Delete footnote";
         del.addEventListener("click", function (e) {
           e.stopPropagation();
@@ -7498,7 +7215,7 @@
       })(footnotes[i], i);
     }
 
-    // Endnotes — listed below footnotes in the same panel
+    // Endnotes â€” listed below footnotes in the same panel
     if (endnotes.length > 0) {
       var enHead = document.createElement("p");
       enHead.className = "outline-empty";
@@ -7521,7 +7238,7 @@
           txt.textContent = en.text;
           var del = document.createElement("button");
           del.className = "fn-del";
-          del.textContent = "×";
+          del.textContent = "Ã—";
           del.title = "Delete endnote";
           del.addEventListener("click", function (e) {
             e.stopPropagation();
@@ -7679,118 +7396,13 @@
     }
   }
 
-  /* ---------------- Table of Figures — removed (feature cut) ---------------- */
-
-  /* ---------------- Compare documents ---------------- */
-  function openCompareDialog() {
-    var versions = getVersions();
-    var aSel = $("compareA");
-    var bSel = $("compareB");
-    aSel.innerHTML = "";
-    bSel.innerHTML = "";
-    if (versions.length < 1) {
-      $("compareOutput").innerHTML = '<div class="diff-empty">Save at least two versions to compare.</div>';
-    }
-    for (var i = 0; i < versions.length; i++) {
-      var o1 = document.createElement("option");
-      o1.value = i; o1.textContent = (i === 0 ? "Latest — " : "v" + (versions.length - i) + " — ") + formatTime(versions[i].savedAt);
-      aSel.appendChild(o1);
-      var o2 = document.createElement("option");
-      o2.value = i; o2.textContent = o1.textContent;
-      bSel.appendChild(o2);
-    }
-    if (versions.length >= 2) {
-      aSel.value = versions.length - 1; // older
-      bSel.value = 0; // latest
-    }
-    $("compareOutput").innerHTML = "";
-    openModal("compareModal");
-  }
-
-  function performCompare() {
-    var versions = getVersions();
-    var aIdx = parseInt($("compareA").value, 10);
-    var bIdx = parseInt($("compareB").value, 10);
-    if (isNaN(aIdx) || isNaN(bIdx) || aIdx < 0 || bIdx < 0 || aIdx >= versions.length || bIdx >= versions.length) {
-      $("compareOutput").innerHTML = '<div class="diff-empty">Pick two valid versions.</div>';
-      return;
-    }
-    var aText = stripHtml(versions[aIdx].content);
-    var bText = stripHtml(versions[bIdx].content);
-    var aWords = aText.split(/\s+/).filter(Boolean);
-    var bWords = bText.split(/\s+/).filter(Boolean);
-    var out = $("compareOutput");
-    out.innerHTML = "";
-    var result = diffWords(aWords, bWords);
-    var html = "";
-    for (var i = 0; i < result.length; i++) {
-      var part = result[i];
-      if (part.type === "same") {
-        html += escapeHtml(part.value) + " ";
-      } else if (part.type === "ins") {
-        html += '<span class="diff-ins">' + escapeHtml(part.value) + '</span> ';
-      } else if (part.type === "del") {
-        html += '<span class="diff-del">' + escapeHtml(part.value) + '</span> ';
-      }
-    }
-    if (!html.trim()) html = '<div class="diff-empty">No differences.</div>';
-    out.innerHTML = html;
-  }
-
-  function stripHtml(html) {
-    var div = document.createElement("div");
-    div.innerHTML = html;
-    return (div.textContent || "").replace(/\s+/g, " ").trim();
-  }
-
-  // Simple LCS-based word diff
-  function diffWords(a, b) {
-    var n = a.length, m = b.length;
-    var dp = [];
-    for (var i = 0; i <= n; i++) dp[i] = [];
-    for (var x = 0; x <= n; x++) {
-      for (var y = 0; y <= m; y++) {
-        if (x === 0 || y === 0) dp[x][y] = 0;
-        else if (a[x - 1] === b[y - 1]) dp[x][y] = dp[x - 1][y - 1] + 1;
-        else dp[x][y] = Math.max(dp[x - 1][y], dp[x][y - 1]);
-      }
-    }
-    var result = [];
-    var i = n, j = m;
-    var parts = [];
-    while (i > 0 && j > 0) {
-      if (a[i - 1] === b[j - 1]) {
-        parts.push({ type: "same", value: a[i - 1] });
-        i--; j--;
-      } else if (dp[i - 1][j] >= dp[i][j - 1]) {
-        parts.push({ type: "del", value: a[i - 1] });
-        i--;
-      } else {
-        parts.push({ type: "ins", value: b[j - 1] });
-        j--;
-      }
-    }
-    while (i > 0) { parts.push({ type: "del", value: a[i - 1] }); i--; }
-    while (j > 0) { parts.push({ type: "ins", value: b[j - 1] }); j--; }
-    parts.reverse();
-    // merge consecutive same-type
-    var merged = [];
-    for (var k = 0; k < parts.length; k++) {
-      var last = merged[merged.length - 1];
-      if (last && last.type === parts[k].type) {
-        last.value += " " + parts[k].value;
-      } else {
-        merged.push({ type: parts[k].type, value: parts[k].value });
-      }
-    }
-    return merged;
-  }
+  /* ---------------- Table of Figures â€” removed (feature cut) ---------------- */
 
   /* ---------------- Real track changes ---------------- */
   function setupTrackChangesInterceptor() {
     var pagesWrap = $(PAGES_WRAPPER_ID);
     if (!pagesWrap) return;
-    // Use keydown for character insertion — preventDefault on keydown is
+    // Use keydown for character insertion â€” preventDefault on keydown is
     // reliably honored by browsers (unlike beforeinput insertText).
     pagesWrap.addEventListener("keydown", function (e) {
       if (!trackChangesOn) return;
@@ -7811,13 +7423,13 @@
         scheduleMergeTracked();
         return;
       }
-      // Enter — track as insertion of a paragraph break
+      // Enter â€” track as insertion of a paragraph break
       if (key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        insertTrackedNode("ins", "¶");
+        insertTrackedNode("ins", "Â¶");
         return;
       }
-      // Backspace / Delete with a non-collapsed selection → wrap in <del>
+      // Backspace / Delete with a non-collapsed selection â†’ wrap in <del>
       if ((key === "Backspace" || key === "Delete") && !sel.isCollapsed) {
         var deleted = sel.toString();
         if (deleted) {
@@ -7847,7 +7459,7 @@
   }
 
   // Insert a tracked-change node (ins/del) at the caret using direct DOM
-  // manipulation — bypasses execCommand/styleWithCSS which would otherwise
+  // manipulation â€” bypasses execCommand/styleWithCSS which would otherwise
   // convert semantic tags into inline-styled spans.
   function insertTrackedNode(tag, text) {
     var sel = window.getSelection();
@@ -7899,46 +7511,6 @@
     }, 800);
   }
 
-  function acceptNearestChange() {
-    operateNearestChange(true);
-  }
-  function rejectNearestChange() {
-    operateNearestChange(false);
-  }
-
-  function operateNearestChange(accept) {
-    var sel = window.getSelection();
-    var node = sel && sel.anchorNode ? (sel.anchorNode.nodeType === Node.TEXT_NODE ? sel.anchorNode.parentElement : sel.anchorNode) : null;
-    // search forward+backward for nearest ins/del
-    var all = document.querySelectorAll(".page-content ins.zdocs-ins, .page-content del.zdocs-del");
-    var target = null;
-    if (node) {
-      // find nearest
-      var bestDist = Infinity;
-      for (var i = 0; i < all.length; i++) {
-        var d = node.compareDocumentPosition(all[i]);
-        // just pick the first one in document order after caret, else first overall
-        var dist = Math.abs(i);
-        if (dist < bestDist) { bestDist = dist; target = all[i]; }
-      }
-    } else if (all.length) {
-      target = all[0];
-    }
-    if (!target) { toast("No tracked changes to " + (accept ? "accept" : "reject"), "error"); return; }
-    if (target.tagName === "INS") {
-      // accept: unwrap (keep content); reject: remove entirely
-      if (accept) unwrapNode(target);
-      else target.parentElement && target.parentElement.removeChild(target);
-    } else if (target.tagName === "DEL") {
-      // accept: remove (deletion confirmed); reject: unwrap (keep content)
-      if (accept) target.parentElement && target.parentElement.removeChild(target);
-      else unwrapNode(target);
-    }
-    schedulePaginate();
-    scheduleAutosave();
-    toast((accept ? "Accepted" : "Rejected") + " tracked change", "success");
-  }
-
   function unwrapNode(node) {
     var parent = node.parentNode;
     if (!parent) return;
@@ -7973,13 +7545,13 @@
     if (scrollEl) {
       scrollEl.addEventListener("click", handleInternalLinkClick);
       // External links: Ctrl/Cmd+click opens in a NEW TAB (links inside a
-      // contenteditable never navigate on their own — without this handler
+      // contenteditable never navigate on their own â€” without this handler
       // Ctrl+click did nothing at all).
       scrollEl.addEventListener("click", function (e) {
         var a = e.target.closest("a");
         if (!a) return;
         // Internal links / bookmarks / TOC anchors are handled by their own
-        // delegated handlers above — skip them here.
+        // delegated handlers above â€” skip them here.
         if (a.classList.contains("zdocs-internal-link") || a.classList.contains("zdocs-bookmark")) return;
         if (a.closest(".zdocs-toc")) return;
         if (e.ctrlKey || e.metaKey) {
@@ -8003,7 +7575,7 @@
         e.preventDefault();
         if (pb.parentElement) {
           // Remove the marker; the empty <p> that followed a manual page
-          // break is left alone — the paginator prunes trailing empties.
+          // break is left alone â€” the paginator prunes trailing empties.
           pb.parentElement.removeChild(pb);
           schedulePaginate();
           scheduleAutosave();
@@ -8038,7 +7610,7 @@
       }); })(covPresets[cp]);
     }
 
-    // Section break (Insert tab only — the Layout tab's Breaks group was removed)
+    // Section break (Insert tab only â€” the Layout tab's Breaks group was removed)
     var bSB = $("btnSectionBreak");
     if (bSB) { bSB.addEventListener("mousedown", function (e) { e.preventDefault(); }); bSB.addEventListener("click", insertSectionBreak); }
     var bSBConfirm = $("sectionBreakConfirm");
@@ -8081,12 +7653,6 @@
     // Draw mode (Slides/Notes-style toolbar)
     initDrawToolbar();
 
-    // Spelling
-    var bSpell = $("btnSpelling");
-    if (bSpell) { bSpell.addEventListener("mousedown", function (e) { e.preventDefault(); }); bSpell.addEventListener("click", openSpellingPanel); }
-    var bSpellClose = $("spellingClose");
-    if (bSpellClose) bSpellClose.addEventListener("click", closeSpellingPanel);
-
     // Footnotes
     var bFn = $("btnFootnote");
     if (bFn) { bFn.addEventListener("mousedown", function (e) { e.preventDefault(); }); bFn.addEventListener("click", openFootnoteModal); }
@@ -8096,18 +7662,6 @@
     if (bEnPanel) bEnPanel.addEventListener("click", openEndnoteModal);
     var bFnClose = $("footnotesClose");
     if (bFnClose) bFnClose.addEventListener("click", function () { toggleFootnotes(false); });
-
-    // Compare
-    var bCmp = $("btnCompare");
-    if (bCmp) { bCmp.addEventListener("mousedown", function (e) { e.preventDefault(); }); bCmp.addEventListener("click", openCompareDialog); }
-    var bCmpConfirm = $("compareConfirm");
-    if (bCmpConfirm) bCmpConfirm.addEventListener("click", performCompare);
-
-    // Real track changes — accept/reject
-    var bAccept = $("btnAcceptChange");
-    if (bAccept) { bAccept.addEventListener("mousedown", function (e) { e.preventDefault(); }); bAccept.addEventListener("click", acceptNearestChange); }
-    var bReject = $("btnRejectChange");
-    if (bReject) { bReject.addEventListener("mousedown", function (e) { e.preventDefault(); }); bReject.addEventListener("click", rejectNearestChange); }
 
     // setup track changes interceptor
     setupTrackChangesInterceptor();
@@ -8119,29 +7673,27 @@
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
         if (shortcutOverlay && shortcutOverlay.classList.contains("open")) { shortcutOverlay.classList.remove("open"); return; }
-        var sp = $("spellingPanel"); if (sp && sp.classList.contains("open")) { closeSpellingPanel(); return; }
         var fp = $("footnotesPanel"); if (fp && fp.classList.contains("open")) { toggleFootnotes(false); return; }
-        var ir = $("immersiveReader"); if (ir && ir.classList.contains("open")) { closeImmersiveReader(); return; }
       }
     });
   }
 
   /* =========================================================
-     Round 2 — new features
-     (mail merge, immersive reader,
+     Round 2 â€” new features
+     (mail merge,
       accessibility checker, document inspector,
-      status-bar zoom, language selector)
+      status-bar zoom)
      ========================================================= */
 
   /* ---------------- Status bar zoom + language ---------------- */
   function initStatusBarControls() {
-    // The zoom % label is NOT clickable — it's a plain informational span,
+    // The zoom % label is NOT clickable â€” it's a plain informational span,
     // exactly like Slides' #zoomStatus. Zoom is changed ONLY via Ctrl+Scroll
-    // (or the View → Zoom ribbon controls / keyboard shortcuts).
+    // (or the View â†’ Zoom ribbon controls / keyboard shortcuts).
 
-    // Ctrl + Scroll to zoom in / out — matches the Slides editor behavior.
+    // Ctrl + Scroll to zoom in / out â€” matches the Slides editor behavior.
     // Slides uses an 8% multiplicative step (factor 1.08) rather than a fixed
-    // ±10% additive step — this feels smoother at high zoom levels.
+    // Â±10% additive step â€” this feels smoother at high zoom levels.
     // Listens on the document scroll area first so we can stopPropagation()
     // before the document-level handler double-fires.
     var scrollEl = $("documentScroll");
@@ -8162,30 +7714,22 @@
       if (!(e.ctrlKey || e.metaKey)) return;
       // Don't hijack scrolling inside a modal or scrollable panel.
       var target = e.target;
-      if (target && target.closest && target.closest(".modal-overlay, .outline-panel, .thumbnails-panel, .comments-panel, .spelling-panel, .footnotes-panel")) return;
+      if (target && target.closest && target.closest(".modal-overlay, .outline-panel, .thumbnails-panel, .comments-panel, .footnotes-panel")) return;
       e.preventDefault();
       var delta = e.deltaY > 0 ? -1 : 1;
       var factor = 1 + (delta * 0.08);
       zoomByFactor(factor);
     }, { passive: false });
 
-    var langBtn = $("statusLang");
-    if (langBtn) {
-      langBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        toggleLangMenu(langBtn);
-      });
-    }
-
     var psLabel = $("pageSizeLabel");
     if (psLabel) {
-      // Informational only — no click handler. Page size is changed via
+      // Informational only â€” no click handler. Page size is changed via
       // Layout -> Size (the ms-dropdown drives setPageSize).
     }
   }
 
   // Additive zoom step (Zoom In / Zoom Out buttons + Ctrl+= / Ctrl+- keys).
-  // Keeps the ±10 step, since that's what users expect.
+  // Keeps the Â±10 step, since that's what users expect.
   function adjustZoom(delta) {
     setZoom(currentZoom + delta);
   }
@@ -8197,7 +7741,7 @@
   }
 
   // Base (un-zoomed) page size. CSS `zoom` inflates offsetWidth and
-  // getBoundingClientRect, so the authored inline size is read instead —
+  // getBoundingClientRect, so the authored inline size is read instead â€”
   // falling back to the A4 default that .page gets from the stylesheet.
   function getBasePageSize() {
     var page = getPages()[0];
@@ -8218,7 +7762,7 @@
     if (avail < 100) avail = 100;
     var fit = Math.floor((avail / base) * 100);
     setZoom(fit);
-    toast("Fit to window · " + currentZoom + "%", "success");
+    toast("Fit to window Â· " + currentZoom + "%", "success");
   }
 
   function updateStatusZoom(v) {
@@ -8226,207 +7770,6 @@
     if (pct) pct.textContent = v + "%";
   }
 
-  var spellLang = "EN";
-  var LANGS = [
-    { code: "EN", name: "English (US)" },
-    { code: "EN-GB", name: "English (UK)" },
-    { code: "ES", name: "Spanish" },
-    { code: "FR", name: "French" },
-    { code: "DE", name: "German" },
-    { code: "IT", name: "Italian" },
-    { code: "PT", name: "Portuguese" },
-    { code: "NL", name: "Dutch" }
-  ];
-  var langMenu = null;
-  function toggleLangMenu(anchor) {
-    if (langMenu && langMenu.classList.contains("open")) {
-      langMenu.classList.remove("open");
-      return;
-    }
-    if (!langMenu) {
-      langMenu = document.createElement("div");
-      langMenu.className = "status-lang-menu";
-      document.body.appendChild(langMenu);
-      document.addEventListener("click", function () { langMenu.classList.remove("open"); });
-    }
-    langMenu.innerHTML = "";
-    for (var i = 0; i < LANGS.length; i++) {
-      (function (l) {
-        var b = document.createElement("button");
-        b.textContent = l.name;
-        if (l.code === spellLang) b.classList.add("active");
-        b.addEventListener("click", function (e) {
-          e.stopPropagation();
-          spellLang = l.code;
-          var span = anchor.querySelector("span");
-          if (span) span.textContent = l.code;
-          langMenu.classList.remove("open");
-          toast("Spellcheck language: " + l.name, "success");
-        });
-        langMenu.appendChild(b);
-      })(LANGS[i]);
-    }
-    var rect = anchor.getBoundingClientRect();
-    langMenu.style.top = (rect.bottom + 4) + "px";
-    langMenu.style.right = (window.innerWidth - rect.right) + "px";
-    langMenu.classList.add("open");
-  }
-
-  /* ---------------- Immersive reader ---------------- */
-  var irPlaying = false;
-  var irCurrentPara = -1;
-  var irUtterance = null;
-
-  function openImmersiveReader() {
-    // Collect all paragraphs from the document
-    var paras = [];
-    var pages = getPages();
-    for (var i = 0; i < pages.length; i++) {
-      var blocks = getContent(pages[i]).querySelectorAll("p, h1, h2, h3, h4, li, blockquote");
-      for (var b = 0; b < blocks.length; b++) {
-        var t = (blocks[b].innerText || "").trim();
-        if (t) paras.push({ tag: blocks[b].tagName, text: t });
-      }
-    }
-    var content = $("irContent");
-    content.innerHTML = "";
-    if (paras.length === 0) {
-      content.innerHTML = '<p style="color:var(--text-faint);text-align:center">No readable content in the document.</p>';
-    } else {
-      for (var p = 0; p < paras.length; p++) {
-        var div = document.createElement("div");
-        div.className = "ir-paragraph";
-        div.setAttribute("data-idx", String(p));
-        if (paras[p].tag === "H1" || paras[p].tag === "H2") div.style.fontWeight = "700";
-        if (paras[p].tag === "H1") div.style.fontSize = "1.4em";
-        div.innerHTML = renderIrText(paras[p].text);
-        content.appendChild(div);
-      }
-    }
-    var ir = $("immersiveReader");
-    ir.classList.add("open");
-    ir.setAttribute("aria-hidden", "false");
-    irCurrentPara = -1;
-    applyIrSettings();
-  }
-
-  function renderIrText(text) {
-    // Wrap each word in a span for highlighting
-    return text.split(/(\s+)/).map(function (tok) {
-      if (/^\s+$/.test(tok)) return tok;
-      return '<span class="ir-word">' + escapeHtml(tok) + '</span>';
-    }).join("");
-  }
-
-  function closeImmersiveReader() {
-    var ir = $("immersiveReader");
-    ir.classList.remove("open");
-    ir.setAttribute("aria-hidden", "true");
-    stopIrReading();
-  }
-
-  function applyIrSettings() {
-    var size = $("irTextSize").value;
-    var spacing = $("irSpacing").value;
-    var lineFocus = $("irLineFocus").checked;
-    var syllables = $("irSyllables").checked;
-    var content = $("irContent");
-    content.style.fontSize = size + "px";
-    content.style.lineHeight = String(spacing);
-    if (syllables) {
-      // Add syllable breakdown marks (simple heuristic: split long words)
-      var words = content.querySelectorAll(".ir-word");
-      for (var i = 0; i < words.length; i++) {
-        var w = words[i].textContent;
-        if (w.length > 5) {
-          words[i].innerHTML = '<span class="ir-syllable">' + escapeHtml(w) + '</span>';
-        } else {
-          words[i].textContent = w;
-        }
-      }
-    } else {
-      var syls = content.querySelectorAll(".ir-syllable");
-      for (var s = 0; s < syls.length; s++) {
-        var par = syls[s].parentElement;
-        if (par) par.textContent = syls[s].textContent;
-      }
-    }
-    if (lineFocus && irCurrentPara < 0) {
-      var first = content.querySelector(".ir-paragraph");
-      if (first) { first.classList.add("ir-focused"); irCurrentPara = 0; }
-    } else if (!lineFocus) {
-      var focused = content.querySelectorAll(".ir-focused");
-      for (var f = 0; f < focused.length; f++) focused[f].classList.remove("ir-focused");
-    }
-  }
-
-  function irPlay() {
-    if (irPlaying) { stopIrReading(); return; }
-    if (!("speechSynthesis" in window)) { toast("Speech not supported", "error"); return; }
-    var paras = $("irContent").querySelectorAll(".ir-paragraph");
-    if (paras.length === 0) return;
-    irPlaying = true;
-    $("irPlay").classList.add("playing");
-    var startIdx = irCurrentPara >= 0 ? irCurrentPara : 0;
-    irReadFrom(startIdx, paras);
-  }
-
-  function irReadFrom(idx, paras) {
-    if (!irPlaying || idx >= paras.length) {
-      stopIrReading();
-      if (idx >= paras.length) {
-        var focused = $("irContent").querySelectorAll(".ir-focused, .ir-reading");
-        for (var f = 0; f < focused.length; f++) focused[f].classList.remove("ir-focused", "ir-reading");
-        irCurrentPara = -1;
-      }
-      return;
-    }
-    // Clear previous focused/reading
-    var prev = $("irContent").querySelectorAll(".ir-focused, .ir-reading");
-    for (var p = 0; p < prev.length; p++) prev[p].classList.remove("ir-focused", "ir-reading");
-    paras[idx].classList.add("ir-reading");
-    paras[idx].classList.add("ir-focused");
-    paras[idx].scrollIntoView({ behavior: "smooth", block: "center" });
-    irCurrentPara = idx;
-    irUtterance = new SpeechSynthesisUtterance(paras[idx].innerText);
-    irUtterance.rate = 0.95;
-    irUtterance.onend = function () {
-      if (irPlaying) irReadFrom(idx + 1, paras);
-    };
-    irUtterance.onerror = function () { irPlaying = false; };
-    window.speechSynthesis.speak(irUtterance);
-  }
-
-  function stopIrReading() {
-    irPlaying = false;
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-    var playBtn = $("irPlay");
-    if (playBtn) playBtn.classList.remove("playing");
-  }
-
-  function irPrev() {
-    var paras = $("irContent").querySelectorAll(".ir-paragraph");
-    if (paras.length === 0) return;
-    var next = Math.max(0, irCurrentPara - 1);
-    var prev = $("irContent").querySelectorAll(".ir-focused, .ir-reading");
-    for (var p = 0; p < prev.length; p++) prev[p].classList.remove("ir-focused", "ir-reading");
-    paras[next].classList.add("ir-focused");
-    paras[next].scrollIntoView({ behavior: "smooth", block: "center" });
-    irCurrentPara = next;
-    if (irPlaying) { stopIrReading(); irPlay(); }
-  }
-
-  function irNext() {
-    var paras = $("irContent").querySelectorAll(".ir-paragraph");
-    if (paras.length === 0) return;
-    var next = Math.min(paras.length - 1, irCurrentPara + 1);
-    var prev = $("irContent").querySelectorAll(".ir-focused, .ir-reading");
-    for (var p = 0; p < prev.length; p++) prev[p].classList.remove("ir-focused", "ir-reading");
-    paras[next].classList.add("ir-focused");
-    paras[next].scrollIntoView({ behavior: "smooth", block: "center" });
-    irCurrentPara = next;
-    if (irPlaying) { stopIrReading(); irPlay(); }
-  }
 
   /* ---------------- Accessibility checker ---------------- */
   function runAccessibilityCheck() {
@@ -8488,7 +7831,7 @@
       // Block count
       totalBlocks += content.querySelectorAll("p, h1, h2, h3, h4, li, blockquote, pre").length;
 
-      // Contrast check — scan elements with inline color/background-color
+      // Contrast check â€” scan elements with inline color/background-color
       var colored = content.querySelectorAll("[style*='color'], [style*='background-color'], font[color]");
       for (var ci = 0; ci < colored.length; ci++) {
         var cs = window.getComputedStyle(colored[ci]);
@@ -8558,7 +7901,7 @@
         item.className = "a11y-issue severity-" + issue.severity;
         var icon = document.createElement("div");
         icon.className = "a11y-icon " + (issue.severity === "error" ? "error" : issue.severity === "warning" ? "warning" : "ok");
-        icon.innerHTML = issue.severity === "error" ? "✕" : issue.severity === "warning" ? "!" : "✓";
+        icon.innerHTML = issue.severity === "error" ? "&times;" : issue.severity === "warning" ? "!" : "&#10003;";
         var body = document.createElement("div");
         body.className = "a11y-body";
         var title = document.createElement("div");
@@ -8658,7 +8001,7 @@
         item.className = "inspector-item" + (it.removable ? "" : " empty");
         var icon = document.createElement("span");
         icon.className = "inspector-item-icon";
-        icon.innerHTML = "●";
+        icon.innerHTML = "â—";
         var text = document.createElement("div");
         text.className = "inspector-item-text";
         text.innerHTML = '<span class="inspector-item-name">' + escapeHtml(it.name) + '</span> <span class="inspector-item-count">' + escapeHtml(String(it.count)) + '</span>';
@@ -8687,25 +8030,6 @@
   function initRound2Features() {
     initStatusBarControls();
 
-    // Immersive reader
-    var bIR = $("btnImmersiveReader");
-    if (bIR) { bIR.addEventListener("mousedown", function (e) { e.preventDefault(); }); bIR.addEventListener("click", openImmersiveReader); }
-    var bIRClose = $("irClose");
-    if (bIRClose) bIRClose.addEventListener("click", closeImmersiveReader);
-    var bIRPlay = $("irPlay");
-    if (bIRPlay) bIRPlay.addEventListener("click", irPlay);
-    var bIRPrev = $("irPrev");
-    if (bIRPrev) bIRPrev.addEventListener("click", irPrev);
-    var bIRNext = $("irNext");
-    if (bIRNext) bIRNext.addEventListener("click", irNext);
-    var irTextSize = $("irTextSize");
-    if (irTextSize) irTextSize.addEventListener("input", applyIrSettings);
-    var irSpacing = $("irSpacing");
-    if (irSpacing) irSpacing.addEventListener("input", applyIrSettings);
-    var irLineFocus = $("irLineFocus");
-    if (irLineFocus) irLineFocus.addEventListener("change", applyIrSettings);
-    var irSyllables = $("irSyllables");
-    if (irSyllables) irSyllables.addEventListener("change", applyIrSettings);
 
     // Accessibility checker
     var bA11y = $("btnAccessibilityCheck");
@@ -8726,7 +8050,7 @@
   }
 
   /* =========================================================
-     Round 4 — tooltips, live merge preview, word count live
+     Round 4 â€” tooltips, live merge preview, word count live
      ========================================================= */
 
   /* ---------------- Rich tooltips ---------------- */
@@ -8738,7 +8062,7 @@
     richTip.className = "rich-tip";
     document.body.appendChild(richTip);
     // Attach to all ribbon buttons, topbar actions, status bar items
-    var selectors = ".ribbon-btn, .topbar-action, .ribbon-tab, .statbar-toggle, .session-timer, .status-lang, .toolbar-stats";
+    var selectors = ".ribbon-btn, .topbar-action, .ribbon-tab, .statbar-toggle, .session-timer, .toolbar-stats";
     var els = document.querySelectorAll(selectors);
     for (var i = 0; i < els.length; i++) {
       attachTooltip(els[i]);
@@ -8793,7 +8117,7 @@
   }
 
   function initRound4Features() {
-    // Custom rich tooltips removed (Slides parity) — buttons keep their
+    // Custom rich tooltips removed (Slides parity) â€” buttons keep their
     // native title= tooltips.
 
     // Round 6: ripple effect + table cell right-click
@@ -8803,7 +8127,7 @@
 
   /* ---------------- Button ripple effect ---------------- */
   function initRippleEffect() {
-    // Slides parity: no ripple on ribbon buttons — keep it for other chrome buttons only
+    // Slides parity: no ripple on ribbon buttons â€” keep it for other chrome buttons only
     var btns = document.querySelectorAll(".topbar-action, .btn");
     for (var i = 0; i < btns.length; i++) {
       (function (btn) {
@@ -8930,8 +8254,6 @@
       { sep: true },
       { label: "Insert Link", shortcut: "Ctrl+K", action: function () { openLinkDialog(); } },
       { label: "Add Comment", action: function () { addComment(); }, disabled: !hasSelection },
-      { sep: true },
-      { label: "Spelling…", action: function () { openSpellingPanel(); } },
     ];
     for (var i = 0; i < items.length; i++) {
       var it = items[i];

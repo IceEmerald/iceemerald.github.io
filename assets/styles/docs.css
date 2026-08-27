@@ -3367,12 +3367,12 @@ body {
      ruler, and all floating panels are hidden. */
   .navbar, .topbar, .ribbon-tabs, .ribbon, .statusbar, .ruler-wrap,
   .toast, .modal-overlay, .focus-bar, .print-preview-bar,
-  .draw-toolbar, .symbol-toolbar, .immersive-reader,
+  .draw-toolbar, .symbol-toolbar,
   .outline-panel, .thumbnails-panel, .comments-panel,
-  .spelling-panel, .footnotes-panel,
+  .footnotes-panel,
   .confetti-container, .rich-tip, .editor-context-menu,
-  .status-lang-menu, .find-history, .dictate-indicator,
-  .zen-indicator, .ir-topbar {
+  .find-history,
+  .zen-indicator {
     display: none !important;
   }
   body { background: #fff; }
@@ -3540,80 +3540,6 @@ body {
 }
 .compare-out .diff-empty { color: var(--text-faint); font-style: italic; }
 
-/* ---- Spelling panel ---- */
-.spelling-panel {
-  position: fixed;
-  top: calc(var(--topbar-h) + var(--ribbon-tabs-h) + var(--ribbon-h) + 8px);
-  right: 8px;
-  width: 320px;
-  max-width: calc(100vw - 16px);
-  max-height: calc(100vh - var(--topbar-h) - var(--ribbon-tabs-h) - var(--ribbon-h) - var(--statusbar-h) - 24px);
-  background: var(--bg-toolbar);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius-lg);
-  /* No box-shadow in the closed state — the panel sits off-screen at
-     translateX(340px) and its leftward shadow would bleed onto the right
-     edge of the viewport, painting a faint dark band down the right side
-     of the screen. Shadow is applied only in the .open state below. */
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  transform: translateX(340px);
-  opacity: 0;
-  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s, box-shadow 0.28s var(--ease-bouncy);
-  pointer-events: none;
-}
-.spelling-panel.open { transform: translateX(0); opacity: 1; pointer-events: auto; box-shadow: var(--shadow-lg); }
-.spelling-body { flex: 1; overflow-y: auto; padding: 8px; }
-.spell-item {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border-chrome);
-}
-.spell-item:last-child { border-bottom: none; }
-.spell-word {
-  font-weight: 700;
-  color: #b91c1c;
-  text-decoration: underline wavy #b91c1c;
-  text-underline-offset: 3px;
-  font-size: 14px;
-}
-.spell-suggestions {
-  margin-top: 6px;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.spell-sug {
-  background: var(--ui-accent-soft);
-  border: 1px solid var(--ui-accent-border);
-  color: var(--ui-accent);
-  border-radius: 4px;
-  padding: 3px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: 0.15s;
-}
-.spell-sug:hover { background: var(--ui-accent); color: #fff; }
-.spell-context {
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--text-faint);
-  font-style: italic;
-}
-.spell-actions { margin-top: 6px; display: flex; gap: 6px; }
-.spell-actions button {
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.spell-actions button:hover { color: var(--ui-accent); border-color: var(--ui-accent-border); }
-
 /* ---- Footnotes panel ---- */
 .footnotes-panel {
   position: fixed;
@@ -3627,8 +3553,9 @@ body {
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-chrome);
   border-radius: var(--radius-lg);
-  /* No box-shadow in the closed state — same reason as .spelling-panel:
-     off-screen panel + always-on shadow = faint band on the right edge. */
+  /* No box-shadow in the closed state — same off-screen-panel reasoning
+     as the other side panels: off-screen panel + always-on shadow =
+     faint band on the right edge. */
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -4130,120 +4057,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   50% { opacity: 0.4; }
 }
 
-/* =========================================================
-   Round 2 — new feature styling
-   ========================================================= */
-
-/* ---- Immersive reader overlay ---- */
-.immersive-reader {
-  position: fixed;
-  inset: 0;
-  z-index: 500;
-  background: var(--bg-app);
-  display: flex;
-  flex-direction: column;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s, visibility 0.3s;
-}
-.immersive-reader.open { opacity: 1; visibility: visible; }
-.ir-topbar {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 20px;
-  background: var(--bg-toolbar);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border-chrome);
-  box-shadow: var(--shadow-sm);
-  flex-wrap: wrap;
-}
-.ir-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.ir-btn {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border-chrome);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--text-base);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: 0.15s;
-}
-.ir-btn:hover {
-  background: var(--ui-accent-soft);
-  border-color: var(--ui-accent-border);
-  color: var(--ui-accent);
-}
-.ir-btn.playing {
-  background: var(--ui-accent);
-  color: #fff;
-  border-color: var(--ui-accent);
-}
-.ir-sep { width: 1px; height: 22px; background: var(--border-chrome); }
-.ir-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--text-base);
-  cursor: pointer;
-  user-select: none;
-}
-.ir-toggle input { accent-color: var(--ui-accent); cursor: pointer; }
-.ir-size-label, .ir-spacing-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.ir-size-label input, .ir-spacing-label input { width: 80px; accent-color: var(--ui-accent); cursor: pointer; }
-.ir-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 60px 40px;
-  max-width: 800px;
-  margin: 0 auto;
-  width: 100%;
-  font-family: var(--font-ui);
-  color: var(--text-strong);
-  line-height: 1.8;
-  font-size: 20px;
-}
-.ir-paragraph {
-  margin: 0 0 1.2em 0;
-  padding: 8px 14px;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-.ir-paragraph.ir-focused {
-  background: var(--ui-accent-soft);
-  box-shadow: inset 3px 0 0 var(--ui-accent);
-}
-.ir-paragraph.ir-reading {
-  background: var(--ui-accent-selected);
-}
-.ir-syllable {
-  border-bottom: 2px dotted var(--ui-accent-border);
-  cursor: help;
-}
-.ir-word.ir-highlight {
-  background: var(--mark-bg);
-  border-radius: 2px;
-  padding: 0 1px;
-}
-
 /* ---- Accessibility checker ---- */
 .accessibility-results { max-height: 400px; overflow-y: auto; }
 .a11y-issue {
@@ -4304,34 +4117,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 }
 .inspector-item-remove:hover { background: rgba(217, 48, 37, 0.14); }
 .inspector-item.empty .inspector-item-count { color: var(--ui-accent); }
-
-/* ---- Status bar polish: language selector dropdown ---- */
-.status-lang-menu {
-  position: fixed;
-  background: var(--bg-toolbar);
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg);
-  padding: 4px;
-  z-index: 250;
-  min-width: 140px;
-  display: none;
-}
-.status-lang-menu.open { display: block; animation: ctxFadeIn 0.15s ease-out; }
-.status-lang-menu button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-  color: var(--text-base);
-  font-size: 12px;
-  cursor: pointer;
-  border-radius: 4px;
-}
-.status-lang-menu button:hover { background: var(--ui-accent-soft); color: var(--ui-accent); }
-.status-lang-menu button.active { background: var(--ui-accent); color: #fff; }
 
 @keyframes ctxFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -4423,39 +4208,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 /* ---- Tooltip (native title= replacement for ribbon buttons) ---- */
 .ribbon-btn[data-tip] { position: relative; }
  ribbon-btn[data-tip]::after { content: ""; }
-
-/* ---- Dictate language + punctuation indicator ---- */
-.dictate-indicator {
-  position: fixed;
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  background: var(--ui-accent);
-  color: #fff;
-  padding: 10px 20px;
-  border-radius: 999px;
-  box-shadow: 0 8px 24px rgba(35, 154, 77, 0.4);
-  z-index: 280;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.3s var(--ease-bouncy), opacity 0.2s;
-}
-.dictate-indicator.active { opacity: 1; transform: translateX(-50%) translateY(0); }
-.dictate-indicator .di-pulse {
-  width: 10px; height: 10px;
-  background: #fff;
-  border-radius: 50%;
-  animation: dictatePulse 1s ease-in-out infinite;
-}
-@keyframes dictatePulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.4); opacity: 0.5; }
-}
 
 /* ---- Contrast checker styles (in accessibility dialog) ---- */
 .a11y-issue.severity-contrast { border-left-color: #f9ab00; }
@@ -4659,14 +4411,10 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 }
 
 /* Status-bar items: no blue focus ring on click OR keyboard focus,
-   to avoid the "weird blue line" lingering under A4.
-   (statusZoomPct no longer needs this — it's not interactive, but keep
-   the rule for status-lang and page-size-label.) */
-.status-lang:focus-visible,
+   to avoid the "weird blue line" lingering under A4. */
 .page-size-label:focus-visible {
   outline: none;
 }
-.status-lang:focus,
 .page-size-label:focus {
   outline: none;
   box-shadow: none;
@@ -5616,11 +5364,11 @@ body.no-active-doc .print-preview-bar {
   /* Flat button matching Slides' .create-note-btn (hover lifts -2px + darkens) */
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: var(--ui-accent);
   color: #fff;
   border: none;
-  padding: 12px 20px;
+  padding: 10px 20px;
   border-radius: 8px;
   font-family: var(--font-ui);
   font-size: 14px;
