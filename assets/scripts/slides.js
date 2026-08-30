@@ -21,10 +21,74 @@ function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
+/* ---- Security helpers (CodeQL hardening) ---- */
+// Whitelist sanitizer for user-authored rich content (slide element HTML/SVG,
+// imported .emeraldcore files). Parses in a detached DOMParser document
+// (nothing executes), removes active elements, strips event-handler
+// attributes and dangerous URL schemes, then re-serializes the clean tree.
+function sanitizeUserHtml(html) {
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    const kill = doc.body.querySelectorAll('script,style,iframe,frame,frameset,object,embed,applet,base,link,meta,form,input,button,select,textarea,noscript,title');
+    kill.forEach(el => el.remove());
+    const all = doc.body.querySelectorAll('*');
+    all.forEach(el => {
+        Array.from(el.attributes).forEach(attr => {
+            const name = attr.name.toLowerCase();
+            const val = String(attr.value || '').trim();
+            if (/^on/i.test(name) || name === 'srcdoc' || name === 'sandbox') { el.removeAttribute(attr.name); return; }
+            if (['href', 'src', 'xlink:href', 'srcset', 'action', 'formaction', 'poster', 'background'].includes(name)) {
+                const m = val.match(/^([a-zA-Z][a-zA-Z0-9+.\-]*):/);
+                if (m && !/^(https?|mailto|tel|blob)$/i.test(m[1]) &&
+                    !(name === 'src' && /^data:image\//i.test(val))) {
+                    el.removeAttribute(attr.name);
+                }
+            }
+        });
+    });
+    return doc.body.innerHTML;
+}
+
+// Only safe schemes survive for media sources. Relative paths (no scheme)
+// are allowed; javascript:/vbscript:/data:text/html are dropped.
+function safeMediaUrl(u, kind) {
+    const s = String(u || '').trim();
+    if (!s) return '';
+    const m = s.match(/^([a-zA-Z][a-zA-Z0-9+.\-]*):/);
+    if (m) {
+        const scheme = m[1].toLowerCase();
+        if (scheme === 'http' || scheme === 'https' || scheme === 'blob') return s;
+        if (scheme === 'data' && kind && new RegExp('^data:' + kind + '/', 'i').test(s)) return s;
+        return '';
+    }
+    return s;
+}
+
+// window.open with a scheme whitelist — blocks javascript:/data:/vbscript:
+// opens. Bare domains get https:// like normalizeExternalUrl does in Docs.
+function safeOpenUrl(u) {
+    const s = String(u || '').trim();
+    if (!s) return;
+    const m = s.match(/^([a-zA-Z][a-zA-Z0-9+.\-]*):/);
+    if (m && !/^(https?|mailto|tel)$/i.test(m[1])) return;
+    if (!m && s.charAt(0) !== '/' && s.charAt(0) !== '#') s = 'https://' + s;
+    window.open(s, '_blank', 'noopener');
+}
+
+// Paint values (fill/stroke) may only be colors or gradients — never markup.
+function svgPaint(v, fallback) {
+    const s = String(v == null ? '' : v).trim();
+    if (s === 'none') return 'none';
+    if (/^#[0-9a-f]{3,8}$/i.test(s)) return s;
+    if (/^(rgba?|hsla?)\(/i.test(s) && /^[a-z()0-9,.%\s\-\/]+$/i.test(s)) return s;
+    if (/^(linear|radial)-gradient\(/i.test(s) && /^[a-z()0-9,.%\s\-\/#+]+$/i.test(s)) return s;
+    if (/^[a-z]+$/i.test(s)) return s;
+    return fallback;
+}
+
 function stripHtmlToText(html) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
+    // DOMParser never executes markup — safer than a detached innerHTML parse.
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    return doc.body.textContent || '';
 }
 
 function generateSecureId(length = 9) {
@@ -36,9 +100,9 @@ function generateSecureId(length = 9) {
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 
 function htmlToText(html) {
-    const d = document.createElement('div');
-    d.innerHTML = html;
-    return d.textContent || '';
+    // DOMParser never executes markup — safer than a detached innerHTML parse.
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    return doc.body.textContent || '';
 }
 
 function formatDate(ts) {
@@ -56,9 +120,9 @@ function stripComments(text) {
 
 // Shape SVG generator — PowerPoint-style comprehensive shape set
 function shapeSVG(shape, fill, stroke, strokeWidth) {
-    const sw = (stroke === 'none' || !stroke) ? 0 : (strokeWidth || 2);
-    const f = fill === 'none' ? 'none' : (fill || '#f97316');
-    const s = (stroke === 'none' || !stroke) ? 'none' : stroke;
+    const sw = Math.max(0, Math.min(40, Number((stroke === 'none' || !stroke) ? 0 : (strokeWidth || 2)) || 0));
+    const f = fill === 'none' ? 'none' : svgPaint(fill, '#f97316');
+    const s = (stroke === 'none' || !stroke) ? 'none' : svgPaint(stroke, 'none');
     const attrs = `fill="${f}" stroke="${s}" stroke-width="${sw}"`;
     const pad = sw / 2;
 
@@ -1595,7 +1659,7 @@ class SlidesApp {
             content.contentEditable = 'false';
             content.setAttribute('data-placeholder', 'Click to edit text');
             content.style.cssText = 'width:100%;height:100%;outline:none;word-break:break-word;white-space:pre-wrap;';
-            content.innerHTML = el.html || '';
+            content.innerHTML = sanitizeUserHtml(el.html) || '';
             // Link is handled via click on the element (see mousedown handler)
             // Listen for input to save
             content.addEventListener('input', () => {
@@ -1617,7 +1681,7 @@ class SlidesApp {
         } else if (el.type === 'shape') {
             // Icon shapes carry their own pre-rendered SVG markup
             if (el.shape === 'icon') {
-                div.innerHTML = el.svg || '';
+                div.innerHTML = sanitizeUserHtml(el.svg) || '';
             } else {
                 div.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
             }
@@ -1626,7 +1690,7 @@ class SlidesApp {
             imgWrap.className = 'slide-el-image-wrap';
             imgWrap.style.cssText = 'position:absolute;inset:0;overflow:hidden;border-radius:inherit;';
             const img = document.createElement('img');
-            img.src = el.src;
+            img.src = safeMediaUrl(el.src, 'image');
             img.draggable = false;
             img.alt = el.alt || '';
             // Apply crop if any
@@ -1650,7 +1714,7 @@ class SlidesApp {
             player.className = 'slide-video-player paused';
             // Hidden <video> element (no native controls)
             const vid = document.createElement('video');
-            vid.src = el.src;
+            vid.src = safeMediaUrl(el.src, 'video');
             vid.preload = 'metadata';
             vid.setAttribute('poster', el.poster || '');
             vid.setAttribute('playsinline', '');
@@ -1765,7 +1829,7 @@ class SlidesApp {
             audCtrl.appendChild(btns);
             // Hidden audio element
             const aud = document.createElement('audio');
-            aud.src = el.src;
+            aud.src = safeMediaUrl(el.src, 'audio');
             aud.preload = 'metadata';
             player.appendChild(art);
             player.appendChild(audCtrl);
@@ -1818,7 +1882,7 @@ class SlidesApp {
                 if (!e.ctrlKey && !e.metaKey) return;
                 e.preventDefault();
                 e.stopPropagation();
-                window.open(el.link, '_blank', 'noopener');
+                safeOpenUrl(el.link);
             });
             div.classList.add('has-link');
         }
@@ -1861,10 +1925,10 @@ class SlidesApp {
             domEl.style.textDecoration = el.underline ? 'underline' : 'none';
             domEl.style.backgroundColor = el.highlight || 'transparent';
             const c = domEl.querySelector('.text-content');
-            if (c && this.editingId !== id) c.innerHTML = el.html || '';
+            if (c && this.editingId !== id) c.innerHTML = sanitizeUserHtml(el.html) || '';
         } else if (el.type === 'shape') {
             if (el.shape === 'icon') {
-                domEl.innerHTML = el.svg || '';
+                domEl.innerHTML = sanitizeUserHtml(el.svg) || '';
             } else {
                 domEl.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
             }
@@ -1879,7 +1943,7 @@ class SlidesApp {
             imgWrap.className = 'slide-el-image-wrap';
             imgWrap.style.cssText = 'position:absolute;inset:0;overflow:hidden;border-radius:inherit;';
             const img = document.createElement('img');
-            img.src = el.src;
+            img.src = safeMediaUrl(el.src, 'image');
             img.draggable = false;
             img.alt = '';
             if (visibleW <= 0 || visibleH <= 0) {
@@ -2306,10 +2370,10 @@ class SlidesApp {
                 d.style.backgroundColor = el.highlight || 'transparent';
                 d.style.padding = '8px 10px';
                 d.style.wordBreak = 'break-word';
-                d.innerHTML = el.html || '';
+                d.innerHTML = sanitizeUserHtml(el.html) || '';
             } else if (el.type === 'shape') {
                 if (el.shape === 'icon') {
-                    d.innerHTML = el.svg || '';
+                    d.innerHTML = sanitizeUserHtml(el.svg) || '';
                 } else {
                     d.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
                 }
@@ -2318,7 +2382,7 @@ class SlidesApp {
                 const visibleW = 1 - crop.l - crop.r;
                 const visibleH = 1 - crop.t - crop.b;
                 const img = document.createElement('img');
-                img.src = el.src;
+                img.src = safeMediaUrl(el.src, 'image');
                 if (visibleW <= 0 || visibleH <= 0) {
                     img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
                 } else if (crop.l > 0 || crop.t > 0 || crop.r > 0 || crop.b > 0) {
@@ -2369,7 +2433,7 @@ class SlidesApp {
         // shows the user's strokes along with the slide content.
         if (slide.drawingData) {
             const drawImg = document.createElement('img');
-            drawImg.src = slide.drawingData;
+            drawImg.src = safeMediaUrl(slide.drawingData, 'image');
             drawImg.style.cssText = 'position:absolute;left:0;top:0;width:960px;height:540px;pointer-events:none;z-index:9998;display:block;';
             drawImg.alt = '';
             inner.appendChild(drawImg);
@@ -3994,9 +4058,9 @@ class SlidesApp {
             item.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:${isSelected ? 'rgba(249,115,22,0.15)' : 'rgba(0,0,0,0.04)'};color:${isSelected ? 'var(--ui-accent,#f97316)' : 'rgba(44,62,80,0.6)'};font-size:11px;font-weight:700;flex-shrink:0;">${i + 1}</div>
                 <div class="ap-item-info">
-                    <div class="ap-item-name">${elLabel}</div>
+                    <div class="ap-item-name">${escapeHtml(elLabel)}</div>
                     <div class="ap-item-anim">
-                        <span class="anim-badge">${animLabel}</span>
+                        <span class="anim-badge">${escapeHtml(animLabel)}</span>
                         <span>${a.start === 'with' ? 'With Prev' : a.start === 'after' ? 'After Prev' : 'On Click'}</span>
                         <span>${(a.duration || 0.5).toFixed(1)}s</span>
                     </div>
@@ -5862,7 +5926,7 @@ class SlidesApp {
                 </div>
                 <div class="delete-modal-body" style="padding-top:0;">
                     <label style="display:block;font-size:0.82rem;color:#666;margin-bottom:6px;font-weight:500;">Link URL</label>
-                    <input type="url" id="linkUrlInput" value="${el.link || 'https://'}" placeholder="https://example.com" />
+                    <input type="url" id="linkUrlInput" value="${escapeHtml(el.link || 'https://')}" placeholder="https://example.com" />
                 </div>
                 <div class="delete-modal-actions" style="${el.link ? 'justify-content:flex-start;' : ''}">
                     ${el.link ? '<button class="delete-modal-btn" id="removeLinkBtn" style="background:rgba(217,48,37,.08);color:#d93025;border:1px solid rgba(217,48,37,.2);">Remove Link</button>' : ''}
@@ -5980,12 +6044,12 @@ class SlidesApp {
         popup.style.cssText = `position:absolute;left:${pinX + 24}px;top:${pinY - 4}px;`;
         popup.innerHTML = `
             <div class="comment-popup-header">
-                <div class="comment-popup-avatar">${comment.author.charAt(0)}</div>
-                <span class="comment-popup-author">${comment.author}</span>
+                <div class="comment-popup-avatar">${escapeHtml(comment.author.charAt(0))}</div>
+                <span class="comment-popup-author">${escapeHtml(comment.author)}</span>
                 <span class="comment-popup-time">${formatDate(comment.ts)}</span>
                 <button class="comment-popup-close">&times;</button>
             </div>
-            <div class="comment-popup-body">${comment.text}</div>
+            <div class="comment-popup-body">${escapeHtml(comment.text)}</div>
             <div class="comment-popup-actions">
                 <button class="comment-reply-btn">Reply</button>
                 <button class="comment-delete-btn">Delete</button>
@@ -7068,7 +7132,7 @@ class SlidesApp {
                 d.style.padding = '8px 10px';
                 d.style.wordBreak = 'break-word';
                 d.style.whiteSpace = 'pre-wrap';
-                d.innerHTML = el.html || '';
+                d.innerHTML = sanitizeUserHtml(el.html) || '';
                 // Show link styling in present mode
                 if (el.link) {
                     d.style.color = '#2563eb';
@@ -7077,7 +7141,7 @@ class SlidesApp {
                 }
             } else if (el.type === 'shape') {
                 if (el.shape === 'icon') {
-                    d.innerHTML = el.svg || '';
+                    d.innerHTML = sanitizeUserHtml(el.svg) || '';
                 } else {
                     d.innerHTML = shapeSVG(el.shape, el.fill, el.stroke, el.strokeWidth);
                 }
@@ -7086,7 +7150,7 @@ class SlidesApp {
                 const visibleW = 1 - crop.l - crop.r;
                 const visibleH = 1 - crop.t - crop.b;
                 const img = document.createElement('img');
-                img.src = el.src;
+                img.src = safeMediaUrl(el.src, 'image');
                 if (visibleW <= 0 || visibleH <= 0) {
                     img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
                 } else if (crop.l > 0 || crop.t > 0 || crop.r > 0 || crop.b > 0) {
@@ -7104,7 +7168,7 @@ class SlidesApp {
                 player.className = 'slide-video-player paused';
                 player.style.cssText = 'position:absolute;inset:0;';
                 const vid = document.createElement('video');
-                vid.src = el.src;
+                vid.src = safeMediaUrl(el.src, 'video');
                 vid.preload = 'metadata';
                 vid.setAttribute('poster', el.poster || '');
                 vid.setAttribute('playsinline', '');
@@ -7204,7 +7268,7 @@ class SlidesApp {
                 audCtrl.appendChild(progWrap);
                 audCtrl.appendChild(btns);
                 const aud = document.createElement('audio');
-                aud.src = el.src;
+                aud.src = safeMediaUrl(el.src, 'audio');
                 aud.preload = 'metadata';
                 player.appendChild(art);
                 player.appendChild(audCtrl);
@@ -7217,7 +7281,7 @@ class SlidesApp {
                 d.style.cursor = 'pointer';
                 d.addEventListener('click', (e) => {
                     e.preventDefault();
-                    window.open(el.link, '_blank', 'noopener');
+                    safeOpenUrl(el.link);
                 });
             }
             container.appendChild(d);
@@ -7231,7 +7295,7 @@ class SlidesApp {
         // non-interactive (pointer-events:none) so it never blocks clicks.
         if (slide.drawingData) {
             const drawImg = document.createElement('img');
-            drawImg.src = slide.drawingData;
+            drawImg.src = safeMediaUrl(slide.drawingData, 'image');
             drawImg.style.cssText = 'position:absolute;left:0;top:0;width:960px;height:540px;pointer-events:none;z-index:9998;display:block;';
             drawImg.alt = '';
             container.appendChild(drawImg);

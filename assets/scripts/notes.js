@@ -236,7 +236,7 @@ class NotesApp {
         else if (m.includes('failed') || m.includes('error')) icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
         else if (m.includes('limit') || m.includes('only have 1') || m.includes('already have') || m.includes('large') || m.includes('select an image') || m.includes('no text')) icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
         else if (m.includes('image')) icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
-        toast.innerHTML = `<span style="display:flex;align-items:center;gap:8px;"><span>${icon}</span><span>${message}</span></span>`;
+        toast.innerHTML = `<span style="display:flex;align-items:center;gap:8px;"><span>${icon}</span><span>${this.escapeHtml(message)}</span></span>`;
         toast.classList.add('show');
         clearTimeout(this._toastTimer);
         this._toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
@@ -3720,7 +3720,9 @@ class NotesApp {
             const editor = document.getElementById('textEditor');
             if (editor) {
                 const img = document.createElement('img');
-                img.src = meta.dataUrl;
+                const du = String(meta.dataUrl || '').trim();
+                // Only image data-URLs, web/blob URLs and relative paths survive.
+                img.src = (/^(https?:|blob:|data:image\/)/i.test(du) || (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(du) && du)) ? du : '';
                 img.alt = 'drawing';
                 img.style.maxWidth = '100%';
                 img.style.height = 'auto';

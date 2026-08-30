@@ -74,8 +74,8 @@
   --modal-border: hsl(214, 25%, 88%);
 
   /* Marks */
-  --mark-bg: #fff59d;
-  --mark-current: #ffb300;
+  --mark-bg: #fde68a;
+  --mark-current: #f59e0b;
   --hr-color: #d8dce1;
 
   --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1227,7 +1227,17 @@ body {
 }
 
 .modal-sm { width: 380px; }
-.modal-find { width: 460px; }
+/* Document Statistics only — wider so sections fit side by side (shorter modal) */
+.modal-stats { width: 940px; max-width: 94%; }
+.modal-stats .modal-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 20px;
+  align-items: start;
+}
+.modal-stats .stats-grid,
+.modal-stats .streak-heatmap-section { grid-column: 1 / -1; }
+.modal-stats .stats-grid { grid-template-columns: repeat(3, 1fr); }
 
 /* Header — centered title with a circular icon badge above it, stacked
    vertically (exact Slides' .link-modal-header / .delete-modal-header
@@ -1386,20 +1396,6 @@ body {
 }
 
 .input-row input { flex: 1; }
-
-.match-count {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  min-width: 56px;
-  text-align: right;
-}
-
-.field-checks {
-  display: flex;
-  gap: 16px;
-  margin-top: 4px;
-}
 
 .check {
   display: flex;
@@ -2122,41 +2118,6 @@ body {
 
 .session-timer svg { opacity: 0.7; }
 
-/* ===================== Word cloud ===================== */
-.word-cloud {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 4px 8px;
-  min-height: 60px;
-  padding: 8px 4px;
-  line-height: 1;
-}
-
-.word-cloud-item {
-  display: inline-block;
-  color: var(--accent-strong);
-  font-weight: 600;
-  transition: transform 0.15s, color 0.15s;
-  cursor: default;
-}
-
-.word-cloud-item:hover {
-  transform: scale(1.15);
-  color: var(--accent);
-}
-
-.word-cloud-empty {
-  color: var(--text-faint);
-  font-size: 12px;
-  font-style: italic;
-  text-align: center;
-  width: 100%;
-  padding: 12px 0;
-  margin: 0;
-}
-
 /* ===================== Dictionary link + dialog ===================== */
 .dict-link {
   float: right;
@@ -2526,205 +2487,6 @@ body {
   margin-left: 2px;
 }
 
-/* ===================== Readability gauge ===================== */
-.readability-wrap {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.readability-gauge {
-  position: relative;
-  width: 88px;
-  height: 88px;
-  flex-shrink: 0;
-}
-
-.readability-gauge svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
-}
-
-.readability-gauge .gauge-bg {
-  fill: none;
-  stroke: color-mix(in srgb, var(--text-base) 12%, transparent);
-  stroke-width: 8;
-}
-
-.readability-gauge .gauge-fill {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 8;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.6s ease, stroke 0.3s;
-}
-
-.readability-gauge .gauge-fill.hard { stroke: #c0392b; }
-.readability-gauge .gauge-fill.medium { stroke: #e0a800; }
-.readability-gauge .gauge-fill.easy { stroke: var(--accent); }
-
-.readability-score {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.readability-score-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-strong);
-  line-height: 1;
-}
-
-.readability-score-unit {
-  font-size: 9px;
-  color: var(--text-muted);
-  margin-top: 1px;
-}
-
-.readability-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.readability-level {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--accent-strong);
-  margin-bottom: 4px;
-}
-
-.readability-level.hard { color: #c0392b; }
-.readability-level.medium { color: #e0a800; }
-
-.readability-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-/* ===================== Word frequency list ===================== */
-.word-freq-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.word-freq-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-}
-
-.word-freq-word {
-  flex: 0 0 90px;
-  color: var(--text-base);
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.word-freq-bar {
-  flex: 1;
-  height: 14px;
-  background: color-mix(in srgb, var(--text-base) 8%, transparent);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.word-freq-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-strong) 100%);
-  border-radius: 3px;
-  transition: width 0.5s ease;
-}
-
-.word-freq-count {
-  flex: 0 0 36px;
-  text-align: right;
-  font-weight: 600;
-  color: var(--text-strong);
-  font-variant-numeric: tabular-nums;
-}
-
-.word-freq-empty {
-  color: var(--text-faint);
-  font-size: 12px;
-  font-style: italic;
-  text-align: center;
-  padding: 12px 0;
-  margin: 0;
-}
-
-/* ===================== Distribution chart ===================== */
-.dist-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 70px;
-  padding: 4px 0;
-}
-
-.dist-bar {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  height: 100%;
-  justify-content: flex-end;
-}
-
-.dist-bar-fill {
-  width: 100%;
-  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%);
-  border-radius: 3px 3px 0 0;
-  min-height: 2px;
-  transition: height 0.5s ease;
-  position: relative;
-}
-
-.dist-bar-fill:hover {
-  background: linear-gradient(180deg, #2ecc8f 0%, var(--accent) 100%);
-}
-
-.dist-bar-fill .dist-count {
-  position: absolute;
-  top: -16px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-base);
-  opacity: 0;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
-
-.dist-bar-fill:hover .dist-count { opacity: 1; }
-
-.dist-bar-label {
-  font-size: 9px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.dist-empty {
-  color: var(--text-faint);
-  font-size: 12px;
-  font-style: italic;
-  text-align: center;
-  padding: 20px 0;
-}
-
 /* ===================== Writing issues ===================== */
 .issues-list {
   display: flex;
@@ -3068,105 +2830,177 @@ body {
 .paste-special-options .check:hover { border-color: var(--ui-accent-border); }
 .paste-special-options .check input { margin-right: 6px; accent-color: var(--ui-accent); }
 
-/* ===================== Comments panel ===================== */
-.comments-panel {
+/* ===================== Comments (Slides-style pins + popup) =====================
+   No sidebar. A commented text range is wrapped in a .comment-anchor span and
+   a small speech-bubble pin (sup.comment-ref, non-editable, one virtual caret
+   character like footnote refs) sits right after it. Clicking the pin opens a
+   floating .comment-popup card — same interaction model as the Slides app,
+   with the Docs teal accent. */
+.page-content .comment-anchor {
+  background: var(--ui-accent-soft);
+  border-bottom: 1px solid var(--ui-accent-border);
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.page-content .comment-anchor.comment-resolved {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
+sup.comment-ref {
+  display: inline-block;
+  margin: 0 3px;
+  vertical-align: middle;
+  line-height: 1;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+sup.comment-ref .comment-bubble {
+  width: 17px;
+  height: 17px;
+  background: var(--ui-accent);
+  border-radius: 50% 50% 50% 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  box-shadow: 0 1px 4px var(--ui-accent-border);
+  transform: rotate(-45deg);
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s;
+}
+
+/* Author initial lives in a pseudo-element (data-initial attribute) so it
+   never enters innerText — word count and caret math stay untouched. */
+sup.comment-ref .comment-bubble::before {
+  content: attr(data-initial);
+  transform: rotate(45deg);
+}
+
+sup.comment-ref:hover .comment-bubble { transform: rotate(-45deg) scale(1.12); }
+
+sup.comment-ref.resolved .comment-bubble {
+  background: var(--text-faint);
+  box-shadow: none;
+}
+
+.comment-popup {
   position: fixed;
-  top: 0;
-  right: 0;
-  width: 300px;
-  height: 100vh;
-  height: 100dvh;
-  background: var(--modal-bg);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-left: 1px solid var(--modal-border);
-  /* Shadow only when open — see .outline-panel note about the closed-state
-     shadow bleeding a dark band onto the right edge of the screen. */
-  z-index: 150;
-  transform: translateX(100%);
-  transition: transform 0.28s var(--ease-bouncy), box-shadow 0.28s var(--ease-bouncy);
+  z-index: 9600;
+  width: 250px;
+  background: var(--modal-bg, #fff);
+  border: 1px solid var(--modal-border, rgba(0, 0, 0, 0.06));
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  animation: commentPopupIn 0.15s ease-out;
+}
+
+@keyframes commentPopupIn {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.comment-popup-header {
   display: flex;
-  flex-direction: column;
-}
-
-.comments-panel.open {
-  transform: translateX(0);
-  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
-}
-
-.comments-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.comments-foot {
-  display: flex;
+  align-items: center;
   gap: 6px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--modal-border);
+  padding: 8px 10px 6px;
+  background: var(--ui-accent-soft);
+  border-bottom: 1px solid var(--border-chrome);
 }
 
-.comment-item {
-  padding: 10px 12px;
-  border: 1px solid var(--border-chrome);
-  border-left: 3px solid var(--ui-accent);
-  border-radius: var(--radius-sm);
-  margin-bottom: 8px;
-  background: var(--modal-bg);
-  transition: opacity 0.2s;
+.comment-popup-avatar {
+  width: 20px;
+  height: 20px;
+  background: var(--ui-accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
-.comment-item.resolved { opacity: 0.5; border-left-color: var(--text-faint); }
+.comment-popup-author { font-weight: 600; font-size: 0.78rem; color: var(--text-base); }
+.comment-popup-time { font-size: 0.65rem; color: var(--text-faint); }
 
-.comment-quote {
-  font-size: 11px;
+.comment-popup-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 2px;
+  border-radius: 3px;
+  transition: background 0.12s, color 0.12s;
+}
+
+.comment-popup-close:hover { background: rgba(0, 0, 0, 0.06); color: var(--text-muted); }
+
+.comment-popup-body {
+  font-size: 0.78rem;
+  color: var(--text-base);
+  line-height: 1.4;
+  padding: 6px 10px;
+  word-break: break-word;
+}
+
+.comment-popup-quote {
+  font-size: 0.68rem;
   color: var(--text-muted);
   font-style: italic;
-  background: var(--ui-accent-soft);
-  padding: 4px 8px;
-  border-radius: 3px;
-  margin-bottom: 6px;
+  padding: 0 10px 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.comment-text {
-  font-size: 13px;
+.comment-popup-replies { border-top: 1px solid var(--border-chrome); }
+
+.comment-popup-reply {
+  padding: 5px 10px 2px;
+  font-size: 0.72rem;
   color: var(--text-base);
-  margin-bottom: 6px;
-  line-height: 1.4;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
-.comment-text[contenteditable]:focus { outline: 1px solid var(--ui-accent); border-radius: 2px; }
+.comment-popup-reply .reply-time { display: block; font-size: 0.6rem; color: var(--text-faint); }
 
-.comment-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 10.5px;
-  color: var(--text-faint);
-}
-
-.comment-actions {
+.comment-popup-actions {
   display: flex;
   gap: 6px;
+  padding: 6px 10px 8px;
 }
 
-.comment-actions button {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 11px;
+.comment-popup-actions button {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
   cursor: pointer;
+  transition: background 0.12s;
   font-family: var(--font-ui);
-  padding: 2px 4px;
-  border-radius: 3px;
-  transition: color 0.12s, background 0.12s;
+  font-weight: 500;
+  border: none;
 }
 
-.comment-actions button:hover { color: var(--ui-accent); background: var(--ui-accent-soft); }
+.comment-reply-btn { background: rgba(0, 0, 0, 0.04); color: var(--text-base); }
+.comment-reply-btn:hover { background: rgba(0, 0, 0, 0.08); }
+.comment-resolve-btn { background: var(--ui-accent-soft); color: var(--ui-accent); }
+.comment-resolve-btn:hover { background: var(--ui-accent-selected); }
+.comment-delete-btn { background: rgba(220, 38, 38, 0.08); color: #dc2626; }
+.comment-delete-btn:hover { background: rgba(220, 38, 38, 0.16); }
 
 /* ===================== View modes ===================== */
 .app.view-web .page {
@@ -3377,10 +3211,10 @@ body {
   .navbar, .topbar, .ribbon-tabs, .ribbon, .statusbar, .ruler-wrap,
   .toast, .modal-overlay, .focus-bar, .print-preview-bar,
   .draw-toolbar, .symbol-toolbar,
-  .outline-panel, .thumbnails-panel, .comments-panel,
-  .footnotes-panel,
+  .outline-panel, .thumbnails-panel,
+  .footnotes-panel, .comment-popup,
   .confetti-container, .rich-tip, .editor-context-menu,
-  .find-history,
+  #findBar, .fr-select-menu,
   .zen-indicator {
     display: none !important;
   }
@@ -3528,35 +3362,6 @@ mark.emdocs-mark,
   vertical-align: middle;
 }
 .equation sup, .equation sub { font-size: 0.7em; }
-
-/* ---- Compare output ---- */
-.compare-out {
-  margin-top: 12px;
-  padding: 14px;
-  background: var(--bg-app);
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius);
-  max-height: 320px;
-  overflow-y: auto;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-base);
-}
-.compare-out .diff-ins {
-  background: rgba(35, 154, 77, 0.16);
-  color: #1a7d3d;
-  text-decoration: none;
-  border-radius: 2px;
-  padding: 0 2px;
-}
-.compare-out .diff-del {
-  background: rgba(217, 48, 37, 0.14);
-  color: #b91c1c;
-  text-decoration: line-through;
-  border-radius: 2px;
-  padding: 0 2px;
-}
-.compare-out .diff-empty { color: var(--text-faint); font-style: italic; }
 
 /* ---- Footnotes panel ---- */
 .footnotes-panel {
@@ -3908,37 +3713,39 @@ sup.footnote-ref:hover, sup.endnote-ref:hover { text-decoration: underline; }
   margin: 0px 4px;
 }
 
-/* ---- Track changes marks (inline) ---- */
-ins.emdocs-ins,
-ins.zdocs-ins {
-  background: rgba(35, 154, 77, 0.16);
-  color: #1a7d3d;
-  text-decoration: none;
-  border-bottom: 1px solid rgba(35, 154, 77, 0.4);
-}
-del.emdocs-del,
-del.zdocs-del {
-  background: rgba(217, 48, 37, 0.14);
-  color: #b91c1c;
-  text-decoration: line-through;
-}
+/* ---- Track changes marks (inline) ----
+   The green/red marks only render while Track Changes is ON (body.track-on,
+   toggled by toggleTrackChanges). With tracking off, every <ins>/<del>
+   shows as normal text — no green highlight after tracking has ended.
+   (.emdocs-change-marker dots removed: no code generates them anymore.) */
 ins.emdocs-ins,
 ins.zdocs-ins,
 del.emdocs-del,
-del.zdocs-del { border-radius: 2px; padding: 0 1px; }
-.emdocs-change-marker,
-.zdocs-change-marker {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ui-accent);
-  margin: 0 2px;
-  vertical-align: middle;
-  cursor: pointer;
+del.zdocs-del {
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 2px;
+  padding: 0 1px;
 }
-.emdocs-change-marker.del,
-.zdocs-change-marker.del { background: #b91c1c; }
+/* Word/Google-Docs style marks: colored TEXT + a thin 1px underline, no
+   background block — the old filled background made tracked text render
+   as a thick green band. */
+.track-on ins.emdocs-ins,
+.track-on ins.zdocs-ins {
+  background: transparent;
+  color: #1a7d3d;
+  text-decoration: underline;
+  text-decoration-color: rgba(35, 154, 77, 0.55);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.track-on del.emdocs-del,
+.track-on del.zdocs-del {
+  background: transparent;
+  color: #b91c1c;
+  text-decoration: line-through;
+}
 
 /* ---- Bookmark anchors (invisible markers in text) ---- */
 a.emdocs-bookmark,
@@ -4026,13 +3833,7 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   padding: 0 8px;
 }
 
-/* ---- Threaded comments ---- */
-.comment-item .comment-thread { margin-left: 18px; border-left: 2px solid var(--border-chrome); padding-left: 10px; margin-top: 6px; }
-.comment-item .comment-reply-row { display: flex; gap: 6px; margin-top: 6px; }
-.comment-item .comment-reply-input { flex: 1; font-size: 12px; padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--bg-toolbar); color: var(--text-base); }
-.comment-item .mention { color: var(--ui-accent); font-weight: 600; background: var(--ui-accent-soft); padding: 0 3px; border-radius: 2px; }
-.comment-item .comment-jump { font-size: 11px; color: var(--text-faint); cursor: pointer; text-decoration: underline; }
-.comment-item .comment-jump:hover { color: var(--ui-accent); }
+
 
 /* ---- Screenshot placeholder ---- */
 .screenshot-img { max-width: 100%; border: 1px solid var(--border-chrome); border-radius: var(--radius-sm); }
@@ -4439,31 +4240,222 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 
 /* Page badge polish block removed — badges disabled globally (see base rule) */
 
-/* Find & Replace history dropdown */
-.find-history {
+/* ===================== Find & Replace / Go To bar (bottom-right) =====================
+   Same compact design as the Notes app's findReplaceBar, with the Docs teal
+   accent: rounded card pinned to the bottom-right corner, slide-in animation,
+   find row with prev/next + live count, replace row, Go To row, options. */
+#findBar {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9500;
+  background: #fff;
+  border: 1px solid var(--border-strong, #d1d5db);
+  border-radius: 10px;
+  box-shadow: 0 4px 5px rgba(0, 0, 0, 0.14);
+  padding: 12px 14px 10px;
+  width: 320px;
+  font-family: var(--font-ui);
+  animation: frSlideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes frSlideIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+#findBar .fr-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+}
+
+#findBar .fr-title { font-size: 13px; font-weight: 600; flex: 1; }
+
+#findBar .fr-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-muted);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+#findBar .fr-close-btn:hover { background: var(--ui-accent-soft); color: var(--text-base); }
+
+#findBar .fr-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+#findBar .fr-input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong, #d1d5db);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+  background: #fff;
+  color: var(--text-base);
+}
+
+#findBar .fr-input:focus { border-color: var(--ui-accent); }
+#findBar .fr-input.fr-no-match { border-color: #ef4444; background: #fff5f5; }
+
+/* Go To type — custom dropdown (replaces the native <select>) */
+#findBar .fr-select-wrap {
+  position: relative;
+  flex: 1.2;
+  min-width: 0;
+}
+
+#findBar .fr-select-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  cursor: pointer;
+  text-align: left;
+  background: #fff;
+  appearance: none;
+}
+
+#findBar .fr-select-btn:focus { border-color: var(--ui-accent); }
+
+#findBar .fr-select-caret {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+#findBar .fr-select-btn[aria-expanded="true"] .fr-select-caret { transform: rotate(180deg); }
+
+#findBar .fr-select-menu {
   position: absolute;
-  top: 100%;
+  bottom: calc(100% + 4px);
   left: 0;
   right: 0;
   background: var(--bg-toolbar);
   border: 1px solid var(--border-chrome);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
-  max-height: 180px;
+  max-height: 150px;
   overflow-y: auto;
-  z-index: 210;
   display: none;
+  z-index: 20;
 }
-.find-history.open { display: block; animation: ctxFadeIn 0.15s ease-out; }
-.find-history-item {
-  padding: 8px 12px;
-  font-size: 12px;
+
+#findBar .fr-select-menu.open { display: block; animation: ctxFadeIn 0.15s ease-out; }
+
+#findBar .fr-select-item {
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-family: var(--font-ui);
   color: var(--text-base);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  user-select: none;
   border-bottom: 1px solid var(--border-chrome);
 }
-.find-history-item:last-child { border-bottom: none; }
-.find-history-item:hover { background: var(--ui-accent-soft); color: var(--ui-accent); }
+
+#findBar .fr-select-item:last-child { border-bottom: none; }
+
+#findBar .fr-select-item:hover,
+#findBar .fr-select-item.focused {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+}
+
+#findBar .fr-select-item.selected { font-weight: 600; }
+
+#findBar .fr-goto-num { flex: 0.8; }
+
+#findBar .fr-nav-btn {
+  background: var(--bg-toolbar, #f3f4f6);
+  border: 1px solid var(--border-strong, #d1d5db);
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 4px 6px;
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+#findBar .fr-nav-btn:hover { background: var(--ui-accent-soft); }
+#findBar .fr-nav-btn:disabled { opacity: 0.4; cursor: default; }
+
+#findBar .fr-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 44px;
+  text-align: right;
+}
+
+#findBar .fr-action-btn {
+  background: var(--ui-accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+#findBar .fr-action-btn:hover { background: var(--ui-accent-hover); }
+#findBar .fr-action-btn:disabled { opacity: 0.4; cursor: default; }
+
+#findBar .fr-divider {
+  border: none;
+  border-top: 1px solid var(--border-chrome);
+  margin: 8px 0 9px;
+}
+
+#findBar .fr-goto-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+#findBar .fr-options { margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
+
+#findBar .fr-opt-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+#findBar .fr-opt-label input { cursor: pointer; accent-color: var(--ui-accent); }
 
 /* Equation preview — bigger, math-like */
 .equation-preview {
@@ -4907,46 +4899,6 @@ a.zdocs-bookmark.flash {
   50% { transform: translate(-50%, -50%) scale(1.05); }
 }
 
-/* Document statistics export button */
-.stats-export-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: var(--ui-accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.15s;
-  font-family: var(--font-ui);
-}
-.stats-export-btn:hover {
-  background: var(--ui-accent-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-/* Print-only stats overlay */
-@media print {
-  .stats-printable {
-    display: block !important;
-    position: fixed;
-    inset: 0;
-    background: #fff;
-    z-index: 9999;
-    padding: 40px;
-    font-family: var(--font-ui);
-  }
-  .stats-printable h1 { font-size: 24px; margin-bottom: 8px; }
-  .stats-printable h2 { font-size: 16px; margin-top: 20px; margin-bottom: 8px; }
-  .stats-printable .stat-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; font-size: 13px; }
-  .stats-printable .stat-label { color: #666; }
-  .stats-printable .stat-val { font-weight: 700; }
-}
-.stats-printable { display: none; }
 
 /* Ribbon button active pulse (when toggled on) */
 .ribbon-btn.active.pulse {
@@ -5070,21 +5022,6 @@ a.zdocs-bookmark.flash {
   color: var(--text-faint);
   font-size: 12px;
   border-top: 1px solid var(--border-chrome);
-}
-
-/* Word frequency export list */
-.word-freq-export {
-  margin-top: 12px;
-  padding: 10px 14px;
-  background: var(--bg-app);
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-base);
-  max-height: 200px;
-  overflow-y: auto;
-  white-space: pre-wrap;
 }
 
 /* ===================== MS Dropdowns (ported from slides.css — 1:1) ===================== */

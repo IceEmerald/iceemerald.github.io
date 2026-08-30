@@ -124,10 +124,11 @@
     }
   }
 
-  // Inline non-editable markers created by the app (footnote/endnote refs).
+  // Inline non-editable markers created by the app (footnote/endnote refs,
+  // comment pins).
   function isInlineMarker(el) {
     return el && el.nodeType === Node.ELEMENT_NODE &&
-      (el.classList.contains("footnote-ref") || el.classList.contains("endnote-ref"));
+      (el.classList.contains("footnote-ref") || el.classList.contains("endnote-ref") || el.classList.contains("comment-ref"));
   }
 
   // Walks every node inside a block but REJECTS text inside non-editable
@@ -138,7 +139,7 @@
       acceptNode: function (n) {
         if (n.nodeType === Node.TEXT_NODE) {
           var p = n.parentElement;
-          if (p && p.closest && p.closest("sup.footnote-ref, sup.endnote-ref")) return NodeFilter.FILTER_REJECT;
+          if (p && p.closest && p.closest("sup.footnote-ref, sup.endnote-ref, sup.comment-ref")) return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
       }
@@ -645,10 +646,6 @@
     if ($("wordCountModal").classList.contains("open")) {
       updateGoalTracker();
       renderStatsChart();
-      renderReadability();
-      renderSentenceLengthChart();
-      renderWordFrequency();
-      renderWordCloud();
       renderWritingIssues();
     }
     // Update thumbnails if panel is open
@@ -787,11 +784,9 @@
     // Escape closes any open modal / outline / thumbnails / focus mode
     if (e.key === "Escape") {
       if (anyModalOpen()) { closeAllModals(); e.preventDefault(); return; }
+      if ($("findBar") && $("findBar").style.display !== "none") { closeFindBar(); e.preventDefault(); return; }
       if ($("outlinePanel").classList.contains("open")) { toggleOutline(false); e.preventDefault(); return; }
       if ($("thumbnailsPanel").classList.contains("open")) { toggleThumbnails(false); e.preventDefault(); return; }
-      if ($("commentsPanel").classList.contains("open")) { toggleComments(false); e.preventDefault(); return; }
-      if ($("app").classList.contains("focus-mode")) { toggleFocusMode(false); e.preventDefault(); return; }
-      if ($("app").classList.contains("view-read")) { setViewMode("print"); e.preventDefault(); return; }
       return;
     }
 
@@ -807,17 +802,6 @@
       document.execCommand("insertText", false, "\t");
       schedulePaginate();
       return;
-    }
-
-    // ? (with no modifier, or Shift+/) shows shortcuts overlay
-    if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      // only trigger if not typing in an input/dialog
-      var ae = document.activeElement;
-      if (ae && ae.tagName !== "INPUT" && ae.tagName !== "TEXTAREA") {
-        e.preventDefault();
-        openShortcutOverlay();
-        return;
-      }
     }
 
     var mod = e.ctrlKey || e.metaKey;
@@ -837,9 +821,6 @@
     if (k === "k") { e.preventDefault(); openLinkDialog(); return; }
     if (k === "g") { e.preventDefault(); toggleOutline(); return; }
     if (k === "m" && e.shiftKey) { e.preventDefault(); cycleMarginPreset(); return; }
-    if (k === "f" && e.shiftKey) { e.preventDefault(); toggleFocusMode(); return; }
-    if (k === "n" && e.shiftKey) { e.preventDefault(); toggleZenMode(); return; }
-    if (k === "/" && e.shiftKey) { e.preventDefault(); openShortcutOverlay(); return; }
 
     // Ctrl++ / Ctrl+= → zoom in
     if (k === "+" || k === "=") { e.preventDefault(); adjustZoom(10); return; }
@@ -1091,135 +1072,6 @@
       if (itemRect.top < bodyRect.top || itemRect.bottom > bodyRect.bottom) {
         activeItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }
-    }
-  }
-
-  /* ---------------- Shortcuts dialog ---------------- */
-  var shortcutOverlay = null;
-  function openShortcutOverlay() {
-    // Also populate the old modal grid for backward compat
-    buildShortcuts();
-    if (!shortcutOverlay) {
-      shortcutOverlay = document.createElement("div");
-      shortcutOverlay.className = "shortcut-overlay";
-      shortcutOverlay.innerHTML =
-        '<div class="shortcut-overlay-content">' +
-          '<div class="shortcut-overlay-head">' +
-            '<h3>Keyboard Shortcuts</h3>' +
-            '<button class="modal-close" id="shortcutOverlayClose" aria-label="Close">×</button>' +
-          '</div>' +
-          '<div class="shortcut-overlay-body" id="shortcutOverlayBody"></div>' +
-          '<div class="shortcut-overlay-hint">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</div>' +
-        '</div>';
-      document.body.appendChild(shortcutOverlay);
-      // click outside to close
-      shortcutOverlay.addEventListener("mousedown", function (e) {
-        if (e.target === shortcutOverlay) shortcutOverlay.classList.remove("open");
-      });
-      // close button
-      var closeBtn = shortcutOverlay.querySelector("#shortcutOverlayClose");
-      if (closeBtn) closeBtn.addEventListener("click", function () { shortcutOverlay.classList.remove("open"); });
-    }
-    // copy the shortcuts grid into the overlay body
-    var body = shortcutOverlay.querySelector("#shortcutOverlayBody");
-    if (body) {
-      body.innerHTML = "";
-      var grid = $("shortcutsGrid");
-      if (grid) body.appendChild(grid.cloneNode(true));
-    }
-    shortcutOverlay.classList.add("open");
-  }
-
-  function buildShortcuts() {
-    var grid = $("shortcutsGrid");
-    grid.innerHTML = "";
-    var modKey = navigator.platform.indexOf("Mac") >= 0 ? "⌘" : "Ctrl";
-    var sections = [
-      {
-        title: "File",
-        items: [
-          { desc: "Save document", keys: [modKey, "S"] },
-          { desc: "Print / Export PDF", keys: [modKey, "P"] },
-          { desc: "New document", keys: [] },
-        ],
-      },
-      {
-        title: "Editing",
-        items: [
-          { desc: "Undo", keys: [modKey, "Z"] },
-          { desc: "Redo", keys: [modKey, "Y"] },
-          { desc: "Find & Replace", keys: [modKey, "H"] },
-          { desc: "Find (quick)", keys: [modKey, "F"] },
-          { desc: "Insert tab", keys: ["Tab"] },
-          { desc: "Page break", keys: [modKey, "Enter"] },
-          { desc: "Close dialog / panel", keys: ["Esc"] },
-          { desc: "Right-click for context menu", keys: ["Right-click"] },
-        ],
-      },
-      {
-        title: "Formatting",
-        items: [
-          { desc: "Bold", keys: [modKey, "B"] },
-          { desc: "Italic", keys: [modKey, "I"] },
-          { desc: "Underline", keys: [modKey, "U"] },
-          { desc: "Strikethrough", keys: [] },
-          { desc: "Insert link", keys: [modKey, "K"] },
-          { desc: "Cycle font size", keys: [modKey, "Shift", ">"] },
-        ],
-      },
-      {
-        title: "Navigation",
-        items: [
-          { desc: "Toggle outline", keys: [modKey, "G"] },
-          { desc: "Focus mode", keys: [modKey, "Shift", "F"] },
-          { desc: "Zen mode (auto-hide)", keys: [modKey, "Shift", "N"] },
-          { desc: "Cycle margin presets", keys: [modKey, "Shift", "M"] },
-          { desc: "Show this help", keys: ["?"] },
-          { desc: "Next table cell", keys: ["Tab"] },
-          { desc: "Previous table cell", keys: ["Shift", "Tab"] },
-          { desc: "Zoom in", keys: [modKey, "+"] },
-          { desc: "Zoom out", keys: [modKey, "-"] },
-        ],
-      },
-    ];
-    for (var s = 0; s < sections.length; s++) {
-      var sec = document.createElement("div");
-      sec.className = "shortcut-section";
-      var h4 = document.createElement("h4");
-      h4.textContent = sections[s].title;
-      sec.appendChild(h4);
-      for (var i = 0; i < sections[s].items.length; i++) {
-        var it = sections[s].items[i];
-        var row = document.createElement("div");
-        row.className = "shortcut-row";
-        var desc = document.createElement("span");
-        desc.className = "desc";
-        desc.textContent = it.desc;
-        row.appendChild(desc);
-        var keys = document.createElement("span");
-        keys.className = "keys";
-        for (var k = 0; k < it.keys.length; k++) {
-          if (k > 0) {
-            var plus = document.createElement("span");
-            plus.textContent = "+";
-            plus.style.color = "var(--text-faint)";
-            keys.appendChild(plus);
-          }
-          var kbd = document.createElement("span");
-          kbd.className = "kbd";
-          kbd.textContent = it.keys[k];
-          keys.appendChild(kbd);
-        }
-        if (it.keys.length === 0) {
-          var hint = document.createElement("span");
-          hint.className = "kbd";
-          hint.textContent = "menu";
-          keys.appendChild(hint);
-        }
-        row.appendChild(keys);
-        sec.appendChild(row);
-      }
-      grid.appendChild(sec);
     }
   }
 
@@ -1751,6 +1603,7 @@
       footer: footerActive && hfHasContent(footerHTML) ? footerHTML : "",
       footnotes: footnotes,
       endnotes: endnotes,
+      comments: comments,
     };
   }
 
@@ -1839,9 +1692,10 @@
   // breaks so headings/paragraphs don't run together. Never throws.
   function htmlToText(html) {
     if (!html) return "";
-    var d = document.createElement("div");
-    d.innerHTML = String(html).replace(/<\/(p|h[1-6]|li|blockquote|pre|div|tr|figcaption)>/gi, "\n");
-    return (d.textContent || "")
+    // DOMParser never executes markup — safer than a detached innerHTML parse.
+    var doc = new DOMParser().parseFromString(
+      String(html).replace(/<\/(p|h[1-6]|li|blockquote|pre|div|tr|figcaption)>/gi, "\n"), "text/html");
+    return (doc.body.textContent || "")
       .split("\n")
       .map(function (s) { return s.replace(/\s+/g, " ").trim(); })
       .filter(Boolean)
@@ -1984,13 +1838,17 @@
     var page = createPage();
     wrapper.appendChild(page);
     var content = getContent(page);
-    content.innerHTML = legacyClassRewrite(v.content) || "";
+    content.innerHTML = sanitizeStoredHtml(legacyClassRewrite(v.content)) || "";
     if (content.children.length === 0) {
       var p = document.createElement("p");
       p.innerHTML = "<br>";
       content.appendChild(p);
     }
     paginate();
+    // Older snapshots carry their own comment anchors — rebuild the pins
+    // against them (keep comment data; anchors that no longer exist simply
+    // get no bubble until the document is reloaded).
+    renderDocPins(false);
     saveDocument(false);
     closeModal("versionsModal");
     toast("Version restored", "success");
@@ -2062,7 +1920,7 @@
     var page = createPage();
     wrapper.appendChild(page);
     var content = getContent(page);
-    content.innerHTML = data.content || "";
+    content.innerHTML = sanitizeStoredHtml(data.content) || "";
     if (content.children.length === 0) {
       var p = document.createElement("p");
       p.innerHTML = "<br>";
@@ -2079,15 +1937,18 @@
     // from the legacy global store so their notes aren't lost.
     if (Array.isArray(data.footnotes)) footnotes = data.footnotes;
     if (Array.isArray(data.endnotes)) endnotes = data.endnotes;
+    // Comments (Slides-style pins) — plain data; anchors live in content HTML.
+    comments = Array.isArray(data.comments) ? data.comments : [];
     paginate();
+    // Rebuild the pins from the comment data (saved pin markup is ignored —
+    // renderDocPins strips and re-creates every bubble; orphaned comments
+    // whose anchor no longer exists are dropped, same as Slides).
+    renderDocPins(true);
   }
 
   async function openDocument(id) {
     var data = await loadDocData(id);
     if (!data) { toast("Could not open document", "error"); return; }
-    // Exit any focus/zen/print states left over from the previous document
-    try { if ($("app").classList.contains("focus-mode")) toggleFocusMode(false); } catch (e) {}
-    try { if ($("app").classList.contains("zen-mode")) toggleZenMode(false); } catch (e) {}
     try { togglePrintPreview(false); } catch (e) {}
     currentDocId = id;
     applyDocData(data);
@@ -2114,6 +1975,8 @@
     wrapper.innerHTML = "";
     headerActive = false; headerHTML = "";
     footerActive = false; footerHTML = "";
+    comments = [];
+    closeCommentPopup();
     ensureFirstPage();
     paginate();
     updateStatus();
@@ -2137,6 +2000,7 @@
       footer: "",
       footnotes: [],
       endnotes: [],
+      comments: [],
     });
     await openDocument(id);
     setTimeout(function () {
@@ -2374,11 +2238,9 @@
   }
 
   function importHtmlToContent(htmlText) {
-    var parsed = new DOMParser().parseFromString(htmlText, "text/html");
-    // Drop anything executable or page-structural before taking the body.
-    var bad = parsed.querySelectorAll("script, iframe, object, embed, link, meta, style");
-    for (var i = 0; i < bad.length; i++) bad[i].remove();
-    var html = parsed.body ? parsed.body.innerHTML : "";
+    // Full pass through the sanitizer: drops active elements AND event
+    // handlers / javascript: URLs, which the old tag-only removal missed.
+    var html = sanitizeStoredHtml(htmlText);
     return html && html.replace(/\S/g, "") ? html : "<p><br></p>";
   }
 
@@ -2581,58 +2443,6 @@
     return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
   }
 
-  /* ---------------- Clipboard history ---------------- */
-  var clipboardHistory = [];
-  var CLIPBOARD_MAX = 12;
-
-  function captureClipboard(text) {
-    if (!text || text.length < 1) return;
-    // dedupe — if the same text is already the most recent, skip
-    if (clipboardHistory.length > 0 && clipboardHistory[0] === text) return;
-    // remove older duplicates
-    var idx = clipboardHistory.indexOf(text);
-    if (idx >= 0) clipboardHistory.splice(idx, 1);
-    clipboardHistory.unshift(text);
-    if (clipboardHistory.length > CLIPBOARD_MAX) clipboardHistory = clipboardHistory.slice(0, CLIPBOARD_MAX);
-  }
-
-  function openClipboardHistory() {
-    var list = $("clipboardHistoryList");
-    list.innerHTML = "";
-    if (clipboardHistory.length === 0) {
-      var empty = document.createElement("p");
-      empty.className = "outline-empty";
-      empty.textContent = "No clipboard history yet. Cut or copy some text.";
-      list.appendChild(empty);
-    } else {
-      for (var i = 0; i < clipboardHistory.length; i++) {
-        (function (text, idx) {
-          var item = document.createElement("div");
-          item.className = "clipboard-history-item";
-          var preview = text.length > 60 ? text.slice(0, 60) + "…" : text;
-          item.innerHTML = '<span class="ch-preview">' + escapeHtml(preview) + '</span><span class="ch-len">' + text.length + ' chars</span>';
-          item.title = "Click to paste at caret";
-          item.addEventListener("click", function () {
-            focusEditorAndRestore();
-            document.execCommand("insertText", false, text);
-            closeModal("clipboardHistoryModal");
-            schedulePaginate();
-            scheduleAutosave();
-            toast("Pasted from clipboard history", "success");
-          });
-          list.appendChild(item);
-        })(clipboardHistory[i], i);
-      }
-    }
-    openModal("clipboardHistoryModal");
-  }
-
-  function clearClipboardHistory() {
-    clipboardHistory = [];
-    openClipboardHistory();
-    toast("Clipboard history cleared", "success");
-  }
-
   /* ---------------- Modal helpers ---------------- */
   function openModal(id) {
     var m = $(id);
@@ -2669,91 +2479,37 @@
     }
   }
 
-  /* ---------------- Find & Replace ---------------- */
-  function openFind() {
+  /* ---------------- Find & Replace / Go To (bottom-right bar, Notes-style) ---------------- */
+  function openFindBar(mode) {
+    var bar = $("findBar");
+    if (!bar) return;
     clearFindHighlights();
-    openModal("findModal");
-    buildFindHistoryDropdown();
-  }
-
-  /* ---------------- Find history ---------------- */
-  var FIND_HISTORY_KEY = "emeralddocs.findHistory";
-  var findHistory = [];
-  var findHistoryDropdown = null;
-
-  function loadFindHistory() {
-    try {
-      var h = null;
-      if (idbAvailable()) h = idb.getJSONSync(FIND_HISTORY_KEY);
-      if (!h) { var raw = localStorage.getItem(FIND_HISTORY_KEY); if (raw) h = JSON.parse(raw); }
-      if (Array.isArray(h)) findHistory = h;
-    } catch (e) {}
-  }
-
-  function saveFindHistory() {
-    try {
-      if (idbAvailable()) idb.setJSON(FIND_HISTORY_KEY, findHistory);
-      else localStorage.setItem(FIND_HISTORY_KEY, JSON.stringify(findHistory));
-    } catch (e) {}
-  }
-
-  function addFindHistory(term) {
-    term = (term || "").trim();
-    if (!term || term.length < 2) return;
-    // dedupe + move to front
-    var idx = findHistory.indexOf(term);
-    if (idx >= 0) findHistory.splice(idx, 1);
-    findHistory.unshift(term);
-    if (findHistory.length > 12) findHistory = findHistory.slice(0, 12);
-    saveFindHistory();
-  }
-
-  function buildFindHistoryDropdown() {
-    var input = $("findInput");
-    if (!input) return;
-    if (!findHistoryDropdown) {
-      findHistoryDropdown = document.createElement("div");
-      findHistoryDropdown.className = "find-history";
-      input.parentElement.style.position = "relative";
-      input.parentElement.appendChild(findHistoryDropdown);
-      // show on focus — rebuild items each time so new searches appear
-      input.addEventListener("focus", function () {
-        populateFindHistoryItems();
-        if (findHistory.length > 0) findHistoryDropdown.classList.add("open");
-      });
-      // hide on click outside
-      document.addEventListener("click", function (e) {
-        if (!e.target.closest(".find-history") && e.target !== input) {
-          findHistoryDropdown.classList.remove("open");
-        }
-      });
-    }
-    populateFindHistoryItems();
-  }
-
-  function populateFindHistoryItems() {
-    if (!findHistoryDropdown) return;
-    findHistoryDropdown.innerHTML = "";
-    if (findHistory.length === 0) {
-      findHistoryDropdown.classList.remove("open");
-      return;
-    }
-    var input = $("findInput");
-    for (var i = 0; i < findHistory.length; i++) {
-      (function (term) {
-        var item = document.createElement("div");
-        item.className = "find-history-item";
-        item.textContent = term;
-        item.addEventListener("click", function () {
-          input.value = term;
-          findHistoryDropdown.classList.remove("open");
-          runFind();
-        });
-        findHistoryDropdown.appendChild(item);
-      })(findHistory[i]);
+    bar.style.display = "block";
+    var sel = window.getSelection();
+    var findInput = $("frFindInput");
+    if (mode === "goto") {
+      $("frGotoValue").value = "";
+      setTimeout(function () { $("frGotoTypeBtn").focus(); }, 60);
+    } else {
+      if (sel && sel.toString().trim()) findInput.value = sel.toString().trim();
+      findInput.focus();
+      findInput.select();
+      runFind();
     }
   }
 
+  function openFind() { openFindBar("find"); }
+
+  function closeFindBar() {
+    var bar = $("findBar");
+    if (bar) bar.style.display = "none";
+    clearFindHighlights();
+    $("frCount").textContent = "";
+    $("frFindInput").classList.remove("fr-no-match");
+    closeGotoTypeMenu();
+  }
+
+  /* ---------------- Find highlighting ---------------- */
   function clearFindHighlights() {
     var marks = document.querySelectorAll(".page-content mark.emdocs-mark");
     for (var i = marks.length - 1; i >= 0; i--) {
@@ -2770,21 +2526,18 @@
 
   function refreshFindHighlights() {
     if (!findMatches.length) return;
-    var term = $("findInput").value;
+    var term = $("frFindInput").value;
     if (term) runFind();
   }
 
   function runFind() {
     clearFindHighlights();
-    var term = $("findInput").value;
+    var term = $("frFindInput").value;
     if (!term) { updateMatchCount(); return; }
 
-    // Track find history (debounced via input event)
-    addFindHistory(term);
-
-    var caseSensitive = $("findCase").checked;
-    var wholeWord = $("findWhole").checked;
-    var useRegex = $("findRegex") && $("findRegex").checked;
+    var caseSensitive = $("frCaseSensitive").checked;
+    var wholeWord = $("frWholeWord").checked;
+    var useRegex = $("frRegex") && $("frRegex").checked;
     var flags = caseSensitive ? "g" : "gi";
     var pattern;
     if (useRegex) {
@@ -2861,13 +2614,14 @@
   }
 
   function updateMatchCount() {
-    var el = $("matchCount");
+    var el = $("frCount");
     if (!el) return;
-    if (findMatches.length === 0) {
-      el.textContent = "0 of 0";
-    } else {
-      el.textContent = (findIndex + 1) + " of " + findMatches.length;
-    }
+    // Notes-app style: live "n / N", "No results", blank when no query
+    var query = $("frFindInput") ? $("frFindInput").value : "";
+    if (!query) { el.textContent = ""; }
+    else if (findMatches.length === 0) { el.textContent = "No results"; }
+    else { el.textContent = (findIndex + 1) + " / " + findMatches.length; }
+    if ($("frFindInput")) $("frFindInput").classList.toggle("fr-no-match", !!query && findMatches.length === 0);
   }
 
   function highlightCurrentMatch() {
@@ -2878,6 +2632,7 @@
       m.node.classList.add("current");
       m.node.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    updateMatchCount();
   }
 
   function findNext() {
@@ -2897,7 +2652,7 @@
   function replaceOne() {
     if (!findMatches.length || findIndex < 0) return;
     var m = findMatches[findIndex];
-    var replacement = $("replaceInput").value;
+    var replacement = $("frReplaceInput").value;
     var textNode = document.createTextNode(replacement);
     m.node.parentNode.replaceChild(textNode, m.node);
     findMatches.splice(findIndex, 1);
@@ -2911,7 +2666,7 @@
   }
 
   function replaceAll() {
-    var replacement = $("replaceInput").value;
+    var replacement = $("frReplaceInput").value;
     var count = findMatches.length;
     if (!count) return;
     // Replace from end to start to preserve indexes
@@ -2970,7 +2725,55 @@
     toast("Link inserted", "success");
   }
 
-  function escapeAttr(s) { return String(s).replace(/"/g, "&quot;"); }
+  /* Full attribute-context escaping (quote-only escaping was flagged by
+     CodeQL as incomplete attribute sanitization). */
+  function escapeAttr(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  /* Complete scheme whitelist for opening a URL in a new tab. CodeQL:
+     an indexOf("javascript:") check is bypassable (case/whitespace), so a
+     positive whitelist is used instead. */
+  function isSafeExternalUrl(u) {
+    var s = String(u || "").trim();
+    if (!s) return false;
+    if (/^(https?:\/\/|mailto:|tel:)/i.test(s)) return true;
+    return s.charAt(0) === "/" || s.charAt(0) === "#";
+  }
+
+  /* Sanitizer for document content coming from storage / imports / templates.
+     Parses with DOMParser (never executes anything), drops active elements,
+     strips event handlers and unsafe URL attributes, and keeps the visual
+     structure (classes, styles, contenteditable) so the editor is unaffected. */
+  function sanitizeStoredHtml(html) {
+    var doc = new DOMParser().parseFromString(String(html || ""), "text/html");
+    var kill = doc.body.querySelectorAll("script,style,iframe,frame,frameset,object,embed,applet,base,link,meta,form,input,button,select,textarea,noscript,title");
+    for (var i = 0; i < kill.length; i++) kill[i].remove();
+    var all = doc.body.querySelectorAll("*");
+    for (var j = 0; j < all.length; j++) {
+      var el = all[j];
+      var attrs = Array.prototype.slice.call(el.attributes);
+      for (var k = 0; k < attrs.length; k++) {
+        var name = attrs[k].name.toLowerCase();
+        var val = String(attrs[k].value || "").trim();
+        if (/^on/i.test(name) || name === "srcdoc" || name === "sandbox") { el.removeAttribute(attrs[k].name); continue; }
+        if (name === "href" || name === "src" || name === "xlink:href" || name === "srcset" ||
+            name === "action" || name === "formaction" || name === "poster" || name === "background") {
+          var m = val.match(/^([a-zA-Z][a-zA-Z0-9+.\-]*):/);
+          if (m && !/^(https?|mailto|tel|blob)$/i.test(m[1]) &&
+              !(name === "src" && /^data:image\//i.test(val))) {
+            el.removeAttribute(attrs[k].name);
+          }
+        }
+      }
+    }
+    return doc.body.innerHTML;
+  }
 
   /* Bare domains typed into the Link dialog ("youtube.com") must NOT resolve
      relative to the app origin (which produced http://127.0.0.1:5500/youtube.com).
@@ -3183,58 +2986,9 @@
     }
     renderStreakHeatmap(streak);
     renderStatsChart();
-    renderReadability();
-    renderSentenceLengthChart();
-    renderWordFrequency();
-    renderWordCloud();
     renderWritingIssues();
     updateGoalTracker();
     openModal("wordCountModal");
-  }
-
-  /* ---------------- Statistics export (printable) ---------------- */
-  function exportStats() {
-    var stats = getStats();
-    var streak = loadStreak();
-    var title = currentTitle || "Untitled Document";
-    var date = formatTime(Date.now());
-    var sentences = countSentences();
-    var avgWordsPerSentence = sentences > 0 ? Math.round(stats.words / sentences) : 0;
-    var readingTime = stats.readingMin + " min";
-    var speakingTime = Math.max(1, Math.ceil(stats.words / 130)) + " min";
-
-    // Build a printable stats overlay
-    var overlay = document.createElement("div");
-    overlay.className = "stats-printable";
-    overlay.innerHTML =
-      '<h1>' + escapeHtml(title) + ' — Statistics Report</h1>' +
-      '<p style="color:#666;font-size:12px">Generated: ' + escapeHtml(date) + '</p>' +
-      '<h2>Document Summary</h2>' +
-      '<div class="stat-row"><span class="stat-label">Words</span><span class="stat-val">' + stats.words.toLocaleString() + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Characters (with spaces)</span><span class="stat-val">' + stats.chars.toLocaleString() + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Characters (no spaces)</span><span class="stat-val">' + stats.charsNoSpaces.toLocaleString() + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Sentences</span><span class="stat-val">' + sentences.toLocaleString() + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Paragraphs / blocks</span><span class="stat-val">' + stats.paragraphs.toLocaleString() + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Pages</span><span class="stat-val">' + stats.pages.toLocaleString() + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Avg words per sentence</span><span class="stat-val">' + avgWordsPerSentence + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Reading time</span><span class="stat-val">' + readingTime + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Speaking time</span><span class="stat-val">' + speakingTime + '</span></div>' +
-      '<h2>Writing Streak</h2>' +
-      '<div class="stat-row"><span class="stat-label">Current streak</span><span class="stat-val">' + (streak.current || 0) + ' day' + ((streak.current||0) === 1 ? "" : "s") + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Longest streak</span><span class="stat-val">' + (streak.longest || 0) + ' day' + ((streak.longest||0) === 1 ? "" : "s") + '</span></div>' +
-      '<div class="stat-row"><span class="stat-label">Active days (last 60)</span><span class="stat-val">' + (streak.days ? streak.days.length : 0) + '</span></div>' +
-      '<p style="margin-top:32px;color:#999;font-size:11px">EmeraldSuite: Docs — generated automatically</p>';
-    document.body.appendChild(overlay);
-
-    // Close the modal, then print, then remove the overlay
-    closeModal("wordCountModal");
-    setTimeout(function () {
-      window.print();
-      setTimeout(function () {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      }, 500);
-    }, 300);
-    toast("Statistics report sent to print dialog", "success");
   }
 
   /* ---------------- Ruler ---------------- */
@@ -3774,217 +3528,6 @@
   }
 
   /* ---------------- Sentence length distribution chart ---------------- */
-  function getSentenceLengths() {
-    return getSentences().map(function (s) {
-      return s.split(/\s+/).filter(Boolean).length;
-    });
-  }
-
-  /* ---------------- Readability (Flesch reading ease) ---------------- */
-  function countSyllables(word) {
-    word = word.toLowerCase().replace(/[^a-z]/g, "");
-    if (word.length <= 3) return 1;
-    word = word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, "");
-    word = word.replace(/^y/, "");
-    var m = word.match(/[aeiouy]{1,2}/g);
-    return m ? m.length : 1;
-  }
-
-  function getReadability() {
-    var sentences = getSentences();
-    var text = getAllText();
-    if (!text || sentences.length === 0) {
-      return { score: 0, grade: "—", level: "—", desc: "Not enough text to analyze.", words: 0, sentences: 0, syllables: 0 };
-    }
-    var words = text.split(/\s+/).filter(function (w) { return /[a-zA-Z]/.test(w); });
-    var wordCount = words.length;
-    var sentenceCount = sentences.length;
-    var syllableCount = 0;
-    for (var i = 0; i < words.length; i++) {
-      syllableCount += countSyllables(words[i]);
-    }
-    // Flesch Reading Ease: 206.835 - 1.015*(words/sentences) - 84.6*(syllables/words)
-    var syllablesPerWord = syllableCount / wordCount;
-    var score = 206.835 - 1.015 * (wordCount / sentenceCount) - 84.6 * syllablesPerWord;
-    // Clamp 0-100
-    score = Math.max(0, Math.min(100, score));
-    var gradeLevel = Math.round(0.39 * (wordCount / sentenceCount) + 11.8 * syllablesPerWord - 15.59);
-    if (isNaN(gradeLevel) || gradeLevel < 0) gradeLevel = 0;
-
-    var level, desc;
-    if (score >= 90) { level = "Very Easy"; desc = "5th-grade level. Easily understood by an 11-year-old."; }
-    else if (score >= 80) { level = "Easy"; desc = "6th-grade level. Conversational English for consumers."; }
-    else if (score >= 70) { level = "Fairly Easy"; desc = "7th-grade level. Fairly easy to read."; }
-    else if (score >= 60) { level = "Standard"; desc = "8th–9th grade. Plain English. Good for most content."; }
-    else if (score >= 50) { level = "Fairly Difficult"; desc = "10th–12th grade. Fairly difficult to read."; }
-    else if (score >= 30) { level = "Difficult"; desc = "College level. Difficult to read."; }
-    else { level = "Very Difficult"; desc = "College graduate level. Best for professional/academic."; }
-
-    return {
-      score: Math.round(score),
-      gradeLevel: gradeLevel,
-      level: level,
-      desc: desc,
-      levelClass: score < 50 ? "hard" : (score < 70 ? "medium" : "easy"),
-      words: wordCount,
-      sentences: sentenceCount,
-      syllables: syllableCount,
-    };
-  }
-
-  function renderReadability() {
-    var wrap = $("readabilityWrap");
-    if (!wrap) return;
-    var r = getReadability();
-    if (r.words === 0) {
-      wrap.innerHTML = '<p class="word-freq-empty">Not enough text to analyze readability.</p>';
-      return;
-    }
-    // Gauge: circumference of r=40 is ~251.3. Fill = score/100.
-    var circumference = 2 * Math.PI * 40;
-    var offset = circumference * (1 - r.score / 100);
-    wrap.innerHTML =
-      '<div class="readability-gauge">' +
-        '<svg viewBox="0 0 88 88">' +
-          '<circle class="gauge-bg" cx="44" cy="44" r="40"/>' +
-          '<circle class="gauge-fill ' + r.levelClass + '" cx="44" cy="44" r="40" stroke-dasharray="' + circumference + '" stroke-dashoffset="' + offset + '"/>' +
-        '</svg>' +
-        '<div class="readability-score">' +
-          '<div class="readability-score-value">' + r.score + '</div>' +
-          '<div class="readability-score-unit">/ 100</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="readability-info">' +
-        '<div class="readability-level ' + r.levelClass + '">' + r.level + '</div>' +
-        '<div class="readability-desc">' + r.desc + '</div>' +
-        '<div class="readability-desc" style="margin-top:4px;">Grade level: ~' + r.gradeLevel + '</div>' +
-      '</div>';
-  }
-
-  /* ---------------- Word frequency chart ---------------- */
-  var STOP_WORDS = {
-    the: 1, a: 1, an: 1, and: 1, or: 1, but: 1, if: 1, then: 1, of: 1, to: 1,
-    in: 1, on: 1, at: 1, by: 1, for: 1, with: 1, as: 1, is: 1, are: 1, was: 1,
-    were: 1, be: 1, been: 1, being: 1, have: 1, has: 1, had: 1, do: 1, does: 1,
-    did: 1, will: 1, would: 1, could: 1, should: 1, may: 1, might: 1, can: 1,
-    this: 1, that: 1, these: 1, those: 1, it: 1, its: 1, i: 1, you: 1, he: 1,
-    she: 1, we: 1, they: 1, them: 1, their: 1, there: 1, here: 1, from: 1,
-    into: 1, out: 1, up: 1, down: 1, not: 1, no: 1, so: 1, than: 1, too: 1,
-    very: 1, just: 1, about: 1, above: 1, below: 1, after: 1, before: 1,
-    his: 1, her: 1, my: 1, your: 1, our: 1, who: 1, whom: 1, which: 1,
-    what: 1, when: 1, where: 1, why: 1, how: 1, all: 1, any: 1, both: 1,
-    each: 1, few: 1, more: 1, most: 1, other: 1, some: 1, such: 1, only: 1,
-    own: 1, same: 1,
-  };
-
-  function renderWordFrequency() {
-    var container = $("wordFreqList");
-    if (!container) return;
-    container.innerHTML = "";
-    var text = getAllText();
-    if (!text) {
-      var empty = document.createElement("p");
-      empty.className = "word-freq-empty";
-      empty.textContent = "No words yet.";
-      container.appendChild(empty);
-      return;
-    }
-    var words = text.toLowerCase().match(/[a-z']+/g) || [];
-    var freq = {};
-    for (var i = 0; i < words.length; i++) {
-      var w = words[i];
-      if (w.length < 3) continue;
-      if (STOP_WORDS[w]) continue;
-      freq[w] = (freq[w] || 0) + 1;
-    }
-    var entries = Object.keys(freq).map(function (k) { return [k, freq[k]]; });
-    entries.sort(function (a, b) { return b[1] - a[1]; });
-    var top = entries.slice(0, 8);
-    if (top.length === 0) {
-      var emptyMsg = document.createElement("p");
-      emptyMsg.className = "word-freq-empty";
-      emptyMsg.textContent = "No significant words found.";
-      container.appendChild(emptyMsg);
-      return;
-    }
-    var maxCount = top[0][1];
-    for (var j = 0; j < top.length; j++) {
-      var row = document.createElement("div");
-      row.className = "word-freq-row";
-      var word = document.createElement("div");
-      word.className = "word-freq-word";
-      word.textContent = top[j][0];
-      var bar = document.createElement("div");
-      bar.className = "word-freq-bar";
-      var fill = document.createElement("div");
-      fill.className = "word-freq-bar-fill";
-      fill.style.width = (top[j][1] / maxCount * 100) + "%";
-      bar.appendChild(fill);
-      var count = document.createElement("div");
-      count.className = "word-freq-count";
-      count.textContent = top[j][1];
-      row.appendChild(word);
-      row.appendChild(bar);
-      row.appendChild(count);
-      container.appendChild(row);
-    }
-  }
-
-  function renderSentenceLengthChart() {
-    var container = $("sentenceLengthChart");
-    if (!container) return;
-    container.innerHTML = "";
-    var lengths = getSentenceLengths();
-    if (lengths.length === 0) {
-      var empty = document.createElement("div");
-      empty.className = "dist-empty";
-      empty.textContent = "No sentences yet.";
-      container.appendChild(empty);
-      return;
-    }
-
-    // Buckets: 1-5, 6-10, 11-15, 16-20, 21-25, 26-30, 31+
-    var buckets = [
-      { label: "1-5", min: 1, max: 5, count: 0 },
-      { label: "6-10", min: 6, max: 10, count: 0 },
-      { label: "11-15", min: 11, max: 15, count: 0 },
-      { label: "16-20", min: 16, max: 20, count: 0 },
-      { label: "21-25", min: 21, max: 25, count: 0 },
-      { label: "26-30", min: 26, max: 30, count: 0 },
-      { label: "31+", min: 31, max: Infinity, count: 0 },
-    ];
-    for (var i = 0; i < lengths.length; i++) {
-      for (var b = 0; b < buckets.length; b++) {
-        if (lengths[i] >= buckets[b].min && lengths[i] <= buckets[b].max) {
-          buckets[b].count++;
-          break;
-        }
-      }
-    }
-    var maxCount = 1;
-    for (var k = 0; k < buckets.length; k++) {
-      if (buckets[k].count > maxCount) maxCount = buckets[k].count;
-    }
-    container.className = "dist-chart";
-    for (var j = 0; j < buckets.length; j++) {
-      var bar = document.createElement("div");
-      bar.className = "dist-bar";
-      var fill = document.createElement("div");
-      fill.className = "dist-bar-fill";
-      fill.style.height = (buckets[j].count / maxCount * 100) + "%";
-      var count = document.createElement("span");
-      count.className = "dist-count";
-      count.textContent = buckets[j].count;
-      fill.appendChild(count);
-      var lbl = document.createElement("div");
-      lbl.className = "dist-bar-label";
-      lbl.textContent = buckets[j].label;
-      bar.appendChild(fill);
-      bar.appendChild(lbl);
-      container.appendChild(bar);
-    }
-  }
-
   /* ---------------- Writing issues checker ---------------- */
   // A small curated list of common misspellings → corrections
   var COMMON_MISSPELLINGS = {
@@ -4133,7 +3676,7 @@
       var pages2 = getPages();
       for (var j = 0; j < pages2.length; j++) {
         var content2 = getContent(pages2[j]);
-        content2.innerHTML = content2.innerHTML.replace(regex2, issue.fixTo);
+        content2.innerHTML = content2.innerHTML.replace(regex2, function () { return escapeHtml(issue.fixTo); });
       }
     }
     schedulePaginate();
@@ -4242,60 +3785,6 @@
     } else {
       app.classList.remove("print-preview");
     }
-  }
-
-  /* ---------------- Focus mode ---------------- */
-  function toggleFocusMode(on) {
-    var app = $("app");
-    if (on === undefined) on = !app.classList.contains("focus-mode");
-    if (on) {
-      app.classList.add("focus-mode");
-      toast("Focus mode on — press Esc to exit", "success");
-      setTimeout(function () {
-        var fc = getContent(getPages()[0]);
-        if (fc) fc.focus();
-      }, 100);
-    } else {
-      app.classList.remove("focus-mode");
-    }
-  }
-
-  /* ---------------- Zen mode (auto-hide chrome on typing) ---------------- */
-  // Zen mode is a softer Focus Mode: when enabled via View → Zen (or Ctrl+Shift+Z),
-  // the topbar/ribbon/ruler/statusbar fade out after 2s of no typing/mouse
-  // movement, and reappear the instant the user types or moves the mouse.
-  var zenMode = false;
-  var zenHideTimer = null;
-  function toggleZenMode(on) {
-    var app = $("app");
-    if (on === undefined) on = !app.classList.contains("zen-mode");
-    zenMode = on;
-    if (on) {
-      app.classList.add("zen-mode");
-      scheduleZenHide();
-      toast("Zen mode on — type or move mouse to show controls", "success");
-      setTimeout(function () {
-        var fc = getContent(getPages()[0]);
-        if (fc) fc.focus();
-      }, 100);
-    } else {
-      app.classList.remove("zen-mode", "zen-hidden");
-      if (zenHideTimer) { clearTimeout(zenHideTimer); zenHideTimer = null; }
-      toast("Zen mode off", "success");
-    }
-  }
-
-  function scheduleZenHide() {
-    if (zenHideTimer) clearTimeout(zenHideTimer);
-    zenHideTimer = setTimeout(function () {
-      if (zenMode) $("app").classList.add("zen-hidden");
-    }, 2000);
-  }
-
-  function zenShowControls() {
-    if (!zenMode) return;
-    $("app").classList.remove("zen-hidden");
-    scheduleZenHide();
   }
 
   /* ---------------- Session timer ---------------- */
@@ -4429,53 +3918,6 @@
       cell.className = "streak-cell" + (daySet[ds] ? " streak-cell-active" : "");
       cell.title = ds + (daySet[ds] ? " — wrote" : " — no activity");
       container.appendChild(cell);
-    }
-  }
-
-  function renderWordCloud() {
-    var container = $("wordCloud");
-    if (!container) return;
-    container.innerHTML = "";
-    var text = getAllText();
-    if (!text) {
-      var empty = document.createElement("p");
-      empty.className = "word-cloud-empty";
-      empty.textContent = "No words yet.";
-      container.appendChild(empty);
-      return;
-    }
-    var words = text.toLowerCase().match(/[a-z']+/g) || [];
-    var freq = {};
-    for (var i = 0; i < words.length; i++) {
-      var w = words[i];
-      if (w.length < 4) continue;
-      if (STOP_WORDS[w]) continue;
-      freq[w] = (freq[w] || 0) + 1;
-    }
-    var entries = Object.keys(freq).map(function (k) { return [k, freq[k]]; });
-    entries.sort(function (a, b) { return b[1] - a[1]; });
-    var top = entries.slice(0, 25);
-    if (top.length === 0) {
-      var emptyMsg = document.createElement("p");
-      emptyMsg.className = "word-cloud-empty";
-      emptyMsg.textContent = "No significant words found.";
-      container.appendChild(emptyMsg);
-      return;
-    }
-    var maxCount = top[0][1];
-    var minCount = top[top.length - 1][1];
-    for (var j = 0; j < top.length; j++) {
-      var span = document.createElement("span");
-      span.className = "word-cloud-item";
-      // Scale font size between 12px and 32px based on frequency
-      var ratio = maxCount === minCount ? 0.5 : (top[j][1] - minCount) / (maxCount - minCount);
-      var size = 12 + ratio * 20;
-      span.style.fontSize = size.toFixed(1) + "px";
-      span.style.opacity = (0.5 + ratio * 0.5).toFixed(2);
-      span.textContent = top[j][0];
-      span.title = top[j][0] + " (" + top[j][1] + " uses)";
-      container.appendChild(span);
-      container.appendChild(document.createTextNode(" "));
     }
   }
 
@@ -4646,7 +4088,7 @@
     var page = createPage();
     wrapper.appendChild(page);
     var content = getContent(page);
-    content.innerHTML = t.html || "<p><br></p>";
+    content.innerHTML = sanitizeStoredHtml(t.html) || "<p><br></p>";
     currentTitle = t.name;
     syncFileModalNameInput();
     paginate();
@@ -4699,16 +4141,12 @@
     if (done) done.addEventListener("click", function () { toggleSymbolBar(false); });
   }
 
-  /* ---------------- Go To ---------------- */
-  function openGoTo() {
-    $("gotoValue").value = "";
-    openModal("gotoModal");
-    setTimeout(function () { $("gotoValue").focus(); }, 80);
-  }
+  /* ---------------- Go To (lives in the bottom-right bar) ---------------- */
+  function openGoTo() { openFindBar("goto"); }
 
   function performGoTo() {
-    var type = $("gotoType").value;
-    var val = parseInt($("gotoValue").value, 10);
+    var type = getGotoType();
+    var val = parseInt($("frGotoValue").value, 10);
     if (isNaN(val) || val < 1) val = 1;
     var pages = getPages();
     if (type === "page") {
@@ -4754,8 +4192,158 @@
       sel2.addRange(range2);
       h.closest(".page-content").focus();
     }
-    closeModal("gotoModal");
     toast("Jumped to " + type + " " + val, "success");
+  }
+
+  /* ---------------- Go To type — custom dropdown (replaces the native select) ---------------- */
+  var gotoType = "page";
+  var GOTO_TYPES = [
+    { value: "page", label: "Page" },
+    { value: "line", label: "Line" },
+    { value: "heading", label: "Next heading" }
+  ];
+
+  function getGotoType() { return gotoType; }
+
+  function setGotoType(value) {
+    for (var i = 0; i < GOTO_TYPES.length; i++) {
+      if (GOTO_TYPES[i].value === value) {
+        gotoType = value;
+        var label = $("frGotoTypeLabel");
+        if (label) label.textContent = GOTO_TYPES[i].label;
+        syncGotoTypeMenu();
+        return;
+      }
+    }
+  }
+
+  function syncGotoTypeMenu() {
+    var menu = $("frGotoTypeMenu");
+    if (!menu) return;
+    var items = menu.querySelectorAll(".fr-select-item");
+    for (var i = 0; i < items.length; i++) {
+      var selected = items[i].getAttribute("data-value") === gotoType;
+      items[i].classList.toggle("selected", selected);
+      items[i].setAttribute("aria-selected", selected ? "true" : "false");
+    }
+  }
+
+  function gotoTypeMenuOpen() {
+    var menu = $("frGotoTypeMenu");
+    return !!(menu && menu.classList.contains("open"));
+  }
+
+  function openGotoTypeMenu() {
+    var menu = $("frGotoTypeMenu");
+    var btn = $("frGotoTypeBtn");
+    if (!menu || !btn || gotoTypeMenuOpen()) return;
+    syncGotoTypeMenu();
+    menu.classList.add("open");
+    btn.setAttribute("aria-expanded", "true");
+    highlightGotoTypeItem(currentGotoTypeIndex());
+  }
+
+  function closeGotoTypeMenu() {
+    var menu = $("frGotoTypeMenu");
+    if (!menu) return;
+    menu.classList.remove("open");
+    var items = menu.querySelectorAll(".fr-select-item");
+    for (var i = 0; i < items.length; i++) items[i].classList.remove("focused");
+    var btn = $("frGotoTypeBtn");
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  }
+
+  function currentGotoTypeIndex() {
+    for (var i = 0; i < GOTO_TYPES.length; i++) {
+      if (GOTO_TYPES[i].value === gotoType) return i;
+    }
+    return 0;
+  }
+
+  function highlightedGotoTypeIndex() {
+    var menu = $("frGotoTypeMenu");
+    if (!menu) return currentGotoTypeIndex();
+    var items = menu.querySelectorAll(".fr-select-item");
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].classList.contains("focused")) return i;
+    }
+    return currentGotoTypeIndex();
+  }
+
+  function highlightGotoTypeItem(idx) {
+    var menu = $("frGotoTypeMenu");
+    if (!menu) return;
+    var items = menu.querySelectorAll(".fr-select-item");
+    for (var i = 0; i < items.length; i++) {
+      items[i].classList.toggle("focused", i === idx);
+    }
+    if (items[idx]) items[idx].scrollIntoView({ block: "nearest" });
+  }
+
+  function setupGotoTypeDropdown() {
+    var btn = $("frGotoTypeBtn");
+    var menu = $("frGotoTypeMenu");
+    if (!btn || !menu || btn._gotoTypeWired) return;
+    btn._gotoTypeWired = true;
+    syncGotoTypeMenu();
+
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (gotoTypeMenuOpen()) closeGotoTypeMenu();
+      else openGotoTypeMenu();
+    });
+
+    btn.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (gotoTypeMenuOpen()) {
+          // commit the highlighted item (arrows move the highlight first)
+          var pick = GOTO_TYPES[highlightedGotoTypeIndex()];
+          if (pick) setGotoType(pick.value);
+          closeGotoTypeMenu();
+        } else {
+          openGotoTypeMenu();
+        }
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (!gotoTypeMenuOpen()) { openGotoTypeMenu(); return; }
+        var idx = highlightedGotoTypeIndex();
+        idx = e.key === "ArrowDown" ? (idx + 1) % GOTO_TYPES.length : (idx - 1 + GOTO_TYPES.length) % GOTO_TYPES.length;
+        highlightGotoTypeItem(idx);
+      } else if (e.key === "Escape") {
+        if (gotoTypeMenuOpen()) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeGotoTypeMenu();
+        } else {
+          e.preventDefault();
+          closeFindBar();
+        }
+      } else if (e.key === "Tab") {
+        closeGotoTypeMenu();
+      }
+    });
+
+    var items = menu.querySelectorAll(".fr-select-item");
+    for (var i = 0; i < items.length; i++) {
+      (function (item) {
+        item.addEventListener("click", function (e) {
+          e.stopPropagation();
+          setGotoType(item.getAttribute("data-value"));
+          closeGotoTypeMenu();
+          btn.focus();
+        });
+      })(items[i]);
+    }
+
+    // click outside closes the menu — deferred one tick so the very click
+    // that opens the bar/dropdown doesn't instantly close it again
+    setTimeout(function () {
+      document.addEventListener("click", function (e) {
+        if (!gotoTypeMenuOpen()) return;
+        if (!e.target.closest("#frGotoTypeWrap")) closeGotoTypeMenu();
+      });
+    }, 0);
   }
 
   /* ---------------- Watermark ---------------- */
@@ -5195,114 +4783,6 @@
     }
   }
 
-  /* ---------------- View modes ---------------- */
-  function setViewMode(mode) {
-    var app = $("app");
-    app.classList.remove("view-web", "view-draft", "view-read", "focus-mode", "print-preview");
-    if (mode === "print") {
-      // default — no class needed
-    } else if (mode === "web") {
-      app.classList.add("view-web");
-    } else if (mode === "draft") {
-      app.classList.add("view-draft");
-    } else if (mode === "read") {
-      app.classList.add("view-read");
-      saveDocument(false);
-    }
-    // update active states
-    var viewBtns = document.querySelectorAll("[data-view]");
-    for (var i = 0; i < viewBtns.length; i++) {
-      if (viewBtns[i].getAttribute("data-view") === mode) viewBtns[i].classList.add("active");
-      else viewBtns[i].classList.remove("active");
-    }
-    if (mode === "web" || mode === "draft") {
-      // re-paginate to adjust to new page heights
-      schedulePaginate();
-    }
-    toast(mode.charAt(0).toUpperCase() + mode.slice(1) + " layout", "success");
-  }
-
-  /* ---------------- Format Painter ---------------- */
-  var painterFormat = null;
-
-  function copyFormat() {
-    var sel = window.getSelection();
-    if (!sel || sel.isCollapsed) {
-      toast("Select text to copy its format", "error");
-      return;
-    }
-    // capture the computed style of the selection's parent
-    var node = sel.anchorNode;
-    var el = node.nodeType === 3 ? node.parentElement : node;
-    painterFormat = {
-      bold: document.queryCommandState("bold"),
-      italic: document.queryCommandState("italic"),
-      underline: document.queryCommandState("underline"),
-      color: document.queryCommandValue("foreColor"),
-      fontName: document.queryCommandValue("fontName"),
-      fontSize: (function () {
-        // Computed px (works for both legacy <font> tags and exact-size spans)
-        try { return getComputedStyle(el).fontSize; } catch (e) { return null; }
-      })(),
-    };
-    document.body.classList.add("painter-active");
-    toast("Format copied — select text to apply", "success");
-  }
-
-  function applyPainterFormat() {
-    if (!painterFormat) {
-      toast("Copy a format first", "error");
-      return;
-    }
-    if (painterFormat.bold) document.execCommand("bold");
-    if (painterFormat.italic) document.execCommand("italic");
-    if (painterFormat.underline) document.execCommand("underline");
-    if (painterFormat.color) document.execCommand("foreColor", false, painterFormat.color);
-    if (painterFormat.fontName) document.execCommand("fontName", false, painterFormat.fontName);
-    if (painterFormat.fontSize) applyFontSize(parseFloat(painterFormat.fontSize));
-    schedulePaginate();
-    scheduleAutosave();
-  }
-
-  /* ---------------- Paste Special ---------------- */
-  function openPasteSpecial() {
-    openModal("pasteSpecialModal");
-  }
-
-  function performPasteSpecial() {
-    var mode = "keep";
-    var radios = document.getElementsByName("pasteMode");
-    for (var i = 0; i < radios.length; i++) {
-      if (radios[i].checked) { mode = radios[i].value; break; }
-    }
-    // read clipboard
-    navigator.clipboard.readText().then(function (text) {
-      restoreEditorSelection();
-      var fc = getContent(getPages()[0]);
-      var sel = window.getSelection();
-      if (!sel || !sel.rangeCount || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
-        if (fc) fc.focus();
-      }
-      if (mode === "plain" || mode === "match") {
-        // strip all formatting → plain text
-        document.execCommand("insertText", false, text);
-      } else if (mode === "html") {
-        document.execCommand("insertHTML", false, escapeHtml(text));
-      } else {
-        // keep source — try insertFromPaste, fallback to text
-        document.execCommand("insertText", false, text);
-      }
-      schedulePaginate();
-      scheduleAutosave();
-      closeModal("pasteSpecialModal");
-      toast("Pasted (" + mode + ")", "success");
-    }).catch(function () {
-      // clipboard read denied — use last clipboard text if available
-      toast("Clipboard access denied — use Ctrl+V", "error");
-      closeModal("pasteSpecialModal");
-    });
-  }
-
   /* ---------------- AutoCorrect ---------------- */
   var AUTOCORRECT = {
     "teh": "the", "adn": "and", "nad": "and", "recieve": "receive",
@@ -5353,98 +4833,275 @@
       if (trackChangesOn) btn.classList.add("active");
       else btn.classList.remove("active");
     }
+    // The green/red tracked-change marks only render while tracking is ON;
+    // turning it off shows every <ins>/<del> as normal text again.
+    document.body.classList.toggle("track-on", trackChangesOn);
     toast(trackChangesOn ? "Track Changes ON" : "Track Changes OFF", "success");
   }
 
-  /* ---------------- Comments ---------------- */
+  /* ---------------- Comments (Slides-style pins + popup) ----------------
+     No sidebar. Selecting text and using Review → Comment opens the composer
+     modal; confirming wraps the range in a .comment-anchor span and places a
+     small speech-bubble pin (sup.comment-ref, contenteditable=false, treated
+     as ONE virtual caret character by the same machinery as footnote refs)
+     right after it. Clicking a pin opens a floating .comment-popup card —
+     same interaction model as the Slides app. Everything persists: anchors
+     and pins live inside the saved page HTML, comment data is stored in the
+     document's data object (data.comments). */
   var comments = [];
-  var commentId = 0;
+  // Pending composer context: { quote, range } for a new comment, or
+  // { replyTo } when replying to an existing thread.
+  var commentComposerCtx = null;
+
+  function makeCommentId() {
+    return "c_" + Date.now() + "_" + generateSecureId(6);
+  }
+
+  function getComment(cid) {
+    for (var i = 0; i < comments.length; i++) {
+      if (comments[i].id === cid) return comments[i];
+    }
+    return null;
+  }
 
   function addComment() {
     var sel = window.getSelection();
-    if (!sel || sel.isCollapsed) {
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
       toast("Select text to comment on", "error");
       return;
     }
-    var quote = sel.toString();
-    var text = window.prompt("Comment:", "");
-    if (!text) return;
+    var range = sel.getRangeAt(0);
+    var scopeEl = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+    if (!scopeEl || !scopeEl.closest || !scopeEl.closest(".page-content")) {
+      toast("Select text in the document to comment on", "error");
+      return;
+    }
+    var quote = sel.toString().replace(/\s+/g, " ").trim();
+    if (!quote) {
+      toast("Select text to comment on", "error");
+      return;
+    }
+    commentComposerCtx = { quote: quote, range: range.cloneRange() };
+    $("commentModalTitle").textContent = "New Comment";
+    $("commentSaveBtn").textContent = "Add Comment";
+    $("commentText").value = "";
+    openModal("commentModal");
+    setTimeout(function () { $("commentText").focus(); }, 90);
+  }
+
+  function openReplyComposer(cid) {
+    commentComposerCtx = { replyTo: cid };
+    $("commentModalTitle").textContent = "Reply";
+    $("commentSaveBtn").textContent = "Reply";
+    $("commentText").value = "";
+    openModal("commentModal");
+    setTimeout(function () { $("commentText").focus(); }, 90);
+  }
+
+  function confirmCommentComposer() {
+    var text = $("commentText").value.trim();
+    if (!text) { toast("Write a comment first", "error"); return; }
+    if (!commentComposerCtx) { closeModal("commentModal"); return; }
+
+    if (commentComposerCtx.replyTo) {
+      var parent = getComment(commentComposerCtx.replyTo);
+      if (parent) {
+        if (!parent.replies) parent.replies = [];
+        parent.replies.push({ id: makeCommentId(), text: text, author: "You", ts: Date.now() });
+        scheduleAutosave();
+        // Refresh the popup if it is open for this comment
+        var openPopup = document.querySelector(".comment-popup");
+        if (openPopup && openPopup.getAttribute("data-cid") === parent.id) {
+          showCommentPopup(parent.id, openPopup._pinEl || null);
+        }
+      }
+    } else {
+      createAnchoredComment(commentComposerCtx.quote, commentComposerCtx.range, text);
+    }
+    commentComposerCtx = null;
+    closeModal("commentModal");
+  }
+
+  // Wraps a saved range in an anchor span, appends the pin, stores the data.
+  function createAnchoredComment(quote, range, text) {
     var c = {
-      id: ++commentId,
+      id: makeCommentId(),
       quote: quote.substring(0, 80) + (quote.length > 80 ? "…" : ""),
       text: text,
+      author: "You",
       resolved: false,
+      replies: [],
       ts: Date.now(),
     };
+    var span = document.createElement("span");
+    span.className = "comment-anchor";
+    span.setAttribute("data-cid", c.id);
+    var ok = false;
+    try {
+      var frag = range.extractContents();
+      span.appendChild(frag);
+      range.insertNode(span);
+      ok = true;
+    } catch (e) {
+      ok = false;
+    }
+    if (!ok || !span.parentNode) {
+      toast("Could not anchor comment here", "error");
+      return;
+    }
     comments.push(c);
-    toggleComments(true);
-    renderComments();
+    insertPinAfter(c, span);
+    placeCaretAfter(span.nextSibling || span);
+    scheduleAutosave();
     toast("Comment added", "success");
   }
 
-  function toggleComments(force) {
-    var panel = $("commentsPanel");
-    var shouldOpen = force === undefined ? !panel.classList.contains("open") : force;
-    if (shouldOpen) {
-      renderComments();
-      panel.classList.add("open");
-      panel.setAttribute("aria-hidden", "false");
-    } else {
-      panel.classList.remove("open");
-      panel.setAttribute("aria-hidden", "true");
-    }
+  function placeCaretAfter(el) {
+    try {
+      var range = document.createRange();
+      range.setStartAfter(el);
+      range.collapse(true);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (e) {}
   }
 
-  function renderComments() {
-    var body = $("commentsBody");
-    body.innerHTML = "";
-    if (comments.length === 0) {
-      var empty = document.createElement("p");
-      empty.className = "outline-empty";
-      empty.textContent = "No comments yet. Select text and use Review → Comment.";
-      body.appendChild(empty);
-      return;
+  // Builds the non-editable bubble pin and inserts it right after the anchor.
+  function buildPin(c) {
+    var sup = document.createElement("sup");
+    sup.className = "comment-ref" + (c.resolved ? " resolved" : "");
+    sup.setAttribute("data-comment", c.id);
+    sup.setAttribute("contenteditable", "false");
+    sup.setAttribute("title", c.author + ": " + c.text);
+    var bubble = document.createElement("span");
+    bubble.className = "comment-bubble";
+    bubble.setAttribute("data-initial", (c.author || "Y").charAt(0).toUpperCase());
+    sup.appendChild(bubble);
+    return sup;
+  }
+
+  function insertPinAfter(c, anchorOrRef) {
+    var pin = buildPin(c);
+    anchorOrRef.parentNode.insertBefore(pin, anchorOrRef.nextSibling);
+    return pin;
+  }
+
+  // Re-renders every pin from the comments array. Anchors already live in
+  // the page HTML (they persist with the document); pins are rebuilt so a
+  // comment whose anchor disappeared (text deleted) has no orphaned bubble.
+  // With dropOrphans set, comment data without a live anchor is removed too
+  // (same orphan cleanup as Slides) — used on document load.
+  function renderDocPins(dropOrphans) {
+    var pages = getPages();
+    for (var i = 0; i < pages.length; i++) {
+      var content = getContent(pages[i]);
+      var old = content.querySelectorAll("sup.comment-ref");
+      for (var j = 0; j < old.length; j++) old[j].remove();
     }
-    for (var i = 0; i < comments.length; i++) {
-      (function (c) {
-        var item = document.createElement("div");
-        item.className = "comment-item" + (c.resolved ? " resolved" : "");
-        var quote = document.createElement("div");
-        quote.className = "comment-quote";
-        quote.textContent = "“" + c.quote + "”";
-        var text = document.createElement("div");
-        text.className = "comment-text";
-        text.textContent = c.text;
-        text.setAttribute("contenteditable", "true");
-        text.addEventListener("blur", function () { c.text = text.textContent; });
-        var meta = document.createElement("div");
-        meta.className = "comment-meta";
-        var time = document.createElement("span");
-        time.textContent = formatTime(c.ts);
-        var actions = document.createElement("div");
-        actions.className = "comment-actions";
-        var resolve = document.createElement("button");
-        resolve.textContent = c.resolved ? "Unresolve" : "Resolve";
-        resolve.addEventListener("click", function () {
-          c.resolved = !c.resolved;
-          renderComments();
-        });
-        var del = document.createElement("button");
-        del.textContent = "Delete";
-        del.addEventListener("click", function () {
-          comments = comments.filter(function (x) { return x.id !== c.id; });
-          renderComments();
-        });
-        actions.appendChild(resolve);
-        actions.appendChild(del);
-        meta.appendChild(time);
-        meta.appendChild(actions);
-        item.appendChild(quote);
-        item.appendChild(text);
-        item.appendChild(meta);
-        body.appendChild(item);
-      })(comments[i]);
+    var kept = [];
+    for (var k = 0; k < comments.length; k++) {
+      var c = comments[k];
+      var anchor = document.querySelector('.page-content .comment-anchor[data-cid="' + c.id + '"]');
+      if (!anchor) {
+        if (dropOrphans) continue; // drop orphaned comment
+        // keep data (it may re-anchor after undo) but nothing to attach to
+        continue;
+      }
+      insertPinAfter(c, anchor);
+      kept.push(c);
     }
+    if (dropOrphans && kept.length !== comments.length) comments = kept;
+  }
+
+  function showCommentPopup(cid, pinEl) {
+    closeCommentPopup();
+    var c = getComment(cid);
+    if (!c) return;
+    var popup = document.createElement("div");
+    popup.className = "comment-popup";
+    popup.setAttribute("data-cid", c.id);
+    popup._pinEl = pinEl || null;
+    var html = '';
+    html += '<div class="comment-popup-header">';
+    html += '<div class="comment-popup-avatar">' + escapeHtml((c.author || "Y").charAt(0).toUpperCase()) + "</div>";
+    html += '<span class="comment-popup-author">' + escapeHtml(c.author || "You") + "</span>";
+    html += '<span class="comment-popup-time">' + escapeHtml(formatTime(c.ts)) + "</span>";
+    html += '<button class="comment-popup-close" aria-label="Close">&times;</button>';
+    html += "</div>";
+    html += '<div class="comment-popup-body">' + escapeHtml(c.text) + "</div>";
+    if (c.quote) html += '<div class="comment-popup-quote">“' + escapeHtml(c.quote) + "”</div>";
+    if (c.replies && c.replies.length) {
+      html += '<div class="comment-popup-replies">';
+      for (var i = 0; i < c.replies.length; i++) {
+        var r = c.replies[i];
+        html += '<div class="comment-popup-reply"><strong>' + escapeHtml(r.author || "You") + "</strong> " + escapeHtml(r.text);
+        html += '<span class="reply-time">' + escapeHtml(formatTime(r.ts)) + "</span></div>";
+      }
+      html += "</div>";
+    }
+    html += '<div class="comment-popup-actions">';
+    html += '<button class="comment-reply-btn">Reply</button>';
+    html += '<button class="comment-resolve-btn">' + (c.resolved ? "Unresolve" : "Resolve") + "</button>";
+    html += '<button class="comment-delete-btn">Delete</button>';
+    html += "</div>";
+    popup.innerHTML = html;
+    document.body.appendChild(popup);
+
+    // Position next to the pin (fixed coordinates), flipping left when the
+    // viewport is too narrow and clamping vertically.
+    var left, top;
+    if (pinEl && pinEl.getBoundingClientRect) {
+      var rect = pinEl.getBoundingClientRect();
+      left = rect.right + 8;
+      top = rect.top - 6;
+    } else {
+      left = Math.max(12, (window.innerWidth - 250) / 2);
+      top = 120;
+    }
+    if (left + 262 > window.innerWidth) left = Math.max(8, (pinEl ? pinEl.getBoundingClientRect().left : left) - 258);
+    var ph = popup.offsetHeight || 140;
+    top = Math.max(8, Math.min(top, window.innerHeight - ph - 8));
+    popup.style.left = left + "px";
+    popup.style.top = top + "px";
+
+    popup.querySelector(".comment-popup-close").addEventListener("click", closeCommentPopup);
+    popup.querySelector(".comment-reply-btn").addEventListener("click", function () { closeCommentPopup(); openReplyComposer(c.id); });
+    popup.querySelector(".comment-resolve-btn").addEventListener("click", function () {
+      c.resolved = !c.resolved;
+      var anchor = document.querySelector('.page-content .comment-anchor[data-cid="' + c.id + '"]');
+      if (anchor) anchor.classList.toggle("comment-resolved", c.resolved);
+      var pin = document.querySelector('sup.comment-ref[data-comment="' + c.id + '"]');
+      if (pin) pin.classList.toggle("resolved", c.resolved);
+      scheduleAutosave();
+      showCommentPopup(c.id, pinEl);
+    });
+    popup.querySelector(".comment-delete-btn").addEventListener("click", function () {
+      deleteComment(c.id);
+      closeCommentPopup();
+      scheduleAutosave();
+      toast("Comment deleted", "success");
+    });
+  }
+
+  function closeCommentPopup() {
+    var existing = document.querySelector(".comment-popup");
+    if (existing) existing.remove();
+  }
+
+  function deleteComment(cid) {
+    comments = comments.filter(function (x) { return x.id !== cid; });
+    // Unwrap the anchor (keep the commented text) and remove the pin.
+    var anchor = document.querySelector('.page-content .comment-anchor[data-cid="' + cid + '"]');
+    if (anchor && anchor.parentNode) {
+      var parent = anchor.parentNode;
+      while (anchor.firstChild) parent.insertBefore(anchor.firstChild, anchor);
+      parent.removeChild(anchor);
+      parent.normalize();
+    }
+    var pin = document.querySelector('sup.comment-ref[data-comment="' + cid + '"]');
+    if (pin && pin.parentNode) pin.parentNode.removeChild(pin);
+    schedulePaginate();
   }
 
   /* ---------------- Read Aloud (Web Speech API) ---------------- */
@@ -5945,28 +5602,6 @@
     if ($("btnRedo")) { $("btnRedo").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnRedo").addEventListener("click", function () { exec("redo"); }); }
     // Theme / color theme / dark paper buttons have been removed from the UI.
     // (No click handlers to wire up — cyan is locked via CSS.)
-    if ($("btnClipboardHistory")) {
-      $("btnClipboardHistory").addEventListener("mousedown", function (e) { e.preventDefault(); });
-      $("btnClipboardHistory").addEventListener("click", openClipboardHistory);
-    }
-    if ($("clipboardHistoryClear")) {
-      $("clipboardHistoryClear").addEventListener("click", clearClipboardHistory);
-    }
-    if ($("btnFocus2")) {
-      $("btnFocus2").addEventListener("mousedown", function (e) { e.preventDefault(); });
-      $("btnFocus2").addEventListener("click", function () { toggleFocusMode(); });
-    }
-    if ($("btnZen")) {
-      $("btnZen").addEventListener("mousedown", function (e) { e.preventDefault(); });
-      $("btnZen").addEventListener("click", function () { toggleZenMode(); });
-    }
-    if ($("zenIndicator")) {
-      $("zenIndicator").addEventListener("click", function () { toggleZenMode(false); });
-    }
-    // Zen mode: show controls on input/mousemove/scroll
-    document.addEventListener("input", function () { if (typeof zenShowControls === "function") zenShowControls(); });
-    document.addEventListener("mousemove", function () { if (typeof zenShowControls === "function") zenShowControls(); });
-    $("documentScroll").addEventListener("scroll", function () { if (typeof zenShowControls === "function") zenShowControls(); });
 
     // Ribbon tabs — switching with sliding indicator + blur/fade panel transition
     initRibbonTabs();
@@ -6022,7 +5657,6 @@
         printDocument();
       });
     }
-    if ($("btnStatsExport")) $("btnStatsExport").addEventListener("click", exportStats);
 
     // Goal tracker input
     $("goalInput").addEventListener("input", function (e) {
@@ -6045,9 +5679,6 @@
       setTimeout(printDocument, 100);
     });
 
-    // Focus mode
-    if ($("btnFocus")) { $("btnFocus").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnFocus").addEventListener("click", function () { toggleFocusMode(); }); }
-    $("btnFocusExit").addEventListener("click", function () { toggleFocusMode(false); });
 
     // EmeraldSuite: Docs — new feature wiring
     // Templates
@@ -6061,8 +5692,9 @@
     // Go To
     $("btnGoTo").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnGoTo").addEventListener("click", openGoTo);
-    $("gotoConfirm").addEventListener("click", performGoTo);
-    $("gotoValue").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); performGoTo(); } });
+    $("frGotoBtn").addEventListener("click", performGoTo);
+    $("frGotoValue").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); performGoTo(); } });
+    setupGotoTypeDropdown();
 
     // Watermark
     $("btnWatermark").addEventListener("mousedown", function (e) { e.preventDefault(); });
@@ -6112,36 +5744,6 @@
     $("btnPageNum").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnPageNum").addEventListener("click", insertPageNumber);
 
-    // View modes
-    var viewBtns = document.querySelectorAll("[data-view]");
-    for (var vb = 0; vb < viewBtns.length; vb++) {
-      (function (b) {
-        b.addEventListener("mousedown", function (e) { e.preventDefault(); });
-        b.addEventListener("click", function () {
-          setViewMode(b.getAttribute("data-view"));
-        });
-      })(viewBtns[vb]);
-    }
-    document.querySelector("[data-view='print']").classList.add("active");
-
-    // Format Painter
-    $("btnFormatPainter").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnFormatPainter").addEventListener("click", function () {
-      // First click copies; if already have a format, second click applies
-      if (painterFormat) {
-        applyPainterFormat();
-        painterFormat = null;
-        document.body.classList.remove("painter-active");
-      } else {
-        copyFormat();
-      }
-    });
-
-    // Paste Special
-    $("btnPasteSpecial").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnPasteSpecial").addEventListener("click", openPasteSpecial);
-    $("pasteSpecialConfirm").addEventListener("click", performPasteSpecial);
-
     // Read Aloud
     $("btnReadAloud").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnReadAloud").addEventListener("click", readAloud);
@@ -6150,16 +5752,13 @@
     $("btnTrackChanges").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnTrackChanges").addEventListener("click", toggleTrackChanges);
 
-    // Comments
+    // Comments (Slides-style pins + popup)
     $("btnComment").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnComment").addEventListener("click", addComment);
-    $("commentsClose").addEventListener("click", function () { toggleComments(false); });
-    $("commentResolveAll").addEventListener("click", function () {
-      comments.forEach(function (c) { c.resolved = true; });
-      renderComments();
-      toast("All comments resolved", "success");
+    $("commentSaveBtn").addEventListener("click", confirmCommentComposer);
+    $("commentText").addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); confirmCommentComposer(); }
     });
-    $("commentAddFromPanel").addEventListener("click", addComment);
 
     // ── FILE MODAL (opened from the File ribbon tab) ──
     // Close X button + backdrop click
@@ -6334,11 +5933,6 @@
       scheduleAutosave();
     });
 
-    // Shortcuts dialog
-    $("btnShortcuts").addEventListener("mousedown", function (e) { e.preventDefault(); });
-    $("btnShortcuts").addEventListener("click", function () { openModal("shortcutsModal"); });
-    buildShortcuts();
-
     // Modal close buttons
     var closeBtns = document.querySelectorAll("[data-close]");
     for (var ci = 0; ci < closeBtns.length; ci++) {
@@ -6356,15 +5950,27 @@
       })(overlays[oi]);
     }
 
-    // Find & Replace
-    $("findInput").addEventListener("input", runFind);
-    $("findCase").addEventListener("change", runFind);
-    $("findWhole").addEventListener("change", runFind);
-    if ($("findRegex")) $("findRegex").addEventListener("change", runFind);
-    $("findNext").addEventListener("click", findNext);
-    $("findPrev").addEventListener("click", findPrev);
-    $("replaceOne").addEventListener("click", replaceOne);
-    $("replaceAll").addEventListener("click", replaceAll);
+    // Find & Replace (bottom-right bar)
+    $("frFindInput").addEventListener("input", runFind);
+    $("frCaseSensitive").addEventListener("change", runFind);
+    $("frWholeWord").addEventListener("change", runFind);
+    if ($("frRegex")) $("frRegex").addEventListener("change", runFind);
+    $("frNextBtn").addEventListener("click", findNext);
+    $("frPrevBtn").addEventListener("click", findPrev);
+    $("frReplaceOneBtn").addEventListener("click", replaceOne);
+    $("frReplaceAllBtn").addEventListener("click", replaceAll);
+    $("frCloseBtn").addEventListener("click", closeFindBar);
+    // Escape anywhere inside the bar closes it (inputs included, buttons too)
+    $("findBar").addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); closeFindBar(); }
+    });
+    $("frFindInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); e.shiftKey ? findPrev() : findNext(); }
+      if (e.key === "Escape") { e.preventDefault(); closeFindBar(); }
+    });
+    $("frReplaceInput").addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); closeFindBar(); }
+    });
 
     // Link dialog
     $("linkConfirm").addEventListener("click", insertLink);
@@ -6406,25 +6012,7 @@
 
     $("documentScroll").addEventListener("scroll", updateStatus);
 
-    // Capture copy/cut for clipboard history
-    document.addEventListener("copy", function (e) {
-      try {
-        var sel = window.getSelection();
-        if (sel && !sel.isCollapsed) captureClipboard(sel.toString());
-      } catch (err) {}
-    });
-    document.addEventListener("cut", function (e) {
-      try {
-        var sel = window.getSelection();
-        if (sel && !sel.isCollapsed) captureClipboard(sel.toString());
-      } catch (err) {}
-    });
-    // Ctrl+Shift+V → clipboard history
     document.addEventListener("keydown", function (e) {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "v") {
-        e.preventDefault();
-        openClipboardHistory();
-      }
       // Escape → close the File modal or delete dialog if open
       if (e.key === "Escape") {
         if (fileModalOpen()) { e.preventDefault(); closeFileModal(); return; }
@@ -6433,14 +6021,6 @@
           e.preventDefault();
           closeDeleteDocModal();
           return;
-        }
-      }
-      // ? → shortcut overlay (document-level so it works even if focus is elsewhere)
-      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        var ae = document.activeElement;
-        if (!ae || (ae.tagName !== "INPUT" && ae.tagName !== "TEXTAREA")) {
-          e.preventDefault();
-          openShortcutOverlay();
         }
       }
     });
@@ -6454,7 +6034,6 @@
     loadMargins();
     loadGoal();
     loadCustomDict();
-    loadFindHistory();
     // Color theme loading is a no-op now (cyan is locked via CSS).
     buildRulerTicks();
     initMarginDrag();
@@ -6528,7 +6107,7 @@
       var page = createPage();
       wrapper.appendChild(page);
       var content = getContent(page);
-      content.innerHTML = data.content || "";
+      content.innerHTML = sanitizeStoredHtml(data.content) || "";
       if (content.children.length === 0) {
         var p = document.createElement("p");
         p.innerHTML = "<br>";
@@ -6579,7 +6158,7 @@
   /* =========================================================
      EmeraldSuite: Docs — Feature additions
      (cover pages, equations, smartart, screenshot, draw mode,
-      spellcheck, footnotes, table of figures, compare,
+      spellcheck, footnotes, table of figures,
       real track changes, threaded comments)
      ========================================================= */
 
@@ -6768,7 +6347,9 @@
     // Tiny LaTeX-ish renderer: handles ^, _, \frac, \sqrt, \sum, \int, \lim,
     // \prod, \log, \ln, \binom, \sin/\cos/\tan, greek letters, etc.
     if (!latex) return "";
-    var out = latex;
+    // Escape FIRST: typed characters can never become live markup in the
+    // preview or the inserted equation (CodeQL: DOM text reinterpreted).
+    var out = escapeHtml(latex);
     // \frac{a}{b}
     out = out.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, function (m, a, b) {
       return '<span style="display:inline-block;vertical-align:middle;text-align:center"><span style="display:block;border-bottom:1px solid currentColor;padding:0 4px">' + a + '</span><span style="display:block;padding:0 4px">' + b + '</span></span>';
@@ -7645,6 +7226,54 @@
 
   /* ---------------- Table of Figures — removed (feature cut) ---------------- */
 
+  /* ---------------- Enter around footnote/endnote markers (shared) ----------------
+     Chrome cannot split a paragraph while the caret is INSIDE a non-editable
+     <sup contenteditable="false"> marker (Enter silently does nothing — no
+     new line ever appears), and when the caret sits immediately BEFORE a
+     marker the native split drags the marker DOWN onto the new line. Both
+     feel like "Enter is broken next to footnotes/endnotes". findProblemMarker()
+     detects the stuck positions; reAnchorCaretPastMarker() moves the caret to
+     just AFTER the marker so a real paragraph split can happen there. Both
+     normal mode (setupMarkerEnterFix) and track-changes mode use these. */
+  function findProblemMarker(range) {
+    function inMarker(node) {
+      var el = node && (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
+      if (!el || !el.closest) return null;
+      return el.closest("sup.footnote-ref, sup.endnote-ref, sup.comment-ref") || null;
+    }
+    // Caret / selection start INSIDE a marker (clicked or double-clicked it)
+    var m = inMarker(range.startContainer);
+    if (m) return m;
+    // Element position pointing directly AT a marker: (parent, idxBeforeMarker)
+    if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
+      var ch = range.startContainer.childNodes[range.startOffset];
+      if (isInlineMarker(ch)) return ch;
+    }
+    // Caret at the very END of a text node directly followed by a marker
+    if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE &&
+        range.startOffset === range.startContainer.nodeValue.length) {
+      var nx = range.startContainer.nextSibling;
+      if (isInlineMarker(nx)) return nx;
+    }
+    return null;
+  }
+
+  function reAnchorCaretPastMarker(marker, sel) {
+    // Caret goes immediately AFTER the marker (marker stays on this line)
+    var nx = marker.nextSibling;
+    var r2 = document.createRange();
+    if (nx && nx.nodeType === Node.TEXT_NODE) r2.setStart(nx, 0);
+    else if (nx) r2.setStartBefore(nx);
+    else r2.setStartAfter(marker);
+    r2.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r2);
+    var content = marker.closest && marker.closest(".page-content");
+    if (content && document.activeElement !== content) {
+      try { content.focus({ preventScroll: true }); } catch (err) { try { content.focus(); } catch (e2) {} }
+    }
+  }
+
   /* ---------------- Real track changes ---------------- */
   function setupTrackChangesInterceptor() {
     var pagesWrap = $(PAGES_WRAPPER_ID);
@@ -7670,10 +7299,17 @@
         scheduleMergeTracked();
         return;
       }
-      // Enter — track as insertion of a paragraph break
+      // Enter — a REAL paragraph split. (The old behavior inserted a tracked
+      // "¶" glyph instead of breaking the line, so the caret never moved
+      // down.) Marker-safe: Chrome cannot split while the caret is stuck on
+      // a non-editable footnote/endnote marker, so re-anchor first.
       if (key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        insertTrackedNode("ins", "¶");
+        var enterMarker = findProblemMarker(sel.getRangeAt(0));
+        if (enterMarker) reAnchorCaretPastMarker(enterMarker, sel);
+        try { document.execCommand("insertParagraph"); } catch (errEnter) {}
+        schedulePaginate();
+        scheduleAutosave();
         return;
       }
       // Backspace / Delete with a non-collapsed selection → wrap in <del>
@@ -7705,72 +7341,22 @@
     });
   }
 
-  /* Enter around footnote/endnote markers:
-     Chrome cannot split a paragraph while the caret is INSIDE a non-editable
-     <sup contenteditable="false"> marker (Enter silently does nothing — no
-     new line ever appears), and when the caret sits immediately BEFORE a
-     marker the native split drags the marker DOWN onto the new line. Both
-     feel like "Enter is broken next to footnotes/endnotes". Fix: when the
-     selection boundary touches a marker, re-anchor the caret to just AFTER
-     it and split there — the marker stays with its text and a fresh line
-     opens below. */
+  /* Enter around footnote/endnote markers (normal editing mode):
+     see findProblemMarker()/reAnchorCaretPastMarker() above for the details. */
   function setupMarkerEnterFix() {
     var pagesWrap = $(PAGES_WRAPPER_ID);
     if (!pagesWrap) return;
 
-    function isMarkerEl(el) {
-      return el && el.nodeType === Node.ELEMENT_NODE &&
-        (el.classList.contains("footnote-ref") || el.classList.contains("endnote-ref"));
-    }
-
-    // Returns the marker the selection boundary is stuck ON (inside it, or
-    // immediately before it), or null when Enter can proceed natively.
-    function findProblemMarker(range) {
-      function inMarker(node) {
-        var el = node && (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
-        if (!el || !el.closest) return null;
-        return el.closest("sup.footnote-ref, sup.endnote-ref") || null;
-      }
-      // Caret / selection start INSIDE a marker (clicked or double-clicked it)
-      var m = inMarker(range.startContainer);
-      if (m) return m;
-      // Element position pointing directly AT a marker: (parent, idxBeforeMarker)
-      if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
-        var ch = range.startContainer.childNodes[range.startOffset];
-        if (isMarkerEl(ch)) return ch;
-      }
-      // Caret at the very END of a text node directly followed by a marker
-      if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE &&
-          range.startOffset === range.startContainer.nodeValue.length) {
-        var nx = range.startContainer.nextSibling;
-        if (isMarkerEl(nx)) return nx;
-      }
-      return null;
-    }
-
     pagesWrap.addEventListener("keydown", function (e) {
       if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
-      if (trackChangesOn) return; // tracked mode tracks the break itself
+      if (trackChangesOn) return; // handled by the track-changes interceptor
       var sel = window.getSelection();
       if (!sel || !sel.rangeCount) return;
       var marker = findProblemMarker(sel.getRangeAt(0));
       if (!marker) return; // native Enter handles every other position
 
       e.preventDefault();
-      // Caret goes immediately AFTER the marker (marker stays on this line),
-      // then the paragraph splits there.
-      var nx = marker.nextSibling;
-      var r2 = document.createRange();
-      if (nx && nx.nodeType === Node.TEXT_NODE) r2.setStart(nx, 0);
-      else if (nx) r2.setStartBefore(nx);
-      else r2.setStartAfter(marker);
-      r2.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(r2);
-      var content = marker.closest && marker.closest(".page-content");
-      if (content && document.activeElement !== content) {
-        try { content.focus({ preventScroll: true }); } catch (err) { try { content.focus(); } catch (e2) {} }
-      }
+      reAnchorCaretPastMarker(marker, sel);
       try { document.execCommand("insertParagraph"); } catch (err) {}
       schedulePaginate();
       scheduleAutosave();
@@ -7830,24 +7416,6 @@
     }, 800);
   }
 
-  /* ---------------- Improved comments (threaded + @mentions) ---------------- */
-  function addCommentReply(c) {
-    var text = window.prompt("Reply:", "");
-    if (!text) return;
-    if (!c.replies) c.replies = [];
-    c.replies.push({ text: text, ts: Date.now() });
-    renderComments();
-    scheduleAutosave();
-  }
-
-  function jumpToComment(c) {
-    if (c.rangeRef) {
-      try { c.rangeRef.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
-    } else {
-      toast("Comment anchor not found", "error");
-    }
-  }
-
   /* ---------------- Wire up new buttons in init ---------------- */
   // (called from init() via initNewFeatures below)
   function initNewFeatures() {
@@ -7869,7 +7437,7 @@
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           var href = a.getAttribute("href");
-          if (href && href !== "#" && href.indexOf("javascript:") !== 0) {
+          if (isSafeExternalUrl(href)) {
             // normalizeExternalUrl fixes links stored without a scheme
             // (e.g. href="youtube.com") so they open https://youtube.com
             // instead of a path under this app's origin.
@@ -7900,6 +7468,14 @@
         if (!fn) return;
         e.preventDefault();
         toggleFootnotes(true);
+      });
+      // Comment pins: open the Slides-style popup card
+      scrollEl.addEventListener("click", function (e) {
+        var pin = e.target.closest("sup.comment-ref");
+        if (!pin) return;
+        e.preventDefault();
+        e.stopPropagation();
+        showCommentPopup(pin.getAttribute("data-comment"), pin);
       });
       scrollEl.addEventListener("click", function (e) {
         var bm = e.target.closest("a.emdocs-bookmark");
@@ -7988,7 +7564,6 @@
     // Escape closes side panels
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
-        if (shortcutOverlay && shortcutOverlay.classList.contains("open")) { shortcutOverlay.classList.remove("open"); return; }
         var fp = $("footnotesPanel"); if (fp && fp.classList.contains("open")) { toggleFootnotes(false); return; }
       }
     });
@@ -8030,7 +7605,7 @@
       if (!(e.ctrlKey || e.metaKey)) return;
       // Don't hijack scrolling inside a modal or scrollable panel.
       var target = e.target;
-      if (target && target.closest && target.closest(".modal-overlay, .outline-panel, .thumbnails-panel, .comments-panel, .footnotes-panel")) return;
+      if (target && target.closest && target.closest(".modal-overlay, .outline-panel, .thumbnails-panel, .footnotes-panel")) return;
       e.preventDefault();
       var delta = e.deltaY > 0 ? -1 : 1;
       var factor = 1 + (delta * 0.08);
