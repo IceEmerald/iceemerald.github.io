@@ -1,6 +1,6 @@
-﻿/* BUILD 2026-08-26.12 (References: Footnote/Endnote/Citation custom modals; proper endnote system â€” numbered refs, end-of-doc section, panel management; Styles group (Title/H1-H3/Normal via formatBlock); Caption/Cross-ref/Table-of-Figures removed) */
+﻿/* BUILD 2026-08-26.12 (References: Footnote/Endnote/Citation custom modals; proper endnote system — numbered refs, end-of-doc section, panel management; Styles group (Title/H1-H3/Normal via formatBlock); Caption/Cross-ref/Table-of-Figures removed) */
 /* =========================================================
-   Z Docs â€” Word Processor  (v2)
+   Emerald Docs — Word Processor  (v2)
    Real pagination engine: content is distributed across real
    A4 page DOM elements. Paragraphs move whole between pages;
    a single block taller than a page is split at a word boundary
@@ -24,18 +24,19 @@
   var PAGES_WRAPPER_ID = "pagesWrapper";
   var CARET_BLOCK_ATTR = "data-caret-block";
   var CARET_OFFSET_ATTR = "data-caret-offset";
-  // Legacy single-document key (pre-multi-document builds). Kept only to
-  // migrate an existing document into the new model on first run.
+  // LEGACY single-document key (pre-multi-document builds). This exact string
+  // is frozen: it is only ever READ to migrate old data into emeralddocs_*
+  // keys, never written to. Do not rename.
   var STORAGE_KEY = "zdocs.document.v3";
   // Multi-document storage: one index of metadata + one key per document,
   // mirroring the Slides app (emeraldslides_index / emeraldslides_pres_<id>).
   var DOC_INDEX_KEY = "emeralddocs_index";
   function docDataKey(id) { return "emeralddocs_doc_" + id; }
-  // THEME_KEY removed â€” dark mode is no longer supported.
-  var LEGACY_VERSIONS_KEY = "zdocs.versions";
-  function versionsKey(id) { return "zdocs.versions." + id; }
-  var MARGINS_KEY = "zdocs.margins";
-  var GOAL_KEY = "zdocs.goal";
+  // THEME_KEY removed — dark mode is no longer supported.
+  var LEGACY_VERSIONS_KEY = "zdocs.versions"; // LEGACY — read-only migration source. Do not rename.
+  function versionsKey(id) { return "emeralddocs.versions." + id; }
+  var MARGINS_KEY = "emeralddocs.margins";
+  var GOAL_KEY = "emeralddocs.goal";
   var MAX_VERSIONS = 10;
   var AUTOSAVE_SNAPSHOT_MS = 5 * 60 * 1000; // 5 minutes
   var autosaveSnapshotTimer = null;
@@ -44,7 +45,7 @@
   var PAGE_HEIGHT = 1123;
   var MIN_MARGIN = 32;
   var MAX_MARGIN = 300;
-  // Zoom limits match Slides: 20% â€“ 400% (Slides uses clamp(scale, 0.2, 4)).
+  // Zoom limits match Slides: 20% – 400% (Slides uses clamp(scale, 0.2, 4)).
   var MIN_ZOOM = 20;
   var MAX_ZOOM = 400;
 
@@ -61,7 +62,7 @@
   var goalTarget = 0;
   // Multi-document state (Slides pattern)
   var documents = [];        // metadata index [{id, title, updatedAt, wordCount}]
-  var currentDocId = null;   // id of the document loaded in the editor (null â†’ welcome screen)
+  var currentDocId = null;   // id of the document loaded in the editor (null → welcome screen)
   var currentTitle = "Untitled Document";
   var _welcomeRenderToken = 0;
   var _deleteTargetId = null;
@@ -123,6 +124,60 @@
     }
   }
 
+  // Inline non-editable markers created by the app (footnote/endnote refs).
+  function isInlineMarker(el) {
+    return el && el.nodeType === Node.ELEMENT_NODE &&
+      (el.classList.contains("footnote-ref") || el.classList.contains("endnote-ref"));
+  }
+
+  // Walks every node inside a block but REJECTS text inside non-editable
+  // markers — used by both caret save and caret restore so the caret can
+  // never re-anchor INSIDE a <sup contenteditable="false">.
+  function caretWalker(block) {
+    return document.createTreeWalker(block, NodeFilter.SHOW_ALL, {
+      acceptNode: function (n) {
+        if (n.nodeType === Node.TEXT_NODE) {
+          var p = n.parentElement;
+          if (p && p.closest && p.closest("sup.footnote-ref, sup.endnote-ref")) return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+  }
+
+  // Character offset of the caret boundary within `block`, counting ONLY
+  // user-editable text. Inline markers count as ONE virtual character each
+  // so their digits never shift the caret across pagination save/restore —
+  // previously a caret parked after a marker re-anchored INSIDE the <sup>
+  // and the keyboard appeared dead until the user clicked again.
+  function editableCaretOffset(block, container, offset) {
+    var caret = document.createRange();
+    try {
+      caret.setStart(container, offset);
+      caret.collapse(true);
+    } catch (e) {
+      return 0;
+    }
+    var walker = caretWalker(block);
+    var probe = document.createRange();
+    var node, len = 0;
+    while ((node = walker.nextNode())) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (node === container) return len + Math.max(0, Math.min(offset, node.textContent.length));
+        probe.selectNodeContents(node);
+        probe.collapse(true); // probe at the node's START
+        if (probe.compareBoundaryPoints(Range.START_TO_START, caret) < 0) len += node.textContent.length;
+        else break;
+      } else if (isInlineMarker(node)) {
+        probe.setStart(node, 0);
+        probe.collapse(true);
+        if (probe.compareBoundaryPoints(Range.START_TO_START, caret) < 0) len += 1;
+        else break;
+      }
+    }
+    return len;
+  }
+
   function saveCaret() {
     clearCaretMarkers();
     var sel = window.getSelection();
@@ -138,10 +193,7 @@
     }
     if (!block || !block.parentElement || !block.parentElement.classList.contains("page-content")) return;
 
-    var preRange = document.createRange();
-    preRange.selectNodeContents(block);
-    preRange.setEnd(range.startContainer, range.startOffset);
-    var offset = preRange.toString().length;
+    var offset = editableCaretOffset(block, range.startContainer, range.startOffset);
 
     block.setAttribute(CARET_BLOCK_ATTR, "1");
     block.setAttribute(CARET_OFFSET_ATTR, String(offset));
@@ -176,22 +228,30 @@
   }
 
   function setCaretInBlock(block, offset) {
-    var walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
+    // Mirrors editableCaretOffset(): markers consume one virtual character,
+    // marker-internal digits are invisible to the walk — so a caret parked
+    // before vs after a marker restores to DIFFERENT, correct positions
+    // instead of drifting inside the non-editable <sup>.
+    var walker = caretWalker(block);
     var node, len = 0;
     while ((node = walker.nextNode())) {
-      var textLen = node.textContent.length;
-      if (offset <= len + textLen) {
-        var range = document.createRange();
-        range.setStart(node, Math.max(0, offset - len));
-        range.collapse(true);
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        var content = block.closest(".page-content");
-        if (content) content.focus();
-        return;
+      if (node.nodeType === Node.TEXT_NODE) {
+        var tlen = node.textContent.length;
+        if (offset <= len + tlen) {
+          var range = document.createRange();
+          range.setStart(node, Math.max(0, offset - len));
+          range.collapse(true);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          var content = block.closest(".page-content");
+          if (content) content.focus();
+          return;
+        }
+        len += tlen;
+      } else if (isInlineMarker(node)) {
+        len += 1;
       }
-      len += textLen;
     }
     var range = document.createRange();
     range.selectNodeContents(block);
@@ -208,9 +268,9 @@
      we split it FIRST (at a word boundary) rather than pushing
      the whole block to the next page. The old logic pushed the
      only block down, leaving an empty page and moving the
-     overflow unchanged â€” producing cascades of empty pages.
+     overflow unchanged — producing cascades of empty pages.
      ---------------------------------------------------------
-     KEY FIX (v3): TRUE hard page break. A `.zdocs-page-break`
+     KEY FIX (v3): TRUE hard page break. A `.emdocs-page-break`
      element forces ALL content after it onto the next page.
      This runs as a pre-pass before the overflow logic.       */
   function paginate() {
@@ -240,14 +300,14 @@
         var guard = 0;
         while (isOverflow(content) && guard++ < 300) {
           if (content.children.length === 1) {
-            // Single overflowing block â†’ SPLIT it (don't push whole)
+            // Single overflowing block → SPLIT it (don't push whole)
             if (splitOverflowingBlock(content, pages[i])) {
               changed = true;
               continue;
             }
             break; // cannot split further (e.g. one giant word)
           }
-          // Multiple blocks â†’ push the last block down
+          // Multiple blocks → push the last block down
           if (!pushOverflowDown(pages[i])) break;
           changed = true;
         }
@@ -276,7 +336,7 @@
   }
 
   /* Hard page break enforcement.
-     For each page, if a `.zdocs-page-break` element exists, every block
+     For each page, if a `.emdocs-page-break` element exists, every block
      AFTER it (and the break itself stays as the last thing on this page)
      is moved to the start of the next page (a new page is created if needed).
      Returns true if any content was moved. */
@@ -285,7 +345,7 @@
     var pages = getPages();
     for (var i = 0; i < pages.length; i++) {
       var content = getContent(pages[i]);
-      var breaks = content.querySelectorAll(".zdocs-page-break");
+      var breaks = content.querySelectorAll(".emdocs-page-break");
       if (breaks.length === 0) continue;
 
       // Take the FIRST page break on this page.
@@ -301,7 +361,7 @@
       }
 
       if (toMove.length === 0) {
-        // Break is already the last block on this page â€” nothing to move.
+        // Break is already the last block on this page — nothing to move.
         // But if there are MULTIPLE breaks on this page, the later ones
         // need to go to the next page (a break with nothing after it still
         // means "the next page starts here").
@@ -363,7 +423,7 @@
 
   function normalizeContent(content) {
     // Wrap stray non-empty text nodes in <p>, drop empty text nodes.
-    // NOTE: do NOT auto-add an empty <p> to a childless page here â€” that
+    // NOTE: do NOT auto-add an empty <p> to a childless page here — that
     // would make removeTrailingEmptyPages think a genuinely-empty trailing
     // page still has content, so it would never clean up pages the user
     // emptied. ensureFirstPage() guarantees the first page stays editable.
@@ -423,7 +483,7 @@
           node.textContent = tokens.slice(0, 1).join("");
           if (isOverflow(content)) {
             node.textContent = text;
-            return false; // single token too big â€” give up
+            return false; // single token too big — give up
           }
           var lo = 1, hi = tokens.length, best = 1;
           while (lo <= hi) {
@@ -471,13 +531,13 @@
     var first = nextContent.firstElementChild;
     if (!first) return false;
 
-    // Never pull a page-break marker up â€” it must stay as a boundary.
-    if (first.classList && first.classList.contains("zdocs-page-break")) return false;
+    // Never pull a page-break marker up — it must stay as a boundary.
+    if (first.classList && first.classList.contains("emdocs-page-break")) return false;
 
     // If the current page already ends with a page-break marker,
-    // content after it belongs on the next page â€” don't pull across.
+    // content after it belongs on the next page — don't pull across.
     var lastHere = currentContent.lastElementChild;
-    if (lastHere && lastHere.classList && lastHere.classList.contains("zdocs-page-break")) {
+    if (lastHere && lastHere.classList && lastHere.classList.contains("emdocs-page-break")) {
       return false;
     }
 
@@ -495,13 +555,13 @@
 
     // A page is "empty" only if it has NO block-level children at all.
     // An empty <p> (created by pressing Enter) IS a legitimate block and
-    // must NOT cause its page to be deleted â€” otherwise pressing Enter on
+    // must NOT cause its page to be deleted — otherwise pressing Enter on
     // the last line of a full page (which pushes the new empty paragraph
     // onto a fresh next page) would have that page immediately removed,
     // making Enter appear to do nothing.
     //
     // EXCEPTION: a trailing page whose ONLY content is page-break markers
-    // (.zdocs-page-break) is a confusing leftover from a page break placed
+    // (.emdocs-page-break) is a confusing leftover from a page break placed
     // at the very end of the document. We strip the now-orphaned marker and
     // remove the page so the document ends cleanly.
     for (var i = pages.length - 1; i >= 1; i--) {
@@ -521,7 +581,7 @@
     var kids = content.children;
     if (kids.length === 0) return false;
     for (var k = 0; k < kids.length; k++) {
-      if (!kids[k].classList || !kids[k].classList.contains("zdocs-page-break")) return false;
+      if (!kids[k].classList || !kids[k].classList.contains("emdocs-page-break")) return false;
     }
     return true;
   }
@@ -603,7 +663,7 @@
     if (!el) return;
     var sel = window.getSelection();
     if (!sel || !sel.rangeCount) {
-      // No selection â€” reset to "Ln 1, Col 1" (e.g. when the editor loses focus
+      // No selection — reset to "Ln 1, Col 1" (e.g. when the editor loses focus
       // or the page is empty and nothing is selected).
       el.textContent = "Ln 1, Col 1";
       return;
@@ -625,7 +685,7 @@
       return;
     }
 
-    // Find the block element containing the caret â€” i.e. the direct child of
+    // Find the block element containing the caret — i.e. the direct child of
     // .page-content (typically a <p>, <h1>, <ul>, <blockquote>, etc.).
     // We walk UP from the anchor node until the parent has .page-content.
     var block = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
@@ -633,7 +693,7 @@
       block = block.parentElement;
     }
     // Guard: if block walked PAST .page-content (happens when the selection is
-    // directly on the .page-content element itself â€” e.g. an empty page with no
+    // directly on the .page-content element itself — e.g. an empty page with no
     // <p> child yet), the walk escapes to <body> and `selectNodeContents(block)`
     // would grab the entire document, producing a bogus column like "Col 15733".
     // In that case, default to line 1, col 1.
@@ -764,7 +824,7 @@
     if (!mod) return;
     var k = e.key.toLowerCase();
 
-    // Ctrl+Enter â†’ page break
+    // Ctrl+Enter → page break
     if (e.key === "Enter") { e.preventDefault(); insertPageBreak(); return; }
 
     if (k === "s") { e.preventDefault(); saveDocument(true); return; }
@@ -781,17 +841,17 @@
     if (k === "n" && e.shiftKey) { e.preventDefault(); toggleZenMode(); return; }
     if (k === "/" && e.shiftKey) { e.preventDefault(); openShortcutOverlay(); return; }
 
-    // Ctrl++ / Ctrl+= â†’ zoom in
+    // Ctrl++ / Ctrl+= → zoom in
     if (k === "+" || k === "=") { e.preventDefault(); adjustZoom(10); return; }
-    // Ctrl+- â†’ zoom out
+    // Ctrl+- → zoom out
     if (k === "-") { e.preventDefault(); adjustZoom(-10); return; }
-    // Ctrl+0 â†’ reset zoom
+    // Ctrl+0 → reset zoom
     if (k === "0") { e.preventDefault(); setZoom(100); return; }
     if (k === "z" && !e.shiftKey) { e.preventDefault(); exec("undo"); return; }
     if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); exec("redo"); return; }
   }
 
-  /* Cycle through margin presets in order: default â†’ narrow â†’ moderate â†’ wide â†’ default */
+  /* Cycle through margin presets in order: default → narrow → moderate → wide → default */
   function cycleMarginPreset() {
     var presets = ["default", "narrow", "moderate", "wide"];
     // Find current preset (or default if custom)
@@ -886,7 +946,7 @@
     }
     // Insert a page-break marker element followed by an empty paragraph.
     // The marker is clickable afterwards to remove (cancel) the break.
-    var html = '<div class="zdocs-page-break" contenteditable="false" title="Click to remove this page break"><span class="pb-label">â€” Page Break â€”</span></div><p><br></p>';
+    var html = '<div class="emdocs-page-break" contenteditable="false" title="Click to remove this page break"><span class="pb-label">— Page Break —</span></div><p><br></p>';
     document.execCommand("insertHTML", false, html);
     schedulePaginate();
     scheduleAutosave();
@@ -928,7 +988,7 @@
     if (headings.length === 0) {
       var empty = document.createElement("p");
       empty.className = "outline-empty";
-      empty.textContent = "Add headings (Title, Heading 1â€“3) to see them here.";
+      empty.textContent = "Add headings (Title, Heading 1–3) to see them here.";
       body.appendChild(empty);
       return;
     }
@@ -1046,7 +1106,7 @@
         '<div class="shortcut-overlay-content">' +
           '<div class="shortcut-overlay-head">' +
             '<h3>Keyboard Shortcuts</h3>' +
-            '<button class="modal-close" id="shortcutOverlayClose" aria-label="Close">Ã—</button>' +
+            '<button class="modal-close" id="shortcutOverlayClose" aria-label="Close">×</button>' +
           '</div>' +
           '<div class="shortcut-overlay-body" id="shortcutOverlayBody"></div>' +
           '<div class="shortcut-overlay-hint">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</div>' +
@@ -1073,7 +1133,7 @@
   function buildShortcuts() {
     var grid = $("shortcutsGrid");
     grid.innerHTML = "";
-    var modKey = navigator.platform.indexOf("Mac") >= 0 ? "âŒ˜" : "Ctrl";
+    var modKey = navigator.platform.indexOf("Mac") >= 0 ? "⌘" : "Ctrl";
     var sections = [
       {
         title: "File",
@@ -1200,7 +1260,7 @@
     var text = a.textContent || "";
     linkPreviewEl.innerHTML =
       '<div class="lp-url">' + escapeHtml(href) + "</div>" +
-      '<div class="lp-hint">' + (text ? "â€œ" + escapeHtml(text) + "â€ Â· " : "") + "Ctrl+click to open</div>";
+      '<div class="lp-hint">' + (text ? "“" + escapeHtml(text) + "” · " : "") + "Ctrl+click to open</div>";
     positionLinkPreview(e);
     linkPreviewEl.classList.add("show");
   }
@@ -1358,7 +1418,7 @@
 
   function scheduleAutosave() {
     if (!currentDocId) return; // nothing open (welcome screen)
-    // Show "Savingâ€¦" immediately (matching slides pattern)
+    // Show "Saving…" immediately (matching slides pattern)
     setAutosaveState("saving");
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(function () {
@@ -1367,7 +1427,7 @@
     }, 800);
   }
 
-  // Periodic version snapshots â€” every 5 minutes, push a version snapshot
+  // Periodic version snapshots — every 5 minutes, push a version snapshot
   // so the user can roll back to an earlier point in their writing session.
   function startAutosaveSnapshots() {
     if (autosaveSnapshotTimer) return; // already running
@@ -1375,7 +1435,7 @@
       try {
         var data = serialize();
         pushVersion(data);
-        // (Version count badge removed from status bar â€” no UI to update.)
+        // (Version count badge removed from status bar — no UI to update.)
       } catch (e) {}
     }, AUTOSAVE_SNAPSHOT_MS);
   }
@@ -1398,8 +1458,143 @@
     }
   }
 
+  // Place the caret INSIDE a text block before an inline insertHTML
+  // (footnote / endnote / citation markers). restoreEditorSelection() alone
+  // re-applies the saved range WITHOUT focusing the editor, so Chrome can run
+  // execCommand against the page root — the marker then lands as a top-level
+  // node and renders on its OWN LINE instead of inline with the text.
+  // Last USER-EDITABLE text block of a page: skips app-managed furniture
+  // (footnotes section / per-page footnote areas) so carets and markers
+  // never target them — renderFootnotesSection() rebuilds those nodes and
+  // would destroy anything inserted inside them.
+  function lastRealBlock(pageContent) {
+    if (!pageContent) return null;
+    for (var i = pageContent.children.length - 1; i >= 0; i--) {
+      var ch = pageContent.children[i];
+      if (ch.classList && (ch.classList.contains("footnotes-section") || ch.classList.contains("page-footnote-area"))) continue;
+      if (/^(P|H[1-6]|LI|DIV|BLOCKQUOTE|PRE)$/.test(ch.nodeName)) return ch;
+    }
+    return null;
+  }
+
+  function placeCaretForInlineInsert() {
+    restoreEditorSelection();
+    var sel = window.getSelection();
+    var anchor = sel && sel.anchorNode;
+    // A range saved before a pagination pass can point at DETACHED nodes;
+    // execCommand with a disconnected selection silently does nothing.
+    var ok = !!(anchor && anchor.isConnected);
+    var anchorEl = null, host = null;
+    if (ok) {
+      anchorEl = anchor.nodeType === Node.ELEMENT_NODE ? anchor : anchor.parentElement;
+      host = anchorEl && anchorEl.closest(".page-content");
+      // Reject: page-content root anchors, anchors INSIDE non-editable
+      // markers (<sup contenteditable="false"> — execCommand fails there),
+      // and anchors inside app-managed furniture (.footnotes-section /
+      // .page-footnote-area — renderFootnotesSection() wipes them, which
+      // used to eat the freshly inserted marker).
+      ok = !!host && !(anchorEl.classList && anchorEl.classList.contains("page-content")) &&
+           !anchorEl.closest('[contenteditable="false"]') &&
+           !anchorEl.closest(".footnotes-section, .page-footnote-area");
+    }
+    if (ok && document.activeElement !== host) {
+      // Make sure the editing host is the focused element, or execCommand
+      // targets the page root even when the range itself is correct.
+      try { host.focus({ preventScroll: true }); } catch (e) { try { host.focus(); } catch (e2) {} }
+      restoreEditorSelection();
+      var a2 = window.getSelection().anchorNode;
+      var a2el = a2 && (a2.nodeType === Node.ELEMENT_NODE ? a2 : a2.parentElement);
+      if (!a2 || !a2.isConnected || !a2el || !a2el.closest(".page-content") ||
+          a2el.closest('[contenteditable="false"]') ||
+          a2el.closest(".footnotes-section, .page-footnote-area")) ok = false;
+    }
+    if (!ok) {
+      // No usable live caret: focus the editor and drop the caret INLINE at
+      // the end of the last real text block, never at the page root and
+      // never inside the footnotes furniture.
+      var fc = getContent(getPages()[0]);
+      if (!fc) return;
+      try { fc.focus(); } catch (e) {}
+      var target = lastRealBlock(fc) || fc;
+      var r = document.createRange();
+      r.selectNodeContents(target);
+      r.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+    // execCommand("insertHTML") REPLACES whatever text is currently selected
+    // (double-clicked word, triple-clicked line, drag select) — the selected
+    // text before the marker would VANISH. Word keeps the text: collapse the
+    // range to its END so the marker lands right AFTER the selection, on the
+    // same line.
+    var s2 = window.getSelection();
+    if (s2 && s2.rangeCount) {
+      var r2 = s2.getRangeAt(0);
+      if (!r2.collapsed) {
+        r2.collapse(false);
+        s2.removeAllRanges();
+        s2.addRange(r2);
+      }
+    }
+  }
+
+  // After inserting a non-editable marker, park the caret right AFTER it so
+  // the next insert never anchors inside the marker itself (which would make
+  // execCommand("insertHTML") fail silently).
+  function parkCaretAfterRef(refEl) {
+    if (!refEl || !refEl.parentElement) return;
+    try {
+      var r = document.createRange();
+      r.setStartAfter(refEl);
+      r.collapse(true);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    } catch (e) {}
+  }
+
+  // Safety net: if a marker still lands as a DIRECT child of .page-content it
+  // would render on its own line — move it inline to the end of the nearest
+  // preceding text block (or wrap it in a new paragraph when none exists).
+  function healInlineRefPlacement(refEl) {
+    if (!refEl || !refEl.parentElement) return;
+    var host = refEl.parentElement;
+    // Marker landed inside app-managed furniture (footnotes section / page
+    // footnote area): renderFootnotesSection() would delete it — relocate it
+    // to the end of the last real text block instead.
+    if (host.classList && (host.classList.contains("footnotes-section") || host.classList.contains("page-footnote-area"))) {
+      var pc2 = host.closest(".page-content");
+      var tgt2 = lastRealBlock(pc2);
+      var nxt2 = refEl.nextSibling;
+      if (nxt2 && nxt2.nodeType === Node.TEXT_NODE && !/\S/.test(nxt2.nodeValue)) nxt2.parentNode.removeChild(nxt2);
+      if (tgt2) {
+        tgt2.appendChild(document.createTextNode(" "));
+        tgt2.appendChild(refEl);
+      }
+      return;
+    }
+    if (!host.classList || !host.classList.contains("page-content")) return;
+    var next = refEl.nextSibling;
+    if (next && next.nodeType === Node.TEXT_NODE && !/\S/.test(next.nodeValue)) {
+      next.parentNode.removeChild(next);
+    }
+    var prev = refEl.previousElementSibling;
+    while (prev && !/^(P|H[1-6]|LI|DIV|BLOCKQUOTE|PRE)$/.test(prev.nodeName)) {
+      prev = prev.previousElementSibling;
+    }
+    if (prev) {
+      prev.appendChild(document.createTextNode(" "));
+      prev.appendChild(refEl);
+    } else {
+      var para = document.createElement("p");
+      host.insertBefore(para, refEl);
+      para.appendChild(refEl);
+      para.appendChild(document.createTextNode(" "));
+    }
+  }
+
   // Focus the first page-content and re-apply the last saved selection.
-  // Used after modal/prompt dialogs steal focus â€” execCommand('insertHTML')
+  // Used after modal/prompt dialogs steal focus — execCommand('insertHTML')
   // only works when the editor is focused and has a selection inside it.
   function focusEditorAndRestore() {
     var firstContent = getContent(getPages()[0]);
@@ -1410,7 +1605,7 @@
   }
 
   function exec(cmd, value) {
-    // Indent/Outdent: plain margin-left indentation â€” NOT execCommand's
+    // Indent/Outdent: plain margin-left indentation — NOT execCommand's
     // blockquote wrapper (which rendered as a blue quote block).
     if (cmd === "indent" || cmd === "outdent") {
       applyIndent(cmd === "indent" ? 1 : -1);
@@ -1449,13 +1644,13 @@
   function applyFontFamily(value) { exec("fontName", value); }
 
   /* Exact pixel font sizes (Slides parity): execCommand only supports a
-     coarse 1â€“7 scale, so we wrap the selection with <font size="7"> and then
+     coarse 1–7 scale, so we wrap the selection with <font size="7"> and then
      convert that wrapper into a <span style="font-size:Npx"> carrying the
      exact size picked in the dropdown. */
   function applyFontSize(value) {
     var v = parseFloat(value);
     if (isNaN(v) || v <= 0) return;
-    // Legacy 1â€“7 values (old macros / format painter) still pass straight through
+    // Legacy 1–7 values (old macros / format painter) still pass straight through
     if (v >= 1 && v <= 7) { exec("fontSize", String(Math.round(v))); return; }
 
     // Remember pre-existing size="7" wrappers so only the new one is converted
@@ -1526,7 +1721,7 @@
       if (active) btn.classList.add("active"); else btn.classList.remove("active");
     }
     updateDropCapState();
-    // Block-type dropdown removed â€” nothing else to sync.
+    // Block-type dropdown removed — nothing else to sync.
   }
 
   /* ---------------- Save / Load (IndexedDB via EmeraldIDBStorage) ---------------- */
@@ -1591,11 +1786,18 @@
   async function saveIndex() {
     try {
       // EmeraldIDBStorage.setJSON removes the localStorage copy of the key
-      // (IDB is primary), so mirror to localStorage only afterwards â€”
+      // (IDB is primary), so mirror to localStorage only afterwards —
       // same pattern as slides.js saveIndex().
       if (window.EmeraldIDBStorage) await window.EmeraldIDBStorage.setJSON(DOC_INDEX_KEY, documents);
       localStorage.setItem(DOC_INDEX_KEY, JSON.stringify(documents));
     } catch (e) {}
+  }
+
+  // Stored documents from builds before the emerald rebrand may still carry
+  // the old "zdocs-*" class names inside their saved HTML. Rewrite them on
+  // load so the editor, pagination and click handlers work on one class set.
+  function legacyClassRewrite(html) {
+    return typeof html === "string" ? html.replace(/zdocs-/g, "emdocs-") : html;
   }
 
   async function loadDocData(id) {
@@ -1608,6 +1810,11 @@
       if (!data) {
         var raw = localStorage.getItem(docDataKey(id));
         if (raw) data = JSON.parse(raw);
+      }
+      if (data) {
+        data.content = legacyClassRewrite(data.content);
+        data.header = legacyClassRewrite(data.header);
+        data.footer = legacyClassRewrite(data.footer);
       }
       return data;
     } catch (e) { return null; }
@@ -1628,7 +1835,7 @@
     } catch (e) {}
   }
 
-  // Strip tags â†’ plain text (for card snippets). Block elements become line
+  // Strip tags → plain text (for card snippets). Block elements become line
   // breaks so headings/paragraphs don't run together. Never throws.
   function htmlToText(html) {
     if (!html) return "";
@@ -1649,7 +1856,7 @@
   }
 
   // Same id format as Slides (pres_<ms>_<hex9>) and Notes (note_<ms>_<hex9>):
-  // doc_<decimal timestamp>_<9 hex chars>  â†’  ?owned=doc_1734567890123_a1b2c3d4e
+  // doc_<decimal timestamp>_<9 hex chars>  →  ?owned=doc_1734567890123_a1b2c3d4e
   function makeDocId() {
     return "doc_" + Date.now() + "_" + generateSecureId(9);
   }
@@ -1706,7 +1913,7 @@
       writeDocData(data);
       setAutosaveState("saved");
       if (showToast) {
-        // Explicit save â†’ also push to version history (store plaintext for versions)
+        // Explicit save → also push to version history (store plaintext for versions)
         pushVersion(serialize());
         toast("Document saved", "success");
       }
@@ -1777,7 +1984,7 @@
     var page = createPage();
     wrapper.appendChild(page);
     var content = getContent(page);
-    content.innerHTML = v.content || "";
+    content.innerHTML = legacyClassRewrite(v.content) || "";
     if (content.children.length === 0) {
       var p = document.createElement("p");
       p.innerHTML = "<br>";
@@ -1868,7 +2075,7 @@
     footerActive = hfHasContent(data.footer);
     footerHTML = footerActive ? data.footer : "";
     // Footnotes/endnotes are per-document. Docs saved before this existed
-    // have no field â€” keep whatever loadFootnotes()/loadEndnotes() loaded
+    // have no field — keep whatever loadFootnotes()/loadEndnotes() loaded
     // from the legacy global store so their notes aren't lost.
     if (Array.isArray(data.footnotes)) footnotes = data.footnotes;
     if (Array.isArray(data.endnotes)) endnotes = data.endnotes;
@@ -1889,7 +2096,7 @@
     document.body.classList.remove("no-active-doc");
     showWelcomeScreen(false);
     switchRibbonTab("home");
-    // Ribbon just became visible â€” re-measure the tab underline (it may have
+    // Ribbon just became visible — re-measure the tab underline (it may have
     // been measured while display:none, leaving a 0-width indicator).
     refreshRibbonIndicator();
     updateOwnedUrl();
@@ -2015,7 +2222,7 @@
     }
   }
 
-  /* ---------------- Legacy migration (single â†’ multi document) ----------------
+  /* ---------------- Legacy migration (single → multi document) ----------------
      Old builds stored one document at STORAGE_KEY. If it exists and holds real
      content, adopt it as the first card on the welcome screen. Completely empty
      untitled leftovers are ignored so new users get a clean welcome screen. */
@@ -2048,13 +2255,14 @@
     await writeDocData({
       id: id,
       title: title,
-      content: legacy.content || "<p><br></p>",
+      content: legacyClassRewrite(legacy.content) || "<p><br></p>",
       savedAt: legacy.savedAt || Date.now(),
       theme: legacy.theme || theme,
       header: legacy.header || "",
       footer: legacy.footer || "",
     });
   }
+
 
   /* ---------------- Welcome screen (home) ---------------- */
   function showWelcomeScreen(show) {
@@ -2228,7 +2436,7 @@
       pill.classList.remove("saving", "error");
       if (state === "saving") {
         pill.classList.add("saving");
-        if (pillText) pillText.textContent = "Savingâ€¦";
+        if (pillText) pillText.textContent = "Saving…";
       } else if (state === "error") {
         pill.classList.add("error");
         if (pillText) pillText.textContent = "Save failed";
@@ -2242,7 +2450,7 @@
       el.classList.remove("saving", "saved");
       if (state === "saving") {
         el.classList.add("saving");
-        el.textContent = "Savingâ€¦";
+        el.textContent = "Saving…";
       } else if (state === "error") {
         el.textContent = "Save failed";
       } else {
@@ -2344,17 +2552,17 @@
   /* ---------------- Theme ----------------
      Dark mode and accent color switching have been removed.
      The accent color is locked to cyan via the CSS :root variables,
-     and there is no dark theme anymore â€” the app is always in light mode. */
+     and there is no dark theme anymore — the app is always in light mode. */
   function applyTheme() {
-    /* no-op â€” kept for backward compat with older code that calls applyTheme("light") */
+    /* no-op — kept for backward compat with older code that calls applyTheme("light") */
   }
 
   function toggleTheme() {
-    /* no-op â€” dark mode removed */
+    /* no-op — dark mode removed */
   }
 
   function toggleDarkPaper() {
-    /* no-op â€” dark paper removed */
+    /* no-op — dark paper removed */
   }
 
   /* ---------------- Document color themes (accent presets) ----------------
@@ -2362,9 +2570,9 @@
      single, locked accent color (defined in :root in docs.css). These stubs
      exist only so older code paths that still call applyColorTheme() /
      openColorThemeDialog() don't throw. */
-  function applyColorTheme() { /* no-op â€” cyan is locked via CSS */ }
+  function applyColorTheme() { /* no-op — cyan is locked via CSS */ }
   function loadColorTheme()  { /* no-op */ }
-  function openColorThemeDialog() { /* no-op â€” modal removed */ }
+  function openColorThemeDialog() { /* no-op — modal removed */ }
   function hexToRgba(hex, alpha) {
     var m = hex.match(/^#([0-9a-f]{6})$/i);
     if (!m) return "rgba(0,0,0," + alpha + ")";
@@ -2379,7 +2587,7 @@
 
   function captureClipboard(text) {
     if (!text || text.length < 1) return;
-    // dedupe â€” if the same text is already the most recent, skip
+    // dedupe — if the same text is already the most recent, skip
     if (clipboardHistory.length > 0 && clipboardHistory[0] === text) return;
     // remove older duplicates
     var idx = clipboardHistory.indexOf(text);
@@ -2401,7 +2609,7 @@
         (function (text, idx) {
           var item = document.createElement("div");
           item.className = "clipboard-history-item";
-          var preview = text.length > 60 ? text.slice(0, 60) + "â€¦" : text;
+          var preview = text.length > 60 ? text.slice(0, 60) + "…" : text;
           item.innerHTML = '<span class="ch-preview">' + escapeHtml(preview) + '</span><span class="ch-len">' + text.length + ' chars</span>';
           item.title = "Click to paste at caret";
           item.addEventListener("click", function () {
@@ -2445,7 +2653,7 @@
     m.setAttribute("aria-hidden", "true");
     if (!m.classList.contains("open")) return;
     // Slides' close: add .closing (0.23s fadeOutOverlay/fadeOutModal), then
-    // drop .open 230ms later â€” same timing as the Slides app's modals.
+    // drop .open 230ms later — same timing as the Slides app's modals.
     clearTimeout(m._closeTimer);
     m.classList.add("closing");
     m._closeTimer = setTimeout(function () {
@@ -2469,7 +2677,7 @@
   }
 
   /* ---------------- Find history ---------------- */
-  var FIND_HISTORY_KEY = "zdocs.findHistory";
+  var FIND_HISTORY_KEY = "emeralddocs.findHistory";
   var findHistory = [];
   var findHistoryDropdown = null;
 
@@ -2508,7 +2716,7 @@
       findHistoryDropdown.className = "find-history";
       input.parentElement.style.position = "relative";
       input.parentElement.appendChild(findHistoryDropdown);
-      // show on focus â€” rebuild items each time so new searches appear
+      // show on focus — rebuild items each time so new searches appear
       input.addEventListener("focus", function () {
         populateFindHistoryItems();
         if (findHistory.length > 0) findHistoryDropdown.classList.add("open");
@@ -2547,7 +2755,7 @@
   }
 
   function clearFindHighlights() {
-    var marks = document.querySelectorAll(".page-content mark.zdocs-mark");
+    var marks = document.querySelectorAll(".page-content mark.emdocs-mark");
     for (var i = marks.length - 1; i >= 0; i--) {
       var mark = marks[i];
       var parent = mark.parentNode;
@@ -2602,7 +2810,7 @@
         acceptNode: function (node) {
           if (!node.textContent.trim()) return NodeFilter.FILTER_REJECT;
           var p = node.parentElement;
-          if (p && p.tagName === "MARK" && p.classList.contains("zdocs-mark")) return NodeFilter.FILTER_REJECT;
+          if (p && p.tagName === "MARK" && p.classList.contains("emdocs-mark")) return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
         }
       });
@@ -2642,7 +2850,7 @@
       var ms = matches[i].start, me = matches[i].end;
       if (ms > last) frag.appendChild(document.createTextNode(text.slice(last, ms)));
       var mark = document.createElement("mark");
-      mark.className = "zdocs-mark";
+      mark.className = "emdocs-mark";
       mark.appendChild(document.createTextNode(text.slice(ms, me)));
       frag.appendChild(mark);
       findMatches.push({ node: mark, pageIndex: pageIndex });
@@ -2663,7 +2871,7 @@
   }
 
   function highlightCurrentMatch() {
-    var marks = document.querySelectorAll(".page-content mark.zdocs-mark");
+    var marks = document.querySelectorAll(".page-content mark.emdocs-mark");
     for (var i = 0; i < marks.length; i++) marks[i].classList.remove("current");
     if (findIndex >= 0 && findMatches[findIndex]) {
       var m = findMatches[findIndex];
@@ -2776,7 +2984,7 @@
 
   /* ---------------- Insert Image (Slides-style: OS file picker directly) ---------------- */
   function openImagePicker() {
-    // Slides parity: no dialog â€” clicking the ribbon button opens the
+    // Slides parity: no dialog — clicking the ribbon button opens the
     // native file explorer straight away via a hidden <input type=file>.
     var input = $("insertImageInput");
     if (input) input.click();
@@ -2895,7 +3103,7 @@
       if (r <= tableDims.rows && c <= tableDims.cols) cells[i].classList.add("hover");
       else cells[i].classList.remove("hover");
     }
-    $("tableGridLabel").textContent = tableDims.rows + " Ã— " + tableDims.cols;
+    $("tableGridLabel").textContent = tableDims.rows + " × " + tableDims.cols;
   }
 
   function openTableDialog() {
@@ -2933,7 +3141,7 @@
     closeModal("tableModal");
     schedulePaginate();
     scheduleAutosave();
-    toast("Table inserted (" + tableDims.rows + "Ã—" + tableDims.cols + ")", "success");
+    toast("Table inserted (" + tableDims.rows + "×" + tableDims.cols + ")", "success");
   }
 
   /* ---------------- Insert HR ---------------- */
@@ -2999,7 +3207,7 @@
     var overlay = document.createElement("div");
     overlay.className = "stats-printable";
     overlay.innerHTML =
-      '<h1>' + escapeHtml(title) + ' â€” Statistics Report</h1>' +
+      '<h1>' + escapeHtml(title) + ' — Statistics Report</h1>' +
       '<p style="color:#666;font-size:12px">Generated: ' + escapeHtml(date) + '</p>' +
       '<h2>Document Summary</h2>' +
       '<div class="stat-row"><span class="stat-label">Words</span><span class="stat-val">' + stats.words.toLocaleString() + '</span></div>' +
@@ -3015,7 +3223,7 @@
       '<div class="stat-row"><span class="stat-label">Current streak</span><span class="stat-val">' + (streak.current || 0) + ' day' + ((streak.current||0) === 1 ? "" : "s") + '</span></div>' +
       '<div class="stat-row"><span class="stat-label">Longest streak</span><span class="stat-val">' + (streak.longest || 0) + ' day' + ((streak.longest||0) === 1 ? "" : "s") + '</span></div>' +
       '<div class="stat-row"><span class="stat-label">Active days (last 60)</span><span class="stat-val">' + (streak.days ? streak.days.length : 0) + '</span></div>' +
-      '<p style="margin-top:32px;color:#999;font-size:11px">EmeraldSuite: Docs â€” generated automatically</p>';
+      '<p style="margin-top:32px;color:#999;font-size:11px">EmeraldSuite: Docs — generated automatically</p>';
     document.body.appendChild(overlay);
 
     // Close the modal, then print, then remove the overlay
@@ -3049,17 +3257,17 @@
   /* ---------------- Ribbon tab switching ----------------
      EmeraldSuite pattern (matches Slides): clicking a tab animates a sliding
      underline indicator to the active tab, and cross-fades the corresponding
-     ribbon-panel with a blur-out â†’ blur-in transition.
+     ribbon-panel with a blur-out → blur-in transition.
 
      IMPORTANT: We listen for `transitionend` on the blur-out animation
      rather than using a fixed setTimeout. The blur-out transition is 0.18s;
      firing at 140ms (the old behaviour) left the panel at ~5% opacity when
      its position flipped from `relative` (centered via margin:auto) to
-     `absolute; left:0` â€” causing a brief flash on the left edge of the
+     `absolute; left:0` — causing a brief flash on the left edge of the
      ribbon before the new panel appeared in the center. */
   /* ---------------- Ribbon tab indicator helpers ---------------- */
   // Position the sliding underline under a tab. No-ops safely when the
-  // ribbon is hidden (welcome screen) â€” the rect is just 0Ã—0 then.
+  // ribbon is hidden (welcome screen) — the rect is just 0×0 then.
   function moveRibbonIndicatorTo(tab) {
     var indicator = $("ribbonTabIndicator");
     if (!indicator || !tab) return;
@@ -3070,8 +3278,8 @@
   }
 
   // Re-measure the active tab's underline after the ribbon becomes visible
-  // (opening a document, fonts loading, resizeâ€¦). Double rAF so layout has
-  // settled â€” measuring while display:none yields a 0-width underline.
+  // (opening a document, fonts loading, resize…). Double rAF so layout has
+  // settled — measuring while display:none yields a 0-width underline.
   function refreshRibbonIndicator() {
     if (window.requestAnimationFrame) {
       requestAnimationFrame(function () {
@@ -3096,13 +3304,13 @@
 
     // Position under the initially-active tab after layout settles. If the
     // ribbon is hidden at that point (welcome screen) the measure is skipped
-    // â€” refreshRibbonIndicator() re-runs it when a document opens.
+    // — refreshRibbonIndicator() re-runs it when a document opens.
     setTimeout(function () {
       var active = document.querySelector(".ribbon-tab.active");
       if (active && active.getBoundingClientRect().width > 0) moveRibbonIndicatorTo(active);
     }, 100);
 
-    // Re-align when fonts finish loading (tab widths can shift) â€” same as Slides
+    // Re-align when fonts finish loading (tab widths can shift) — same as Slides
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(refreshRibbonIndicator);
     }
@@ -3144,7 +3352,7 @@
         // already active?
         if (tab.classList.contains("active") && target !== "file") return;
 
-        // FILE TAB â†’ Backstage-style File modal (Slides behaviour).
+        // FILE TAB → Backstage-style File modal (Slides behaviour).
         // The File tab has no inline ribbon panel; clicking it opens the
         // file modal overlay over the editor instead.
         if (target === "file") {
@@ -3444,9 +3652,9 @@
       if (current > goalTarget) fillEl.classList.add("over");
 
       // Milestone toasts at 25%, 50%, 75%
-      if (pct >= 25 && !goalMilestones[25]) { goalMilestones[25] = true; toastMilestone("25% there â€” keep going!"); }
+      if (pct >= 25 && !goalMilestones[25]) { goalMilestones[25] = true; toastMilestone("25% there — keep going!"); }
       if (pct >= 50 && !goalMilestones[50]) { goalMilestones[50] = true; toastMilestone("Halfway there!"); }
-      if (pct >= 75 && !goalMilestones[75]) { goalMilestones[75] = true; toastMilestone("75% â€” almost done!"); }
+      if (pct >= 75 && !goalMilestones[75]) { goalMilestones[75] = true; toastMilestone("75% — almost done!"); }
 
       // Celebration: fire confetti once when goal is first reached
       if (current >= goalTarget && !goalCelebrated) {
@@ -3462,7 +3670,7 @@
       if (pct < 50) goalMilestones[50] = false;
       if (pct < 25) goalMilestones[25] = false;
     } else {
-      targetEl.textContent = "â€”";
+      targetEl.textContent = "—";
       fillEl.style.width = "0%";
       fillEl.className = "goal-bar-fill";
       if (inputEl && document.activeElement !== inputEl) inputEl.value = "";
@@ -3473,7 +3681,7 @@
 
   function toastMilestone(msg) {
     // Milestones reuse the standard Slides-style toast (white pill + award
-    // icon picked by _toastIcon) â€” no more special gradient styling.
+    // icon picked by _toastIcon) — no more special gradient styling.
     toast(msg, "success");
   }
 
@@ -3536,7 +3744,7 @@
     "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
   ];
 
-  /* Smart sentence tokenizer â€” protects abbreviations and decimals. */
+  /* Smart sentence tokenizer — protects abbreviations and decimals. */
   function getSentences() {
     var text = getAllText();
     if (!text) return [];
@@ -3586,7 +3794,7 @@
     var sentences = getSentences();
     var text = getAllText();
     if (!text || sentences.length === 0) {
-      return { score: 0, grade: "â€”", level: "â€”", desc: "Not enough text to analyze.", words: 0, sentences: 0, syllables: 0 };
+      return { score: 0, grade: "—", level: "—", desc: "Not enough text to analyze.", words: 0, sentences: 0, syllables: 0 };
     }
     var words = text.split(/\s+/).filter(function (w) { return /[a-zA-Z]/.test(w); });
     var wordCount = words.length;
@@ -3607,8 +3815,8 @@
     if (score >= 90) { level = "Very Easy"; desc = "5th-grade level. Easily understood by an 11-year-old."; }
     else if (score >= 80) { level = "Easy"; desc = "6th-grade level. Conversational English for consumers."; }
     else if (score >= 70) { level = "Fairly Easy"; desc = "7th-grade level. Fairly easy to read."; }
-    else if (score >= 60) { level = "Standard"; desc = "8thâ€“9th grade. Plain English. Good for most content."; }
-    else if (score >= 50) { level = "Fairly Difficult"; desc = "10thâ€“12th grade. Fairly difficult to read."; }
+    else if (score >= 60) { level = "Standard"; desc = "8th–9th grade. Plain English. Good for most content."; }
+    else if (score >= 50) { level = "Fairly Difficult"; desc = "10th–12th grade. Fairly difficult to read."; }
     else if (score >= 30) { level = "Difficult"; desc = "College level. Difficult to read."; }
     else { level = "Very Difficult"; desc = "College graduate level. Best for professional/academic."; }
 
@@ -3778,7 +3986,7 @@
   }
 
   /* ---------------- Writing issues checker ---------------- */
-  // A small curated list of common misspellings â†’ corrections
+  // A small curated list of common misspellings → corrections
   var COMMON_MISSPELLINGS = {
     "recieve": "receive",
     "definately": "definitely",
@@ -3839,7 +4047,7 @@
           type: "repeat",
           word: tokens[j],
           suggestion: "remove duplicate",
-          context: "â€¦" + tokens[j - 1] + " " + tokens[j] + "â€¦",
+          context: "…" + tokens[j - 1] + " " + tokens[j] + "…",
           fixType: "removeDuplicate",
         });
       }
@@ -3857,7 +4065,7 @@
           type: "spelling",
           word: match[0],
           suggestion: COMMON_MISSPELLINGS[misspelling],
-          context: "â€¦" + match[0] + "â€¦",
+          context: "…" + match[0] + "…",
           fixType: "replace",
           fixFrom: match[0],
           fixTo: COMMON_MISSPELLINGS[misspelling],
@@ -3892,9 +4100,9 @@
         var text = document.createElement("div");
         text.className = "issue-text";
         if (issue.type === "repeat") {
-          text.innerHTML = 'Repeated word: <span class="issue-highlight">' + escapeHtml(issue.word) + '</span> â€” <span class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</span>';
+          text.innerHTML = 'Repeated word: <span class="issue-highlight">' + escapeHtml(issue.word) + '</span> — <span class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</span>';
         } else {
-          text.innerHTML = 'Possible misspelling: <span class="issue-highlight">' + escapeHtml(issue.word) + '</span> â†’ <span class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</span>';
+          text.innerHTML = 'Possible misspelling: <span class="issue-highlight">' + escapeHtml(issue.word) + '</span> → <span class="issue-suggestion">' + escapeHtml(issue.suggestion) + '</span>';
         }
         content.appendChild(text);
         var fixBtn = document.createElement("button");
@@ -3988,7 +4196,7 @@
         for (var j = 0; j < blocks.length && count < 8; j++) {
           var clone = blocks[j].cloneNode(true);
           // Strip nested complexity for the thumbnail
-          var tables = clone.querySelectorAll("table, img, .zdocs-page-break");
+          var tables = clone.querySelectorAll("table, img, .emdocs-page-break");
           for (var k = 0; k < tables.length; k++) tables[k].remove();
           content.appendChild(clone);
           count++;
@@ -4042,7 +4250,7 @@
     if (on === undefined) on = !app.classList.contains("focus-mode");
     if (on) {
       app.classList.add("focus-mode");
-      toast("Focus mode on â€” press Esc to exit", "success");
+      toast("Focus mode on — press Esc to exit", "success");
       setTimeout(function () {
         var fc = getContent(getPages()[0]);
         if (fc) fc.focus();
@@ -4053,7 +4261,7 @@
   }
 
   /* ---------------- Zen mode (auto-hide chrome on typing) ---------------- */
-  // Zen mode is a softer Focus Mode: when enabled via View â†’ Zen (or Ctrl+Shift+Z),
+  // Zen mode is a softer Focus Mode: when enabled via View → Zen (or Ctrl+Shift+Z),
   // the topbar/ribbon/ruler/statusbar fade out after 2s of no typing/mouse
   // movement, and reappear the instant the user types or moves the mouse.
   var zenMode = false;
@@ -4065,7 +4273,7 @@
     if (on) {
       app.classList.add("zen-mode");
       scheduleZenHide();
-      toast("Zen mode on â€” type or move mouse to show controls", "success");
+      toast("Zen mode on — type or move mouse to show controls", "success");
       setTimeout(function () {
         var fc = getContent(getPages()[0]);
         if (fc) fc.focus();
@@ -4131,7 +4339,7 @@
   }
 
   /* ---------------- Writing streak tracker ---------------- */
-  var STREAK_KEY = "zdocs.streak";
+  var STREAK_KEY = "emeralddocs.streak";
   function recordWritingDay() {
     var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     var streak = loadStreak();
@@ -4209,7 +4417,7 @@
     var daySet = {};
     for (var i = 0; i < days.length; i++) daySet[days[i]] = true;
     var today = new Date();
-    // render last 35 days as 5 rows Ã— 7 cols (5 weeks)
+    // render last 35 days as 5 rows × 7 cols (5 weeks)
     var cells = 35;
     var start = new Date(today);
     start.setDate(start.getDate() - (cells - 1));
@@ -4219,7 +4427,7 @@
       var ds = d.toISOString().slice(0, 10);
       var cell = document.createElement("div");
       cell.className = "streak-cell" + (daySet[ds] ? " streak-cell-active" : "");
-      cell.title = ds + (daySet[ds] ? " â€” wrote" : " â€” no activity");
+      cell.title = ds + (daySet[ds] ? " — wrote" : " — no activity");
       container.appendChild(cell);
     }
   }
@@ -4272,7 +4480,7 @@
   }
 
   /* ---------------- Custom dictionary ---------------- */
-  var DICT_KEY = "zdocs.dictionary";
+  var DICT_KEY = "emeralddocs.dictionary";
   var customDict = {};
 
   function loadCustomDict() {
@@ -4317,7 +4525,7 @@
         chip.appendChild(document.createTextNode(word));
         var remove = document.createElement("button");
         remove.className = "dict-word-remove";
-        remove.textContent = "Ã—";
+        remove.textContent = "×";
         remove.title = "Remove";
         remove.addEventListener("click", function () {
           delete customDict[word];
@@ -4348,19 +4556,19 @@
   }
 
   /* ===================================================================
-     EMERALDSUITE: DOCS â€” additional features
+     EMERALDSUITE: DOCS — additional features
      =================================================================== */
 
   /* ---------------- Templates ---------------- */
   var TEMPLATES = [
     { id: "blank", name: "Blank Document", desc: "Start from scratch", html: "<p><br></p>" },
     { id: "resume", name: "Resume", desc: "Clean professional CV", html:
-      "<h1>First Last</h1><p>email@example.com Â· (555) 123-4567 Â· City, Country</p>" +
+      "<h1>First Last</h1><p>email@example.com · (555) 123-4567 · City, Country</p>" +
       "<h2>Summary</h2><p>Experienced professional with a track record of...</p>" +
-      "<h2>Experience</h2><p><strong>Job Title</strong> â€” Company, 2020â€“Present</p><p>Description of role and achievements.</p>" +
-      "<p><strong>Previous Role</strong> â€” Company, 2017â€“2020</p><p>Description.</p>" +
-      "<h2>Education</h2><p><strong>Degree</strong> â€” University, Year</p>" +
-      "<h2>Skills</h2><p>Skill Â· Skill Â· Skill Â· Skill</p>"
+      "<h2>Experience</h2><p><strong>Job Title</strong> — Company, 2020–Present</p><p>Description of role and achievements.</p>" +
+      "<p><strong>Previous Role</strong> — Company, 2017–2020</p><p>Description.</p>" +
+      "<h2>Education</h2><p><strong>Degree</strong> — University, Year</p>" +
+      "<h2>Skills</h2><p>Skill · Skill · Skill · Skill</p>"
     },
     { id: "letter", name: "Letter", desc: "Formal business letter", html:
       "<p>Sender Name<br/>123 Street Address<br/>City, State ZIP</p>" +
@@ -4383,11 +4591,11 @@
       "<p><strong>Date:</strong> " + new Date().toLocaleDateString() + "<br/><strong>Attendees:</strong> <br/><strong>Objective:</strong> </p>" +
       "<h2>Agenda</h2><p>1. <br/>2. <br/>3. </p>" +
       "<h2>Discussion</h2><p>Key points discussed.</p>" +
-      "<h2>Action Items</h2><p>Â· Task â€” Owner â€” Due date</p>"
+      "<h2>Action Items</h2><p>· Task — Owner — Due date</p>"
     },
     { id: "essay", name: "Essay", desc: "Academic 5-paragraph", html:
       "<h1>Essay Title</h1>" +
-      "<p><em>Introduction</em> â€” Hook, context, and thesis statement that previews three main points.</p>" +
+      "<p><em>Introduction</em> — Hook, context, and thesis statement that previews three main points.</p>" +
       "<h2>Body Paragraph 1</h2><p>First point with supporting evidence.</p>" +
       "<h2>Body Paragraph 2</h2><p>Second point with supporting evidence.</p>" +
       "<h2>Body Paragraph 3</h2><p>Third point with supporting evidence.</p>" +
@@ -4449,17 +4657,17 @@
 
   /* ---------------- Symbol bar (Slides-style floating bottom bar) ----------------
      Ported from the Slides app's symbolToolbar: a bottom-docked floating
-     pill (no modal box) with grouped symbol buttons â€” Stars, Marks, Arrows,
+     pill (no modal box) with grouped symbol buttons — Stars, Marks, Arrows,
      Math, Greek, Numbers, Special. Clicking a symbol inserts it at the
      caret; the bar STAYS OPEN so several symbols can be inserted in a row
-     (Slides parity). Done â€” or the ribbon button again â€” closes it. */
+     (Slides parity). Done — or the ribbon button again — closes it. */
   function toggleSymbolBar(force) {
     var bar = $("symbolToolbar");
     var btn = $("btnSymbols");
     if (!bar) return;
     var shouldOpen = force === undefined ? !bar.classList.contains("visible") : force;
     if (shouldOpen) {
-      // Only one bottom toolbar at a time â€” exit draw mode if it is on.
+      // Only one bottom toolbar at a time — exit draw mode if it is on.
       if (drawMode) toggleDrawMode(false);
       bar.classList.add("visible");
       if (btn) btn.classList.add("active");
@@ -4585,7 +4793,7 @@
     if (!sel || !sel.rangeCount || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
       if (fc) fc.focus();
     }
-    var html = '<div class="zdocs-toc" contenteditable="false"><h2>Table of Contents</h2><ul>';
+    var html = '<div class="emdocs-toc" contenteditable="false"><h2>Table of Contents</h2><ul>';
     for (var i = 0; i < headings.length; i++) {
       var h = headings[i];
       var level = h.tagName.toLowerCase();
@@ -4623,14 +4831,14 @@
 
   /* Sync the Drop Cap button's toggle-ON look with the paragraph under the
      caret, so the button visually reflects the applied state (ON/OFF) while
-     moving through the document â€” same behavior as Bold/Italic buttons. */
+     moving through the document — same behavior as Bold/Italic buttons. */
   function updateDropCapState() {
     var btn = document.getElementById("btnDropCap");
     if (!btn) return;
     var block = getCurrentBlock();
     var on = !!(block && block.tagName === "P" && block.classList.contains("has-dropcap"));
     btn.classList.toggle("active", on);
-    btn.title = on ? "Drop cap (currently ON â€” click to remove)" : "Drop cap";
+    btn.title = on ? "Drop cap (currently ON — click to remove)" : "Drop cap";
   }
 
   /* ---------------- Columns ---------------- */
@@ -4735,7 +4943,7 @@
 
   /* ---------------- Header / Footer / Page Number ---------------- */
   // Robust "is the selection inside X" check. anchorNode can BE the element
-  // itself (caret at (container, childCount)) â€” parentElement would then point
+  // itself (caret at (container, childCount)) — parentElement would then point
   // ABOVE the container and closest() would miss it.
   function selectionInside(sel, selector) {
     if (!sel || !sel.rangeCount || !sel.anchorNode) return false;
@@ -4747,7 +4955,7 @@
 
   // When the caret is parked at a container's very end ((el, childCount)),
   // execCommand insertHTML drops the new node as a SIBLING below the last
-  // paragraph â€” it then renders on its own line (outside a footer strip's
+  // paragraph — it then renders on its own line (outside a footer strip's
   // height). Deepening the caret into the last line keeps inserts inline.
   function deepenEndCaret(el) {
     if (!el) return;
@@ -4807,12 +5015,12 @@
         if (fc) fc.focus();
       }
     }
-    // Caret at a container's end â†’ deepen into the last line (inline insert)
+    // Caret at a container's end → deepen into the last line (inline insert)
     var anchor = sel && sel.anchorNode ? sel.anchorNode : null;
     deepenEndCaret(anchor && anchor.nodeType === Node.ELEMENT_NODE ? anchor : null);
     document.execCommand("insertHTML", false, '<span class="field-dynamic" contenteditable="false" data-field="PAGE">Page 1</span> ');
     // Chrome drops contenteditable=false nodes AFTER the paragraph when the
-    // caret sits at a block's end â€” pull strays back inline + re-mirror.
+    // caret sits at a block's end — pull strays back inline + re-mirror.
     normalizeStrayHF();
     updateDynamicFields();
     schedulePaginate();
@@ -4840,7 +5048,7 @@
     return el.querySelectorAll("img, svg, table, hr, .field-dynamic").length === 0;
   }
 
-  // Keep the .is-empty class in sync â€” CSS shows the grayed hint through it.
+  // Keep the .is-empty class in sync — CSS shows the grayed hint through it.
   function refreshHFHint(el) {
     if (el) el.classList.toggle("is-empty", isHFEmpty(el));
   }
@@ -4914,7 +5122,7 @@
     }
   }
 
-  // Re-apply strips to every page â€” called from paginate() so pages the
+  // Re-apply strips to every page — called from paginate() so pages the
   // paginator creates (or removes) stay in sync.
   function syncHeaderFooter() {
     var pages = getPages();
@@ -4943,10 +5151,10 @@
       else { footerActive = true; footerHTML = "<p><br></p>"; }
       syncHeaderFooter();
       scheduleAutosave();
-      toast((kind === "header" ? "Header" : "Footer") + " added â€” type in the " +
+      toast((kind === "header" ? "Header" : "Footer") + " added — type in the " +
             (kind === "header" ? "top" : "bottom") + " strip", "success");
     } else {
-      toast((kind === "header" ? "Header" : "Footer") + " â€” edit the " +
+      toast((kind === "header" ? "Header" : "Footer") + " — edit the " +
             (kind === "header" ? "top" : "bottom") + " strip of any page", "info");
     }
     // Jump to the first strip so the user can type right away
@@ -4992,7 +5200,7 @@
     var app = $("app");
     app.classList.remove("view-web", "view-draft", "view-read", "focus-mode", "print-preview");
     if (mode === "print") {
-      // default â€” no class needed
+      // default — no class needed
     } else if (mode === "web") {
       app.classList.add("view-web");
     } else if (mode === "draft") {
@@ -5038,7 +5246,7 @@
       })(),
     };
     document.body.classList.add("painter-active");
-    toast("Format copied â€” select text to apply", "success");
+    toast("Format copied — select text to apply", "success");
   }
 
   function applyPainterFormat() {
@@ -5076,12 +5284,12 @@
         if (fc) fc.focus();
       }
       if (mode === "plain" || mode === "match") {
-        // strip all formatting â†’ plain text
+        // strip all formatting → plain text
         document.execCommand("insertText", false, text);
       } else if (mode === "html") {
         document.execCommand("insertHTML", false, escapeHtml(text));
       } else {
-        // keep source â€” try insertFromPaste, fallback to text
+        // keep source — try insertFromPaste, fallback to text
         document.execCommand("insertText", false, text);
       }
       schedulePaginate();
@@ -5089,8 +5297,8 @@
       closeModal("pasteSpecialModal");
       toast("Pasted (" + mode + ")", "success");
     }).catch(function () {
-      // clipboard read denied â€” use last clipboard text if available
-      toast("Clipboard access denied â€” use Ctrl+V", "error");
+      // clipboard read denied — use last clipboard text if available
+      toast("Clipboard access denied — use Ctrl+V", "error");
       closeModal("pasteSpecialModal");
     });
   }
@@ -5104,7 +5312,7 @@
     "havent": "haven't", "didnt": "didn't", "wouldnt": "wouldn't",
     "shouldnt": "shouldn't", "couldnt": "couldn't", "im": "I'm",
     "ive": "I've", "ill": "I'll", "id": "I'd",
-    ":-)": "ðŸ˜Š", ":-(": "ðŸ˜ž", "<3": "â¤",
+    ":-)": "😊", ":-(": "😞", "<3": "❤",
   };
 
   function checkAutoCorrect() {
@@ -5163,7 +5371,7 @@
     if (!text) return;
     var c = {
       id: ++commentId,
-      quote: quote.substring(0, 80) + (quote.length > 80 ? "â€¦" : ""),
+      quote: quote.substring(0, 80) + (quote.length > 80 ? "…" : ""),
       text: text,
       resolved: false,
       ts: Date.now(),
@@ -5193,7 +5401,7 @@
     if (comments.length === 0) {
       var empty = document.createElement("p");
       empty.className = "outline-empty";
-      empty.textContent = "No comments yet. Select text and use Review â†’ Comment.";
+      empty.textContent = "No comments yet. Select text and use Review → Comment.";
       body.appendChild(empty);
       return;
     }
@@ -5203,7 +5411,7 @@
         item.className = "comment-item" + (c.resolved ? " resolved" : "");
         var quote = document.createElement("div");
         quote.className = "comment-quote";
-        quote.textContent = "â€œ" + c.quote + "â€";
+        quote.textContent = "“" + c.quote + "”";
         var text = document.createElement("div");
         text.className = "comment-text";
         text.textContent = c.text;
@@ -5259,7 +5467,7 @@
     readAloudUtter.rate = 1;
     readAloudUtter.onend = function () { readAloudUtter = null; toast("Finished reading", "success"); };
     window.speechSynthesis.speak(readAloudUtter);
-    toast("Reading aloudâ€¦", "success");
+    toast("Reading aloud…", "success");
   }
 
   function formatTime(ts) {
@@ -5275,11 +5483,11 @@
      removed to match Slides exactly. */
   function _toastIcon(rawMsg, type) {
     // Strip leading emoji/whitespace so the icon doesn't double up with
-    // a &#10003; or âš  character that was baked into the message string.
+    // a &#10003; or ⚠ character that was baked into the message string.
     var msg = String(rawMsg || "").replace(/^\s*[\u2705\u2714\u2716\u2728\u26a0\ufe0f\u2757\u2753\u2139]+\s*/u, "").trim();
     var m = msg.toLowerCase();
 
-    // Monochrome black â€” matches the Slides app's toast icon color.
+    // Monochrome black — matches the Slides app's toast icon color.
     var INK = "#111";
 
     // SVG stroke wrapper helper
@@ -5287,7 +5495,7 @@
       return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="' + INK + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + paths + "</svg>";
     };
 
-    // 1. Loading / progress (reading, recording, generatingâ€¦)
+    // 1. Loading / progress (reading, recording, generating…)
     if (m.indexOf("generating") === 0 || m.indexOf("importing") === 0 || m.indexOf("recording") === 0 ||
         m.indexOf("reading") === 0 || m.indexOf("previewing") === 0 ||
         m.indexOf("searching") === 0 || m.indexOf("loading") === 0 || m.indexOf("this may take") !== -1) {
@@ -5307,7 +5515,7 @@
       return { icon: svg('<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'), msg: msg };
     }
 
-    // 4. Warnings / hints: must / select first / no X found / enter a â€¦
+    // 4. Warnings / hints: must / select first / no X found / enter a …
     if (m.indexOf("must have") !== -1 || m.indexOf("must be") !== -1 || m.indexOf("select ") !== -1 ||
         m.indexOf("place cursor") !== -1 || m.indexOf("no headings") !== -1 || m.indexOf("no captions") !== -1 ||
         m.indexOf("no text") !== -1 || m.indexOf("no image") !== -1 || m.indexOf("no comments") !== -1 ||
@@ -5332,7 +5540,7 @@
       return { icon: svg('<circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/><path d="M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>'), msg: msg };
     }
 
-    // 8. Success confirmations (saved / inserted / applied / added / exportedâ€¦)
+    // 8. Success confirmations (saved / inserted / applied / added / exported…)
     if (m.indexOf("saved") !== -1 || m.indexOf("inserted") !== -1 || m.indexOf("applied") !== -1 ||
         m.indexOf("added") !== -1 || m.indexOf("created") !== -1 || m.indexOf("restored") !== -1 ||
         m.indexOf("exported") !== -1 || m.indexOf("merged") !== -1 || m.indexOf("complete") !== -1 ||
@@ -5377,13 +5585,13 @@
       try { await idb.ready(); } catch (e) {}
     }
 
-    // Theme â€” dark mode removed; cyan is the only accent color and is set via CSS.
+    // Theme — dark mode removed; cyan is the only accent color and is set via CSS.
     // (The old THEME_KEY localStorage lookup is no longer needed.)
 
     ensureFirstPage();
     paginate();
 
-    // Load footnote/endnote arrays BEFORE any document open â€” the deep-link
+    // Load footnote/endnote arrays BEFORE any document open — the deep-link
     // ?owned= path below opens a document immediately, and openDocument
     // renders the per-page footnote areas + end-of-doc endnotes section.
     loadFootnotes();
@@ -5406,7 +5614,7 @@
       if (meta) {
         await openDocument(ownedParam);
       } else {
-        // Stale URL â€” clean it so a refresh lands on the welcome screen
+        // Stale URL — clean it so a refresh lands on the welcome screen
         history.replaceState({}, document.title, location.pathname);
       }
     }
@@ -5439,7 +5647,7 @@
     hookSelect($("fontFamily"), applyFontFamily);
     hookSelect($("fontSize"), applyFontSize);
 
-    // Colors (hidden native inputs kept for compatibility â€” Slides-style
+    // Colors (hidden native inputs kept for compatibility — Slides-style
     // dropdown lists below drive them)
     if ($("textColor")) $("textColor").addEventListener("input", function (e) { applyTextColor(e.target.value); });
     if ($("hiliteColor")) $("hiliteColor").addEventListener("input", function (e) { applyHiliteColor(e.target.value); });
@@ -5561,7 +5769,7 @@
       }
     });
 
-    // Close portal on scroll or resize â€” but NOT when scrolling inside the menu itself
+    // Close portal on scroll or resize — but NOT when scrolling inside the menu itself
     window.addEventListener("scroll", function (e) {
       if (_portalMenu && (e.target === _portalMenu || _portalMenu.contains(e.target))) return;
       closePortalDropdown();
@@ -5607,7 +5815,7 @@
       }
 
       // Keep the button label in sync whenever the select changes (user pick,
-      // updateToolbarStatesâ€¦)
+      // updateToolbarStates…)
       select.addEventListener("change", function () {
         var lbl = dropdown.querySelector(".dropdown-value");
         if (!lbl) return;
@@ -5633,7 +5841,7 @@
     wireSelectDropdown("fontFamilyDropdown", "fontFamily");
     wireSelectDropdown("fontSizeDropdown", "fontSize");
 
-    // Font color â€” vertical list (same behavior as Slides)
+    // Font color — vertical list (same behavior as Slides)
     var fontColorDd = $("fontColorDropdown");
     if (fontColorDd) {
       var fcItems = fontColorDd.querySelectorAll(".ms-dropdown-item[data-value]");
@@ -5657,7 +5865,7 @@
       }
     }
 
-    // Highlight color â€” vertical list (same behavior as Slides)
+    // Highlight color — vertical list (same behavior as Slides)
     var hlColorDd = $("highlightColorDropdown");
     if (hlColorDd) {
       var hlItems = hlColorDd.querySelectorAll(".ms-dropdown-item[data-value]");
@@ -5686,7 +5894,7 @@
       }
     }
 
-    // Page size (Layout tab) â€” custom dropdown with no native select behind
+    // Page size (Layout tab) — custom dropdown with no native select behind
     // it. The generic .ms-dropdown portal code above handles open/close.
     var psDd = $("pageSizeDropdown");
     if (psDd) {
@@ -5712,7 +5920,7 @@
       bClear.addEventListener("click", clearFormatting);
     }
 
-    // Styles group â€” Title / Heading 1-3 / Normal (formatBlock; feeds TOC + outline)
+    // Styles group — Title / Heading 1-3 / Normal (formatBlock; feeds TOC + outline)
     var styleBtns = document.querySelectorAll("#stylesGroup .style-btn");
     for (var sb = 0; sb < styleBtns.length; sb++) {
       (function (btn) {
@@ -5727,7 +5935,7 @@
       })(styleBtns[sb]);
     }
 
-    // Menubar / topbar actions (guarded â€” elements may have moved to ribbon)
+    // Menubar / topbar actions (guarded — elements may have moved to ribbon)
     if ($("btnNew")) $("btnNew").addEventListener("click", newDocument);
     if ($("btnFind")) $("btnFind").addEventListener("click", openFind);
     if ($("btnFind2")) $("btnFind2").addEventListener("click", openFind);
@@ -5736,7 +5944,7 @@
     if ($("btnUndo")) { $("btnUndo").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnUndo").addEventListener("click", function () { exec("undo"); }); }
     if ($("btnRedo")) { $("btnRedo").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnRedo").addEventListener("click", function () { exec("redo"); }); }
     // Theme / color theme / dark paper buttons have been removed from the UI.
-    // (No click handlers to wire up â€” cyan is locked via CSS.)
+    // (No click handlers to wire up — cyan is locked via CSS.)
     if ($("btnClipboardHistory")) {
       $("btnClipboardHistory").addEventListener("mousedown", function (e) { e.preventDefault(); });
       $("btnClipboardHistory").addEventListener("click", openClipboardHistory);
@@ -5760,10 +5968,10 @@
     document.addEventListener("mousemove", function () { if (typeof zenShowControls === "function") zenShowControls(); });
     $("documentScroll").addEventListener("scroll", function () { if (typeof zenShowControls === "function") zenShowControls(); });
 
-    // Ribbon tabs â€” switching with sliding indicator + blur/fade panel transition
+    // Ribbon tabs — switching with sliding indicator + blur/fade panel transition
     initRibbonTabs();
 
-    // Export dropdown (guarded â€” may not exist if moved)
+    // Export dropdown (guarded — may not exist if moved)
     var exportToggle = $("btnExportToggle");
     var exportMenu = $("exportMenu");
     if (exportToggle && exportMenu) {
@@ -5803,13 +6011,13 @@
     $("btnWordCount").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnWordCount").addEventListener("click", showWordCount);
     // (The old #wordCount span in the ribbon-tabs-right has been replaced by
-    // the Print button â€” the live word counter is gone from the ribbon.
-    // Word count is still available via Review â†’ Word Count.)
+    // the Print button — the live word counter is gone from the ribbon.
+    // Word count is still available via Review → Word Count.)
     if ($("btnPrint")) {
       $("btnPrint").addEventListener("mousedown", function (e) { e.preventDefault(); });
       $("btnPrint").addEventListener("click", function () {
         // Save first, then open the browser print dialog. togglePrintPreview
-        // is not used here because the user clicked Print directly â€” they
+        // is not used here because the user clicked Print directly — they
         // want the OS print dialog, not the in-app preview bar.
         printDocument();
       });
@@ -5841,11 +6049,11 @@
     if ($("btnFocus")) { $("btnFocus").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnFocus").addEventListener("click", function () { toggleFocusMode(); }); }
     $("btnFocusExit").addEventListener("click", function () { toggleFocusMode(false); });
 
-    // EmeraldSuite: Docs â€” new feature wiring
+    // EmeraldSuite: Docs — new feature wiring
     // Templates
     if ($("btnTemplates")) $("btnTemplates").addEventListener("click", function () { buildTemplates(); openModal("templatesModal"); });
 
-    // Symbols (Slides-style floating bottom bar â€” toggle, insert at caret)
+    // Symbols (Slides-style floating bottom bar — toggle, insert at caret)
     $("btnSymbols").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnSymbols").addEventListener("click", function () { toggleSymbolBar(); });
     initSymbolBar();
@@ -5891,7 +6099,7 @@
     // default 1-column active
     document.querySelector("[data-cols='1']").classList.add("active");
 
-    // Orientation & Page Size (size is a dropdown now â€” it is wired with
+    // Orientation & Page Size (size is a dropdown now — it is wired with
     // the other ms-dropdowns above)
     $("btnOrientation").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("btnOrientation").addEventListener("click", toggleOrientation);
@@ -5953,7 +6161,7 @@
     });
     $("commentAddFromPanel").addEventListener("click", addComment);
 
-    // â”€â”€ FILE MODAL (opened from the File ribbon tab) â”€â”€
+    // ── FILE MODAL (opened from the File ribbon tab) ──
     // Close X button + backdrop click
     if ($("fileModalCloseXBtn")) $("fileModalCloseXBtn").addEventListener("click", closeFileModal);
     $("fileModal").addEventListener("click", function (e) {
@@ -5981,7 +6189,6 @@
     // Tools (Docs-specific)
     if ($("fileStatsBtn")) $("fileStatsBtn").addEventListener("click", showWordCount);
     if ($("fileVersionsBtn")) $("fileVersionsBtn").addEventListener("click", showVersions);
-    if ($("fileInspectorBtn")) $("fileInspectorBtn").addEventListener("click", runDocumentInspector);
     // Rename input: Enter commits + closes; typing renames live
     var nameInput = $("fileModalNameInput");
     if (nameInput) {
@@ -5995,7 +6202,7 @@
       });
     }
 
-    // â”€â”€ WELCOME SCREEN (home) â”€â”€
+    // ── WELCOME SCREEN (home) ──
     if ($("welcomeNewBtn")) $("welcomeNewBtn").addEventListener("click", createNewDocument);
     if ($("welcomeImportBtn")) $("welcomeImportBtn").addEventListener("click", function () { $("fileImportInput").click(); });
     var importInput = $("fileImportInput");
@@ -6006,7 +6213,7 @@
       e.target.value = "";
     });
 
-    // â”€â”€ DELETE DOCUMENT CONFIRMATION (Slides/Notes-style) â”€â”€
+    // ── DELETE DOCUMENT CONFIRMATION (Slides/Notes-style) ──
     if ($("deleteDocConfirm")) $("deleteDocConfirm").addEventListener("click", function () {
       var target = _deleteTargetId;
       // Animate the dialog out first, then delete once it's gone (Slides pattern)
@@ -6019,7 +6226,7 @@
       if (e.target === delModal) closeDeleteDocModal();
     });
 
-    // â”€â”€ FOOTNOTE / ENDNOTE / CITATION MODALS â”€â”€
+    // ── FOOTNOTE / ENDNOTE / CITATION MODALS ──
     if ($("footnoteInsert")) $("footnoteInsert").addEventListener("click", function () {
       var note = ($("footnoteText").value || "").trim();
       if (!note) { toast("Enter footnote text", "error"); return; }
@@ -6038,7 +6245,7 @@
       closeModal("citeModal");
       performInsertCite(cite);
     });
-    // Ctrl/âŒ˜+Enter inside the textarea = Insert; plain Enter in the cite input = Insert
+    // Ctrl/⌘+Enter inside the textarea = Insert; plain Enter in the cite input = Insert
     [["footnoteText", "footnoteInsert"], ["endnoteText", "endnoteInsert"]].forEach(function (pair) {
       var ta = $(pair[0]);
       if (ta) ta.addEventListener("keydown", function (e) {
@@ -6059,7 +6266,7 @@
     if ($("btnIndexEntry")) { $("btnIndexEntry").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnIndexEntry").addEventListener("click", function () { var sel = window.getSelection(); if (sel && !sel.isCollapsed) { toast("Index entry marked: " + sel.toString(), "success"); } else { toast("Select text first to mark an index entry", "error"); } }); }
     if ($("btnInsertIndex")) { $("btnInsertIndex").addEventListener("mousedown", function (e) { e.preventDefault(); }); $("btnInsertIndex").addEventListener("click", function () { document.execCommand("insertHTML", false, '<h2>Index</h2><p>Term, Page</p>'); toast("Index inserted", "success"); schedulePaginate(); }); }
 
-    // Session timer (click to reset) â€” element removed in Slides-style bar; guard.
+    // Session timer (click to reset) — element removed in Slides-style bar; guard.
     var stBtn = $("sessionTimer");
     if (stBtn) {
       stBtn.addEventListener("click", function () {
@@ -6172,7 +6379,7 @@
     $("tableConfirm").addEventListener("click", insertTable);
     buildTableGrid();
 
-    // Zoom (Slides-style buttons â€” the old slider was removed)
+    // Zoom (Slides-style buttons — the old slider was removed)
     $("zoomFitBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("zoomFitBtn").addEventListener("click", zoomFitToWindow);
     $("zoom100Btn").addEventListener("mousedown", function (e) { e.preventDefault(); });
@@ -6182,7 +6389,7 @@
     $("zoomOutBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("zoomOutBtn").addEventListener("click", function () { adjustZoom(-10); });
 
-    // Page navigation buttons removed from status bar (no more â€¹ â€º buttons).
+    // Page navigation buttons removed from status bar (no more ‹ › buttons).
 
     // Track editor selection
     document.addEventListener("selectionchange", function () {
@@ -6212,13 +6419,13 @@
         if (sel && !sel.isCollapsed) captureClipboard(sel.toString());
       } catch (err) {}
     });
-    // Ctrl+Shift+V â†’ clipboard history
+    // Ctrl+Shift+V → clipboard history
     document.addEventListener("keydown", function (e) {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "v") {
         e.preventDefault();
         openClipboardHistory();
       }
-      // Escape â†’ close the File modal or delete dialog if open
+      // Escape → close the File modal or delete dialog if open
       if (e.key === "Escape") {
         if (fileModalOpen()) { e.preventDefault(); closeFileModal(); return; }
         var delModalOpen = $("deleteDocModal");
@@ -6228,7 +6435,7 @@
           return;
         }
       }
-      // ? â†’ shortcut overlay (document-level so it works even if focus is elsewhere)
+      // ? → shortcut overlay (document-level so it works even if focus is elsewhere)
       if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         var ae = document.activeElement;
         if (!ae || (ae.tagName !== "INPUT" && ae.tagName !== "TEXTAREA")) {
@@ -6261,7 +6468,7 @@
     initNewFeatures();
 
     setTimeout(function () {
-      // Only auto-focus the editor when a document is actually open â€”
+      // Only auto-focus the editor when a document is actually open —
       // on the welcome screen the user may be about to click a card.
       if (!currentDocId) return;
       var firstContent = getContent(getPages()[0]);
@@ -6281,12 +6488,12 @@
 
       if (change.key === DOC_INDEX_KEY) {
         // Another tab changed the document index (created/deleted/renamed a
-        // document) â€” refresh the welcome screen cards if it is visible.
+        // document) — refresh the welcome screen cards if it is visible.
         loadIndex().then(function () {
           if (!currentDocId) renderWelcomeCards();
         });
       } else if (currentDocId && change.key === docDataKey(currentDocId)) {
-        // Another tab changed the open document â€” reload it softly (only if
+        // Another tab changed the open document — reload it softly (only if
         // this tab is not actively being edited, to avoid clobbering the caret).
         reloadFromStorageQuietly();
       } else if (change.key === MARGINS_KEY) {
@@ -6295,7 +6502,7 @@
       } else if (change.key === GOAL_KEY) {
         loadGoal();
         updateGoalTracker();
-      } else if (change.key === "zdocs.dictionary") {
+      } else if (change.key === "emeralddocs.dictionary") {
         loadCustomDict();
         renderWritingIssues();
       }
@@ -6370,7 +6577,7 @@
   }
 
   /* =========================================================
-     EmeraldSuite: Docs â€” Feature additions
+     EmeraldSuite: Docs — Feature additions
      (cover pages, equations, smartart, screenshot, draw mode,
       spellcheck, footnotes, table of figures, compare,
       real track changes, threaded comments)
@@ -6395,7 +6602,7 @@
   }
 
   function handleInternalLinkClick(e) {
-    var link = e.target.closest("a.zdocs-internal-link");
+    var link = e.target.closest("a.emdocs-internal-link");
     if (!link) return;
     e.preventDefault();
     var targetId = link.getAttribute("data-target");
@@ -6429,7 +6636,7 @@
     if (author) html += '<div class="cover-author">' + escapeHtml(author) + '</div>';
     if (dateStr) html += '<div class="cover-date">' + escapeHtml(dateStr) + '</div>';
     if (style === "modern") html += '</div>';
-    html += '</div><p><br></p><div class="zdocs-page-break" contenteditable="false"><span class="pb-label">â€” Page Break â€”</span></div><p><br></p>';
+    html += '</div><p><br></p><div class="emdocs-page-break" contenteditable="false"><span class="pb-label">— Page Break —</span></div><p><br></p>';
     // Insert at the very beginning of the document
     var firstPage = getPages()[0];
     var content = getContent(firstPage);
@@ -6470,7 +6677,7 @@
     var mb = parseFloat($("secMarginBottom").value) || 2.54;
     var ml = parseFloat($("secMarginLeft").value) || 2.54;
     var mr = parseFloat($("secMarginRight").value) || 2.54;
-    // convert cm â†’ px (1cm â‰ˆ 37.8px at 96dpi)
+    // convert cm → px (1cm ≈ 37.8px at 96dpi)
     var config = {
       orientation: orient,
       margins: {
@@ -6515,7 +6722,7 @@
             currentConfig = JSON.parse(breaks[0].getAttribute("data-section-config") || "null");
           } catch (e) {}
         } else {
-          // break is later in the page â€” apply to next pages
+          // break is later in the page — apply to next pages
           try {
             var nextConfig = JSON.parse(breaks[breaks.length - 1].getAttribute("data-section-config") || "null");
             // store for next page iteration
@@ -6566,32 +6773,32 @@
     out = out.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, function (m, a, b) {
       return '<span style="display:inline-block;vertical-align:middle;text-align:center"><span style="display:block;border-bottom:1px solid currentColor;padding:0 4px">' + a + '</span><span style="display:block;padding:0 4px">' + b + '</span></span>';
     });
-    // \binom{n}{k} â†’ (n choose k) rendered as stacked fraction in parens
+    // \binom{n}{k} → (n choose k) rendered as stacked fraction in parens
     out = out.replace(/\\binom\{([^{}]*)\}\{([^{}]*)\}/g, function (m, a, b) {
       return '(<span style="display:inline-block;vertical-align:middle;text-align:center"><span style="display:block;padding:0 2px">' + a + '</span><span style="display:block;border-top:1px solid currentColor;padding:0 2px">' + b + '</span></span>)';
     });
     // \sqrt{x}
     out = out.replace(/\\sqrt\{([^{}]*)\}/g, function (m, a) {
-      return '<span style="white-space:nowrap">âˆš<span style="border-top:1px solid currentColor;padding:0 2px">' + a + '</span></span>';
+      return '<span style="white-space:nowrap">√<span style="border-top:1px solid currentColor;padding:0 2px">' + a + '</span></span>';
     });
     // \sum_{i=1}^{n}  (with optional braces)
     out = out.replace(/\\sum_\{([^{}]*)\}\^\{([^{}]*)\}/g, function (m, lo, hi) {
-      return '<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:1.4em">âˆ‘<span style="display:block;font-size:0.5em">' + lo + '..' + hi + '</span></span>';
+      return '<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:1.4em">∑<span style="display:block;font-size:0.5em">' + lo + '..' + hi + '</span></span>';
     });
-    out = out.replace(/\\sum/g, "âˆ‘");
+    out = out.replace(/\\sum/g, "∑");
     // \prod_{i=1}^{n}
     out = out.replace(/\\prod_\{([^{}]*)\}\^\{([^{}]*)\}/g, function (m, lo, hi) {
-      return '<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:1.4em">âˆ<span style="display:block;font-size:0.5em">' + lo + '..' + hi + '</span></span>';
+      return '<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:1.4em">∏<span style="display:block;font-size:0.5em">' + lo + '..' + hi + '</span></span>';
     });
-    out = out.replace(/\\prod/g, "âˆ");
+    out = out.replace(/\\prod/g, "∏");
     // \int_a^b
     out = out.replace(/\\int_\{?([^{}]*?)\}?\^\{?([^{}]*?)\}?/g, function (m, lo, hi) {
-      return '<span style="font-size:1.4em">âˆ«</span><sub>' + lo + '</sub><sup>' + hi + '</sup>';
+      return '<span style="font-size:1.4em">∫</span><sub>' + lo + '</sub><sup>' + hi + '</sup>';
     });
-    out = out.replace(/\\int/g, "âˆ«");
+    out = out.replace(/\\int/g, "∫");
     // \lim_{x \to 0}
     out = out.replace(/\\lim_\{([^{}]*)\}/g, function (m, sub) {
-      return 'lim<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:0.7em"><span style="display:block">' + sub.replace(/\\to/g, "â†’") + '</span></span>';
+      return 'lim<span style="display:inline-block;vertical-align:middle;text-align:center;font-size:0.7em"><span style="display:block">' + sub.replace(/\\to/g, "→") + '</span></span>';
     });
     out = out.replace(/\\lim/g, "lim");
     // \log_{10}(x)
@@ -6605,69 +6812,69 @@
     });
     // \sin, \cos, \tan, \cot, \sec, \csc
     out = out.replace(/\\(sin|cos|tan|cot|sec|csc)\b/g, function (m, fn) { return fn; });
-    // \to â†’
-    out = out.replace(/\\to/g, "â†’");
+    // \to →
+    out = out.replace(/\\to/g, "→");
     // \pm
-    out = out.replace(/\\pm/g, "Â±");
-    out = out.replace(/\\mp/g, "âˆ“");
-    out = out.replace(/\\times/g, "Ã—");
-    out = out.replace(/\\div/g, "Ã·");
-    out = out.replace(/\\cdot/g, "Â·");
-    out = out.replace(/\\leq/g, "â‰¤");
-    out = out.replace(/\\geq/g, "â‰¥");
-    out = out.replace(/\\neq/g, "â‰ ");
-    out = out.replace(/\\approx/g, "â‰ˆ");
-    out = out.replace(/\\infty/g, "âˆž");
-    out = out.replace(/\\partial/g, "âˆ‚");
-    out = out.replace(/\\nabla/g, "âˆ‡");
-    out = out.replace(/\\forall/g, "âˆ€");
-    out = out.replace(/\\exists/g, "âˆƒ");
-    out = out.replace(/\\in/g, "âˆˆ");
-    out = out.replace(/\\notin/g, "âˆ‰");
-    out = out.replace(/\\subset/g, "âŠ‚");
-    out = out.replace(/\\supset/g, "âŠƒ");
-    out = out.replace(/\\cup/g, "âˆª");
-    out = out.replace(/\\cap/g, "âˆ©");
-    out = out.replace(/\\emptyset/g, "âˆ…");
-    out = out.replace(/\\rightarrow/g, "â†’");
-    out = out.replace(/\\leftarrow/g, "â†");
-    out = out.replace(/\\Rightarrow/g, "â‡’");
-    out = out.replace(/\\Leftarrow/g, "â‡");
-    out = out.replace(/\\leftrightarrow/g, "â†”");
+    out = out.replace(/\\pm/g, "±");
+    out = out.replace(/\\mp/g, "∓");
+    out = out.replace(/\\times/g, "×");
+    out = out.replace(/\\div/g, "÷");
+    out = out.replace(/\\cdot/g, "·");
+    out = out.replace(/\\leq/g, "≤");
+    out = out.replace(/\\geq/g, "≥");
+    out = out.replace(/\\neq/g, "≠");
+    out = out.replace(/\\approx/g, "≈");
+    out = out.replace(/\\infty/g, "∞");
+    out = out.replace(/\\partial/g, "∂");
+    out = out.replace(/\\nabla/g, "∇");
+    out = out.replace(/\\forall/g, "∀");
+    out = out.replace(/\\exists/g, "∃");
+    out = out.replace(/\\in/g, "∈");
+    out = out.replace(/\\notin/g, "∉");
+    out = out.replace(/\\subset/g, "⊂");
+    out = out.replace(/\\supset/g, "⊃");
+    out = out.replace(/\\cup/g, "∪");
+    out = out.replace(/\\cap/g, "∩");
+    out = out.replace(/\\emptyset/g, "∅");
+    out = out.replace(/\\rightarrow/g, "→");
+    out = out.replace(/\\leftarrow/g, "←");
+    out = out.replace(/\\Rightarrow/g, "⇒");
+    out = out.replace(/\\Leftarrow/g, "⇐");
+    out = out.replace(/\\leftrightarrow/g, "↔");
     // Greek letters
-    out = out.replace(/\\alpha/g, "Î±");
-    out = out.replace(/\\beta/g, "Î²");
-    out = out.replace(/\\gamma/g, "Î³");
-    out = out.replace(/\\delta/g, "Î´");
-    out = out.replace(/\\epsilon/g, "Îµ");
-    out = out.replace(/\\varepsilon/g, "Îµ");
-    out = out.replace(/\\zeta/g, "Î¶");
-    out = out.replace(/\\eta/g, "Î·");
-    out = out.replace(/\\theta/g, "Î¸");
-    out = out.replace(/\\iota/g, "Î¹");
-    out = out.replace(/\\kappa/g, "Îº");
-    out = out.replace(/\\lambda/g, "Î»");
-    out = out.replace(/\\mu/g, "Î¼");
-    out = out.replace(/\\nu/g, "Î½");
-    out = out.replace(/\\xi/g, "Î¾");
-    out = out.replace(/\\pi/g, "Ï€");
-    out = out.replace(/\\rho/g, "Ï");
-    out = out.replace(/\\sigma/g, "Ïƒ");
-    out = out.replace(/\\tau/g, "Ï„");
-    out = out.replace(/\\upsilon/g, "Ï…");
-    out = out.replace(/\\phi/g, "Ï†");
-    out = out.replace(/\\chi/g, "Ï‡");
-    out = out.replace(/\\psi/g, "Ïˆ");
-    out = out.replace(/\\omega/g, "Ï‰");
-    out = out.replace(/\\Gamma/g, "Î“");
-    out = out.replace(/\\Delta/g, "Î”");
-    out = out.replace(/\\Theta/g, "Î˜");
-    out = out.replace(/\\Lambda/g, "Î›");
-    out = out.replace(/\\Pi/g, "Î ");
-    out = out.replace(/\\Sigma/g, "Î£");
-    out = out.replace(/\\Phi/g, "Î¦");
-    out = out.replace(/\\Psi/g, "Î¨");
-    out = out.replace(/\\Omega/g, "Î©");
+    out = out.replace(/\\alpha/g, "α");
+    out = out.replace(/\\beta/g, "β");
+    out = out.replace(/\\gamma/g, "γ");
+    out = out.replace(/\\delta/g, "δ");
+    out = out.replace(/\\epsilon/g, "ε");
+    out = out.replace(/\\varepsilon/g, "ε");
+    out = out.replace(/\\zeta/g, "ζ");
+    out = out.replace(/\\eta/g, "η");
+    out = out.replace(/\\theta/g, "θ");
+    out = out.replace(/\\iota/g, "ι");
+    out = out.replace(/\\kappa/g, "κ");
+    out = out.replace(/\\lambda/g, "λ");
+    out = out.replace(/\\mu/g, "μ");
+    out = out.replace(/\\nu/g, "ν");
+    out = out.replace(/\\xi/g, "ξ");
+    out = out.replace(/\\pi/g, "π");
+    out = out.replace(/\\rho/g, "ρ");
+    out = out.replace(/\\sigma/g, "σ");
+    out = out.replace(/\\tau/g, "τ");
+    out = out.replace(/\\upsilon/g, "υ");
+    out = out.replace(/\\phi/g, "φ");
+    out = out.replace(/\\chi/g, "χ");
+    out = out.replace(/\\psi/g, "ψ");
+    out = out.replace(/\\omega/g, "ω");
+    out = out.replace(/\\Gamma/g, "Γ");
+    out = out.replace(/\\Delta/g, "Δ");
+    out = out.replace(/\\Theta/g, "Θ");
+    out = out.replace(/\\Lambda/g, "Λ");
+    out = out.replace(/\\Pi/g, "Π");
+    out = out.replace(/\\Sigma/g, "Σ");
+    out = out.replace(/\\Phi/g, "Φ");
+    out = out.replace(/\\Psi/g, "Ψ");
+    out = out.replace(/\\Omega/g, "Ω");
     // superscripts ^{..} or ^x
     out = out.replace(/\^\{([^{}]*)\}/g, "<sup>$1</sup>");
     out = out.replace(/\^([^\s\\{}])/g, "<sup>$1</sup>");
@@ -6703,15 +6910,15 @@
       id: "flow3",
       name: "Flow (3 steps)",
       desc: "Linear process, left-to-right",
-      preview: '<div class="sa-mini"><span class="sa-m-node">Start</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">Mid</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">End</span></div>',
-      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">Start</span><span class="sa-arrow">â†’</span><span class="sa-node">Process</span><span class="sa-arrow">â†’</span><span class="sa-node">End</span></div><p><br></p>'
+      preview: '<div class="sa-mini"><span class="sa-m-node">Start</span><span class="sa-m-arrow">→</span><span class="sa-m-node">Mid</span><span class="sa-m-arrow">→</span><span class="sa-m-node">End</span></div>',
+      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">Start</span><span class="sa-arrow">→</span><span class="sa-node">Process</span><span class="sa-arrow">→</span><span class="sa-node">End</span></div><p><br></p>'
     },
     {
       id: "flow5",
       name: "Process (5 steps)",
       desc: "Detailed sequential workflow",
-      preview: '<div class="sa-mini"><span class="sa-m-node">1</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">2</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">3</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">4</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">5</span></div>',
-      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">1</span><span class="sa-arrow">â†’</span><span class="sa-node">2</span><span class="sa-arrow">â†’</span><span class="sa-node">3</span><span class="sa-arrow">â†’</span><span class="sa-node">4</span><span class="sa-arrow">â†’</span><span class="sa-node">5</span></div><p><br></p>'
+      preview: '<div class="sa-mini"><span class="sa-m-node">1</span><span class="sa-m-arrow">→</span><span class="sa-m-node">2</span><span class="sa-m-arrow">→</span><span class="sa-m-node">3</span><span class="sa-m-arrow">→</span><span class="sa-m-node">4</span><span class="sa-m-arrow">→</span><span class="sa-m-node">5</span></div>',
+      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">1</span><span class="sa-arrow">→</span><span class="sa-node">2</span><span class="sa-arrow">→</span><span class="sa-node">3</span><span class="sa-arrow">→</span><span class="sa-node">4</span><span class="sa-arrow">→</span><span class="sa-node">5</span></div><p><br></p>'
     },
     {
       id: "hierarchy",
@@ -6724,8 +6931,8 @@
       id: "cycle",
       name: "Cycle (4 stages)",
       desc: "Continuous / iterative process",
-      preview: '<div class="sa-mini cycle"><span class="sa-m-node">Plan</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">Do</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">Check</span><span class="sa-m-arrow">â†’</span><span class="sa-m-node">Act</span></div>',
-      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">Plan</span><span class="sa-arrow">â†’</span><span class="sa-node">Do</span><span class="sa-arrow">â†’</span><span class="sa-node">Check</span><span class="sa-arrow">â†’</span><span class="sa-node">Act</span><span class="sa-arrow">â†»</span></div><p><br></p>'
+      preview: '<div class="sa-mini cycle"><span class="sa-m-node">Plan</span><span class="sa-m-arrow">→</span><span class="sa-m-node">Do</span><span class="sa-m-arrow">→</span><span class="sa-m-node">Check</span><span class="sa-m-arrow">→</span><span class="sa-m-node">Act</span></div>',
+      html: '<div class="smartart flow" contenteditable="false"><span class="sa-node">Plan</span><span class="sa-arrow">→</span><span class="sa-node">Do</span><span class="sa-arrow">→</span><span class="sa-node">Check</span><span class="sa-arrow">→</span><span class="sa-node">Act</span><span class="sa-arrow">↻</span></div><p><br></p>'
     },
     {
       id: "pyramid",
@@ -6794,7 +7001,7 @@
       document.body.removeChild(video);
       // Bring the focus back to this Docs tab. When the user captured a
       // different app/window the OS focus usually stays on that app after
-      // the native picker closes â€” browsers cannot fully "steal" focus
+      // the native picker closes — browsers cannot fully "steal" focus
       // back, but window.focus() restores it whenever the browser allows
       // (same-window contexts), and the toast confirms the capture landed.
       try { window.focus(); } catch (_) {}
@@ -6823,13 +7030,13 @@
     var shouldOpen = force === undefined ? !drawMode : force;
     drawMode = shouldOpen;
     if (shouldOpen) {
-      // Only one bottom toolbar at a time â€” close the symbol bar if open.
+      // Only one bottom toolbar at a time — close the symbol bar if open.
       toggleSymbolBar(false);
       app.classList.add("draw-mode");
       toolbar.classList.add("visible");
       ensureDrawCanvas();
       if (btn) btn.classList.add("active");
-      // No "on" toast â€” the toolbar appearing IS the signal (user request);
+      // No "on" toast — the toolbar appearing IS the signal (user request);
       // only the "Draw mode off." toast below is shown, on Done/Exit.
     } else {
       app.classList.remove("draw-mode");
@@ -6862,7 +7069,7 @@
       drawCanvas.addEventListener("touchend", function () { drawEnd(); });
     }
     // Size the canvas to the full scrollable document area.
-    // NOTE: assigning canvas.width/height CLEARS the bitmap â€” only resize
+    // NOTE: assigning canvas.width/height CLEARS the bitmap — only resize
     // when the dimensions actually changed, and carry the strokes over.
     requestAnimationFrame(function () {
       var w = scroll.scrollWidth;
@@ -6874,7 +7081,7 @@
         drawCanvas.height = h;
         drawCanvas.style.width = w + "px";
         drawCanvas.style.height = h + "px";
-        // Resizing also resets context state â€” restore it.
+        // Resizing also resets context state — restore it.
         drawCtx.lineCap = "round";
         drawCtx.lineJoin = "round";
         if (snapshot) {
@@ -6887,7 +7094,7 @@
   }
 
   function clearDrawing() {
-    // Silent clear â€” the canvas visibly emptying is its own feedback
+    // Silent clear — the canvas visibly emptying is its own feedback
     // (user request: no "Drawing cleared" toast).
     if (drawCtx && drawCanvas) drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
   }
@@ -7070,17 +7277,20 @@
   function performInsertFootnote(note) {
     var num = footnotes.length + 1;
     var refId = "fn_ref_" + num + "_" + Date.now().toString(36);
-    restoreEditorSelection();
-    var sel = window.getSelection();
-    if (!sel || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
-      var fc = getContent(getPages()[0]); if (fc) fc.focus();
-    }
+    placeCaretForInlineInsert();
     document.execCommand("insertHTML", false, '<sup class="footnote-ref" data-fn="' + num + '" id="' + refId + '" contenteditable="false">' + num + '</sup> ');
+    var _ref = document.getElementById(refId);
+    healInlineRefPlacement(_ref);
+    parkCaretAfterRef(_ref);
     footnotes.push({ num: num, text: note, refId: refId, ts: Date.now() });
+    // Renumber BEFORE rendering: markers are numbered by document order and
+    // the array is re-synced, so the per-page areas / panel show the right
+    // text under the right number even when this marker was inserted BEFORE
+    // an existing one.
+    renumberFootnoteRefs();
     saveFootnotes();
     renderFootnotes();
     renderFootnotesSection();
-    renumberFootnoteRefs();
     schedulePaginate();
     scheduleAutosave();
     toggleFootnotes(true);
@@ -7097,13 +7307,16 @@
   function performInsertEndnote(note) {
     var num = endnotes.length + 1;
     var refId = "en_ref_" + num + "_" + Date.now().toString(36);
-    restoreEditorSelection();
-    var sel = window.getSelection();
-    if (!sel || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
-      var fc = getContent(getPages()[0]); if (fc) fc.focus();
-    }
+    placeCaretForInlineInsert();
     document.execCommand("insertHTML", false, '<sup class="endnote-ref" data-en="' + num + '" id="' + refId + '" contenteditable="false">' + num + '</sup> ');
+    var _ref = document.getElementById(refId);
+    healInlineRefPlacement(_ref);
+    parkCaretAfterRef(_ref);
     endnotes.push({ num: num, text: note, refId: refId, ts: Date.now() });
+    // Endnote markers were never renumbered after an insert — a marker
+    // inserted before an existing one kept a wrong number. Renumber by
+    // document order (and re-sync the array) before rendering.
+    renumberEndnoteRefs();
     saveEndnotes();
     renderFootnotes();
     renderEndnotesSection();
@@ -7115,8 +7328,8 @@
 
   function saveEndnotes() {
     try {
-      if (idbAvailable()) idb.setJSON("zdocs.endnotes", endnotes);
-      else localStorage.setItem("zdocs.endnotes", JSON.stringify(endnotes));
+      if (idbAvailable()) idb.setJSON("emeralddocs.endnotes", endnotes);
+      else localStorage.setItem("emeralddocs.endnotes", JSON.stringify(endnotes));
     } catch (e) {}
   }
 
@@ -7129,12 +7342,14 @@
   }
 
   function performInsertCite(text) {
-    restoreEditorSelection();
-    var sel = window.getSelection();
-    if (!sel || !sel.anchorNode || !sel.anchorNode.parentElement.closest(".page-content")) {
-      var fc = getContent(getPages()[0]); if (fc) fc.focus();
-    }
+    placeCaretForInlineInsert();
     document.execCommand("insertHTML", false, '<span class="citation">(' + escapeHtml(text) + ')</span>');
+    var _cites = document.querySelectorAll(".page-content > span.citation");
+    if (_cites.length) {
+      var _cE = _cites[_cites.length - 1];
+      healInlineRefPlacement(_cE);
+      parkCaretAfterRef(_cE);
+    }
     schedulePaginate();
     scheduleAutosave();
     toast("Citation inserted", "success");
@@ -7143,24 +7358,24 @@
   function loadEndnotes() {
     try {
       var f = null;
-      if (idbAvailable()) f = idb.getJSONSync("zdocs.endnotes");
-      if (!f) { var raw = localStorage.getItem("zdocs.endnotes"); if (raw) f = JSON.parse(raw); }
+      if (idbAvailable()) f = idb.getJSONSync("emeralddocs.endnotes");
+      if (!f) { var raw = localStorage.getItem("emeralddocs.endnotes"); if (raw) f = JSON.parse(raw); }
       if (Array.isArray(f)) endnotes = f;
     } catch (e) {}
   }
 
   function saveFootnotes() {
     try {
-      if (idbAvailable()) idb.setJSON("zdocs.footnotes", footnotes);
-      else localStorage.setItem("zdocs.footnotes", JSON.stringify(footnotes));
+      if (idbAvailable()) idb.setJSON("emeralddocs.footnotes", footnotes);
+      else localStorage.setItem("emeralddocs.footnotes", JSON.stringify(footnotes));
     } catch (e) {}
   }
 
   function loadFootnotes() {
     try {
       var f = null;
-      if (idbAvailable()) f = idb.getJSONSync("zdocs.footnotes");
-      if (!f) { var raw = localStorage.getItem("zdocs.footnotes"); if (raw) f = JSON.parse(raw); }
+      if (idbAvailable()) f = idb.getJSONSync("emeralddocs.footnotes");
+      if (!f) { var raw = localStorage.getItem("emeralddocs.footnotes"); if (raw) f = JSON.parse(raw); }
       if (Array.isArray(f)) footnotes = f;
     } catch (e) {}
   }
@@ -7172,7 +7387,7 @@
     if (footnotes.length === 0 && endnotes.length === 0) {
       var empty = document.createElement("p");
       empty.className = "outline-empty";
-      empty.textContent = "No footnotes or endnotes yet. Use References â†’ Footnote / Endnote to add one.";
+      empty.textContent = "No footnotes or endnotes yet. Use References → Footnote / Endnote to add one.";
       body.appendChild(empty);
       return;
     }
@@ -7188,7 +7403,7 @@
         txt.textContent = fn.text;
         var del = document.createElement("button");
         del.className = "fn-del";
-        del.textContent = "Ã—";
+        del.textContent = "×";
         del.title = "Delete footnote";
         del.addEventListener("click", function (e) {
           e.stopPropagation();
@@ -7196,11 +7411,11 @@
           // remove the superscript ref from the text, then renumber the rest
           var refEl = document.getElementById(fn.refId);
           if (refEl && refEl.parentNode) refEl.parentNode.removeChild(refEl);
-          for (var k = 0; k < footnotes.length; k++) footnotes[k].num = k + 1;
+          // Renumber BEFORE rendering so the areas/panel use final numbers
+          renumberFootnoteRefs();
           saveFootnotes();
           renderFootnotes();
           renderFootnotesSection();
-          renumberFootnoteRefs();
           schedulePaginate();
           scheduleAutosave();
         });
@@ -7215,7 +7430,7 @@
       })(footnotes[i], i);
     }
 
-    // Endnotes â€” listed below footnotes in the same panel
+    // Endnotes — listed below footnotes in the same panel
     if (endnotes.length > 0) {
       var enHead = document.createElement("p");
       enHead.className = "outline-empty";
@@ -7238,7 +7453,7 @@
           txt.textContent = en.text;
           var del = document.createElement("button");
           del.className = "fn-del";
-          del.textContent = "Ã—";
+          del.textContent = "×";
           del.title = "Delete endnote";
           del.addEventListener("click", function (e) {
             e.stopPropagation();
@@ -7246,11 +7461,11 @@
             // remove the superscript ref from the text, then renumber the rest
             var refEl = document.getElementById(en.refId);
             if (refEl && refEl.parentNode) refEl.parentNode.removeChild(refEl);
-            for (var k = 0; k < endnotes.length; k++) endnotes[k].num = k + 1;
+            // Renumber BEFORE rendering so the areas/panel use final numbers
+            renumberEndnoteRefs();
             saveEndnotes();
             renderFootnotes();
             renderEndnotesSection();
-            renumberEndnoteRefs();
             schedulePaginate();
             scheduleAutosave();
           });
@@ -7269,10 +7484,29 @@
 
   function renumberFootnoteRefs() {
     var refs = document.querySelectorAll("sup.footnote-ref[data-fn]");
+    // Renumber markers by DOCUMENT order AND keep the footnotes array in the
+    // SAME order (matched by refId) — a marker inserted BEFORE an existing
+    // one takes the lower number, and its note text must follow it, because
+    // the per-page footnote areas render note text by data-fn number.
+    var ordered = [];
     for (var i = 0; i < refs.length; i++) {
       var n = i + 1;
       refs[i].setAttribute("data-fn", n);
       refs[i].textContent = n;
+      for (var k = 0; k < footnotes.length; k++) {
+        if (footnotes[k].refId === refs[i].id && ordered.indexOf(footnotes[k]) === -1) {
+          footnotes[k].num = n;
+          ordered.push(footnotes[k]);
+          break;
+        }
+      }
+    }
+    // Only adopt the document order when every marker matched a note entry
+    // (markers pasted from imported HTML have no array entry — leave the
+    // array untouched in that case).
+    if (ordered.length > 0 && ordered.length === footnotes.length) {
+      footnotes = ordered;
+      saveFootnotes();
     }
   }
 
@@ -7389,20 +7623,33 @@
 
   function renumberEndnoteRefs() {
     var refs = document.querySelectorAll("sup.endnote-ref[data-en]");
+    // Same document-order + array-sync contract as renumberFootnoteRefs().
+    var ordered = [];
     for (var i = 0; i < refs.length; i++) {
       var n = i + 1;
       refs[i].setAttribute("data-en", n);
       refs[i].textContent = n;
+      for (var k = 0; k < endnotes.length; k++) {
+        if (endnotes[k].refId === refs[i].id && ordered.indexOf(endnotes[k]) === -1) {
+          endnotes[k].num = n;
+          ordered.push(endnotes[k]);
+          break;
+        }
+      }
+    }
+    if (ordered.length > 0 && ordered.length === endnotes.length) {
+      endnotes = ordered;
+      saveEndnotes();
     }
   }
 
-  /* ---------------- Table of Figures â€” removed (feature cut) ---------------- */
+  /* ---------------- Table of Figures — removed (feature cut) ---------------- */
 
   /* ---------------- Real track changes ---------------- */
   function setupTrackChangesInterceptor() {
     var pagesWrap = $(PAGES_WRAPPER_ID);
     if (!pagesWrap) return;
-    // Use keydown for character insertion â€” preventDefault on keydown is
+    // Use keydown for character insertion — preventDefault on keydown is
     // reliably honored by browsers (unlike beforeinput insertText).
     pagesWrap.addEventListener("keydown", function (e) {
       if (!trackChangesOn) return;
@@ -7423,13 +7670,13 @@
         scheduleMergeTracked();
         return;
       }
-      // Enter â€” track as insertion of a paragraph break
+      // Enter — track as insertion of a paragraph break
       if (key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        insertTrackedNode("ins", "Â¶");
+        insertTrackedNode("ins", "¶");
         return;
       }
-      // Backspace / Delete with a non-collapsed selection â†’ wrap in <del>
+      // Backspace / Delete with a non-collapsed selection → wrap in <del>
       if ((key === "Backspace" || key === "Delete") && !sel.isCollapsed) {
         var deleted = sel.toString();
         if (deleted) {
@@ -7458,8 +7705,80 @@
     });
   }
 
+  /* Enter around footnote/endnote markers:
+     Chrome cannot split a paragraph while the caret is INSIDE a non-editable
+     <sup contenteditable="false"> marker (Enter silently does nothing — no
+     new line ever appears), and when the caret sits immediately BEFORE a
+     marker the native split drags the marker DOWN onto the new line. Both
+     feel like "Enter is broken next to footnotes/endnotes". Fix: when the
+     selection boundary touches a marker, re-anchor the caret to just AFTER
+     it and split there — the marker stays with its text and a fresh line
+     opens below. */
+  function setupMarkerEnterFix() {
+    var pagesWrap = $(PAGES_WRAPPER_ID);
+    if (!pagesWrap) return;
+
+    function isMarkerEl(el) {
+      return el && el.nodeType === Node.ELEMENT_NODE &&
+        (el.classList.contains("footnote-ref") || el.classList.contains("endnote-ref"));
+    }
+
+    // Returns the marker the selection boundary is stuck ON (inside it, or
+    // immediately before it), or null when Enter can proceed natively.
+    function findProblemMarker(range) {
+      function inMarker(node) {
+        var el = node && (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
+        if (!el || !el.closest) return null;
+        return el.closest("sup.footnote-ref, sup.endnote-ref") || null;
+      }
+      // Caret / selection start INSIDE a marker (clicked or double-clicked it)
+      var m = inMarker(range.startContainer);
+      if (m) return m;
+      // Element position pointing directly AT a marker: (parent, idxBeforeMarker)
+      if (range.startContainer.nodeType === Node.ELEMENT_NODE) {
+        var ch = range.startContainer.childNodes[range.startOffset];
+        if (isMarkerEl(ch)) return ch;
+      }
+      // Caret at the very END of a text node directly followed by a marker
+      if (range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE &&
+          range.startOffset === range.startContainer.nodeValue.length) {
+        var nx = range.startContainer.nextSibling;
+        if (isMarkerEl(nx)) return nx;
+      }
+      return null;
+    }
+
+    pagesWrap.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (trackChangesOn) return; // tracked mode tracks the break itself
+      var sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      var marker = findProblemMarker(sel.getRangeAt(0));
+      if (!marker) return; // native Enter handles every other position
+
+      e.preventDefault();
+      // Caret goes immediately AFTER the marker (marker stays on this line),
+      // then the paragraph splits there.
+      var nx = marker.nextSibling;
+      var r2 = document.createRange();
+      if (nx && nx.nodeType === Node.TEXT_NODE) r2.setStart(nx, 0);
+      else if (nx) r2.setStartBefore(nx);
+      else r2.setStartAfter(marker);
+      r2.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r2);
+      var content = marker.closest && marker.closest(".page-content");
+      if (content && document.activeElement !== content) {
+        try { content.focus({ preventScroll: true }); } catch (err) { try { content.focus(); } catch (e2) {} }
+      }
+      try { document.execCommand("insertParagraph"); } catch (err) {}
+      schedulePaginate();
+      scheduleAutosave();
+    });
+  }
+
   // Insert a tracked-change node (ins/del) at the caret using direct DOM
-  // manipulation â€” bypasses execCommand/styleWithCSS which would otherwise
+  // manipulation — bypasses execCommand/styleWithCSS which would otherwise
   // convert semantic tags into inline-styled spans.
   function insertTrackedNode(tag, text) {
     var sel = window.getSelection();
@@ -7467,7 +7786,7 @@
     var range = sel.getRangeAt(0);
     if (!sel.isCollapsed) range.deleteContents();
     var node = document.createElement(tag);
-    node.className = "zdocs-" + (tag === "ins" ? "ins" : "del");
+    node.className = "emdocs-" + (tag === "ins" ? "ins" : "del");
     node.textContent = text;
     range.insertNode(node);
     // move caret after the inserted node
@@ -7480,7 +7799,7 @@
     scheduleAutosave();
   }
 
-  // Merge all consecutive <ins class="zdocs-ins"> (and <del class="zdocs-del">)
+  // Merge all consecutive <ins class="emdocs-ins"> (and <del class="emdocs-del">)
   // siblings into single elements. Called on a debounce after typing stops,
   // to keep the DOM clean without risking caret corruption mid-keystroke.
   function mergeConsecutiveTrackedChanges() {
@@ -7488,7 +7807,7 @@
       var pages = getPages();
       for (var pi = 0; pi < pages.length; pi++) {
         var content = getContent(pages[pi]);
-        var all = content.querySelectorAll("ins.zdocs-ins, del.zdocs-del");
+        var all = content.querySelectorAll("ins.emdocs-ins, del.emdocs-del");
         for (var i = 0; i < all.length; i++) {
           var node = all[i];
           var prev = node.previousSibling;
@@ -7509,13 +7828,6 @@
       mergeTrackedTimer = null;
       mergeConsecutiveTrackedChanges();
     }, 800);
-  }
-
-  function unwrapNode(node) {
-    var parent = node.parentNode;
-    if (!parent) return;
-    while (node.firstChild) parent.insertBefore(node.firstChild, node);
-    parent.removeChild(node);
   }
 
   /* ---------------- Improved comments (threaded + @mentions) ---------------- */
@@ -7545,15 +7857,15 @@
     if (scrollEl) {
       scrollEl.addEventListener("click", handleInternalLinkClick);
       // External links: Ctrl/Cmd+click opens in a NEW TAB (links inside a
-      // contenteditable never navigate on their own â€” without this handler
+      // contenteditable never navigate on their own — without this handler
       // Ctrl+click did nothing at all).
       scrollEl.addEventListener("click", function (e) {
         var a = e.target.closest("a");
         if (!a) return;
         // Internal links / bookmarks / TOC anchors are handled by their own
-        // delegated handlers above â€” skip them here.
-        if (a.classList.contains("zdocs-internal-link") || a.classList.contains("zdocs-bookmark")) return;
-        if (a.closest(".zdocs-toc")) return;
+        // delegated handlers above — skip them here.
+        if (a.classList.contains("emdocs-internal-link") || a.classList.contains("emdocs-bookmark")) return;
+        if (a.closest(".emdocs-toc")) return;
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           var href = a.getAttribute("href");
@@ -7570,12 +7882,12 @@
       });
       // Page-break markers: click to remove (cancel the break).
       scrollEl.addEventListener("click", function (e) {
-        var pb = e.target.closest(".zdocs-page-break");
+        var pb = e.target.closest(".emdocs-page-break");
         if (!pb) return;
         e.preventDefault();
         if (pb.parentElement) {
           // Remove the marker; the empty <p> that followed a manual page
-          // break is left alone â€” the paginator prunes trailing empties.
+          // break is left alone — the paginator prunes trailing empties.
           pb.parentElement.removeChild(pb);
           schedulePaginate();
           scheduleAutosave();
@@ -7590,7 +7902,7 @@
         toggleFootnotes(true);
       });
       scrollEl.addEventListener("click", function (e) {
-        var bm = e.target.closest("a.zdocs-bookmark");
+        var bm = e.target.closest("a.emdocs-bookmark");
         if (!bm) return;
         // no-op for clicks on bookmark anchors themselves
       });
@@ -7610,7 +7922,7 @@
       }); })(covPresets[cp]);
     }
 
-    // Section break (Insert tab only â€” the Layout tab's Breaks group was removed)
+    // Section break (Insert tab only — the Layout tab's Breaks group was removed)
     var bSB = $("btnSectionBreak");
     if (bSB) { bSB.addEventListener("mousedown", function (e) { e.preventDefault(); }); bSB.addEventListener("click", insertSectionBreak); }
     var bSBConfirm = $("sectionBreakConfirm");
@@ -7666,6 +7978,10 @@
     // setup track changes interceptor
     setupTrackChangesInterceptor();
 
+    // Enter key must keep working when the caret/selection sits on a
+    // footnote/endnote marker (Chrome deadlocks inside <sup contenteditable="false">)
+    setupMarkerEnterFix();
+
     // Round 2 features
     initRound2Features();
 
@@ -7679,21 +7995,21 @@
   }
 
   /* =========================================================
-     Round 2 â€” new features
+     Round 2 — new features
      (mail merge,
-      accessibility checker, document inspector,
+      accessibility checker,
       status-bar zoom)
      ========================================================= */
 
   /* ---------------- Status bar zoom + language ---------------- */
   function initStatusBarControls() {
-    // The zoom % label is NOT clickable â€” it's a plain informational span,
+    // The zoom % label is NOT clickable — it's a plain informational span,
     // exactly like Slides' #zoomStatus. Zoom is changed ONLY via Ctrl+Scroll
-    // (or the View â†’ Zoom ribbon controls / keyboard shortcuts).
+    // (or the View → Zoom ribbon controls / keyboard shortcuts).
 
-    // Ctrl + Scroll to zoom in / out â€” matches the Slides editor behavior.
+    // Ctrl + Scroll to zoom in / out — matches the Slides editor behavior.
     // Slides uses an 8% multiplicative step (factor 1.08) rather than a fixed
-    // Â±10% additive step â€” this feels smoother at high zoom levels.
+    // ±10% additive step — this feels smoother at high zoom levels.
     // Listens on the document scroll area first so we can stopPropagation()
     // before the document-level handler double-fires.
     var scrollEl = $("documentScroll");
@@ -7723,13 +8039,13 @@
 
     var psLabel = $("pageSizeLabel");
     if (psLabel) {
-      // Informational only â€” no click handler. Page size is changed via
+      // Informational only — no click handler. Page size is changed via
       // Layout -> Size (the ms-dropdown drives setPageSize).
     }
   }
 
   // Additive zoom step (Zoom In / Zoom Out buttons + Ctrl+= / Ctrl+- keys).
-  // Keeps the Â±10 step, since that's what users expect.
+  // Keeps the ±10 step, since that's what users expect.
   function adjustZoom(delta) {
     setZoom(currentZoom + delta);
   }
@@ -7741,7 +8057,7 @@
   }
 
   // Base (un-zoomed) page size. CSS `zoom` inflates offsetWidth and
-  // getBoundingClientRect, so the authored inline size is read instead â€”
+  // getBoundingClientRect, so the authored inline size is read instead —
   // falling back to the A4 default that .page gets from the stylesheet.
   function getBasePageSize() {
     var page = getPages()[0];
@@ -7762,7 +8078,7 @@
     if (avail < 100) avail = 100;
     var fit = Math.floor((avail / base) * 100);
     setZoom(fit);
-    toast("Fit to window Â· " + currentZoom + "%", "success");
+    toast("Fit to window · " + currentZoom + "%", "success");
   }
 
   function updateStatusZoom(v) {
@@ -7831,7 +8147,7 @@
       // Block count
       totalBlocks += content.querySelectorAll("p, h1, h2, h3, h4, li, blockquote, pre").length;
 
-      // Contrast check â€” scan elements with inline color/background-color
+      // Contrast check — scan elements with inline color/background-color
       var colored = content.querySelectorAll("[style*='color'], [style*='background-color'], font[color]");
       for (var ci = 0; ci < colored.length; ci++) {
         var cs = window.getComputedStyle(colored[ci]);
@@ -7971,61 +8287,6 @@
     return null;
   }
 
-  /* ---------------- Document inspector ---------------- */
-  function runDocumentInspector() {
-    var results = $("inspectorResults");
-    results.innerHTML = "";
-    var pages = getPages();
-    var items = [];
-    // Gather metadata
-    var commentsCount = comments.length;
-    var trackedIns = document.querySelectorAll(".page-content ins.zdocs-ins").length;
-    var trackedDel = document.querySelectorAll(".page-content del.zdocs-del").length;
-    var hiddenBookmarks = document.querySelectorAll(".page-content a.zdocs-bookmark").length;
-    var fnCount = footnotes.length;
-    var personalInfo = currentTitle || "Untitled";
-    var lastSaved = lastSavedAt;
-
-    items.push({ name: "Document title", count: personalInfo, removable: true, action: function () { currentTitle = "Untitled Document"; syncFileModalNameInput(); scheduleAutosave(); toast("Title cleared", "success"); } });
-    items.push({ name: "Comments", count: commentsCount + (commentsCount === 1 ? " comment" : " comments"), removable: commentsCount > 0, action: function () { comments = []; renderComments(); scheduleAutosave(); toast("Comments removed", "success"); } });
-    items.push({ name: "Tracked changes (insertions)", count: trackedIns + " ins", removable: trackedIns > 0, action: function () { var all = document.querySelectorAll(".page-content ins.zdocs-ins"); for (var i = 0; i < all.length; i++) unwrapNode(all[i]); schedulePaginate(); scheduleAutosave(); toast("Insertions accepted", "success"); } });
-    items.push({ name: "Tracked changes (deletions)", count: trackedDel + " del", removable: trackedDel > 0, action: function () { var all = document.querySelectorAll(".page-content del.zdocs-del"); for (var i = 0; i < all.length; i++) { var p = all[i].parentNode; if (p) p.removeChild(all[i]); } schedulePaginate(); scheduleAutosave(); toast("Deletions removed", "success"); } });
-    items.push({ name: "Bookmarks", count: hiddenBookmarks + (hiddenBookmarks === 1 ? " bookmark" : " bookmarks"), removable: hiddenBookmarks > 0, action: function () { var all = document.querySelectorAll(".page-content a.zdocs-bookmark"); for (var i = 0; i < all.length; i++) { var p = all[i].parentNode; if (p) p.removeChild(all[i]); } schedulePaginate(); scheduleAutosave(); toast("Bookmarks removed", "success"); } });
-    items.push({ name: "Footnotes & endnotes", count: fnCount + (fnCount === 1 ? " footnote" : " footnotes"), removable: fnCount > 0 || endnotes.length > 0, action: function () { var refs = document.querySelectorAll(".page-content sup.footnote-ref, .page-content sup.endnote-ref"); for (var i = 0; i < refs.length; i++) { var p = refs[i].parentNode; if (p) p.removeChild(refs[i]); } footnotes = []; endnotes = []; saveFootnotes(); saveEndnotes(); renderFootnotes(); renderFootnotesSection(); renderEndnotesSection(); schedulePaginate(); scheduleAutosave(); toast("Footnotes removed", "success"); } });
-    items.push({ name: "Last saved", count: lastSaved ? formatTime(lastSaved) : "never", removable: false });
-    items.push({ name: "Page count", count: pages.length + (pages.length === 1 ? " page" : " pages"), removable: false });
-
-    for (var i = 0; i < items.length; i++) {
-      (function (it) {
-        var item = document.createElement("div");
-        item.className = "inspector-item" + (it.removable ? "" : " empty");
-        var icon = document.createElement("span");
-        icon.className = "inspector-item-icon";
-        icon.innerHTML = "â—";
-        var text = document.createElement("div");
-        text.className = "inspector-item-text";
-        text.innerHTML = '<span class="inspector-item-name">' + escapeHtml(it.name) + '</span> <span class="inspector-item-count">' + escapeHtml(String(it.count)) + '</span>';
-        item.appendChild(icon);
-        item.appendChild(text);
-        if (it.removable) {
-          var rm = document.createElement("button");
-          rm.className = "inspector-item-remove";
-          rm.textContent = "Remove";
-          rm.addEventListener("click", function () { it.action(); runDocumentInspector(); });
-          item.appendChild(rm);
-        }
-        results.appendChild(item);
-      })(items[i]);
-    }
-    openModal("inspectorModal");
-  }
-
-  function inspectorRemoveAll() {
-    var items = $("inspectorResults").querySelectorAll(".inspector-item-remove");
-    for (var i = 0; i < items.length; i++) items[i].click();
-    toast("All removable metadata cleared", "success");
-  }
-
   /* ---------------- Wire up round 2 features ---------------- */
   function initRound2Features() {
     initStatusBarControls();
@@ -8034,12 +8295,6 @@
     // Accessibility checker
     var bA11y = $("btnAccessibilityCheck");
     if (bA11y) { bA11y.addEventListener("mousedown", function (e) { e.preventDefault(); }); bA11y.addEventListener("click", runAccessibilityCheck); }
-
-    // Document inspector
-    var bIns = $("btnInspector");
-    if (bIns) { bIns.addEventListener("mousedown", function (e) { e.preventDefault(); }); bIns.addEventListener("click", runDocumentInspector); }
-    var bInsRm = $("inspectorRemoveAll");
-    if (bInsRm) bInsRm.addEventListener("click", inspectorRemoveAll);
 
     // Round 3: editor context menu + section break wiring done in initNewFeatures
     initEditorContextMenu();
@@ -8050,7 +8305,7 @@
   }
 
   /* =========================================================
-     Round 4 â€” tooltips, live merge preview, word count live
+     Round 4 — tooltips, live merge preview, word count live
      ========================================================= */
 
   /* ---------------- Rich tooltips ---------------- */
@@ -8117,7 +8372,7 @@
   }
 
   function initRound4Features() {
-    // Custom rich tooltips removed (Slides parity) â€” buttons keep their
+    // Custom rich tooltips removed (Slides parity) — buttons keep their
     // native title= tooltips.
 
     // Round 6: ripple effect + table cell right-click
@@ -8127,7 +8382,7 @@
 
   /* ---------------- Button ripple effect ---------------- */
   function initRippleEffect() {
-    // Slides parity: no ripple on ribbon buttons â€” keep it for other chrome buttons only
+    // Slides parity: no ripple on ribbon buttons — keep it for other chrome buttons only
     var btns = document.querySelectorAll(".topbar-action, .btn");
     for (var i = 0; i < btns.length; i++) {
       (function (btn) {

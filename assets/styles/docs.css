@@ -6,7 +6,7 @@
    If this line is missing from your docs.css, you are running
    a stale copy — replace it with this file.
    =========================================================
-   Z Docs — Word Processor Styles
+   Emerald Docs — Word Processor Styles
    EmeraldSuite design language:
    • DM Sans typography
    • Emerald accent (#239a4d / #2BD059)
@@ -1042,6 +1042,9 @@ body {
 }
 
 /* Find highlight marks */
+/* TRANSITION ALIASES: ".zdocs-*" selectors below temporarily keep the old
+   class names working for content saved before the emerald rebrand. */
+.page-content mark.emdocs-mark,
 .page-content mark.zdocs-mark {
   background: var(--mark-bg);
   color: inherit;
@@ -1049,6 +1052,7 @@ body {
   padding: 0 1px;
 }
 
+.page-content mark.emdocs-mark.current,
 .page-content mark.zdocs-mark.current {
   background: var(--mark-current);
   color: #fff;
@@ -1618,6 +1622,7 @@ body {
 }
 
 /* ===================== Page Break element ===================== */
+.page-content .emdocs-page-break,
 .page-content .zdocs-page-break {
   display: flex;
   align-items: center;
@@ -1630,6 +1635,7 @@ body {
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
+.page-content .emdocs-page-break:hover,
 .page-content .zdocs-page-break:hover {
   color: var(--ui-accent);
   border-top-color: var(--ui-accent-border);
@@ -1643,6 +1649,7 @@ body {
   position: relative;
 }
 
+.page-content .emdocs-page-break::before,
 .page-content .zdocs-page-break::before {
   content: "";
   flex: 1;
@@ -1650,6 +1657,7 @@ body {
   margin-top: 2px;
 }
 
+.page-content .emdocs-page-break::after,
 .page-content .zdocs-page-break::after {
   content: "";
   flex: 1;
@@ -1657,6 +1665,7 @@ body {
   margin-top: 2px;
 }
 
+.page-content .emdocs-page-break .pb-label,
 .page-content .zdocs-page-break .pb-label {
   flex: 0 0 auto;
 }
@@ -3398,6 +3407,7 @@ body {
   }
   .page::before { display: none; }
   .page-badge { display: none !important; }
+.emdocs-page-break,
   .zdocs-page-break { display: none !important; }
   .section-break { display: none !important; }
   /* Header/footer strips print as plain text — no editing frames. */
@@ -3410,10 +3420,18 @@ body {
     print-color-adjust: exact;
   }
   /* Preserve colors for tracked changes, highlights, etc. */
-  ins.zdocs-ins, del.zdocs-del, mark, .equation, .smartart, .cover-page {
+ins.emdocs-ins,
+  ins.zdocs-ins,
+  del.emdocs-del,
+  del.zdocs-del,
+  mark,
+  .equation,
+  .smartart,
+  .cover-page {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+mark.emdocs-mark,
   mark.zdocs-mark { background: transparent !important; color: inherit !important; }
 }
 
@@ -3891,18 +3909,24 @@ sup.footnote-ref:hover, sup.endnote-ref:hover { text-decoration: underline; }
 }
 
 /* ---- Track changes marks (inline) ---- */
+ins.emdocs-ins,
 ins.zdocs-ins {
   background: rgba(35, 154, 77, 0.16);
   color: #1a7d3d;
   text-decoration: none;
   border-bottom: 1px solid rgba(35, 154, 77, 0.4);
 }
+del.emdocs-del,
 del.zdocs-del {
   background: rgba(217, 48, 37, 0.14);
   color: #b91c1c;
   text-decoration: line-through;
 }
-ins.zdocs-ins, del.zdocs-del { border-radius: 2px; padding: 0 1px; }
+ins.emdocs-ins,
+ins.zdocs-ins,
+del.emdocs-del,
+del.zdocs-del { border-radius: 2px; padding: 0 1px; }
+.emdocs-change-marker,
 .zdocs-change-marker {
   display: inline-block;
   width: 6px;
@@ -3913,9 +3937,11 @@ ins.zdocs-ins, del.zdocs-del { border-radius: 2px; padding: 0 1px; }
   vertical-align: middle;
   cursor: pointer;
 }
+.emdocs-change-marker.del,
 .zdocs-change-marker.del { background: #b91c1c; }
 
 /* ---- Bookmark anchors (invisible markers in text) ---- */
+a.emdocs-bookmark,
 a.zdocs-bookmark {
   display: inline;
   border-bottom: 2px dotted var(--ui-accent-border);
@@ -3924,7 +3950,9 @@ a.zdocs-bookmark {
   padding: 0 2px;
   cursor: pointer;
 }
+a.emdocs-bookmark:hover,
 a.zdocs-bookmark:hover { background: var(--ui-accent-selected); }
+a.emdocs-internal-link,
 a.zdocs-internal-link {
   color: var(--ui-accent);
   text-decoration: underline;
@@ -3932,6 +3960,7 @@ a.zdocs-internal-link {
   text-underline-offset: 2px;
   cursor: pointer;
 }
+a.emdocs-internal-link:hover,
 a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 
 /* ---- Cover page styles ---- */
@@ -4089,34 +4118,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   cursor: pointer;
 }
 .a11y-fix:hover { background: var(--ui-accent); color: #fff; }
-
-/* ---- Document inspector ---- */
-.inspector-results { max-height: 360px; overflow-y: auto; }
-.inspector-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius-sm);
-  margin-bottom: 6px;
-  background: var(--bg-app);
-}
-.inspector-item-icon { color: var(--text-muted); flex-shrink: 0; }
-.inspector-item-text { flex: 1; font-size: 12px; }
-.inspector-item-name { font-weight: 600; color: var(--text-strong); }
-.inspector-item-count { color: var(--text-faint); font-size: 11px; }
-.inspector-item-remove {
-  font-size: 11px;
-  padding: 3px 10px;
-  border-radius: 4px;
-  border: 1px solid rgba(217, 48, 37, 0.3);
-  background: rgba(217, 48, 37, 0.06);
-  color: #d93025;
-  cursor: pointer;
-}
-.inspector-item-remove:hover { background: rgba(217, 48, 37, 0.14); }
-.inspector-item.empty .inspector-item-count { color: var(--ui-accent); }
 
 @keyframes ctxFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -4725,15 +4726,18 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 }
 
 /* Better heading anchor links */
+a.emdocs-internal-link,
 a.zdocs-internal-link {
   position: relative;
   padding: 0 2px;
   border-radius: 2px;
   transition: background 0.15s;
 }
+a.emdocs-internal-link:hover,
 a.zdocs-internal-link:hover {
   background: var(--ui-accent-soft);
 }
+a.emdocs-internal-link::after,
 a.zdocs-internal-link::after {
   content: "¶";
   position: absolute;
@@ -4744,11 +4748,13 @@ a.zdocs-internal-link::after {
   opacity: 0;
   transition: opacity 0.15s;
 }
+a.emdocs-internal-link:hover::after,
 a.zdocs-internal-link:hover::after {
   opacity: 0.7;
 }
 
 /* Bookmark anchor pulse on jump */
+a.emdocs-bookmark.flash,
 a.zdocs-bookmark.flash {
   animation: bookmarkFlash 0.8s ease-out;
 }
@@ -5552,7 +5558,7 @@ body.no-active-doc .print-preview-bar {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.25s, visibility 0.25s;
-  z-index: 95000; /* below docs modals (100000) so Statistics/Versions/Inspector/Delete open on top */
+  z-index: 95000; /* below docs modals (100000) so Statistics/Versions/Delete open on top */
   padding: 20px;
 }
 
