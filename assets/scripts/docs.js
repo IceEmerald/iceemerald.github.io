@@ -37,12 +37,19 @@
   function versionsKey(id) { return "emeralddocs.versions." + id; }
   var MARGINS_KEY = "emeralddocs.margins";
   var GOAL_KEY = "emeralddocs.goal";
+  var WRITING_TIME_KEY = "emeralddocs.writingTime";
   var MAX_VERSIONS = 10;
-  var AUTOSAVE_SNAPSHOT_MS = 5 * 60 * 1000; // 5 minutes
+  var AUTOSAVE_SNAPSHOT_MS = 60 * 1000; // 1 minute
   var autosaveSnapshotTimer = null;
+  // Set on every edit; the version-history ticker only snapshots when it's true.
+  var snapshotDirty = false;
   var MAX_PAGINATE_ITER = 120;
   var PAGE_WIDTH = 794;
   var PAGE_HEIGHT = 1123;
+  // Current effective page dimensions (updated by applyDocPageLayout for
+  // imported docs; default to A4). Kept in sync with the .page elements.
+  var curPageW = PAGE_WIDTH;
+  var curPageH = PAGE_HEIGHT;
   var MIN_MARGIN = 32;
   var MAX_MARGIN = 300;
   // Zoom limits match Slides: 20% – 400% (Slides uses clamp(scale, 0.2, 4)).
@@ -60,6 +67,11 @@
   var findIndex = -1;
   var pageMargins = { top: 96, right: 96, bottom: 96, left: 96 };
   var goalTarget = 0;
+  var assetRepaginateToken = 0;
+  // Ribbon availability state (Notes/Slides parity): Undo/Redo reflect whether
+  // the browser's native contenteditable history can actually undo/redo.
+  var canUndo = false;
+  var canRedo = false;
   // Multi-document state (Slides pattern)
   var documents = [];        // metadata index [{id, title, updatedAt, wordCount}]
   var currentDocId = null;   // id of the document loaded in the editor (null → welcome screen)
@@ -771,6 +783,7 @@
   function onInput(e) {
     startSessionTimer();
     startAutosaveSnapshots();
+    snapshotDirty = true;
     // AutoCorrect: when user types a space, check the preceding word
     if (e && (e.data === " " || e.data === "\u00a0")) {
       try { checkAutoCorrect(); } catch (err) {}
@@ -778,6 +791,9 @@
     schedulePaginate();
     scheduleAutosave();
     scheduleOutlineUpdate();
+    canUndo = true;
+    canRedo = false;
+    updateRibbonAvailability();
   }
 
   function onKeyDown(e) {
@@ -960,6 +976,8 @@
       panel.classList.remove("open");
       panel.setAttribute("aria-hidden", "true");
     }
+    var btn = $("btnOutline");
+    if (btn) btn.classList.toggle("active", shouldOpen);
   }
 
   function buildOutline() {
@@ -1140,6 +1158,7 @@
   var resizeStartW = 0;
   var resizeStartH = 0;
   var resizeMode = null; // 'nw','ne','sw','se','n','s','e','w'
+  var resizeBodyCursorSet = false;
 
   function initImageResize() {
     // Delegated click listener on the document
@@ -1156,22 +1175,32 @@
     document.addEventListener("mousemove", function (e) {
       if (activeResizeImg && resizeMode) {
         e.preventDefault();
+        // Keep the drag feel stable (cursor + no text selection) across the
+        // whole drag, not just while over the handle.
+        if (!resizeBodyCursorSet) {
+          resizeBodyCursorSet = true;
+          document.body.style.userSelect = "none";
+          document.body.style.cursor = "se-resize";
+        }
         var dx = e.clientX - resizeStartX;
         var dy = e.clientY - resizeStartY;
         var newW = resizeStartW, newH = resizeStartH;
         var ratio = resizeStartW / resizeStartH;
+        var min = 40;
         switch (resizeMode) {
-          case "se": newW = Math.max(40, resizeStartW + dx); newH = newW / ratio; break;
-          case "sw": newW = Math.max(40, resizeStartW - dx); newH = newW / ratio; break;
-          case "ne": newW = Math.max(40, resizeStartW + dx); newH = newW / ratio; break;
-          case "nw": newW = Math.max(40, resizeStartW - dx); newH = newW / ratio; break;
-          case "e": newW = Math.max(40, resizeStartW + dx); break;
-          case "w": newW = Math.max(40, resizeStartW - dx); break;
-          case "s": newH = Math.max(40, resizeStartH + dy); break;
-          case "n": newH = Math.max(40, resizeStartH - dy); break;
+          case "se": newW = Math.max(min, resizeStartW + dx); newH = newW / ratio; break;
+          case "sw": newW = Math.max(min, resizeStartW - dx); newH = newW / ratio; break;
+          case "ne": newW = Math.max(min, resizeStartW + dx); newH = newW / ratio; break;
+          case "nw": newW = Math.max(min, resizeStartW - dx); newH = newW / ratio; break;
+          case "e": newW = Math.max(min, resizeStartW + dx); newH = newW / ratio; break;
+          case "w": newW = Math.max(min, resizeStartW - dx); newH = newW / ratio; break;
+          case "s": newH = Math.max(min, resizeStartH + dy); newW = newH * ratio; break;
+          case "n": newH = Math.max(min, resizeStartH - dy); newW = newH * ratio; break;
         }
-        activeResizeImg.style.width = newW + "px";
-        activeResizeImg.style.height = newH + "px";
+        activeResizeImg.style.width = newW.toFixed(1) + "px";
+        activeResizeImg.style.height = newH.toFixed(1) + "px";
+        activeResizeImg.style.maxWidth = "none";
+        positionResizeOverlay();
       }
     });
 
@@ -1179,6 +1208,10 @@
       if (activeResizeImg && resizeMode) {
         resizeMode = null;
         activeResizeImg.removeAttribute("data-resizing");
+        // Clean up drag state for the whole document (not just the handle).
+        resizeBodyCursorSet = false;
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
         schedulePaginate();
         scheduleAutosave();
       }
@@ -1206,6 +1239,11 @@
           resizeStartY = e.clientY;
           resizeStartW = img.offsetWidth;
           resizeStartH = img.offsetHeight;
+          // Lock cursor (matching that handle's direction) + block text
+          // selection while dragging (Slides/Notes parity).
+          resizeBodyCursorSet = true;
+          document.body.style.userSelect = "none";
+          document.body.style.cursor = getComputedStyle(h).cursor;
           img.setAttribute("data-resizing", "true");
         });
         resizeOverlay.appendChild(h);
@@ -1279,15 +1317,17 @@
     }, 800);
   }
 
-  // Periodic version snapshots — every 5 minutes, push a version snapshot
-  // so the user can roll back to an earlier point in their writing session.
-  function startAutosaveSnapshots() {
+  // Periodic version snapshots — every 1 minute, if there were edits since the
+// last snapshot, push a version so the user can roll back to an earlier point
+// in their writing session. Nothing is saved when nothing changed.
+function startAutosaveSnapshots() {
     if (autosaveSnapshotTimer) return; // already running
     autosaveSnapshotTimer = setInterval(function () {
+      if (!currentDocId) return;
+      if (!snapshotDirty) return; // no edits since the last snapshot — skip
+      snapshotDirty = false;
       try {
-        var data = serialize();
-        pushVersion(data);
-        // (Version count badge removed from status bar — no UI to update.)
+        pushVersion(serialize());
       } catch (e) {}
     }, AUTOSAVE_SNAPSHOT_MS);
   }
@@ -1464,6 +1504,27 @@
       return;
     }
     restoreEditorSelection();
+
+    // Undo/Redo use the browser's native contenteditable history. Detect
+    // availability by snapshotting the editor before/after: if nothing
+    // changed there was no history entry to undo/redo.
+    if (cmd === "undo" || cmd === "redo") {
+      var snapBefore = editorSnapshot();
+      try { document.execCommand(cmd, false, value); } catch (e) {}
+      var snapAfter = editorSnapshot();
+      if (cmd === "undo") {
+        if (snapBefore === snapAfter) { canUndo = false; }
+        else { canRedo = true; }
+      } else {
+        if (snapBefore === snapAfter) { canRedo = false; }
+        else { canUndo = true; }
+      }
+      schedulePaginate();
+      scheduleAutosave();
+      setTimeout(updateRibbonAvailability, 10);
+      return;
+    }
+
     var sel = window.getSelection();
     var inEditor = false;
     if (sel && sel.anchorNode) {
@@ -1474,10 +1535,19 @@
       var firstContent = getContent(getPages()[0]);
       if (firstContent) firstContent.focus();
     }
+    var before = editorSnapshot();
     try { document.execCommand(cmd, false, value); } catch (e) {}
+    if (editorSnapshot() !== before) {
+      // A real edit happened → undo becomes available, redo is cleared.
+      canUndo = true;
+      canRedo = false;
+    }
     schedulePaginate();
     scheduleAutosave();
     setTimeout(updateToolbarStates, 10);
+    if (cmd !== "styleWithCSS" && cmd !== "defaultParagraphSeparator") {
+      setTimeout(updateRibbonAvailability, 10);
+    }
   }
 
   function applyBlock(tag) { exec("formatBlock", "<" + (tag === "p" ? "p" : tag) + ">"); }
@@ -1574,6 +1644,101 @@
     }
     updateDropCapState();
     // Block-type dropdown removed — nothing else to sync.
+  }
+
+  /* Snapshot all page content for native undo/redo availability detection. */
+  function editorSnapshot() {
+    var pages = getPages();
+    var s = "";
+    for (var i = 0; i < pages.length; i++) {
+      s += getContent(pages[i]).innerHTML + "\n";
+    }
+    return s;
+  }
+
+  /* ---------------- Ribbon availability (Notes/Slides parity) ----------------
+     Buttons gray out when their precondition isn't met: Undo/Redo need history,
+     Cut/Copy need a text selection in the editor, Paste needs the caret in the
+     editor, and formatting/insert/layout controls need an editable document. */
+  function getRibbonSelectionState() {
+    var activeDoc = !!currentDocId;
+    var inEditor = false;
+    var hasSelection = false;
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount && sel.anchorNode) {
+      var node = sel.anchorNode.nodeType === Node.ELEMENT_NODE ? sel.anchorNode : sel.anchorNode.parentElement;
+      inEditor = !!node && !!node.closest && !!node.closest(".page-content");
+      hasSelection = !sel.isCollapsed && sel.toString().length > 0;
+    }
+    return { activeDoc: activeDoc, inEditor: inEditor, hasSelection: hasSelection };
+  }
+
+  function setRibbonControlDisabled(control, disabled) {
+    if (!control) return;
+    control.disabled = !!disabled;
+    control.setAttribute("aria-disabled", disabled ? "true" : "false");
+    control.classList.toggle("is-unavailable", !!disabled);
+  }
+
+  function setCommandControlsDisabled(cmd, disabled) {
+    var controls = document.querySelectorAll('[data-cmd="' + cmd + '"]');
+    for (var i = 0; i < controls.length; i++) {
+      setRibbonControlDisabled(controls[i], disabled);
+    }
+  }
+
+  function setRibbonDropdownDisabled(id, disabled) {
+    var wrap = $(id);
+    if (!wrap) return;
+    var btn = wrap.querySelector(".ms-dropdown-btn");
+    if (btn) setRibbonControlDisabled(btn, disabled);
+  }
+
+  function updateRibbonAvailability() {
+    var state = getRibbonSelectionState();
+    var editableContext = state.activeDoc && state.inEditor;
+    var editableSelection = state.activeDoc && state.hasSelection;
+
+    setCommandControlsDisabled("undo", !state.activeDoc || !canUndo);
+    setCommandControlsDisabled("redo", !state.activeDoc || !canRedo);
+    setCommandControlsDisabled("cut", !editableSelection);
+    setCommandControlsDisabled("copy", !editableSelection);
+    setCommandControlsDisabled("paste", !editableContext);
+
+    // Formatting (font + paragraph) needs the caret inside the editor.
+    ["bold", "italic", "underline", "strikeThrough", "subscript", "superscript",
+     "justifyLeft", "justifyCenter", "justifyRight", "justifyFull",
+     "insertUnorderedList", "insertOrderedList", "outdent", "indent"].forEach(function (cmd) {
+      setCommandControlsDisabled(cmd, !editableContext);
+    });
+
+    // Font / color dropdown triggers follow the same formatting context.
+    setRibbonDropdownDisabled("fontFamilyDropdown", !editableContext);
+    setRibbonDropdownDisabled("fontSizeDropdown", !editableContext);
+    setRibbonDropdownDisabled("fontColorDropdown", !editableContext);
+    setRibbonDropdownDisabled("highlightColorDropdown", !editableContext);
+    setRibbonControlDisabled($("btnClearFormat"), !editableContext);
+
+    // Insert / layout / styles / review controls need an open document.
+    var docOnly = ["btnLink", "btnImage", "btnTable", "btnHr", "btnPageBreak",
+      "btnDropCap", "btnWatermark", "btnSymbols", "btnCoverPage", "btnSectionBreak",
+      "btnEquation", "btnSmartArt", "btnScreenshot", "btnDraw", "btnMargins",
+      "btnOrientation", "btnHeader", "btnFooter", "btnTocRef", "btnFootnote",
+      "btnEndnote", "btnCitation", "btnBibliography", "btnIndexEntry",
+      "btnInsertIndex", "btnComment", "btnPageNum", "btnTrackChanges"];
+    for (var i = 0; i < docOnly.length; i++) {
+      setRibbonControlDisabled($(docOnly[i]), !state.activeDoc);
+    }
+    // Style buttons (Title / Heading 1–3 / Normal) and column buttons.
+    var styles = document.querySelectorAll(".ribbon-btn[data-block]");
+    for (var j = 0; j < styles.length; j++) {
+      setRibbonControlDisabled(styles[j], !state.activeDoc);
+    }
+    var cols = document.querySelectorAll(".ribbon-btn[data-cols]");
+    for (var k = 0; k < cols.length; k++) {
+      setRibbonControlDisabled(cols[k], !state.activeDoc);
+    }
+    setRibbonDropdownDisabled("pageSizeDropdown", !state.activeDoc);
   }
 
   /* ---------------- Save / Load (IndexedDB via EmeraldIDBStorage) ---------------- */
@@ -1767,8 +1932,8 @@
       writeDocData(data);
       setAutosaveState("saved");
       if (showToast) {
-        // Explicit save → also push to version history (store plaintext for versions)
-        pushVersion(serialize());
+        // Autosave handles persistence; the manual Save no longer creates a
+        // version snapshot (version history is driven by the 1-minute ticker).
         toast("Document saved", "success");
       }
     } catch (e) {
@@ -1861,7 +2026,7 @@
     if (versions.length === 0) {
       var empty = document.createElement("p");
       empty.className = "outline-empty";
-      empty.textContent = "No saved versions yet. Use the Save button to create version snapshots.";
+      empty.textContent = "No versions yet. Versions are saved automatically while you edit.";
       list.appendChild(empty);
     } else {
       for (var i = 0; i < versions.length; i++) {
@@ -1939,11 +2104,59 @@
     if (Array.isArray(data.endnotes)) endnotes = data.endnotes;
     // Comments (Slides-style pins) — plain data; anchors live in content HTML.
     comments = Array.isArray(data.comments) ? data.comments : [];
+    // Fresh document context — the previous document's native undo/redo
+    // history does not apply to this one.
+    canUndo = false;
+    canRedo = false;
+    // Restore the imported document's own page layout (size/orientation/
+    // margins/background) BEFORE paginating so content breaks at the right
+    // height. Docs that carry no layout keep the current (A4) default.
+    applyDocPageLayout(data);
     paginate();
     // Rebuild the pins from the comment data (saved pin markup is ignored —
     // renderDocPins strips and re-creates every bubble; orphaned comments
     // whose anchor no longer exists are dropped, same as Slides).
     renderDocPins(true);
+  }
+
+  /* Pagination measures text height, so running it before webfonts/images have
+     loaded can undercount and leave a long document on a single page until the
+     user types. Re-paginate once the document's assets (fonts + images) settle. */
+  function repaginateAfterAssetsLoad() {
+    var token = ++assetRepaginateToken;
+    function finish() {
+      if (token !== assetRepaginateToken) return;
+      var imgs = document.querySelectorAll(".page-content img");
+      var waiters = [];
+      for (var i = 0; i < imgs.length; i++) {
+        if (imgs[i].src && !imgs[i].complete) {
+          waiters.push(new Promise(function (res) {
+            imgs[i].addEventListener("load", res);
+            imgs[i].addEventListener("error", res);
+          }));
+        }
+      }
+      if (waiters.length) {
+        var attempts = 0;
+        (function wait() {
+          if (token !== assetRepaginateToken) return;
+          var left = 0;
+          for (var j = 0; j < imgs.length; j++) {
+            if (imgs[j].src && !imgs[j].complete) left++;
+          }
+          // Give up after ~5s so a broken image can't block pagination forever.
+          if (left === 0 || attempts++ > 50) { paginate(); return; }
+          setTimeout(wait, 100);
+        })();
+      } else {
+        paginate();
+      }
+    }
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(finish);
+    } else {
+      finish();
+    }
   }
 
   async function openDocument(id) {
@@ -1954,6 +2167,7 @@
     applyDocData(data);
     // Re-render footnote/endnote areas for the freshly-loaded content
     try { renderFootnotesSection(); renderEndnotesSection(); } catch (e) {}
+    repaginateAfterAssetsLoad();
     document.body.classList.remove("no-active-doc");
     showWelcomeScreen(false);
     switchRibbonTab("home");
@@ -1962,13 +2176,19 @@
     refreshRibbonIndicator();
     updateOwnedUrl();
     updateStatus();
+    updateRibbonAvailability();
   }
 
   function closeDocument() {
     if (currentDocId) saveDocument(false);
+    // Closing the document ends the current writing session.
+    commitSessionTime();
     currentDocId = null;
     currentTitle = "Untitled Document";
     syncFileModalNameInput();
+    // Drop open side panels (and their ribbon "active" states) on close.
+    if ($("outlinePanel") && $("outlinePanel").classList.contains("open")) toggleOutline(false);
+    if ($("thumbnailsPanel") && $("thumbnailsPanel").classList.contains("open")) toggleThumbnails(false);
     // Leave a fresh blank page behind so status/interval code that touches
     // the pages never runs against an empty wrapper.
     var wrapper = $(PAGES_WRAPPER_ID);
@@ -1979,6 +2199,9 @@
     closeCommentPopup();
     ensureFirstPage();
     paginate();
+    canUndo = false;
+    canRedo = false;
+    updateRibbonAvailability();
     updateStatus();
     history.replaceState({}, document.title, location.pathname);
     document.body.classList.add("no-active-doc");
@@ -2207,7 +2430,7 @@
     }).catch(function () {});
   }
 
-  /* ---------------- Import (.txt / .md / .html) ---------------- */
+  /* ---------------- Import (.txt / .md / .html / .docx / .doc / .odt / .rtf) ---------------- */
   function importTextToHtml(text, isMarkdown) {
     var lines = String(text).replace(/\r\n?/g, "\n").split("\n");
     var out = [];
@@ -2244,10 +2467,634 @@
     return html && html.replace(/\S/g, "") ? html : "<p><br></p>";
   }
 
+  // ── Minimal in-browser ZIP reader (no dependencies) ──
+  // Reads a specific entry from a ZIP file by its local file name, using the
+  // end-of-central-directory record. Supports stored (0) and deflate (8)
+  // entries. If an inflate stream is unavailable we fall back to stored only.
+  function zipReadEntry(arrayBuffer, targetName) {
+    var bytes = new Uint8Array(arrayBuffer);
+    var view = new DataView(arrayBuffer);
+    var len = bytes.length;
+    // Locate EOCD record (signature 0x06054b50) scanning from the end.
+    var eocd = -1;
+    for (var i = len - 22; i >= Math.max(0, len - 65557); i--) {
+      if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) return null;
+    var count = view.getUint16(eocd + 10, true);
+    var cdOffset = view.getUint32(eocd + 16, true);
+    var names = {};
+    for (var c = 0; c < count; c++) {
+      var p = cdOffset;
+      if (view.getUint32(cdOffset, true) !== 0x02014b50) return null;
+      var method = view.getUint16(cdOffset + 10, true);
+      var compSize = view.getUint32(cdOffset + 20, true);
+      var nameLen = view.getUint16(cdOffset + 28, true);
+      var extraLen = view.getUint16(cdOffset + 30, true);
+      var commentLen = view.getUint16(cdOffset + 32, true);
+      var localOffset = view.getUint32(cdOffset + 42, true);
+      var name = "";
+      for (var n = 0; n < nameLen; n++) name += String.fromCharCode(bytes[cdOffset + 46 + n]);
+      names[name] = { method: method, compSize: compSize, localOffset: localOffset };
+      cdOffset += 46 + nameLen + extraLen + commentLen;
+    }
+    var entry = names[targetName];
+    if (!entry) return null;
+    // Parse local header to find the data start.
+    var lo = entry.localOffset;
+    var lhNameLen = view.getUint16(lo + 26, true);
+    var lhExtraLen = view.getUint16(lo + 28, true);
+    var dataStart = lo + 30 + lhNameLen + lhExtraLen;
+    var data = bytes.subarray(dataStart, dataStart + entry.compSize);
+    if (entry.method === 0) return data;
+    if (entry.method === 8 && typeof DecompressionStream !== "undefined") return inflate(data);
+    return null;
+  }
+  function inflate(array) {
+    // DecompressionStream is available in Chromium 103+/Safari 16.4+/Firefox 113+.
+    var ds = new DecompressionStream("deflate-raw");
+    var stream = new Blob([array]).stream().pipeThrough(ds);
+    return stream.arrayBuffer();
+  }
+
+  // Extract the visible text from an ODT file (a ZIP whose content.xml holds
+  // <text:p> paragraphs and <text:h> headings).
+  async function convertOdtToHtml(arrayBuffer) {
+    var entry = await zipReadEntry(arrayBuffer, "content.xml");
+    if (!entry) return null;
+    var text = new TextDecoder("utf-8").decode(entry);
+    var body = (text.match(/<office:body[\s\S]*?<\/office:body>/) || [""])[0];
+    var html = "";
+    var paraRe = /<(?:text:p|text:h)\b[^>]*>([\s\S]*?)<\/(?:text:p|text:h)>/g;
+    var m;
+    while ((m = paraRe.exec(body)) !== null) {
+      var inner = m[1]
+        .replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&#xA0;/g, " ")
+        .replace(/&apos;/g, "'");
+      html += "<p>" + escapeHtml(inner) + "</p>";
+    }
+    return html && html.replace(/\S/g, "") ? null : (html || "<p><br></p>");
+  }
+
+  // Best-effort RTF → plain text (strip control words/symbols, keep readable
+  // runs). Content between \pard groups is walked to recover unicode text.
+  function convertRtfToText(rtf) {
+    var out = "";
+    var hex = /\\'([0-9a-fA-F]{2})/;
+    var i = 0, n = rtf.length;
+    while (i < n) {
+      var ch = rtf[i];
+      if (ch === "\\") {
+        var m = hex.exec(rtf.substr(i, 4));
+        if (m) {
+          try { out += String.fromCharCode(parseInt(m[1], 16)); } catch (e) {}
+          i += 4; continue;
+        }
+        // \uN escapes carry a sign + digits in RTF.
+        var u = /^\\u(-?\d+)/.exec(rtf.substr(i));
+        if (u) { out += String.fromCharCode(parseInt(u[1], 10)); i += u[0].length; continue; }
+        // Paragraph / line breaks map to newlines; tabs to spaces.
+        var br = /^\\[a-zA-Z]+\d*/.exec(rtf.substr(i)) || [""];
+        var word = br[0];
+        if (word === "\\par" || word === "\\line") { out += "\n"; i += word.length; continue; }
+        if (word === "\\tab") { out += " "; i += word.length; continue; }
+        // Other control symbol like \b0, \b1, \plain etc — skip the whole word.
+        var w = /^\\[a-zA-Z]+-?\d*/.exec(rtf.substr(i));
+        if (w) { i += w[0].length; continue; }
+        i++; continue;
+      }
+      if (ch === "{" || ch === "}") { i++; continue; }
+      out += ch; i++;
+    }
+    return out.replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
+  }
+
+  // Best-effort legacy .doc text extraction: the Word binary stores readable
+  // text (often in a mix of byte and UTF-16 runs). We scan the bytes and keep
+  // sequences of printable characters as likely text, dropping binary noise.
+  function convertDocToText(arrayBuffer) {
+    var bytes = new Uint8Array(arrayBuffer);
+    var n = bytes.length;
+    function isTextByte(b) {
+      return (b >= 32 && b <= 126) || b === 9 || b === 10 || b === 13;
+    }
+    // Build a big decodable string from UTF-16-ish words where low bytes are
+    // ASCII (common in Word 6/95/97/2000 files), plus a raw-byte pass.
+    var latin = "", utf = "";
+    for (var i = 0; i + 1 < n; i += 2) {
+      var lo = bytes[i], hi = bytes[i + 1];
+      var keepLatin = isTextByte(lo);
+      var keepUtf = hi === 0 && isTextByte(lo);
+      latin += keepLatin ? String.fromCharCode(lo) : " ";
+      utf += keepUtf ? String.fromCharCode(lo) : " ";
+    }
+    function collect(src) {
+      var chunk = "", res = [];
+      for (var k = 0; k < src.length; k++) {
+        var c = src[k];
+        if (c === "\n" || c === "\r" || c === "\t" || c.charCodeAt(0) >= 32) {
+          chunk += c === "\r" ? "\n" : c;
+        } else {
+          if (chunk.trim().length >= 3) res.push(chunk);
+          chunk = "";
+        }
+      }
+      if (chunk.trim().length >= 3) res.push(chunk);
+      return res;
+    }
+    function meaningful(list) {
+      return list.filter(function (l) { var t = l.trim(); return t.length > 1 && /[A-Za-z]/.test(t); });
+    }
+    var utfLines = meaningful(collect(utf));
+    var latinLines = meaningful(collect(latin));
+    // Prefer the UTF-16 pass as it usually carries the "real" text, but if it
+    // yields almost nothing, fall back to the raw-byte pass.
+    var lines = (utfLines.length >= Math.min(2, latinLines.length)) ? utfLines : latinLines;
+    var out = lines.join("\n").replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+    return out || null;
+  }
+
+  /* ===================== .docx rich conversion =====================
+     Falls back to mammoth (when loaded) + plain text. This converter parses
+     word/document.xml + styles.xml directly so page size, margins, background,
+     paragraph alignment, text colour, shading and cell padding survive import
+     (the way MS Word stores them), not just the bare text structure. */
+
+  // ---- minimal XML parser (namespace-agnostic, strips prefixes) ----
+  function xmlParse(xml) {
+    var root = { tag: "#root", attrs: {}, kids: [], text: "" };
+    var stack = [root];
+    var i = 0, n = xml.length;
+    var reText = /[^<]*/;
+    function tagName(s) { return s.replace(/^.*:/, ""); }
+    while (i < n) {
+      var lt = xml.indexOf("<", i);
+      if (lt < 0) { stack[stack.length - 1].text += xml.substring(i); break; }
+      if (lt > i) stack[stack.length - 1].text += xml.substring(i, lt);
+      var gt = xml.indexOf(">", lt);
+      if (gt < 0) break;
+      var inner = xml.substring(lt + 1, gt);
+      i = gt + 1;
+      if (inner.charAt(0) === "!") continue;          // <!DOCTYPE ...> etc
+      if (inner.charAt(0) === "?") continue;          // <?xml ...?>
+      if (inner.charAt(0) === "/") { stack.pop(); continue; } // closing
+      var selfClose = /\/$/.test(inner.trim());
+      var body = selfClose ? inner.trim().slice(0, -1) : inner;
+      var m = /^([^\s=\/>]+)([\s\S]*)$/.exec(body);
+      if (!m) continue;
+      var tag = tagName(m[1]);
+      var attrs = {};
+      var rest = m[2];
+      var attrRe = /([^\s=\/>]+)=("([^"]*)"|'([^']*)')/g;
+      var am;
+      while ((am = attrRe.exec(rest)) !== null) attrs[tagName(am[1])] = am[3] != null ? am[3] : (am[4] != null ? am[4] : "");
+      var node = { tag: tag, attrs: attrs, kids: [], text: "" };
+      stack[stack.length - 1].kids.push(node);
+      if (!selfClose) stack.push(node);
+    }
+    return root;
+  }
+  function firstChild(node, tag) {
+    for (var i = 0; i < node.kids.length; i++) if (node.kids[i].tag === tag) return node.kids[i];
+    return null;
+  }
+  function allChildren(node, tag) {
+    var out = [];
+    for (var i = 0; i < node.kids.length; i++) if (node.kids[i].tag === tag) out.push(node.kids[i]);
+    return out;
+  }
+  function nodeText(node) {
+    var s = node.text || "";
+    for (var i = 0; i < node.kids.length; i++) s += nodeText(node.kids[i]);
+    return s;
+  }
+  function ooxmlColor(hex, tint) {
+    if (!hex) return null;
+    if (hex === "auto") return null;
+    var v = hex.replace(/^#/, "");
+    if (/^[0-9a-fA-F]{6}$/.test(v)) {
+      if (tint !== undefined && tint !== null) {
+        var r = parseInt(v.substr(0, 2), 16), g = parseInt(v.substr(2, 2), 16), b = parseInt(v.substr(4, 2), 16);
+        var t = Math.max(-1, Math.min(1, parseFloat(tint)));
+        if (t < 0) { r = Math.round(r * (1 + t)); g = Math.round(g * (1 + t)); b = Math.round(b * (1 + t)); }
+        else { r = Math.round(r + (255 - r) * t); g = Math.round(g + (255 - g) * t); b = Math.round(b + (255 - b) * t); }
+        v = [r, g, b].map(function (x) { x = Math.max(0, Math.min(255, x)); return ("0" + x.toString(16)).slice(-2); }).join("");
+      }
+      return "#" + v;
+    }
+    return null;
+  }
+  function twipToPx(tw) {
+    var v = parseFloat(tw);
+    if (!isFinite(v) || isNaN(v)) return null;
+    return Math.round((v / 20) * 96 / 72); // twips → px @96dpi
+  }
+
+  // ---- styles.xml model ----
+  function parseDocxStyles(stylesRoot) {
+    var para = {}; // styleId → props
+    var run = {};
+    var defPara = null, defRun = null;
+    function styleId(node) {
+      var s = firstChild(node, "styleId");
+      return s ? nodeText(s).trim() : null;
+    }
+    function styleName(node) {
+      var nm = firstChild(node, "name");
+      return nm && nm.attrs.val ? nm.attrs.val : null;
+    }
+    function walkStyle(node, kind) {
+      var pPr = firstChild(node, "pPr"), rPr = firstChild(node, "rPr");
+      var props = { name: styleName(node) };
+      if (pPr) {
+        var jc = firstChild(pPr, "jc");
+        if (jc) props.alignment = jc.attrs.val;
+        var shd = firstChild(pPr, "shd");
+        if (shd && shd.attrs.fill) props.paraShading = ooxmlColor(shd.attrs.fill);
+      }
+      if (rPr) {
+        var color = firstChild(rPr, "color");
+        if (color) props.color = ooxmlColor(color.attrs.val);
+        props.bold = firstChild(rPr, "b") ? firstChild(rPr, "b").attrs.val !== "0" && firstChild(rPr, "b").attrs.val !== "false" : false;
+        props.italic = firstChild(rPr, "i") ? firstChild(rPr, "i").attrs.val !== "0" && firstChild(rPr, "i").attrs.val !== "false" : false;
+        props.underline = firstChild(rPr, "u") ? true : false;
+        var sz = firstChild(rPr, "sz");
+        if (sz) props.fontSize = parseFloat(sz.attrs.val) / 2;
+        var shdR = firstChild(rPr, "shd");
+        if (shdR && shdR.attrs.fill) props.runShading = ooxmlColor(shdR.attrs.fill);
+      }
+      return props;
+    }
+
+    function parseStyles(el) {
+      for (var i = 0; i < el.kids.length; i++) {
+        var k = el.kids[i];
+        if (k.tag !== "style") continue;
+        var id = styleId(k);
+        if (id == null) continue;
+        var type = k.attrs.type || "";
+        var styleNode = k;
+        var props = walkStyle(styleNode, type);
+        if (type === "paragraph") para[id] = props;
+        if (type === "character") run[id] = props;
+      }
+    }
+    // Look for <w:docDefaults> (default paragraph/run props)
+    var dd = firstChild(stylesRoot, "docDefaults");
+    if (dd) {
+      var pPrD = firstChild(dd, "pPrDefault");
+      if (pPrD) { var pj = firstChild(firstChild(pPrD, "pPr"), "jc"); if (pj && pj.attrs.val) defPara = { alignment: pj.attrs.val }; }
+      var rPrD = firstChild(dd, "rPrDefault");
+      if (rPrD) {
+        var rd = firstChild(rPrD, "rPr");
+        if (rd) {
+          defRun = {};
+          var c = firstChild(rd, "color");
+          if (c) defRun.color = ooxmlColor(c.attrs.val, c.attrs.val === "auto" ? null : c.attrs.val);
+          var sz = firstChild(rd, "sz");
+          if (sz) defRun.fontSize = parseFloat(sz.attrs.val) / 2;
+        }
+      }
+    }
+    parseStyles(stylesRoot);
+    return { para: para, run: run, defaultRun: defRun || null };
+  }
+
+  // ---- page setup from document.xml <w:sectPr> ----
+  function parseDocxPageSetup(documentRoot) {
+    var setup = { w: 794, h: 1123, portrait: true, marginTop: 96, marginRight: 96, marginBottom: 96, marginLeft: 96, bg: null };
+    function findSectPr(el) {
+      if (el.kids) { for (var k = 0; k < el.kids.length; k++) { var r = findSectPr(el.kids[k]); if (r) return r; } }
+      if (el.tag === "sectPr") return el;
+      return null;
+    }
+    var sect = findSectPr(documentRoot);
+    if (!sect) return setup;
+    var pgSz = firstChild(sect, "pgSz");
+    if (pgSz) {
+      var w = pgSz.attrs.w, h = pgSz.attrs.h;
+      if (w && h) {
+        setup.w = twipToPx(w); setup.h = twipToPx(h);
+        setup.portrait = !(pgSz.attrs.orient === "landscape");
+        if (pgSz.attrs.orient === "landscape") { setup.w = twipToPx(h); setup.h = twipToPx(w); }
+      }
+    }
+    var pgMar = firstChild(sect, "pgMar");
+    if (pgMar) {
+      if (pgMar.attrs.top) setup.marginTop = twipToPx(pgMar.attrs.top);
+      if (pgMar.attrs.right) setup.marginRight = twipToPx(pgMar.attrs.right);
+      if (pgMar.attrs.bottom) setup.marginBottom = twipToPx(pgMar.attrs.bottom);
+      if (pgMar.attrs.left) setup.marginLeft = twipToPx(pgMar.attrs.left);
+    }
+    var bg = firstChild(sect, "background");
+    if (bg && bg.attrs.color) setup.bg = ooxmlColor(bg.attrs.color, bg.attrs.color === "auto" ? null : bg.attrs.color);
+    return setup;
+  }
+
+  // ---- main converter ----
+  function convertDocxTree(documentRoot, styles) {
+    var body = firstChild(documentRoot, "body");
+    if (!body) return "<p><br></p>";
+    var out = "";
+    var listBuf = null; // { type, items:[...] } for consecutive list paragraphs
+    function flushList() {
+      if (listBuf) {
+        out += "<" + listBuf.type + ">" + listBuf.items.join("") + "</" + listBuf.type + ">";
+        listBuf = null;
+      }
+    }
+    for (var i = 0; i < body.kids.length; i++) {
+      var el = body.kids[i];
+      if (el.tag === "p") {
+        var par = convertDocxPar(el, styles);
+        if (par.isList) {
+          var li = "<li" + par.styleAttr + ">" + par.content + "</li>";
+          if (listBuf) {
+            listBuf.items.push(li);
+          } else {
+            listBuf = { type: "ul", items: [li] };
+          }
+        } else {
+          flushList();
+          out += "<" + par.tag + par.styleAttr + ">" + par.content + "</" + par.tag + ">";
+        }
+      } else if (el.tag === "tbl") {
+        flushList();
+        out += convertDocxTable(el, styles);
+      } else if (el.tag === "sectPr") {} // page setup handled separately
+    }
+    flushList();
+    return out || "<p><br></p>";
+  }
+
+  function resolveParaStyle(p, styles, styleId) {
+    var props = { alignment: null, paraShading: null };
+    if (styleId && styles.para[styleId]) {
+      var def = styles.para[styleId];
+      props.alignment = def.alignment || null;
+      props.paraShading = def.paraShading || null;
+    }
+    var pPr = firstChild(p, "pPr");
+    if (pPr) {
+      var jc = firstChild(pPr, "jc");
+      if (jc && jc.attrs.val) props.alignment = jc.attrs.val;
+      var shd = firstChild(pPr, "shd");
+      if (shd && shd.attrs.fill) props.paraShading = ooxmlColor(shd.attrs.fill, shd.attrs.fill === "auto" ? null : shd.attrs.fill);
+    }
+    return props;
+  }
+
+  function resolveRunStyle(r, styles, inherit) {
+    var props = { color: null, bold: false, italic: false, underline: false, fontSize: null, runShading: null };
+    if (inherit) {
+      props.color = inherit.color || null; props.bold = inherit.bold; props.italic = inherit.italic;
+      props.underline = inherit.underline; props.fontSize = inherit.fontSize || null;
+    } else if (styles && styles.defaultRun) {
+      props.color = styles.defaultRun.color || null;
+      props.fontSize = styles.defaultRun.fontSize || null;
+    }
+    var rPr = firstChild(r, "rPr");
+    var styleId = null;
+    if (rPr) { var rs = firstChild(rPr, "rStyle"); if (rs) styleId = rs.attrs.val; }
+    if (styleId && styles.run[styleId]) {
+      var def = styles.run[styleId];
+      if (def.color) props.color = def.color;
+      if (def.bold !== undefined) props.bold = def.bold;
+      if (def.italic !== undefined) props.italic = def.italic;
+      if (def.fontSize) props.fontSize = def.fontSize;
+    }
+    if (rPr) {
+      var color = firstChild(rPr, "color");
+      if (color && color.attrs.val) props.color = ooxmlColor(color.attrs.val, color.attrs.val === "auto" ? null : color.attrs.val);
+      var b = firstChild(rPr, "b");
+      if (b) props.bold = b.attrs.val !== "0" && b.attrs.val !== "false";
+      var i = firstChild(rPr, "i");
+      if (i) props.italic = i.attrs.val !== "0" && i.attrs.val !== "false";
+      var u = firstChild(rPr, "u");
+      if (u) props.underline = u.attrs.val !== "0" && u.attrs.val !== "false" && u.attrs.val !== "none";
+      var sz = firstChild(rPr, "sz");
+      if (sz && sz.attrs.val) props.fontSize = parseFloat(sz.attrs.val) / 2;
+      var shd = firstChild(rPr, "shd");
+      if (shd && shd.attrs.fill) props.runShading = ooxmlColor(shd.attrs.fill, shd.attrs.fill === "auto" ? null : shd.attrs.fill);
+    }
+    return props;
+  }
+
+  function convertDocxRunContent(r, styles, inherit) {
+    var runProps = resolveRunStyle(r, styles, inherit);
+    var html = "";
+    for (var i = 0; i < r.kids.length; i++) {
+      var k = r.kids[i];
+      if (k.tag === "t") {
+        var txt = nodeText(k);
+        if (runProps.bold) txt = "<b>" + txt + "</b>";
+        if (runProps.italic) txt = "<i>" + txt + "</i>";
+        if (runProps.underline) txt = "<u>" + txt + "</u>";
+        var styleParts = [];
+        if (runProps.color) styleParts.push("color:" + runProps.color);
+        if (runProps.fontSize) styleParts.push("font-size:" + runProps.fontSize + "pt");
+        if (runProps.runShading) styleParts.push("background:" + runProps.runShading);
+        if (styleParts.length) txt = '<span style="' + styleParts.join(";") + '">' + txt + "</span>";
+        html += txt;
+      } else if (k.tag === "br") {
+        html += runProps.bold ? "<b><br></b>" : "<br>";
+      } else if (k.tag === "tab") {
+        html += "&emsp;";
+      } else if (k.tag === "hyperlink" || k.tag === "ins" || k.tag === "smartTag") {
+        html += convertDocxRunContainer(k, styles, runProps);
+      } else if (k.tag === "drawing" || k.tag === "pict" || k.tag === "object") {
+        // images are dropped in plain import (no data available without
+        // extracting media parts); keep a placeholder so layout is visible.
+      }
+    }
+    return html;
+  }
+
+  function convertDocxRunContainer(el, styles, inherit) {
+    var html = "";
+    for (var i = 0; i < el.kids.length; i++) html += convertDocxRunContent(el.kids[i], styles, inherit);
+    return html;
+  }
+
+  function convertDocxPar(p, styles) {
+    var pPr = firstChild(p, "pPr");
+    var styleId = null;
+    if (pPr) { var st = firstChild(pPr, "pStyle"); if (st) styleId = st.attrs.val; }
+    var props = resolveParaStyle(p, styles, styleId);
+    var styleParts = [];
+    var alignMap = { left: "left", center: "center", right: "right", both: "justify", start: "left", end: "right" };
+    if (props.alignment && alignMap[props.alignment]) styleParts.push("text-align:" + alignMap[props.alignment]);
+    if (props.paraShading) styleParts.push("background:" + props.paraShading);
+    var isList = false, listType = null;
+    if (pPr) {
+      var numPr = firstChild(pPr, "numPr");
+      isList = !!numPr;
+      var ilvl = numPr ? firstChild(numPr, "ilvl") : null;
+      // any indentation level renders as a bulleted <li> (kept simple).
+      listType = isList ? "ul" : null;
+    }
+    var inner = "";
+    var kids = p.kids;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].tag === "r") inner += convertDocxRunContent(kids[i], styles, null);
+      else if (kids[i].tag === "hyperlink" || kids[i].tag === "ins" || kids[i].tag === "smartTag") inner += convertDocxRunContainer(kids[i], styles, null);
+    }
+    // fast-ish heading detection: style name "Heading N"
+    var heading = null;
+    if (styleId && styles.para[styleId] && styles.para[styleId].name) {
+      var nm = styles.para[styleId].name.match(/^Heading\s*([1-6])$/i);
+      if (nm) heading = parseInt(nm[1], 10);
+    }
+    var tag = heading ? ("h" + Math.min(6, heading)) : "p";
+    var styleAttr = styleParts.length ? ' style="' + styleParts.join(";") + '"' : "";
+    var content = inner || "<br>";
+    return { tag: tag, styleAttr: styleAttr, content: content, isList: isList };
+  }
+
+  function convertDocxTable(tbl, styles) {
+    var html = "<table>";
+    var tblPr = firstChild(tbl, "tblPr");
+    var rows = allChildren(tbl, "tr");
+    for (var r = 0; r < rows.length; r++) {
+      html += "<tr>";
+      var cells = allChildren(rows[r], "tc");
+      for (var c = 0; c < cells.length; c++) {
+        var cell = cells[c];
+        var styleParts = [];
+        var gridSpanVal = 1;
+        var tcPr = firstChild(cell, "tcPr");
+        if (tcPr) {
+          var shd = firstChild(tcPr, "shd");
+          if (shd && shd.attrs.fill) styleParts.push("background-color:" + ooxmlColor(shd.attrs.fill, shd.attrs.fill === "auto" ? null : shd.attrs.fill));
+          var tcMar = firstChild(tcPr, "tcMar");
+          // Word stores cell margins in twips: left/right in w:start/w:end
+          if (tcMar) {
+            var padVals = { top: null, right: null, bottom: null, left: null };
+            var sides = { top: "top", start: "left", bottom: "bottom", end: "right" };
+            for (var sd in sides) {
+              var sEl = firstChild(tcMar, sd);
+              if (sEl && sEl.attrs.w && sides[sd]) padVals[sides[sd]] = Math.max(0, twipToPx(sEl.attrs.w));
+            }
+            if (padVals.top != null && padVals.right != null && padVals.bottom != null && padVals.left != null && padVals.top === padVals.right && padVals.right === padVals.bottom && padVals.bottom === padVals.left) {
+              styleParts.push("padding:" + padVals.top + "px");
+            } else {
+              var pt = ["top", "right", "bottom", "left"].map(function (s) { return (padVals[s] != null ? padVals[s] : 0) + "px"; }).join(" ");
+              styleParts.push("padding:" + pt);
+            }
+          }
+          var gridSpan = firstChild(tcPr, "gridSpan");
+          if (gridSpan && gridSpan.attrs.val) gridSpanVal = parseInt(gridSpan.attrs.val, 10) || 1;
+        }
+        // cell content: paragraphs
+        var cellHtml = "";
+        var cellKids = cell.kids;
+        for (var k = 0; k < cellKids.length; k++) {
+          if (cellKids[k].tag === "p") {
+            var par = convertDocxPar(cellKids[k], styles);
+            cellHtml += par.isList
+              ? "<ul><li" + par.styleAttr + ">" + par.content + "</li></ul>"
+              : "<" + par.tag + par.styleAttr + ">" + par.content + "</" + par.tag + ">";
+          }
+        }
+        var cellAttr = "";
+        if (gridSpanVal && gridSpanVal > 1) cellAttr = ' colspan="' + gridSpanVal + '"';
+        html += "<td" + cellAttr + (styleParts.length ? ' style="' + styleParts.join(";") + '"' : "") + ">" + (cellHtml || "<p><br></p>") + "</td>";
+      }
+      html += "</tr>";
+    }
+    html += "</table>";
+    return html;
+  }
+
+  // Minimal text fallback: pull w:t text nodes / paragraph boundaries.
+  async function convertDocxTextFallback(arrayBuffer) {
+    var doc = await zipReadEntry(arrayBuffer, "word/document.xml");
+    if (!doc) return null;
+    var xml = new TextDecoder("utf-8").decode(doc);
+    var html = "";
+    var blockRe = /<(?:w:p|w:tbl)\b[\s\S]*?<\/(?:w:p|w:tbl)>/g;
+    var m;
+    while ((m = blockRe.exec(xml)) !== null) {
+      var inner = (m[0].match(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g) || [])
+        .map(function (t) {
+          return t.replace(/^<w:t\b[^>]*>/, "").replace(/<\/w:t>$/, "")
+            .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+        }).join("");
+      if (inner.replace(/\s/g, "")) html += "<p>" + escapeHtml(inner) + "</p>";
+    }
+    return html && html.replace(/\S/g, "") ? null : (html || null);
+  }
+
+  // ---- entry point: full .docx → {html, pageSetup} ----
+  async function convertDocxFully(arrayBuffer) {    var docEntry = await zipReadEntry(arrayBuffer, "word/document.xml");
+    if (!docEntry) return null;
+    var docXml = new TextDecoder("utf-8").decode(docEntry);
+    var docRoot = xmlParse(docXml);
+    var stylesEntry = await zipReadEntry(arrayBuffer, "word/styles.xml");
+    var styles = { para: {}, run: {} };
+    if (stylesEntry) {
+      var stylesXml = new TextDecoder("utf-8").decode(stylesEntry);
+      styles = parseDocxStyles(xmlParse(stylesXml));
+    }
+    var html = convertDocxTree(docRoot, styles);
+    var pageSetup = parseDocxPageSetup(docRoot);
+    return { html: html, pageSetup: pageSetup };
+  }
+
+  // Public-ish: convert a .docx file to { html, pageSetup }, preferring the
+  // full custom converter, falling back to mammoth, then plain text.
+  async function convertDocxToHtml(file) {
+    var ab = await file.arrayBuffer();
+    var full = null;
+    try { full = await convertDocxFully(ab); } catch (e) { full = null; }
+    if (full && full.html && full.html.replace(/\S/g, "")) {
+      return { html: importHtmlToContent(full.html), pageSetup: full.pageSetup || null };
+    }
+    // mammoth fallback (structure only — page setup/alignment lost)
+    var text = (typeof mammoth !== "undefined")
+      ? await mammoth.convertToHtml({ arrayBuffer: ab })
+          .then(function (r) { return r.value; }).catch(function () { return null; })
+      : null;
+    if (text && text.replace(/\S/g, "")) {
+      return { html: importHtmlToContent(text), pageSetup: null };
+    }
+    var ab2 = ab;
+    var plain = await convertDocxTextFallback(ab2);
+    return { html: plain ? importTextToHtml(plain, false) : "<p><br></p>", pageSetup: null };
+  }
+
+  // Best-effort .doc → HTML. Tries the binary text extractor; the result may
+  // be incomplete for older/newer Word files but preserves readable prose. If
+  // nothing usable is found we surface a helpful error. A .doc that is really
+  // RTF underneath (common for files saved by "Save As Type: .doc") is routed
+  // through the RTF parser first.
+  async function convertDocToHtml(file) {
+    var ab = await file.arrayBuffer();
+    var head = new TextDecoder("latin1").decode(ab.slice(0, 16));
+    if (/^\s*\{\\rtf/.test(head)) {
+      return nullContentToSpacer(convertRtfToText(new TextDecoder("latin1").decode(ab)));
+    }
+    var txt = convertDocToText(ab);
+    if (!txt) {
+      throw new Error("EMPTYDOC");
+    }
+    return importTextToHtml(txt, false);
+  }
+
+  function nullContentToSpacer(plain) {
+    return importTextToHtml(plain || "", false);
+  }
+
   async function importDocumentFromFile(file) {
     var ext = (file.name.toLowerCase().split(".").pop() || "");
     var baseName = file.name.replace(/\.[^.]+$/, "").trim() || "Imported Document";
-
     var contentPromise;
     if (ext === "html" || ext === "htm") {
       contentPromise = file.text().then(function (t) { return importHtmlToContent(t); });
@@ -2255,18 +3102,36 @@
       contentPromise = file.text().then(function (t) { return importTextToHtml(t, true); });
     } else if (ext === "txt" || ext === "text" || file.type.indexOf("text/") === 0) {
       contentPromise = file.text().then(function (t) { return importTextToHtml(t, false); });
+    } else if (ext === "docx") {
+      contentPromise = convertDocxToHtml(file);
+    } else if (ext === "odt") {
+      contentPromise = file.arrayBuffer().then(convertOdtToHtml).then(function (h) { return h || "<p><br></p>"; });
+    } else if (ext === "rtf") {
+      contentPromise = file.text().then(function (t) { return convertRtfToText(t); }).then(nullContentToSpacer);
+    } else if (ext === "doc") {
+      contentPromise = convertDocToHtml(file);
     } else {
-      toast("Unsupported file type. Please use .txt, .md or .html.", "error");
+      toast("Unsupported file type. Please use .doc, .docx, .odt, .txt, .md or .html.", "error");
       return;
     }
 
     var content;
     try { content = await contentPromise; } catch (e) {
-      toast("Could not read file", "error");
+      if (e && e.message === "EMPTYDOC") {
+        toast("Could not extract readable text from this .doc file.", "error");
+      } else {
+        toast("Could not read file", "error");
+      }
       return;
     }
 
     var id = makeDocId();
+    var pageSetup = null;
+    // .docx importer returns {html, pageSetup}. Unwrap it.
+    if (content && typeof content === "object" && content.html) {
+      pageSetup = content.pageSetup || null;
+      content = content.html;
+    }
     var plain = htmlToText(content);
     documents.unshift({
       id: id,
@@ -2275,7 +3140,7 @@
       wordCount: plain ? plain.split(/\s+/).filter(Boolean).length : 0,
     });
     await saveIndex();
-    await writeDocData({
+    var docData = {
       id: id,
       title: baseName,
       content: content,
@@ -2285,7 +3150,13 @@
       footer: "",
       footnotes: [],
       endnotes: [],
-    });
+    };
+    if (pageSetup) {
+      docData.pageSize = { w: pageSetup.w, h: pageSetup.h, portrait: pageSetup.portrait };
+      docData.pageMargins = { top: pageSetup.marginTop, right: pageSetup.marginRight, bottom: pageSetup.marginBottom, left: pageSetup.marginLeft };
+      if (pageSetup.bg) docData.pageBg = pageSetup.bg;
+    }
+    await writeDocData(docData);
     toast("Imported \u201C" + baseName + "\u201D", "success");
     await openDocument(id);
   }
@@ -2323,14 +3194,25 @@
     }
   }
   /* ---------------- New / Print / Export ---------------- */
+  // Guards against firing the OS print dialog twice (double-click, or Ctrl+P
+  // repeated while the dialog is opening).
+  var printInFlight = false;
   function printDocument() {
+    if (printInFlight) return;
+    printInFlight = true;
     saveDocument(false);
     // Force a paginate pass before printing so the latest content is split
     // into pages correctly (otherwise the printout may use stale page breaks).
     try { schedulePaginate(); } catch (e) {}
     // Defer window.print() to the next tick so the paginate pass has a chance
     // to flush DOM changes before the browser snapshots the page for printing.
-    setTimeout(function () { window.print(); }, 50);
+    setTimeout(function () {
+      window.print();
+      // Release after the native dialog has been dismissed. If it's still
+      // open, printing again is harmless (browser ignores it), but this keeps
+      // the flag from permanently locking out future prints.
+      setTimeout(function () { printInFlight = false; }, 500);
+    }, 50);
   }
 
   function exportDocument(format) {
@@ -2964,7 +3846,6 @@
   /* ---------------- Word Count Dialog ---------------- */
   function showWordCount() {
     var stats = getStats();
-    var streak = loadStreak();
     var grid = $("statsGrid");
     var items = [
       { value: stats.words.toLocaleString(), label: "Words" },
@@ -2974,20 +3855,18 @@
       { value: stats.paragraphs.toLocaleString(), label: "Paragraphs / blocks" },
       { value: stats.pages.toLocaleString(), label: "Pages" },
       { value: stats.readingMin + " min", label: "Reading time" },
-      { value: (streak.current || 0) + " day" + (streak.current === 1 ? "" : "s"), label: "Writing streak", accent: true },
-      { value: (streak.longest || 0) + " day" + (streak.longest === 1 ? "" : "s"), label: "Longest streak" },
     ];
     grid.innerHTML = "";
     for (var i = 0; i < items.length; i++) {
       var div = document.createElement("div");
-      div.className = "stat-item" + (items[i].accent ? " stat-accent" : "");
+      div.className = "stat-item";
       div.innerHTML = '<div class="stat-value">' + items[i].value + '</div><div class="stat-label">' + items[i].label + "</div>";
       grid.appendChild(div);
     }
-    renderStreakHeatmap(streak);
     renderStatsChart();
     renderWritingIssues();
     updateGoalTracker();
+    renderWritingTimeStats();
     openModal("wordCountModal");
   }
 
@@ -2996,8 +3875,8 @@
     var ticks = $("rulerTicks");
     if (!ticks) return;
     ticks.innerHTML = "";
-    // content width depends on current margins
-    var contentWidth = PAGE_WIDTH - pageMargins.left - pageMargins.right;
+    // content width depends on current margins + page size
+    var contentWidth = curPageW - pageMargins.left - pageMargins.right;
     var step = 50;
     for (var x = 0; x <= contentWidth; x += step) {
       var t = document.createElement("div");
@@ -3596,11 +4475,9 @@
       }
     }
 
-    // 2) Detect common misspellings (skip words in custom dictionary)
+    // 2) Detect common misspellings
     var lowerText = text.toLowerCase();
     for (var misspelling in COMMON_MISSPELLINGS) {
-      // Skip if the misspelling is in the user's custom dictionary
-      if (customDict[misspelling]) continue;
       var regex = new RegExp("\\b" + misspelling + "\\b", "gi");
       var match;
       while ((match = regex.exec(text)) !== null) {
@@ -3689,9 +4566,11 @@
   function updateMarginPreview() {
     var preview = $("marginPreview");
     if (!preview) return;
-    // Scale the real page margins (794x1123) down to the preview (140x180)
-    var scaleX = 140 / 794;
-    var scaleY = 180 / 1123;
+    // Scale the real page down to the preview (140x180 box) using the
+    // current page dimensions so non-A4 imported docs preview correctly.
+    var base = getBasePageSize();
+    var scaleX = 140 / base.w;
+    var scaleY = 180 / base.h;
     var scale = Math.min(scaleX, scaleY);
     var top = pageMargins.top * scale;
     var right = pageMargins.right * scale;
@@ -3717,6 +4596,8 @@
       panel.classList.remove("open");
       panel.setAttribute("aria-hidden", "true");
     }
+    var btn = $("btnPages");
+    if (btn) btn.classList.toggle("active", shouldOpen);
   }
 
   function buildThumbnails() {
@@ -3787,7 +4668,7 @@
     }
   }
 
-  /* ---------------- Session timer ---------------- */
+  /* ---------------- Session timer + writing time ---------------- */
   var sessionStart = 0;
   var sessionInterval = null;
   var sessionActive = false;
@@ -3817,184 +4698,92 @@
 
   function updateSessionTimer() {
     var el = $("sessionTimerText");
-    if (!el) return;
-    if (!sessionActive) return;
-    var elapsed = Math.floor((Date.now() - sessionStart) / 1000);
-    var mins = Math.floor(elapsed / 60);
-    var secs = elapsed % 60;
-    el.textContent = mins + ":" + String(secs).padStart(2, "0");
-    // record today's writing activity for the streak tracker
-    recordWritingDay();
-  }
-
-  /* ---------------- Writing streak tracker ---------------- */
-  var STREAK_KEY = "emeralddocs.streak";
-  function recordWritingDay() {
-    var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    var streak = loadStreak();
-    if (!streak.days) streak.days = [];
-    if (streak.days.indexOf(today) < 0) {
-      streak.days.push(today);
-      // keep last 60 days
-      if (streak.days.length > 60) streak.days = streak.days.slice(-60);
-      // recompute current streak
-      streak.current = computeCurrentStreak(streak.days);
-      streak.longest = Math.max(streak.longest || 0, streak.current);
-      saveStreak(streak);
+    if (el && sessionActive) {
+      var elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+      var mins = Math.floor(elapsed / 60);
+      var secs = elapsed % 60;
+      el.textContent = mins + ":" + String(secs).padStart(2, "0");
     }
+    // Keep the Document Statistics "This session" figure live while the modal is open.
+    var wc = $("wordCountModal");
+    if (wc && wc.classList.contains("open") && sessionActive) renderWritingTimeStats();
   }
 
-  function loadStreak() {
+  /* Tally of all writing time, saved across sessions (IDB + localStorage fallback). */
+  var writingTimeCache = null;
+
+  function loadWritingTime() {
+    if (writingTimeCache) return writingTimeCache;
     try {
-      var s = null;
-      if (idbAvailable()) s = idb.getJSONSync(STREAK_KEY);
-      if (!s) { var raw = localStorage.getItem(STREAK_KEY); if (raw) s = JSON.parse(raw); }
-      if (s && Array.isArray(s.days)) return s;
-    } catch (e) {}
-    return { days: [], current: 0, longest: 0 };
-  }
-
-  function saveStreak(s) {
-    try {
-      if (idbAvailable()) idb.setJSON(STREAK_KEY, s);
-      else localStorage.setItem(STREAK_KEY, JSON.stringify(s));
-    } catch (e) {}
-  }
-
-  function computeCurrentStreak(days) {
-    if (!days || !days.length) return 0;
-    var sorted = days.slice().sort();
-    var today = new Date();
-    var streak = 0;
-    // start from today and walk backwards
-    var d = new Date(today);
-    // If today is in the list, count it; otherwise start from yesterday
-    var todayStr = today.toISOString().slice(0, 10);
-    if (sorted.indexOf(todayStr) < 0) {
-      d.setDate(d.getDate() - 1);
-    }
-    while (true) {
-      var ds = d.toISOString().slice(0, 10);
-      if (sorted.indexOf(ds) >= 0) {
-        streak++;
-        d.setDate(d.getDate() - 1);
-      } else {
-        break;
+      var wt = null;
+      if (idbAvailable()) wt = idb.getJSONSync(WRITING_TIME_KEY);
+      if (!wt) {
+        var raw = localStorage.getItem(WRITING_TIME_KEY);
+        if (raw) wt = JSON.parse(raw);
       }
-    }
-    return streak;
+      if (wt && typeof wt.totalSeconds === "number") {
+        writingTimeCache = { totalSeconds: wt.totalSeconds, sessions: wt.sessions || 0 };
+        return writingTimeCache;
+      }
+    } catch (e) {}
+    writingTimeCache = { totalSeconds: 0, sessions: 0 };
+    return writingTimeCache;
   }
 
-
-  /* ---------------- Word cloud ---------------- */
-  /* ---------------- Writing streak heatmap (GitHub-style) ---------------- */
-  function renderStreakHeatmap(streak) {
-    var container = $("streakHeatmap");
-    if (!container) {
-      // find the stats grid section and insert a heatmap section after it
-      var grid = $("statsGrid");
-      if (!grid) return;
-      var wrap = document.createElement("div");
-      wrap.className = "stats-chart-section streak-heatmap-section";
-      wrap.innerHTML = '<h4>Writing activity (last 35 days)</h4><div class="streak-heatmap" id="streakHeatmap"></div>';
-      grid.parentElement.insertBefore(wrap, grid.nextSibling);
-      container = $("streakHeatmap");
-      if (!container) return;
-    }
-    container.innerHTML = "";
-    var days = streak.days || [];
-    var daySet = {};
-    for (var i = 0; i < days.length; i++) daySet[days[i]] = true;
-    var today = new Date();
-    // render last 35 days as 5 rows × 7 cols (5 weeks)
-    var cells = 35;
-    var start = new Date(today);
-    start.setDate(start.getDate() - (cells - 1));
-    for (var c = 0; c < cells; c++) {
-      var d = new Date(start);
-      d.setDate(d.getDate() + c);
-      var ds = d.toISOString().slice(0, 10);
-      var cell = document.createElement("div");
-      cell.className = "streak-cell" + (daySet[ds] ? " streak-cell-active" : "");
-      cell.title = ds + (daySet[ds] ? " — wrote" : " — no activity");
-      container.appendChild(cell);
-    }
-  }
-
-  /* ---------------- Custom dictionary ---------------- */
-  var DICT_KEY = "emeralddocs.dictionary";
-  var customDict = {};
-
-  function loadCustomDict() {
+  function saveWritingTime() {
     try {
-      var d = null;
-      if (idbAvailable()) { d = idb.getJSONSync(DICT_KEY); }
-      if (d && typeof d === "object") { customDict = d; return; }
-      var raw = localStorage.getItem(DICT_KEY);
-      if (raw) customDict = JSON.parse(raw) || {};
-    } catch (e) { customDict = {}; }
-  }
-
-  function saveCustomDict() {
-    try {
-      if (idbAvailable()) { idb.setJSON(DICT_KEY, customDict); }
-      else { localStorage.setItem(DICT_KEY, JSON.stringify(customDict)); }
+      if (idbAvailable()) idb.setJSON(WRITING_TIME_KEY, writingTimeCache);
+      else localStorage.setItem(WRITING_TIME_KEY, JSON.stringify(writingTimeCache));
     } catch (e) {}
   }
 
-  function openDictDialog() {
-    renderDictWords();
-    openModal("dictModal");
-    setTimeout(function () { $("dictInput").focus(); }, 80);
+  function currentSessionSeconds() {
+    if (!sessionActive) return 0;
+    return Math.floor((Date.now() - sessionStart) / 1000);
   }
 
-  function renderDictWords() {
-    var container = $("dictWords");
-    if (!container) return;
-    container.innerHTML = "";
-    var keys = Object.keys(customDict).sort();
-    if (keys.length === 0) {
-      var empty = document.createElement("p");
-      empty.className = "dict-empty";
-      empty.textContent = "No custom words yet. Add names or technical terms you use often.";
-      container.appendChild(empty);
-      return;
-    }
-    for (var i = 0; i < keys.length; i++) {
-      (function (word) {
-        var chip = document.createElement("span");
-        chip.className = "dict-word";
-        chip.appendChild(document.createTextNode(word));
-        var remove = document.createElement("button");
-        remove.className = "dict-word-remove";
-        remove.textContent = "×";
-        remove.title = "Remove";
-        remove.addEventListener("click", function () {
-          delete customDict[word];
-          saveCustomDict();
-          renderDictWords();
-          renderWritingIssues();
-        });
-        chip.appendChild(remove);
-        container.appendChild(chip);
-      })(keys[i]);
-    }
+  /* Move the elapsed session time into the all-time total (once per session). */
+  function commitSessionTime() {
+    if (!sessionActive) return;
+    var secs = Math.floor((Date.now() - sessionStart) / 1000);
+    sessionActive = false;
+    if (sessionInterval) { clearInterval(sessionInterval); sessionInterval = null; }
+    if (secs < 1) return;
+    loadWritingTime();
+    writingTimeCache.totalSeconds += secs;
+    writingTimeCache.sessions++;
+    saveWritingTime();
   }
 
-  function addDictWord(word) {
-    word = (word || "").trim().toLowerCase();
-    if (!word) return;
-    if (customDict[word]) {
-      toast("Already in dictionary", "error");
-      return;
-    }
-    customDict[word] = true;
-    saveCustomDict();
-    renderDictWords();
-    renderWritingIssues();
-    $("dictInput").value = "";
-    $("dictInput").focus();
-    toast("Added to dictionary", "success");
+  function formatSessionClock(secs) {
+    secs = Math.max(0, Math.floor(secs || 0));
+    var h = Math.floor(secs / 3600);
+    var m = Math.floor((secs % 3600) / 60);
+    var s = secs % 60;
+    if (h > 0) return h + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  function formatDurationLabel(secs) {
+    secs = Math.max(0, Math.floor(secs || 0));
+    var h = Math.floor(secs / 3600);
+    var m = Math.floor((secs % 3600) / 60);
+    if (h > 0 && m === 0) return h + "h";
+    if (h > 0) return h + "h " + m + "m";
+    if (m > 0) return m + "m";
+    return secs + "s";
+  }
+
+  function renderWritingTimeStats() {
+    var session = $("sessionTimeStat");
+    var total = $("totalTimeStat");
+    var sessions = $("sessionsStat");
+    if (!session && !total && !sessions) return;
+    var live = currentSessionSeconds();
+    var wt = loadWritingTime();
+    if (session) session.textContent = formatSessionClock(live);
+    if (total) total.textContent = formatDurationLabel(wt.totalSeconds + live);
+    if (sessions) sessions.textContent = String(wt.sessions + (sessionActive ? 1 : 0));
   }
 
   /* ===================================================================
@@ -4139,6 +4928,69 @@
     }
     var done = $("symbolDoneBtn");
     if (done) done.addEventListener("click", function () { toggleSymbolBar(false); });
+  }
+
+  /* ---------------- Apply per-document page layout ----------------
+     Imported .docx files carry their own page size, orientation, margins and
+     background fill (the way MS Word stores them per section). applyDocPageLayout
+     restores those on the current editor so an imported doc looks like the
+     original rather than inheriting the app's A4 default. */
+  function applyDocPageSize(w, h, portrait) {
+    var pw = Math.round(w) || PAGE_WIDTH;
+    var ph = Math.round(h) || PAGE_HEIGHT;
+    if (portrait === false) { var tmp = pw; pw = ph; ph = tmp; }
+    curPageW = pw; curPageH = ph;
+    // Drive both the CSS variables (base .page rule + print) and the inline
+    // sizes (so getBasePageSize / zoom-fit still work for arbitrary sizes).
+    var root = document.documentElement;
+    root.style.setProperty("--emu-pw", pw + "px");
+    root.style.setProperty("--emu-ph", ph + "px");
+    root.style.setProperty("--emu-ppw", (pw / 96 * 25.4).toFixed(2) + "mm");
+    root.style.setProperty("--emu-pph", (ph / 96 * 25.4).toFixed(2) + "mm");
+    var pages = getPages();
+    for (var i = 0; i < pages.length; i++) {
+      pages[i].style.width = pw + "px";
+      pages[i].style.height = ph + "px";
+      pages[i].classList.toggle("landscape", portrait === false);
+    }
+  }
+
+  function applyDocPageLayout(data) {
+    if (!data) return;
+    if (data.pageSize && (data.pageSize.w || data.pageSize.h)) {
+      var portrait = data.pageSize.portrait !== false;
+      applyDocPageSize(data.pageSize.w, data.pageSize.h, portrait);
+    } else {
+      applyDocPageSize(PAGE_WIDTH, PAGE_HEIGHT, true);
+    }
+    if (data.pageMargins) {
+      var m = data.pageMargins;
+      if (m.left && m.top && m.right && m.bottom) {
+        pageMargins.left = clampMargin(m.left);
+        pageMargins.top = clampMargin(m.top);
+        pageMargins.right = clampMargin(m.right);
+        pageMargins.bottom = clampMargin(m.bottom);
+      }
+    }
+    applyDocMarginsVars();
+    // Background fill from the imported doc (Word section background).
+    if (data.pageBg) {
+      var wrapper = $(PAGES_WRAPPER_ID);
+      if (wrapper) wrapper.style.setProperty("--paper-bg", data.pageBg);
+    } else {
+      var wrapper2 = $(PAGES_WRAPPER_ID);
+      if (wrapper2) wrapper2.style.removeProperty("--paper-bg");
+    }
+    buildRulerTicks();
+  }
+
+  // Mirror the current pageMargins object onto CSS variables + persistence.
+  function applyDocMarginsVars() {
+    var root = document.documentElement;
+    root.style.setProperty("--page-margin-top", pageMargins.top + "px");
+    root.style.setProperty("--page-margin-right", pageMargins.right + "px");
+    root.style.setProperty("--page-margin-bottom", pageMargins.bottom + "px");
+    root.style.setProperty("--page-margin-left", pageMargins.left + "px");
   }
 
   /* ---------------- Go To (lives in the bottom-right bar) ---------------- */
@@ -5281,7 +6133,10 @@
     for (var i = 0; i < cmdButtons.length; i++) {
       (function (btn) {
         btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
-        btn.addEventListener("click", function () { exec(btn.getAttribute("data-cmd")); });
+        btn.addEventListener("click", function () {
+          if (btn.disabled) return;
+          exec(btn.getAttribute("data-cmd"));
+        });
       })(cmdButtons[i]);
     }
 
@@ -5676,7 +6531,7 @@
     $("btnPrintExit").addEventListener("click", function () { togglePrintPreview(false); });
     $("btnPrintNow").addEventListener("click", function () {
       togglePrintPreview(false);
-      setTimeout(printDocument, 100);
+      printDocument();
     });
 
 
@@ -5767,11 +6622,6 @@
       if (e.target === $("fileModal")) closeFileModal();
     });
     // Actions
-    if ($("fileSaveBtn")) $("fileSaveBtn").addEventListener("click", function () {
-      commitFileModalRename();
-      saveDocument(true);
-      syncFileModalNameInput();
-    });
     if ($("fileDeleteBtn")) $("fileDeleteBtn").addEventListener("click", function () {
       var wasCurrent = currentDocId;
       closeFileModal();
@@ -5874,23 +6724,6 @@
         }
       });
     }
-
-    // Custom dictionary
-    $("dictLink").addEventListener("click", openDictDialog);
-    $("dictAdd").addEventListener("click", function () { addDictWord($("dictInput").value); });
-    $("dictInput").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); addDictWord($("dictInput").value); }
-    });
-    $("dictClearAll").addEventListener("click", function () {
-      if (Object.keys(customDict).length === 0) return;
-      if (window.confirm("Clear all custom dictionary words?")) {
-        customDict = {};
-        saveCustomDict();
-        renderDictWords();
-        renderWritingIssues();
-        toast("Dictionary cleared", "success");
-      }
-    });
 
     // Outline panel
     $("btnOutline").addEventListener("mousedown", function (e) { e.preventDefault(); });
@@ -6007,6 +6840,7 @@
         }
       }
       updateToolbarStates();
+      updateRibbonAvailability();
       updateStatus();
     });
 
@@ -6033,7 +6867,6 @@
 
     loadMargins();
     loadGoal();
-    loadCustomDict();
     // Color theme loading is a no-op now (cyan is locked via CSS).
     buildRulerTicks();
     initMarginDrag();
@@ -6042,9 +6875,12 @@
     initDragDropImage();
     setZoom(100);
     updateToolbarStates();
+    updateRibbonAvailability();
     updateStatus();
     initCrossTabSync();
     initNewFeatures();
+    // Bank the current session's writing time if the tab is closed mid-session.
+    window.addEventListener("pagehide", commitSessionTime);
 
     setTimeout(function () {
       // Only auto-focus the editor when a document is actually open —
@@ -6081,9 +6917,8 @@
       } else if (change.key === GOAL_KEY) {
         loadGoal();
         updateGoalTracker();
-      } else if (change.key === "emeralddocs.dictionary") {
-        loadCustomDict();
-        renderWritingIssues();
+      } else if (change.key === WRITING_TIME_KEY) {
+        writingTimeCache = null; // reload from the other tab on next read
       }
     });
   }

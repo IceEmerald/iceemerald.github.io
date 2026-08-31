@@ -357,7 +357,7 @@
             <div class="group-label">Text</div>
             <div class="ribbon-controls">
               <button class="ribbon-btn" id="btnDropCap" title="Drop cap">
-                <svg viewBox="0 0 24 24"><text x="3" y="20" font-size="20" font-weight="700" fill="currentColor">A</text><text x="13" y="20" font-size="11" fill="currentColor">bc</text></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><text x="2" y="19" font-size="18" font-weight="500" fill="none" stroke="currentColor" stroke-width="1.5">A</text><text x="12" y="19" font-size="10" fill="none" stroke="currentColor" stroke-width="1.5">bc</text></svg>
                 <span>Drop Cap</span>
               </button>
             </div>
@@ -597,7 +597,7 @@
         <!-- ============ REFERENCES PANEL ============ -->
         <div class="ribbon-panel" data-panel="references">
           <div class="ribbon-group">
-            <div class="group-label">Table of Contents</div>
+            <div class="group-label">TOC</div>
             <div class="ribbon-controls">
               <button class="ribbon-btn" id="btnTocRef" title="Insert table of contents">
                 <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="11" x2="15" y2="11"/><line x1="3" y1="16" x2="17" y2="16"/><line x1="3" y1="21" x2="13" y2="21"/></svg>
@@ -677,7 +677,7 @@
                 Import File
               </button>
             </div>
-            <input type="file" id="fileImportInput" accept=".txt,.md,.html,.htm" style="display:none;">
+            <input type="file" id="fileImportInput" accept=".txt,.md,.markdown,.html,.htm,.doc,.docx,.rtf,.odt,.xml" style="display:none;">
           </div>
         </div>
         <div class="docs-section">
@@ -685,7 +685,7 @@
           </div>
           <div class="no-docs-container" id="noDocsContainer">
             <div class="show-phone-only" style="margin-top:4rem;"></div>
-            <img class="show-desktop-only" src="/assets/images/noslides.webp" style="max-width:600px;height:auto;opacity:1;transform:translateY(0px);filter:blur(0px);transition:opacity 0.45s ease-out,transform 0.45s ease-out,filter 0.45s ease-out,background-color 0.2s,color 0.2s,border-color 0.2s;will-change:opacity,transform,filter;" alt="">
+            <img class="show-desktop-only" src="/assets/images/nodocs.webp" style="max-width:600px;height:auto;opacity:1;transform:translateY(0px);filter:blur(0px);transition:opacity 0.45s ease-out,transform 0.45s ease-out,filter 0.45s ease-out,background-color 0.2s,color 0.2s,border-color 0.2s;will-change:opacity,transform,filter;" alt="">
             <p class="no-docs-hint">Create your first document to get started</p>
           </div>
         </div>
@@ -822,7 +822,7 @@
         </div>
 
         <div class="stats-chart-section">
-          <h4>Writing issues <button class="dict-link" id="dictLink" title="Custom dictionary">Manage dictionary</button></h4>
+          <h4>Writing issues</h4>
           <div class="issues-list" id="issuesList"></div>
         </div>
 
@@ -853,13 +853,14 @@
   <aside class="outline-panel" id="outlinePanel" aria-hidden="true">
     <div class="outline-head">
       <h3>Outline</h3>
-      <button class="modal-close" id="outlineClose" aria-label="Close outline">×</button>
+      <button class="modal-close" id="outlineClose" aria-label="Close outline">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="outline-search">
       <svg class="outline-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="outlineSearch" placeholder="Filter headings…" autocomplete="off" />
     </div>
-    <div class="outline-hint" id="outlineHint">Drag to reorder headings</div>
     <div class="outline-body" id="outlineBody">
       <p class="outline-empty">Add headings (Title, Heading 1–3) to see them here.</p>
     </div>
@@ -941,38 +942,13 @@
     </div>
   </div>
 
-  <!-- ===================== Custom Dictionary Dialog ===================== -->
-  <div class="modal-overlay" id="dictModal" aria-hidden="true">
-    <div class="modal modal-sm" role="dialog" aria-label="Custom dictionary">
-      <div class="modal-head">
-        <div class="modal-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-        </div>
-        <h3>Custom Dictionary</h3>
-        <button class="modal-close" data-close="dictModal" aria-label="Close">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <div class="modal-body">
-        <p class="dict-hint">Words added here are ignored by the writing-issue checker. Useful for names, technical terms, or words you use often.</p>
-        <div class="dict-add-row">
-          <input type="text" id="dictInput" placeholder="Add a word…" autocomplete="off" />
-          <button class="btn primary sm" id="dictAdd">Add</button>
-        </div>
-        <div class="dict-words" id="dictWords"></div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn ghost sm" id="dictClearAll">Clear all</button>
-        <button class="btn primary sm" data-close="dictModal">Done</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ===================== Page Thumbnails Panel ===================== -->
   <aside class="thumbnails-panel" id="thumbnailsPanel" aria-hidden="true">
     <div class="outline-head">
       <h3>Pages</h3>
-      <button class="modal-close" id="thumbnailsClose" aria-label="Close thumbnails">×</button>
+      <button class="modal-close" id="thumbnailsClose" aria-label="Close thumbnails">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="thumbnails-body" id="thumbnailsBody"></div>
   </aside>
@@ -1119,7 +1095,9 @@
   <aside class="footnotes-panel" id="footnotesPanel" aria-hidden="true">
     <div class="outline-head">
       <h3>Footnotes &amp; Endnotes</h3>
-      <button class="modal-close" id="footnotesClose" aria-label="Close footnotes">×</button>
+      <button class="modal-close" id="footnotesClose" aria-label="Close footnotes">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
     <div class="footnotes-body" id="footnotesBody">
       <p class="outline-empty">No footnotes yet. Use References → Footnote to add one.</p>
@@ -1608,10 +1586,6 @@
               Close
             </button>
           </div>
-          <button class="file-overlay-action-btn" id="fileSaveBtn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/></svg>
-            Save &amp; snapshot version
-          </button>
         </div>
         <!-- Export -->
         <div class="file-overlay-section">
@@ -1723,6 +1697,7 @@
   <!-- Toast -->
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="/assets/scripts/idb-storage.js"></script>
   <script src="/assets/scripts/docs.js"></script>
 </body>

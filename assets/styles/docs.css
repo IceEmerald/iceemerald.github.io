@@ -404,9 +404,7 @@ body {
 .ribbon-tab.active {
   background: transparent;
   color: var(--ui-accent);
-  /* font-weight kept at base 500 — bolding on click made the tab wider
-     (layout shift). Active state is conveyed by accent color + the
-     sliding underline indicator, matching Word/Slides behavior. */
+  font-weight: 600;
   box-shadow: none;
 }
 
@@ -837,11 +835,11 @@ body {
   min-width: 100%;
 }
 
-/* ===================== Page (A4) ===================== */
+/* ===================== Page (A4 default; per-document from imports) ===== */
 .page {
   position: relative;
-  width: 794px;
-  height: 1123px;
+  width: var(--emu-pw, 794px);
+  height: var(--emu-ph, 1123px);
   padding: var(--page-margin-top) var(--page-margin-right) var(--page-margin-bottom) var(--page-margin-left);
   box-sizing: border-box;
   background: var(--paper-bg);
@@ -1471,98 +1469,131 @@ body {
 /* ===================== Outline Sidebar ===================== */
 .outline-panel {
   position: fixed;
-  top: 0;
-  right: 0;
+  top: calc(var(--topbar-h) + var(--ribbon-tabs-h) + var(--ribbon-h) + 10px);
+  right: 10px;
+  bottom: calc(var(--statusbar-h) + 15px);
   width: 280px;
-  height: 100vh;
-  height: 100dvh;
-  background: var(--modal-bg);
-  border-left: 1px solid var(--modal-border);
-  /* No box-shadow in the closed state — the panel sits off-screen at
-     translateX(100%) and its leftward shadow would bleed ~36px into the
-     viewport, painting a dark band down the right edge of the screen.
-     The shadow is applied only in the .open state below. */
+  border-radius: 14px;
   z-index: 150;
-  transform: translateX(100%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateX(24px);
+  pointer-events: none;
+  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s, box-shadow 0.28s var(--ease-bouncy);
   display: flex;
   flex-direction: column;
 }
 
 .outline-panel.open {
-  transform: translateX(0);
-  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .outline-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--modal-border);
+  padding: 16px 16px 4px;
   flex-shrink: 0;
 }
 
 .outline-head h3 {
   margin: 0;
   font-size: 15px;
-  font-weight: 600;
-  color: var(--text-strong);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(44, 62, 80, 0.95);
+}
+
+/* Side-panel close (Outline / Pages / Footnotes) matches Slides' Animation
+   Pane close button: 14px SVG glyph, compact hit target. */
+.outline-head .modal-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(44, 62, 80, 0.5);
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.2s, color 0.2s;
+  position: static;
+  margin-left: auto;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: auto;
+  height: auto;
+}
+
+.outline-head .modal-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(44, 62, 80, 0.9);
 }
 
 .outline-body {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 8px 12px 12px;
 }
 
 .outline-empty {
   color: var(--text-faint);
   font-size: 12.5px;
   font-style: italic;
-  padding: 16px 12px;
+  padding: 24px 12px;
   text-align: center;
   margin: 0;
+  line-height: 1.5;
 }
 
 .outline-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   text-align: left;
-  border: none;
-  background: transparent;
-  color: var(--text-base);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.7);
+  color: rgba(44, 62, 80, 0.9);
   font-family: var(--font-ui);
   font-size: 13px;
-  padding: 7px 10px;
-  border-radius: var(--radius-sm);
+  font-weight: 500;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  position: relative;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .outline-item:hover {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  background: rgba(8, 145, 178, 0.06);
+  border-color: rgba(8, 145, 178, 0.12);
+  box-shadow: rgba(8, 145, 178, 0.08) 0px 2px 8px;
+  color: var(--ui-accent-hover);
 }
 
-.outline-item.level-h1 { font-weight: 600; font-size: 13.5px; color: var(--text-strong); padding-left: 10px; }
-.outline-item.level-h2 { padding-left: 24px; font-weight: 500; }
-.outline-item.level-h3 { padding-left: 38px; font-size: 12.5px; color: var(--text-muted); }
-.outline-item.level-h4 { padding-left: 52px; font-size: 12px; color: var(--text-muted); }
+.outline-item.level-h1 { font-weight: 600; font-size: 13.5px; color: rgba(44, 62, 80, 0.95); }
+.outline-item.level-h2 { font-weight: 500; }
+.outline-item.level-h3 { font-size: 12.5px; color: rgba(44, 62, 80, 0.72); }
+.outline-item.level-h4 { font-size: 12px; color: rgba(44, 62, 80, 0.6); }
 
 .outline-item .outline-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   font-size: 9px;
   font-weight: 700;
-  color: var(--accent-strong);
-  background: var(--accent-soft);
-  border-radius: 3px;
-  padding: 1px 5px;
-  margin-right: 6px;
-  vertical-align: middle;
+  color: var(--ui-accent);
+  background: rgba(8, 145, 178, 0.12);
+  border-radius: 4px;
+  padding: 1px 6px;
+  letter-spacing: 0.02em;
 }
 
 /* ===================== Shortcuts Grid ===================== */
@@ -2022,6 +2053,30 @@ body {
   color: var(--text-muted);
 }
 
+/* Writing time grid — same scale as Reading time / stat items */
+.writing-time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.writing-time-item {
+  background: color-mix(in srgb, var(--text-base) 5%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.writing-time-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-strong);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.writing-time-label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 /* ===================== Focus mode ===================== */
 .focus-bar {
   display: none;
@@ -2157,103 +2212,12 @@ body {
   margin: 0;
 }
 
-/* ===================== Dictionary link + dialog ===================== */
-.dict-link {
-  float: right;
-  background: none;
-  border: none;
-  color: var(--accent-strong);
-  font-size: 11px;
-  font-weight: 500;
-  font-family: var(--font-ui);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  padding: 0;
-}
-
+/* ===================== Modal helper hint text ===================== */
 .dict-hint {
   font-size: 12.5px;
   color: var(--text-muted);
   line-height: 1.5;
   margin: 0 0 12px;
-}
-
-.dict-add-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.dict-add-row input {
-  flex: 1;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--modal-bg);
-  color: var(--text-strong);
-  font-size: 13px;
-  font-family: var(--font-ui);
-}
-
-.dict-add-row input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.dict-words {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 40px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.dict-word {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px 4px 10px;
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.dict-word-remove {
-  display: grid;
-  place-items: center;
-  width: 14px;
-  height: 14px;
-  border: none;
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
-  color: var(--accent-strong);
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-  font-family: var(--font-ui);
-  transition: background 0.12s;
-}
-
-.dict-word-remove:hover {
-  background: var(--accent);
-  color: var(--accent-contrast);
-}
-
-.dict-empty {
-  color: var(--text-faint);
-  font-size: 12px;
-  font-style: italic;
-  text-align: center;
-  width: 100%;
-  padding: 16px 0;
-  margin: 0;
 }
 
 /* ===================== Print preview ===================== */
@@ -2355,14 +2319,13 @@ body {
 /* ===================== Outline search ===================== */
 .outline-search {
   position: relative;
-  padding: 8px 12px 6px;
-  border-bottom: 1px solid var(--modal-border);
+  padding: 8px 16px 10px;
   flex-shrink: 0;
 }
 
 .outline-search-icon {
   position: absolute;
-  left: 22px;
+  left: 26px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-faint);
@@ -2852,34 +2815,33 @@ body {
 /* ===================== Page thumbnails panel ===================== */
 .thumbnails-panel {
   position: fixed;
-  top: 0;
-  right: 0;
-  width: 200px;
-  height: 100vh;
-  height: 100dvh;
-  background: var(--modal-bg);
-  border-left: 1px solid var(--modal-border);
-  /* Shadow only when open — see .outline-panel note about the closed-state
-     shadow bleeding a dark band onto the right edge of the screen. */
+  top: calc(var(--topbar-h) + var(--ribbon-tabs-h) + var(--ribbon-h) + 10px);
+  left: 10px;
+  bottom: calc(var(--statusbar-h) + 15px);
+  width: 240px;
+  border-radius: 14px;
   z-index: 150;
-  transform: translateX(100%);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateX(-24px);
+  pointer-events: none;
+  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s, box-shadow 0.28s var(--ease-bouncy);
   display: flex;
   flex-direction: column;
 }
 
 .thumbnails-panel.open {
+  opacity: 1;
   transform: translateX(0);
-  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
 }
 
 .thumbnails-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 8px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .thumbnail-item {
@@ -2887,27 +2849,45 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  transition: transform 0.12s;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+  box-shadow: rgba(0, 0, 0, 0.03) 0px 1px 3px;
+  transition: transform 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-.thumbnail-item:hover { transform: scale(1.03); }
+.thumbnail-item:hover {
+  transform: translateY(-2px);
+  background: rgba(8, 145, 178, 0.06);
+  border-color: rgba(8, 145, 178, 0.12);
+  box-shadow: rgba(8, 145, 178, 0.08) 0px 2px 8px;
+}
+
+.thumbnail-item.active {
+  background: rgba(8, 145, 178, 0.1);
+  border-color: rgba(8, 145, 178, 0.2);
+  box-shadow: rgba(8, 145, 178, 0.12) 0px 2px 12px;
+  outline: none;
+}
 
 .thumbnail-item.active .thumbnail-page {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  box-shadow: 0 0 0 2px rgba(8, 145, 178, 0.25);
 }
 
 .thumbnail-page {
-  width: 140px;
-  height: 197px;
+  width: 132px;
+  height: 185px;
   background: var(--paper-bg);
   border: 1px solid var(--border-strong);
-  border-radius: 2px;
+  border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   position: relative;
   transition: border-color 0.12s, box-shadow 0.12s;
+  flex-shrink: 0;
 }
 
 .thumbnail-content {
@@ -2930,12 +2910,12 @@ body {
 
 .thumbnail-label {
   font-size: 11px;
-  color: var(--text-muted);
+  color: rgba(44, 62, 80, 0.6);
   font-weight: 500;
 }
 
 .thumbnail-item.active .thumbnail-label {
-  color: var(--accent-strong);
+  color: var(--ui-accent-hover);
   font-weight: 600;
 }
 
@@ -3370,6 +3350,10 @@ body {
 }
 
 /* ===================== Print ===================== */
+@page {
+  size: A4;
+  margin: 0;
+}
 @media print {
   /* Hide ALL app chrome — only the paper/page content should print.
      The navbar (logo, EmeraldSuite, save-indicator), ribbon, status bar,
@@ -3393,12 +3377,18 @@ body {
     padding: 0;
   }
   .pages-wrapper { gap: 0; transform: none !important; }
+  /* Each on-screen page fills exactly one A4 sheet edge-to-edge. Its own
+     padding is the document margins, so the printout matches the on-screen
+     paper exactly (real-paper look). */
   .page {
+    width: var(--emu-ppw, 210mm);
+    height: var(--emu-pph, 297mm);
     box-shadow: none;
     page-break-after: always;
     break-after: page;
     border-radius: 0;
     margin: 0;
+    overflow: visible;
     animation: none;
   }
   .page:last-child {
@@ -4568,54 +4558,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   box-shadow: var(--shadow-sm);
 }
 
-/* ---- Writing streak heatmap (GitHub-style) ---- */
-.streak-heatmap-section {
-  margin-top: 16px;
-}
-.streak-heatmap {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  max-width: 280px;
-}
-.streak-cell {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 3px;
-  background: var(--border-chrome);
-  min-width: 14px;
-  min-height: 14px;
-  transition: transform 0.15s;
-  cursor: default;
-}
-.streak-cell:hover {
-  transform: scale(1.2);
-  z-index: 2;
-}
-.streak-cell-active {
-  background: var(--ui-accent);
-  box-shadow: 0 0 0 1px var(--ui-accent-border);
-}
-.streak-cell-active:nth-child(7n) {
-  background: var(--ui-accent-hover);
-}
-
-/* Accent stat item (writing streak) */
-.stat-item.stat-accent {
-  background: var(--ui-accent-soft);
-  border: 1px solid var(--ui-accent-border);
-  border-radius: var(--radius-sm);
-  padding: 8px;
-}
-.stat-item.stat-accent .stat-value {
-  color: var(--ui-accent);
-  font-weight: 800;
-}
-.stat-item.stat-accent .stat-label {
-  color: var(--ui-accent);
-  opacity: 0.8;
-}
-
 /* ---- Ruler refinement ---- */
 .ruler {
   background: linear-gradient(180deg, var(--ruler-bg), color-mix(in srgb, var(--ruler-bg) 95%, #000 5%));
@@ -4695,10 +4637,10 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 
 /* Active outline heading */
 .outline-item.active-heading {
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
-  border-left: 3px solid var(--ui-accent);
-  padding-left: 8px;
+  background: rgba(8, 145, 178, 0.1);
+  border-color: rgba(8, 145, 178, 0.2);
+  box-shadow: rgba(8, 145, 178, 0.12) 0px 2px 12px;
+  color: var(--ui-accent-hover);
   font-weight: 600;
 }
 .outline-item.active-heading .outline-badge {
@@ -4798,19 +4740,6 @@ a.zdocs-bookmark.flash {
 @keyframes headingFlash {
   0% { background: var(--ui-accent-selected); }
   100% { background: transparent; }
-}
-
-/* Improved thumbnail hover */
-.thumbnail-item {
-  transition: transform 0.2s var(--ease-fluid), box-shadow 0.2s;
-}
-.thumbnail-item:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: var(--shadow-md);
-}
-.thumbnail-item.active {
-  outline: 2px solid var(--ui-accent);
-  outline-offset: 2px;
 }
 
 /* ---- Round 8: color themes + clipboard history ---- */
@@ -4993,11 +4922,17 @@ a.zdocs-bookmark.flash {
   transform: translateY(-1px);
 }
 
-/* Better disabled button styling */
-.btn[disabled], .ribbon-btn[disabled] {
+/* Better disabled button styling (Notes/Slides parity) */
+.btn[disabled], .ribbon-btn[disabled], .ms-dropdown-btn[disabled] {
   opacity: 0.35;
   cursor: not-allowed;
   pointer-events: none;
+  box-shadow: none;
+}
+.btn[disabled]:hover, .ribbon-btn[disabled]:hover, .ms-dropdown-btn[disabled]:hover {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: rgba(44, 62, 80, 0.8);
 }
 
 /* Word count goal bar — gradient fill */
@@ -5520,6 +5455,7 @@ body.no-active-doc .print-preview-bar {
   text-align: left;
   display: -webkit-box;
   -webkit-line-clamp: 6;
+  line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
@@ -5943,8 +5879,7 @@ body.no-active-doc .print-preview-bar {
   column-gap: 20px;
   align-items: start;
 }
-.modal-stats .stats-grid,
-.modal-stats .streak-heatmap-section { grid-column: 1 / -1; }
+.modal-stats .stats-grid { grid-column: 1 / -1; }
 .modal-stats .stats-grid { grid-template-columns: repeat(3, 1fr); }
 
 /* ===================== Comments (Slides-style pins + popup) =====================
