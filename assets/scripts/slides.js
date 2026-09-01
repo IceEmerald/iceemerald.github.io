@@ -4156,12 +4156,6 @@ class SlidesApp {
             e.currentTarget.classList.toggle('active');
             this.renderRulers();
         });
-        document.getElementById('toggleGridBtn')?.addEventListener('click', (e) => {
-            document.body.classList.toggle('show-grid');
-            e.currentTarget.classList.toggle('active');
-            const canvas = document.getElementById('slideCanvas');
-            if (canvas) canvas.classList.toggle('show-grid');
-        });
         document.getElementById('toggleGuidesBtn')?.addEventListener('click', (e) => {
             document.body.classList.toggle('show-guides');
             e.currentTarget.classList.toggle('active');

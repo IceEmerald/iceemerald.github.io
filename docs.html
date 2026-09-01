@@ -577,6 +577,19 @@
             </div>
           </div>
           <div class="ribbon-group">
+            <div class="group-label">Show</div>
+            <div class="ribbon-controls">
+              <button class="ribbon-btn" id="toggleRulerBtn" title="Show or hide the ruler">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="2"/><path d="M3 6v12M7 4v4M11 4v4M15 4v4M19 4v4"/></svg>
+                <span>Ruler</span>
+              </button>
+              <button class="ribbon-btn" id="toggleGuidesBtn" title="Show or hide guidelines">
+                <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>
+                <span>Guidelines</span>
+              </button>
+            </div>
+          </div>
+          <div class="ribbon-group">
             <div class="group-label">Navigation</div>
             <div class="ribbon-controls">
               <button class="ribbon-btn" id="btnOutline" title="Document outline (Ctrl+G)">
@@ -649,12 +662,55 @@
       </div>
     </div>
 
-    <!-- ===================== Document ===================== -->
-    <main class="document-scroll" id="documentScroll">
-      <div class="pages-wrapper" id="pagesWrapper">
-        <!-- Pages injected by JS -->
+    <!-- ===================== Document area (side panels + ruler overlay + scroll) ===================== -->
+    <div class="document-area">
+
+      <!-- Pages (thumbnails) panel — in-flow, mirrors Slides' left sidebar -->
+      <aside class="thumbnails-panel" id="thumbnailsPanel" aria-hidden="true">
+        <div class="outline-head">
+          <h3>Pages</h3>
+          <button class="modal-close" id="thumbnailsClose" aria-label="Close thumbnails">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="thumbnails-body" id="thumbnailsBody"></div>
+      </aside>
+
+      <!-- Center column: ruler overlay + document scroll -->
+      <div class="document-col">
+        <!-- Rulers overlay (top + left + corner) - visible when body.show-rulers is set,
+             matching Slides' editor-rulers -->
+        <div class="document-rulers" id="documentRulers" aria-hidden="true">
+          <div class="ruler-corner"></div>
+          <div class="ruler-top" id="rulerTop"></div>
+          <div class="ruler-left" id="rulerLeft"></div>
+        </div>
+
+        <!-- ===================== Document ===================== -->
+        <main class="document-scroll" id="documentScroll">
+          <div class="pages-wrapper" id="pagesWrapper">
+            <!-- Pages injected by JS -->
+          </div>
+        </main>
       </div>
-    </main>
+
+      <!-- Outline panel — in-flow, mirrors Slides' Animation Pane (right side) -->
+      <aside class="outline-panel" id="outlinePanel" aria-hidden="true">
+        <div class="outline-head">
+          <h3>Outline</h3>
+          <button class="modal-close" id="outlineClose" aria-label="Close outline">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="outline-search">
+          <svg class="outline-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="outlineSearch" placeholder="Filter headings…" autocomplete="off" />
+        </div>
+        <div class="outline-body" id="outlineBody">
+          <p class="outline-empty">Add headings (Title, Heading 1–3) to see them here.</p>
+        </div>
+      </aside>
+    </div>
 
     <!-- ===================== WELCOME SCREEN (home / documents overview) ===================== -->
     <div class="welcome-screen" id="welcomeScreen">
@@ -850,22 +906,6 @@
   </div>
 
   <!-- ===================== Outline Sidebar ===================== -->
-  <aside class="outline-panel" id="outlinePanel" aria-hidden="true">
-    <div class="outline-head">
-      <h3>Outline</h3>
-      <button class="modal-close" id="outlineClose" aria-label="Close outline">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="outline-search">
-      <svg class="outline-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" id="outlineSearch" placeholder="Filter headings…" autocomplete="off" />
-    </div>
-    <div class="outline-body" id="outlineBody">
-      <p class="outline-empty">Add headings (Title, Heading 1–3) to see them here.</p>
-    </div>
-  </aside>
-
   <!-- ===================== Margins Dialog ===================== -->
   <div class="modal-overlay" id="marginsModal" aria-hidden="true">
     <div class="modal modal-sm" role="dialog" aria-label="Page margins">
@@ -941,17 +981,6 @@
       </div>
     </div>
   </div>
-
-  <!-- ===================== Page Thumbnails Panel ===================== -->
-  <aside class="thumbnails-panel" id="thumbnailsPanel" aria-hidden="true">
-    <div class="outline-head">
-      <h3>Pages</h3>
-      <button class="modal-close" id="thumbnailsClose" aria-label="Close thumbnails">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="thumbnails-body" id="thumbnailsBody"></div>
-  </aside>
 
   <!-- ===================== Templates Dialog ===================== -->
   <div class="modal-overlay" id="templatesModal" aria-hidden="true">

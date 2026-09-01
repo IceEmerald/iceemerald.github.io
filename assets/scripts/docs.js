@@ -3269,6 +3269,7 @@ function startAutosaveSnapshots() {
     if (wrapper) wrapper.style.zoom = String(percent / 100);
     var statusPct = $("statusZoomPct");
     if (statusPct) statusPct.textContent = percent + "%";
+    if (document.body.classList.contains("show-rulers")) buildRulerTicks();
   }
 
   /* ---------------- Page navigation ---------------- */
@@ -3870,21 +3871,72 @@ function startAutosaveSnapshots() {
     openModal("wordCountModal");
   }
 
-  /* ---------------- Ruler ---------------- */
+  /* ---------------- Ruler (matches Slides: top + left overlay) ---------------- */
   function buildRulerTicks() {
-    var ticks = $("rulerTicks");
-    if (!ticks) return;
-    ticks.innerHTML = "";
-    // content width depends on current margins + page size
-    var contentWidth = curPageW - pageMargins.left - pageMargins.right;
-    var step = 50;
-    for (var x = 0; x <= contentWidth; x += step) {
-      var t = document.createElement("div");
-      t.className = "ruler-tick" + (x % 100 === 0 ? " major" : "");
-      t.style.width = step + "px";
-      if (x % 100 === 0) t.setAttribute("data-n", Math.round(x / 37.8));
-      ticks.appendChild(t);
+    var top = $("rulerTop");
+    var left = $("rulerLeft");
+    var area = document.querySelector(".document-area");
+    if (!top || !left || !area) return;
+    if (!document.body.classList.contains("show-rulers")) return;
+
+    var page = document.querySelector(".page");
+    if (!page) return;
+
+    var areaRect = area.getBoundingClientRect();
+    var wrapper = $(PAGES_WRAPPER_ID);
+    // Offset of the page top-left corner inside the document area (screen px).
+    // The rulers are pinned to the area, so this already accounts for scroll
+    // and zoom because pageRect is viewport/zoom-aware.
+    var pageRect = page.getBoundingClientRect();
+    var offsetX = pageRect.left - areaRect.left;
+    var scale = (typeof currentZoom === "number" && currentZoom) ? currentZoom / 100 : 1;
+    var pw = curPageW;  // page width in page px (unscaled)
+    var ph = curPageH;  // page height in page px (unscaled)
+
+    // Zoom-aware tick spacing (same tiers as Slides).
+    var minorStep, majorStep;
+    if (scale < 0.4)      { minorStep = 100; majorStep = 250; }
+    else if (scale < 0.8) { minorStep = 50;  majorStep = 100; }
+    else if (scale < 1.6) { minorStep = 25;  majorStep = 100; }
+    else if (scale < 3.0) { minorStep = 10;  majorStep = 50;  }
+    else                  { minorStep = 5;   majorStep = 25;  }
+
+    // Top ruler: vertical ticks + numeric labels.
+    var topHtml = "";
+    for (var x = 0; x <= pw; x += minorStep) {
+      var tpx = offsetX + x * scale;
+      if (tpx < -2 || tpx > areaRect.width + 2) continue;
+      var isMajorX = (x % majorStep === 0);
+      var isMidX = !isMajorX && (majorStep % (minorStep * 2) === 0) && (x % (minorStep * 2) === 0);
+      var h = isMajorX ? 11 : (isMidX ? 7 : 4);
+      topHtml += '<div class="ruler-tick ruler-tick-x" style="left:' + tpx + 'px;height:' + h + 'px;"></div>';
+      if (isMajorX && x > 0) {
+        topHtml += '<span class="ruler-label ruler-label-x" style="left:' + (tpx + 2) + 'px;">' + Math.round(x / 37.8) + '</span>';
+      }
     }
+    top.innerHTML = topHtml;
+
+    // Left ruler: horizontal ticks + numeric labels. Anchored to the whole
+    // document (pages-wrapper) so it scrolls continuously with content and
+    // never "resets" when paginating to another page. totalH is the full
+    // document height (on-screen); we convert it to page px via scale and
+    // step through the whole content with a continuous measurement scale.
+    var leftHtml = "";
+    var wrapperRect = wrapper ? wrapper.getBoundingClientRect() : null;
+    var offsetY = wrapperRect ? wrapperRect.top - areaRect.top : 0;
+    var totalPagePx = wrapperRect ? Math.max(ph, wrapperRect.height / scale) : ph;
+    for (var y = 0; y <= totalPagePx; y += minorStep) {
+      var lpy = offsetY + y * scale;
+      if (lpy < -2 || lpy > areaRect.height + 2) continue;
+      var isMajorY = (y % majorStep === 0);
+      var isMidY = !isMajorY && (majorStep % (minorStep * 2) === 0) && (y % (minorStep * 2) === 0);
+      var w = isMajorY ? 11 : (isMidY ? 7 : 4);
+      leftHtml += '<div class="ruler-tick ruler-tick-y" style="top:' + lpy + 'px;width:' + w + 'px;"></div>';
+      if (isMajorY && y > 0) {
+        leftHtml += '<span class="ruler-label ruler-label-y" style="top:' + (lpy + 2) + 'px;">' + Math.round(y / 37.8) + '</span>';
+      }
+    }
+    left.innerHTML = leftHtml;
   }
 
   /* ---------------- Ribbon tab switching ----------------
@@ -4067,78 +4119,6 @@ function startAutosaveSnapshots() {
   function clampMargin(v) {
     if (typeof v !== "number" || isNaN(v)) return 96;
     return Math.max(MIN_MARGIN, Math.min(MAX_MARGIN, Math.round(v)));
-  }
-
-  var marginTipEl = null;
-  var marginDragSide = null; // 'left' | 'right'
-  var marginDragStartX = 0;
-  var marginDragStartVal = 0;
-
-  function initMarginDrag() {
-    marginTipEl = document.createElement("div");
-    marginTipEl.className = "ruler-margin-tip";
-    document.body.appendChild(marginTipEl);
-
-    var left = document.querySelector(".ruler-margin-left");
-    var right = document.querySelector(".ruler-margin-right");
-
-    if (left) {
-      left.addEventListener("mousedown", function (e) {
-        e.preventDefault();
-        startMarginDrag("left", e);
-      });
-    }
-    if (right) {
-      right.addEventListener("mousedown", function (e) {
-        e.preventDefault();
-        startMarginDrag("right", e);
-      });
-    }
-
-    document.addEventListener("mousemove", function (e) {
-      if (marginDragSide) {
-        var dx = e.clientX - marginDragStartX;
-        var newVal = marginDragStartVal;
-        if (marginDragSide === "left") newVal = marginDragStartVal + dx;
-        else newVal = marginDragStartVal - dx; // right margin: drag right = smaller
-        newVal = clampMargin(newVal);
-        pageMargins[marginDragSide] = newVal;
-        applyPageMargins();
-        buildRulerTicks();
-        showMarginTip(e, marginDragSide, newVal);
-        schedulePaginate();
-      }
-    });
-
-    document.addEventListener("mouseup", function () {
-      if (marginDragSide) {
-        marginDragSide = null;
-        var leftEl = document.querySelector(".ruler-margin-left");
-        var rightEl = document.querySelector(".ruler-margin-right");
-        if (leftEl) leftEl.classList.remove("dragging");
-        if (rightEl) rightEl.classList.remove("dragging");
-        marginTipEl.classList.remove("show");
-        saveMargins();
-        scheduleAutosave();
-      }
-    });
-  }
-
-  function startMarginDrag(side, e) {
-    marginDragSide = side;
-    marginDragStartX = e.clientX;
-    marginDragStartVal = pageMargins[side];
-    var el = document.querySelector(".ruler-margin-" + side);
-    if (el) el.classList.add("dragging");
-    showMarginTip(e, side, pageMargins[side]);
-  }
-
-  function showMarginTip(e, side, val) {
-    var cm = (val / 37.8).toFixed(1);
-    marginTipEl.textContent = (side === "left" ? "Left" : "Right") + " margin: " + cm + " cm (" + val + "px)";
-    marginTipEl.style.left = (e.clientX + 12) + "px";
-    marginTipEl.style.top = (e.clientY + 18) + "px";
-    marginTipEl.classList.add("show");
   }
 
   /* ---------------- Margins dialog ---------------- */
@@ -6828,7 +6808,29 @@ function startAutosaveSnapshots() {
     $("zoomOutBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
     $("zoomOutBtn").addEventListener("click", function () { adjustZoom(-10); });
 
-    // Page navigation buttons removed from status bar (no more ‹ › buttons).
+    // Show > Ruler
+    $("toggleRulerBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
+    $("toggleRulerBtn").addEventListener("click", function (e) {
+      var on = document.body.classList.toggle("show-rulers");
+      e.currentTarget.classList.toggle("active", on);
+      if (on) buildRulerTicks();
+    });
+    // Show > Guidelines
+    $("toggleGuidesBtn").addEventListener("mousedown", function (e) { e.preventDefault(); });
+    $("toggleGuidesBtn").addEventListener("click", function (e) {
+      var on = document.body.classList.toggle("show-guides");
+      e.currentTarget.classList.toggle("active", on);
+      var wrapper = $(PAGES_WRAPPER_ID);
+      if (wrapper) wrapper.classList.toggle("show-guides", on);
+    });
+
+    // Keep the ruler aligned to the page while zooming / scrolling / resizing.
+    $("documentScroll").addEventListener("scroll", function () {
+      if (document.body.classList.contains("show-rulers")) buildRulerTicks();
+    });
+    window.addEventListener("resize", function () {
+      if (document.body.classList.contains("show-rulers")) buildRulerTicks();
+    });
 
     // Track editor selection
     document.addEventListener("selectionchange", function () {
@@ -6869,7 +6871,6 @@ function startAutosaveSnapshots() {
     loadGoal();
     // Color theme loading is a no-op now (cyan is locked via CSS).
     buildRulerTicks();
-    initMarginDrag();
     initLinkPreview();
     initImageResize();
     initDragDropImage();
@@ -8785,38 +8786,8 @@ function startAutosaveSnapshots() {
     // Custom rich tooltips removed (Slides parity) — buttons keep their
     // native title= tooltips.
 
-    // Round 6: ripple effect + table cell right-click
-    initRippleEffect();
+    // Table cell right-click (Round 6)
     initTableContextMenu();
-  }
-
-  /* ---------------- Button ripple effect ---------------- */
-  function initRippleEffect() {
-    // Slides parity: no ripple on ribbon buttons — keep it for other chrome buttons only
-    var btns = document.querySelectorAll(".topbar-action, .btn");
-    for (var i = 0; i < btns.length; i++) {
-      (function (btn) {
-        if (btn.getAttribute("data-ripple-wired")) return;
-        btn.setAttribute("data-ripple-wired", "1");
-        btn.style.position = "relative";
-        btn.style.overflow = "hidden";
-        btn.addEventListener("click", function (e) {
-          var rect = btn.getBoundingClientRect();
-          var size = Math.max(rect.width, rect.height);
-          var x = e.clientX - rect.left - size / 2;
-          var y = e.clientY - rect.top - size / 2;
-          var ripple = document.createElement("span");
-          ripple.className = "ripple";
-          ripple.style.width = ripple.style.height = size + "px";
-          ripple.style.left = x + "px";
-          ripple.style.top = y + "px";
-          btn.appendChild(ripple);
-          setTimeout(function () {
-            if (ripple.parentElement) ripple.parentElement.removeChild(ripple);
-          }, 500);
-        });
-      })(btns[i]);
-    }
   }
 
   /* ---------------- Table cell right-click menu ---------------- */

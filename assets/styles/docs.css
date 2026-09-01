@@ -60,7 +60,6 @@
   --ruler-bg: #fbfbfc;
   --ruler-fg: #9ca3af;
   --ruler-line: #d8dce1;
-  --ruler-margin: rgba(8, 145, 178, 0.10);
 
   /* Page margins (dynamic — set by JS) */
   --page-margin-top: 96px;
@@ -824,6 +823,7 @@ body {
 }
 
 .pages-wrapper {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -856,11 +856,12 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Modal animations — exact Slides' keyframes (entrance lifts + scales,
-   exit is a clean 0.23s opacity fade, removed 230ms after `.closing`). */
+/* Modal animations — exact Slides' keyframes (clean opacity fade on
+   entrance, exit is a clean 0.23s opacity fade, removed 230ms after
+   `.closing`). */
 @keyframes fadeInModal {
-  0% { opacity: 0; transform: translateY(10px) scale(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 @keyframes fadeOutModal {
@@ -874,6 +875,31 @@ body {
 }
 
 /* Margin guide removed (per user request) — clean paper like Slides */
+
+/* Guidelines (Show > Guidelines) — center crosshair on each page, using the
+   docs accent (cyan). */
+.pages-wrapper.show-guides .page::before,
+.pages-wrapper.show-guides .page::after {
+  content: "";
+  position: absolute;
+  background: rgba(8, 145, 178, 0.55);
+  pointer-events: none;
+  z-index: 5;
+}
+.pages-wrapper.show-guides .page::before {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  transform: translateX(-0.5px);
+}
+.pages-wrapper.show-guides .page::after {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  transform: translateY(-0.5px);
+}
 
 /* Page number badge removed (per user request) */
 .page-badge {
@@ -1468,25 +1494,37 @@ body {
 
 /* ===================== Outline Sidebar ===================== */
 .outline-panel {
-  position: fixed;
-  top: calc(var(--topbar-h) + var(--ribbon-tabs-h) + var(--ribbon-h) + 10px);
-  right: 10px;
-  bottom: calc(var(--statusbar-h) + 15px);
-  width: 280px;
-  border-radius: 14px;
-  z-index: 150;
-  opacity: 0;
-  transform: translateX(24px);
-  pointer-events: none;
-  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s, box-shadow 0.28s var(--ease-bouncy);
-  display: flex;
+  display: none;
   flex-direction: column;
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--modal-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 0 12px 12px 0;
+  margin-right: 2px;
+  z-index: 10;
+  transition: width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .outline-panel.open {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+  display: flex;
+  animation: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) paneSlideInRight;
+}
+
+@keyframes paneSlideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0px);
+  }
 }
 
 .outline-head {
@@ -1829,28 +1867,6 @@ body {
   flex-shrink: 0;
 }
 
-/* ===================== Ruler margin drag handles ===================== */
-/* NOTE: blue hover/drag highlights and the floating blue tooltip are disabled
-   to keep the ruler visually quiet. The drag handles still work via JS — they
-   just no longer render the accent-colored background, the inner edge line,
-   or the floating "Right margin: … cm (…px)" tooltip. */
-.ruler-margin {
-  transition: background 0.15s;
-}
-
-.ruler-margin:hover,
-.ruler-margin.dragging {
-  background: transparent;
-}
-
-.ruler-margin::after {
-  content: none;
-}
-
-.ruler-margin-tip {
-  display: none !important;
-}
-
 /* ===================== Goal tracker ===================== */
 .goal-bar-wrap {
   margin: 8px 0 4px;
@@ -2121,7 +2137,7 @@ body {
 .app.focus-mode .topbar,
 .app.focus-mode .ribbon-tabs,
 .app.focus-mode .ribbon,
-.app.focus-mode .ruler-wrap {
+.app.focus-mode .document-rulers {
   display: none !important;
 }
 
@@ -2224,7 +2240,7 @@ body {
 .app.print-preview .menubar,
 .app.print-preview .toolbar,
 .app.print-preview .statusbar,
-.app.print-preview .ruler-wrap {
+.app.print-preview .document-rulers {
   filter: blur(0);
 }
 
@@ -2284,37 +2300,6 @@ body {
 .app.print-preview .page::before {
   border-color: rgba(15, 157, 110, 0.25);
 }
-
-/* ===================== Ruler margins button ===================== */
-.ruler-margins-btn {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 18px;
-  padding: 0 7px;
-  border: 1px solid var(--border-chrome);
-  border-radius: 4px;
-  background: var(--bg-toolbar);
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 500;
-  font-family: var(--font-ui);
-  cursor: pointer;
-  z-index: 5;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-
-.ruler-margins-btn:hover {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  border-color: var(--accent);
-}
-
-.ruler-margins-btn span { white-space: nowrap; }
 
 /* ===================== Outline search ===================== */
 .outline-search {
@@ -2814,25 +2799,37 @@ body {
 
 /* ===================== Page thumbnails panel ===================== */
 .thumbnails-panel {
-  position: fixed;
-  top: calc(var(--topbar-h) + var(--ribbon-tabs-h) + var(--ribbon-h) + 10px);
-  left: 10px;
-  bottom: calc(var(--statusbar-h) + 15px);
-  width: 240px;
-  border-radius: 14px;
-  z-index: 150;
-  opacity: 0;
-  transform: translateX(-24px);
-  pointer-events: none;
-  transition: transform 0.28s var(--ease-bouncy), opacity 0.2s, box-shadow 0.28s var(--ease-bouncy);
-  display: flex;
+  display: none;
   flex-direction: column;
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--modal-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px 0 0 12px;
+  margin-left: 2px;
+  z-index: 10;
+  transition: width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .thumbnails-panel.open {
-  opacity: 1;
-  transform: translateX(0);
-  pointer-events: auto;
+  display: flex;
+  animation: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) paneSlideInLeft;
+}
+
+@keyframes paneSlideInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0px);
+  }
 }
 
 .thumbnails-body {
@@ -3175,7 +3172,7 @@ body {
 .app.view-read .topbar,
 .app.view-read .ribbon-tabs,
 .app.view-read .ribbon,
-.app.view-read .ruler-wrap,
+.app.view-read .document-rulers,
 .app.view-read .statusbar {
   display: none !important;
 }
@@ -3358,7 +3355,7 @@ body {
   /* Hide ALL app chrome — only the paper/page content should print.
      The navbar (logo, EmeraldSuite, save-indicator), ribbon, status bar,
      ruler, and all floating panels are hidden. */
-  .navbar, .topbar, .ribbon-tabs, .ribbon, .statusbar, .ruler-wrap,
+  .navbar, .topbar, .ribbon-tabs, .ribbon, .statusbar, .document-rulers,
   .toast, .modal-overlay, .focus-bar, .print-preview-bar,
   .draw-toolbar, .symbol-toolbar,
   .outline-panel, .thumbnails-panel, .comments-panel,
@@ -3436,7 +3433,7 @@ mark.emdocs-mark,
      Slides' behavior of keeping the Present action accessible on mobile. */
   .ribbon-tab-action span { display: none; }
   .ribbon-tab-action { padding: 7px 10px; }
-  .ruler-wrap { display: none; }
+  .document-rulers { display: none; }
   .ribbon-tabs { padding: 0 8px; }
   .ribbon-tab { margin: 0 4px; }
 }
@@ -4031,21 +4028,21 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 .cover-presets .preset-btn, .equation-presets .eq-preset { min-width: 0; }
 
 /* ---- Focus mode refinement ---- */
-.app.focus-mode .ribbon-tabs, .app.focus-mode .ribbon, .app.focus-mode .ruler-wrap, .app.focus-mode .statusbar { display: none; }
+.app.focus-mode .ribbon-tabs, .app.focus-mode .ribbon, .app.focus-mode .document-rulers, .app.focus-mode .statusbar { display: none; }
 .app.focus-mode .document-scroll { padding-top: 40px; }
 
 /* ---- Zen mode (auto-hide chrome) ---- */
 .app.zen-mode .topbar,
 .app.zen-mode .ribbon-tabs,
 .app.zen-mode .ribbon,
-.app.zen-mode .ruler-wrap,
+.app.zen-mode .document-rulers,
 .app.zen-mode .statusbar {
   transition: opacity 0.4s var(--ease-fluid), transform 0.4s var(--ease-fluid);
 }
 .app.zen-mode.zen-hidden .topbar { opacity: 0; transform: translateY(-100%); pointer-events: none; }
 .app.zen-mode.zen-hidden .ribbon-tabs { opacity: 0; transform: translateY(-100%); pointer-events: none; }
 .app.zen-mode.zen-hidden .ribbon { opacity: 0; transform: translateY(-100%); pointer-events: none; height: 0; min-height: 0; margin: 0; }
-.app.zen-mode.zen-hidden .ruler-wrap { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+.app.zen-mode.zen-hidden .document-rulers { opacity: 0; pointer-events: none; }
 .app.zen-mode.zen-hidden .statusbar { opacity: 0; transform: translateY(100%); pointer-events: none; }
 .app.zen-mode .document-scroll { padding-top: 60px; transition: padding-top 0.4s; }
 .app.zen-mode.zen-hidden .document-scroll { padding-top: 20px; }
@@ -4558,43 +4555,121 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
   box-shadow: var(--shadow-sm);
 }
 
-/* ---- Ruler refinement ---- */
-.ruler {
-  background: linear-gradient(180deg, var(--ruler-bg), color-mix(in srgb, var(--ruler-bg) 95%, #000 5%));
-  border-bottom: 1px solid var(--border-chrome);
-  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.02);
+/* ---- Document area + ruler overlay (matching Slides) ---- */
+/* Non-scrolling wrapper that pins the rulers while the document scrolls
+   beneath them. */
+.document-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
 }
-.ruler-ticks {
-  background-image: repeating-linear-gradient(90deg,
-    transparent 0,
-    transparent 9px,
-    var(--ruler-line) 9px,
-    var(--ruler-line) 10px);
+.document-col {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+.document-area .document-col .document-scroll {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Ruler overlay — purely visual, mirrors Slides' editor-rulers.
+   Hidden until toggled via Show > Ruler (body.show-rulers). */
+.document-rulers {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+body.show-rulers .document-rulers {
+  display: block;
+}
+
+.ruler-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border-right: 1px solid rgb(203, 213, 225);
+  border-bottom: 1px solid rgb(203, 213, 225);
+  z-index: 2;
+}
+
+.ruler-top,
+.ruler-left {
+  position: absolute;
+  background: transparent;
+  overflow: hidden;
+  color: rgb(100, 116, 139);
+  font-family: "DM Sans", system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.ruler-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 18px;
+  background: rgb(245, 245, 245);
+  border-bottom: 1px solid rgb(203, 213, 225);
+}
+
+.ruler-left {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 18px;
+  background: rgb(245, 245, 245);
+  border-right: 1px solid rgb(203, 213, 225);
+}
+
+.ruler-tick {
+  position: absolute;
+  background: rgb(148, 163, 184);
+  pointer-events: none;
+}
+
+.ruler-tick-x {
+  top: 0;
+  width: 1px;
+}
+
+.ruler-tick-y {
+  left: 0;
+  height: 1px;
+}
+
+.ruler-label {
+  position: absolute;
+  color: rgb(100, 116, 139);
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ruler-label-x {
+  top: 11px;
+  white-space: nowrap;
+}
+
+.ruler-label-y {
+  left: 11px;
+  white-space: nowrap;
+  transform: rotate(-90deg);
+  transform-origin: left top;
 }
 
 /* ---- More micro-interactions ---- */
-
-/* Button press ripple — spans are injected by initRippleEffect() into
-   .topbar-action and .btn elements. The .ripple rule MUST be generic
-   (not scoped to .ribbon-btn): with no matching rule the span would be
-   position:static and sit in the flex layout, inflating the button to
-   ~max(w,h) square for 500ms on every click. position:absolute keeps
-   it out of layout flow so the button never changes size. */
-.ribbon-btn {
-  position: relative;
-  overflow: hidden;
-}
-.ripple {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(8, 145, 178, 0.25);
-  transform: scale(0);
-  animation: rippleEffect 0.5s ease-out;
-  pointer-events: none;
-}
-@keyframes rippleEffect {
-  to { transform: scale(4); opacity: 0; }
-}
 
 /* Better focus for text color tools */
 .color-tool {

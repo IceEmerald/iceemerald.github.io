@@ -4919,12 +4919,10 @@ body.no-active-note .ribbon {
 @keyframes fadeInModal {
     0% {
         opacity: 0;
-        transform: translateY(10px) scale(0.98);
     }
 
     100% {
         opacity: 1;
-        transform: translateY(0px) scale(1);
     }
 }
 
@@ -6238,12 +6236,6 @@ body.no-active-note .editor-header, body.no-active-note .editor-content, body.no
     border-color: var(--ui-accent-border, rgba(249, 115, 22, 0.3));
     color: var(--ui-accent, #f97316);
     box-shadow: inset 0 0 0 1px var(--ui-accent-border, rgba(249, 115, 22, 0.3));
-}
-
-.slide-canvas.show-grid {
-    background-image: linear-gradient(rgba(100, 116, 139, 0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(100, 116, 139, 0.18) 1px, transparent 1px);
-    background-size: 20px 20px;
-    background-position: 0px 0px;
 }
 
 .slide-canvas-wrapper.show-guides .slide-canvas-scaler::before, .slide-canvas-wrapper.show-guides .slide-canvas-scaler::after {
