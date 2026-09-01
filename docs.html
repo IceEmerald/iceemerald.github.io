@@ -16,6 +16,20 @@
   <link rel="icon" type="image/x-icon" href="/assets/images/docsicon.webp">
 </head>
 <body class="no-active-doc">
+  <div id="custom-context-menu" class="rightclick-menu">
+    <div class="context-section">
+      <span class="context-title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          style="vertical-align:-1px;display:inline-block">
+          <path
+            d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+        </svg> Tools</span>
+      <a onclick="copyTextContent()">Copy Text</a>
+      <a onclick="copyPageLink()">Copy Page Link</a>
+      <a onclick="showElementInfo()">Show Element Info</a>
+    </div>
+  </div>
+  <div id="custom-toast" class="custom-toast"></div>
   <div class="app" id="app">
     <!-- ===================== Print Preview Bar ===================== -->
     <div class="print-preview-bar" id="printPreviewBar">
@@ -1729,5 +1743,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="/assets/scripts/idb-storage.js"></script>
   <script src="/assets/scripts/docs.js"></script>
+  <script src="/assets/scripts/rightclick.js"></script>
 </body>
 </html>

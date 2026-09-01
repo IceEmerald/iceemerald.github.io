@@ -451,8 +451,7 @@ body {
 .ribbon-tab[data-tab="file"]:hover { background: transparent; }
 
 .ribbon-tab:focus-visible {
-  outline: 2px solid var(--ui-accent-ring);
-  outline-offset: 2px;
+  outline-offset: 0px;
 }
 
 .ribbon-tab-indicator {
@@ -1705,10 +1704,6 @@ body {
   border-top-color: var(--ui-accent-border);
   border-bottom-color: var(--ui-accent-border);
   background: var(--ui-accent-soft);
-  font-size: 11px;
-  font-family: var(--font-ui);
-  text-transform: uppercase;
-  letter-spacing: 1px;
   user-select: none;
   position: relative;
 }
@@ -3347,7 +3342,7 @@ body {
   .draw-toolbar, .symbol-toolbar,
   .outline-panel, .thumbnails-panel, .comments-panel,
   .footnotes-panel,
-  .confetti-container, .rich-tip, .editor-context-menu,
+  .confetti-container, .rich-tip,
   .find-history,
   .zen-indicator {
     display: none !important;
@@ -3360,25 +3355,26 @@ body {
     background-image: none;
     padding: 0;
   }
-  .pages-wrapper { gap: 0; transform: none !important; }
+  .pages-wrapper { gap: 0; transform: none !important; zoom: 1 !important; }
   /* Each on-screen page fills exactly one A4 sheet edge-to-edge. Its own
      padding is the document margins, so the printout matches the on-screen
      paper exactly (real-paper look). */
   .page {
-    width: var(--emu-ppw, 210mm);
-    height: var(--emu-pph, 297mm);
+    width: 210mm !important;
+    height: 297mm !important;
     box-shadow: none;
     page-break-after: always;
     break-after: page;
     border-radius: 0;
     margin: 0;
-    overflow: visible;
+    overflow: hidden !important;
     animation: none;
   }
   .page:last-child {
     page-break-after: auto;
     break-after: auto;
   }
+  .page[data-thumb="1"] { display: none !important; }
   .page::before { display: none; }
   .page-badge { display: none !important; }
 .emdocs-page-break,
@@ -4169,45 +4165,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 }
 
 /* ---- Right-click context menu (in-document) ---- */
-.editor-context-menu {
-  position: fixed;
-  background: var(--bg-toolbar);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--border-chrome);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 4px;
-  z-index: 260;
-  min-width: 200px;
-  display: none;
-}
-.editor-context-menu.open { display: block; animation: ctxFadeIn 0.15s ease-out; }
-.editor-context-menu .ctx-group { padding: 2px 0; }
-.editor-context-menu .ctx-sep { height: 1px; background: var(--border-chrome); margin: 4px 0; }
-.editor-context-menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  text-align: left;
-  padding: 7px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-base);
-  font-size: 13px;
-  cursor: pointer;
-  border-radius: 4px;
-  font-family: var(--font-ui);
-}
-.editor-context-menu button:hover { background: var(--ui-accent-soft); color: var(--ui-accent); }
-.editor-context-menu button.ctx-danger { color: #d93025; }
-.editor-context-menu button.ctx-danger:hover { background: rgba(217, 48, 37, 0.08); }
-.editor-context-menu button svg { width: 14px; height: 14px; opacity: 0.7; }
-.editor-context-menu button.ctx-disabled { opacity: 0.4; cursor: default; }
-.editor-context-menu button.ctx-disabled:hover { background: transparent; color: var(--text-base); }
-.editor-context-menu .ctx-shortcut { margin-left: auto; font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); }
-
 /* ---- Tooltip (native title= replacement for ribbon buttons) ---- */
 .ribbon-btn[data-tip] { position: relative; }
  ribbon-btn[data-tip]::after { content: ""; }
@@ -4404,13 +4361,14 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
    not leave a blue outline lingering on the bar. Keyboard users still get a
    visible focus affordance via the browser default :focus ring, which we
    also neutralize for these specific controls below. */
+/* Keyboard focus matches slides/notes: browser-default focus ring flush to the
+   control (outline-offset 0px), NOT a custom colored/thick ring. */
 .ribbon-btn:focus-visible,
 .topbar-action:focus-visible,
 .btn:focus-visible,
 .select:focus-visible,
 .ribbon-btn-icon:focus-visible {
-  outline: 2px solid var(--ui-accent-ring);
-  outline-offset: 2px;
+  outline-offset: 0px;
 }
 
 /* Status-bar items: no blue focus ring on click OR keyboard focus,
@@ -4421,11 +4379,6 @@ a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 .page-size-label:focus {
   outline: none;
   box-shadow: none;
-}
-
-/* Ribbon button focus glow (subtle) */
-.ribbon-btn:focus-visible {
-  box-shadow: 0 0 0 3px var(--ui-accent-ring), var(--shadow-md);
 }
 
 /* Topbar action hover refinement */
@@ -5566,9 +5519,10 @@ body.no-active-doc .print-preview-bar {
 }
 
 .no-docs-hint {
-  font-family: var(--font-ui);
-  font-size: 14px;
-  color: rgba(71, 85, 105, 0.6);
+  /* 16px — matches Slides/Notes "Create your first …" hint. Their
+     .no-notes-container p (0,1,1) overrides .no-notes-hint (0,1,0) to 16px. */
+  font-size: 16px;
+  color: rgba(44, 62, 80, 0.5) !important;
   margin: 0;
 }
 
