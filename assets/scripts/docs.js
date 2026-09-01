@@ -82,7 +82,15 @@
 
   /* ---------------- DOM helpers ---------------- */
   function $(id) { return document.getElementById(id); }
-  function getPages() { return Array.prototype.slice.call(document.querySelectorAll(".page")); }
+  // IMPORTANT: scope page lookup to the real pages wrapper ONLY. Page
+  // thumbnails clone real .page elements into the DOM for 1:1 previews, so a
+  // global document.querySelectorAll(".page") would also match those clones and
+  // break pagination/status/counts (creating runaway pages while typing).
+  function getPages() {
+    var wrapper = $(PAGES_WRAPPER_ID);
+    if (!wrapper) return [];
+    return Array.prototype.slice.call(wrapper.querySelectorAll(".page"));
+  }
   function getContent(page) { return page.querySelector(".page-content"); }
   function isOverflow(content) { return content.scrollHeight > content.clientHeight + 1; }
 
@@ -2356,6 +2364,11 @@ function startAutosaveSnapshots() {
     var ws = $("welcomeScreen");
     if (!ws) return;
     ws.style.display = show ? "flex" : "none";
+    // Only one of the two flex:1 column children may occupy space at a time —
+    // hide the editor area while the home/welcome screen is shown so it does
+    // NOT push the welcome content down / crop it (both were flex:1 siblings).
+    var area = document.querySelector(".document-area");
+    if (area) area.style.display = show ? "none" : "flex";
     if (show) renderWelcomeCards();
   }
 
@@ -3879,7 +3892,7 @@ function startAutosaveSnapshots() {
     if (!top || !left || !area) return;
     if (!document.body.classList.contains("show-rulers")) return;
 
-    var page = document.querySelector(".page");
+    var page = getPages()[0];
     if (!page) return;
 
     var areaRect = area.getBoundingClientRect();
@@ -4592,20 +4605,32 @@ function startAutosaveSnapshots() {
         item.className = "thumbnail-item" + (idx === currentPage ? " active" : "");
         var thumb = document.createElement("div");
         thumb.className = "thumbnail-page";
-        var content = document.createElement("div");
-        content.className = "thumbnail-content";
-        // Clone the first ~6 blocks of content for the preview
-        var blocks = getContent(page).children;
-        var count = 0;
-        for (var j = 0; j < blocks.length && count < 8; j++) {
-          var clone = blocks[j].cloneNode(true);
-          // Strip nested complexity for the thumbnail
-          var tables = clone.querySelectorAll("table, img, .emdocs-page-break");
-          for (var k = 0; k < tables.length; k++) tables[k].remove();
-          content.appendChild(clone);
-          count++;
+        // Compute the fit scale from the REAL page dimensions (already laid out
+        // in the editor) and the fixed thumbnail frame, so the clone can be
+        // scaled BEFORE it enters the DOM — this prevents a big→small flash on
+        // every thumbnail rebuild while typing.
+        var realW = parseFloat(page.offsetWidth) || 794;
+        var realH = parseFloat(page.offsetHeight) || 1123;
+        var frameW = 132;
+        var frameH = 185;
+        var scale = Math.min(frameW / realW, frameH / realH) || 0.166;
+        // True 1:1 copy — clone the ENTIRE real .page element so it keeps the
+        // exact typography, colors, padding and wrapping (no re-rendering).
+        var content = page.cloneNode(true);
+        content.setAttribute("data-thumb", "1");
+        content.setAttribute("aria-hidden", "true");
+        content.style.width = realW + "px";
+        content.style.height = realH + "px";
+        content.style.transform = "scale(" + scale + ")";
+        content.style.transformOrigin = "top left";
+        var editable = content.querySelector(".page-content");
+        if (editable) {
+          editable.removeAttribute("contenteditable");
+          editable.setAttribute("contenteditable", "false");
+          editable.removeAttribute("spellcheck");
         }
         thumb.appendChild(content);
+        thumb.style.height = Math.round(realH * scale) + "px";
         var label = document.createElement("div");
         label.className = "thumbnail-label";
         label.textContent = "Page " + (idx + 1);
