@@ -3221,11 +3221,117 @@ function startAutosaveSnapshots() {
     // to flush DOM changes before the browser snapshots the page for printing.
     setTimeout(function () {
       window.print();
-      // Release after the native dialog has been dismissed. If it's still
-      // open, printing again is harmless (browser ignores it), but this keeps
-      // the flag from permanently locking out future prints.
       setTimeout(function () { printInFlight = false; }, 500);
     }, 50);
+  }
+
+  // Generates a true A4 PDF directly from the real on-screen pages (one
+  // printed sheet per editor page), bypassing the browser print dialog so the
+  // output is 1:1 "what you see is what you get" regardless of the dialog's
+  // margin setting (no blank pages, no clipped lines). Each real `.page` is
+  // rasterized at its exact on-screen size and placed onto one 210x297mm PDF
+  // sheet. (Thumbnail clones carry [data-thumb="1"] and are excluded via
+  // getPages()).
+  function printToPdf(done) {
+    var jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    var canCapture = typeof html2canvas !== "undefined";
+    try { togglePrintPreview(false); } catch (e) {}
+    if (!jsPDF || !canCapture) {
+      toast("PDF libraries not loaded. Check your internet connection then retry.", "error");
+      if (done) done();
+      return;
+    }
+
+    var pages = getPages();
+    if (pages.length === 0) { if (done) done(); return; }
+
+    toast("Preparing PDF…", 4000);
+    saveCaret();
+
+    // Neutralise editor-only chrome that must not appear in the printed PDF.
+    // Save the selected page / guideline / badge state so we can restore it.
+    var wrapper = $(PAGES_WRAPPER_ID);
+    var wrapperHadGuides = wrapper && wrapper.classList.contains("show-guides");
+    var badges = [];
+    var i;
+    for (i = 0; i < pages.length; i++) {
+      var b = pages[i].querySelector(".page-badge");
+      if (b) { badges.push(b); b.style.display = "none"; }
+    }
+    if (wrapper) wrapper.classList.remove("show-guides");
+
+    // Snapshot each page's own transform so html2canvas captures it at 1:1.
+    var hadTransforms = [];
+    for (i = 0; i < pages.length; i++) {
+      hadTransforms.push(pages[i].style.transform);
+      pages[i].style.transform = "none";
+    }
+
+    // Scope all page content to a known intrinsic size while rasterizing so
+    // zoom on the pages-wrapper can't alter the captured dimensions.
+    var savedWrapperTransform = wrapper ? wrapper.style.transform : "";
+    var savedWrapperZoom = wrapper ? wrapper.style.zoom : "";
+    if (wrapper) { wrapper.style.transform = "none"; wrapper.style.zoom = "1"; }
+
+    var pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    var pageWmm = 210;
+    var pageHmm = 297;
+    var idx = 0;
+
+    function next() {
+      if (idx >= pages.length) {
+        finish();
+        return;
+      }
+      var page = pages[idx];
+      idx++;
+      // Make sure the page is rendered/in the viewport before rasterizing so
+      // html2canvas captures the full page rather than an off-screen blank.
+      try { page.scrollIntoView({ block: "start" }); } catch (e) {}
+      setTimeout(function () {
+        html2canvas(page, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+        }).then(function (canvas) {
+          if (idx > 1) pdf.addPage();
+          var ratio = canvas.height / canvas.width;
+          var drawW = pageWmm;
+          var drawH = pageHmm;
+          // Maintain the on-screen aspect ratio, centered, filling the sheet.
+          if (drawW * ratio > pageHmm) { drawH = pageHmm; drawW = drawH / ratio; }
+          else { drawH = drawW * ratio; }
+          var offX = (pageWmm - drawW) / 2;
+          var offY = (pageHmm - drawH) / 2;
+          pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", offX, offY, drawW, drawH);
+          next();
+        }).catch(function () {
+          // Rasterization failed for one page — skip it rather than aborting.
+          next();
+        });
+      }, 40);
+    }
+
+    function finish() {
+      // Restore editor state.
+      for (var j = 0; j < badges.length; j++) badges[j].style.display = "";
+      if (wrapper) {
+        if (wrapperHadGuides) wrapper.classList.add("show-guides");
+        wrapper.style.transform = savedWrapperTransform;
+        wrapper.style.zoom = savedWrapperZoom;
+      }
+      for (var k = 0; k < pages.length; k++) pages[k].style.transform = hadTransforms[k];
+      restoreCaret();
+      try {
+        var title = (currentTitle || "document").replace(/[^\w\-]+/g, "_").toLowerCase() || "document";
+        pdf.save(title + ".pdf");
+        toast("PDF saved", "success");
+      } catch (e) { toast("PDF export failed", "error"); }
+      if (done) done();
+    }
+
+    next();
   }
 
   function exportDocument(format) {
@@ -3249,6 +3355,8 @@ function startAutosaveSnapshots() {
       toast("Exported as .html", "success");
     } else if (format === "print") {
       printDocument();
+    } else if (format === "pdf") {
+      printToPdf();
     } else if (format === "preview") {
       togglePrintPreview(true);
     }
@@ -6639,6 +6747,7 @@ function startAutosaveSnapshots() {
     // Export (Docs-supported formats)
     if ($("fileExportTxtBtn")) $("fileExportTxtBtn").addEventListener("click", function () { closeFileModal(); exportDocument("txt"); });
     if ($("fileExportHtmlBtn")) $("fileExportHtmlBtn").addEventListener("click", function () { closeFileModal(); exportDocument("html"); });
+    if ($("fileExportPdfBtn")) $("fileExportPdfBtn").addEventListener("click", function () { closeFileModal(); exportDocument("pdf"); });
     if ($("fileExportPrintBtn")) $("fileExportPrintBtn").addEventListener("click", function () { closeFileModal(); exportDocument("print"); });
     // Tools (Docs-specific)
     if ($("fileStatsBtn")) $("fileStatsBtn").addEventListener("click", showWordCount);

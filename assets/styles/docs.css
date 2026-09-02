@@ -3355,20 +3355,27 @@ body {
     background-image: none;
     padding: 0;
   }
-  .pages-wrapper { gap: 0; transform: none !important; zoom: 1 !important; }
-  /* Each on-screen page fills exactly one A4 sheet edge-to-edge. Its own
-     padding is the document margins, so the printout matches the on-screen
-     paper exactly (real-paper look). */
+  .pages-wrapper { gap: 0; transform: none !important; }
+  /* Browser "Print" (window.print) output — kept overflow-safe so it never
+     emits blank pages. For a pixel-perfect 1:1 A4 copy, use File -> Export ->
+     Export as PDF (jsPDF), which rasterizes each on-screen page at exact A4
+     size and is independent of the print dialog's margin setting.
+     Here each page uses height:auto (no fixed mm height) so the sheet is
+     exactly its content height and can never overflow onto a blank page,
+     regardless of the print dialog's "Default" margins. Width stays at the
+     on-screen value so text wraps as in the editor. break-after separates
+     sheets (except the last page). */
   .page {
-    width: 210mm !important;
-    height: 297mm !important;
+    width: var(--emu-pw, 794px) !important;
+    height: auto !important;
+    box-sizing: border-box !important;
     box-shadow: none;
+    border-radius: 0;
+    margin: 0 auto;
+    overflow: visible !important;
+    animation: none;
     page-break-after: always;
     break-after: page;
-    border-radius: 0;
-    margin: 0;
-    overflow: hidden !important;
-    animation: none;
   }
   .page:last-child {
     page-break-after: auto;
