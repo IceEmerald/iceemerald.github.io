@@ -1865,7 +1865,6 @@ function startAutosaveSnapshots() {
   // breaks so headings/paragraphs don't run together. Never throws.
   function htmlToText(html) {
     if (!html) return "";
-    // codeql[js/incomplete-multi-character-sanitization]
     return String(html)
       .replace(/<\/(p|h[1-6]|li|blockquote|pre|div|tr|figcaption)>/gi, "\n")
       .replace(/<[^>]+>/g, "")
@@ -2546,7 +2545,6 @@ function startAutosaveSnapshots() {
     while ((m = paraRe.exec(body)) !== null) {
 // The entity escaping above runs first; the tag regex below only
         // skips well-formed tag spans, leaving entities already decoded.
-        // codeql[js/incomplete-multi-character-sanitization]
         var inner = m[1]
           .replace(/<[^>]+>/g, "")
         .replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&#xA0;|&apos;/g, function(c) {
@@ -3760,8 +3758,6 @@ function startAutosaveSnapshots() {
   function sanitizeStoredHtml(html) {
     // DOMParser never executes markup; active elements and unsafe URL
     // attributes are removed before the clean tree is re-serialized.
-    // codeql[js/xss]
-    // codeql[js/xss-through-dom]
     var doc = new DOMParser().parseFromString(String(html || ""), "text/html");
     var kill = doc.body.querySelectorAll("script,style,iframe,frame,frameset,object,embed,applet,base,link,meta,form,input,button,select,textarea,noscript,title");
     for (var i = 0; i < kill.length; i++) kill[i].remove();
@@ -5617,8 +5613,6 @@ function startAutosaveSnapshots() {
 
   function hfHasContent(html) {
     if (!html) return false;
-    // codeql[js/xss]
-    // codeql[js/xss-through-dom]
     var doc = new DOMParser().parseFromString(html, "text/html");
     return !isHFEmpty(doc.body);
   }

@@ -3722,8 +3722,6 @@ class NotesApp {
                 const img = document.createElement('img');
                 const du = String(meta.dataUrl || '').trim();
                 // Only image data-URLs, web/blob URLs and relative paths survive.
-                // codeql[js/xss]
-                // codeql[js/client-side-unvalidated-url-redirection]
                 img.src = (/^(https?:|blob:|data:image\/)/i.test(du) || (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(du) && !/^\/\//.test(du) && du)) ? du : '';
                 img.alt = 'drawing';
                 img.style.maxWidth = '100%';
