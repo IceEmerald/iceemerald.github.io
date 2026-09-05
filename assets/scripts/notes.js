@@ -3722,7 +3722,7 @@ class NotesApp {
                 const img = document.createElement('img');
                 const du = String(meta.dataUrl || '').trim();
                 // Only image data-URLs, web/blob URLs and relative paths survive.
-                img.src = (/^(https?:|blob:|data:image\/)/i.test(du) || (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(du) && du)) ? du : '';
+                img.src = (/^(https?:|blob:|data:image\/)/i.test(du) || (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(du) && !/^\/\//.test(du) && du)) ? du : '';
                 img.alt = 'drawing';
                 img.style.maxWidth = '100%';
                 img.style.height = 'auto';

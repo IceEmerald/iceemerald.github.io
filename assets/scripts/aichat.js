@@ -1737,7 +1737,7 @@ function fileCardHTML(f) {
   const fid = _regFile(f);
   const isImg = f.type && f.type.startsWith("image/");
   const name = escapeHtml(f.name || "");
-  const inner = isImg && f.data ? `<img class="msg-file-thumb" src="${f.data}" alt="">` : fileIcon(f.type || "");
+  const inner = isImg && f.data ? `<img class="msg-file-thumb" src="${escapeHtmlAttr(f.data)}" alt="">` : fileIcon(f.type || "");
   return `<div class="msg-file-card${isImg ? " msg-file-card--img" : ""}" data-fid="${fid}" onclick="openFilePreview('${fid}')" title="${name}">${inner}<span class="msg-file-name">${name}</span></div>`;
 }
 const _TEXT_PREVIEW_EXTS = /* @__PURE__ */ new Set([
@@ -3064,7 +3064,7 @@ async function regenerateMessage(msgEl) {
   if (idx < 0) return;
   const currentMsg = conv.messages[idx];
   const regenBranchId = currentMsg._regenBranchRef || msgId;
-  conv._regenBranches = conv._regenBranches || {};
+  conv._regenBranches = conv._regenBranches || Object.create(null);
   if (!conv._regenBranches[regenBranchId]) {
     conv._regenBranches[regenBranchId] = { variants: [], current: -1 };
   }
@@ -4098,7 +4098,7 @@ function _obShowAvatarImg(src) {
   const img = $("obAvatarImg");
   const init2 = $("obAvatarInitials");
   if (!img || !init2) return;
-  img.src = src;
+  img.src = /^(https?:|blob:|data:image\/)/i.test(src) || (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(src) && src) ? src : '';
   img.style.display = "block";
   init2.style.display = "none";
 }
@@ -4675,16 +4675,17 @@ function appendStoredAIMessage(m) {
     div.querySelector(".message-text").insertAdjacentElement("afterend", errCard.firstElementChild);
   }
   div.querySelector(".message-body").appendChild(buildMessageActionsEl(m.id || genId()));
-  if (m.imageData) {
+  const _imgDataSafe = /^(https?:|blob:|data:image\/)/i.test(m.imageData) ? m.imageData : '';
+  if (m.imageData && _imgDataSafe) {
     const wrapper = document.createElement("div");
     wrapper.className = "img-gen-result";
     const img = document.createElement("img");
-    img.src = m.imageData;
+    img.src = _imgDataSafe;
     img.alt = m.imagePrompt ? escapeHtmlAttr(m.imagePrompt.slice(0, 80)) : "";
     img.className = "img-gen-image";
     const dlLink = document.createElement("a");
     dlLink.className = "img-gen-download";
-    dlLink.href = m.imageData;
+    dlLink.href = _imgDataSafe;
     dlLink.download = "emeraldbot-image.png";
     dlLink.title = "Download image";
     dlLink.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
@@ -5015,7 +5016,7 @@ async function submitUserMsgEdit(msgId) {
   if (conv) {
     const msgIdx = conv.messages.findIndex((m) => m.id === msgId);
     if (msgIdx >= 0) {
-      conv._editBranches = conv._editBranches || {};
+      conv._editBranches = conv._editBranches || Object.create(null);
       if (!conv._editBranches[branchRootId]) conv._editBranches[branchRootId] = { variants: [], current: -1 };
       const b = conv._editBranches[branchRootId];
       if (b.variants.length === 0) {
@@ -5773,7 +5774,7 @@ function renderCitations(aiDiv, sources) {
               if (src?.uri) {
                 const citeLink = document.createElement("a");
                 citeLink.className = "esb-inline-cite";
-                citeLink.href = src.uri;
+                citeLink.href = /^(https?:)/i.test(src.uri) ? src.uri : '#';
                 citeLink.target = "_blank";
                 citeLink.rel = "noopener noreferrer";
                 citeLink.textContent = String(marker.idx + 1);
@@ -5802,7 +5803,7 @@ function renderCitations(aiDiv, sources) {
     seen.add(s.uri);
     const a = document.createElement("a");
     a.className = "esb-citation-chip";
-    a.href = s.uri;
+    a.href = /^(https?:)/i.test(s.uri) ? s.uri : '#';
     a.target = "_blank";
     a.rel = "noopener noreferrer";
     let host = "";
@@ -5952,7 +5953,7 @@ function processWebImageTags(aiDiv, displayText) {
     wrapper.className = "web-image-result";
     const img = document.createElement("img");
     img.className = "web-image";
-    img.src = url;
+    img.src = /^(https?:|blob:|data:image\/)/i.test(url) ? url : '';
     img.alt = "Image";
     img.loading = "lazy";
     wrapper.dataset.webImg = "1";

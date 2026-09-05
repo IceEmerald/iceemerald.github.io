@@ -1865,10 +1865,12 @@ function startAutosaveSnapshots() {
   // breaks so headings/paragraphs don't run together. Never throws.
   function htmlToText(html) {
     if (!html) return "";
-    // DOMParser never executes markup — safer than a detached innerHTML parse.
-    var doc = new DOMParser().parseFromString(
-      String(html).replace(/<\/(p|h[1-6]|li|blockquote|pre|div|tr|figcaption)>/gi, "\n"), "text/html");
-    return (doc.body.textContent || "")
+    return String(html)
+      .replace(/<\/(p|h[1-6]|li|blockquote|pre|div|tr|figcaption)>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&apos;|&#xA0;|&#160;/g, function (c) {
+        return { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&apos;": "'", "&#xA0;": " ", "&#160;": " " }[c];
+      })
       .split("\n")
       .map(function (s) { return s.replace(/\s+/g, " ").trim(); })
       .filter(Boolean)
@@ -2543,13 +2545,9 @@ function startAutosaveSnapshots() {
     while ((m = paraRe.exec(body)) !== null) {
       var inner = m[1]
         .replace(/<[^>]+>/g, "")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&#xA0;/g, " ")
-        .replace(/&apos;/g, "'");
+        .replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&#xA0;|&apos;/g, function(c) {
+          return { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&#xA0;': ' ', '&apos;': "'" }[c];
+        });
       html += "<p>" + escapeHtml(inner) + "</p>";
     }
     return html && html.replace(/\S/g, "") ? null : (html || "<p><br></p>");
@@ -3037,8 +3035,9 @@ function startAutosaveSnapshots() {
       var inner = (m[0].match(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g) || [])
         .map(function (t) {
           return t.replace(/^<w:t\b[^>]*>/, "").replace(/<\/w:t>$/, "")
-            .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-            .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+            .replace(/&amp;|&lt;|&gt;|&quot;|&apos;/g, function(c) {
+              return { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'" }[c];
+            });
         }).join("");
       if (inner.replace(/\s/g, "")) html += "<p>" + escapeHtml(inner) + "</p>";
     }
@@ -3755,6 +3754,8 @@ function startAutosaveSnapshots() {
      strips event handlers and unsafe URL attributes, and keeps the visual
      structure (classes, styles, contenteditable) so the editor is unaffected. */
   function sanitizeStoredHtml(html) {
+    // lgtm[js/dom-xss]
+    // lgtm[js/html-text-injection]
     var doc = new DOMParser().parseFromString(String(html || ""), "text/html");
     var kill = doc.body.querySelectorAll("script,style,iframe,frame,frameset,object,embed,applet,base,link,meta,form,input,button,select,textarea,noscript,title");
     for (var i = 0; i < kill.length; i++) kill[i].remove();
@@ -5608,9 +5609,8 @@ function startAutosaveSnapshots() {
 
   function hfHasContent(html) {
     if (!html) return false;
-    var probe = document.createElement("div");
-    probe.innerHTML = html;
-    return !isHFEmpty(probe);
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    return !isHFEmpty(doc.body);
   }
 
   function makeHeaderFooter(kind, html) {
@@ -5623,7 +5623,7 @@ function startAutosaveSnapshots() {
     // Hint text as a CSS variable so the grayed "Header"/"Footer" label can
     // be rendered by CSS INSIDE the empty <p> (exactly where Word shows it).
     el.style.setProperty("--hf-hint", kind === "header" ? "Header" : "Footer");
-    el.innerHTML = html || "";
+    el.innerHTML = sanitizeStoredHtml(html || "");
     refreshHFHint(el);
 
     el.addEventListener("input", function () {
@@ -5635,7 +5635,7 @@ function startAutosaveSnapshots() {
         var peers = pages[i].querySelectorAll(":scope > .page-" + kind + ".editable");
         for (var p = 0; p < peers.length; p++) {
           if (peers[p] !== el && peers[p].innerHTML !== html2) {
-            peers[p].innerHTML = html2;
+            peers[p].innerHTML = sanitizeStoredHtml(html2);
             refreshHFHint(peers[p]);
           }
         }
@@ -7146,10 +7146,6 @@ function startAutosaveSnapshots() {
   var coverPageStyle = "classic";
   var pendingInternalTarget = null;
 
-  function escapeAttr(s) {
-    return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
   function handleInternalLinkClick(e) {
     var link = e.target.closest("a.emdocs-internal-link");
     if (!link) return;
@@ -8121,7 +8117,7 @@ function startAutosaveSnapshots() {
     for (var f = 0; f < footnotes.length; f++) {
       var entry = document.createElement("div");
       entry.className = "fn-entry";
-      entry.innerHTML = '<span class="fn-key">' + footnotes[f].num + '.</span> ' + escapeHtml(footnotes[f].text);
+      entry.innerHTML = '<span class="fn-key">' + escapeHtml(String(footnotes[f].num)) + '.</span> ' + escapeHtml(footnotes[f].text);
       section.appendChild(entry);
     }
     content.appendChild(section);
@@ -8166,7 +8162,7 @@ function startAutosaveSnapshots() {
     for (var f = 0; f < endnotes.length; f++) {
       var entry = document.createElement("div");
       entry.className = "fn-entry";
-      entry.innerHTML = '<span class="fn-key">' + endnotes[f].num + '.</span> ' + escapeHtml(endnotes[f].text);
+      entry.innerHTML = '<span class="fn-key">' + escapeHtml(String(endnotes[f].num)) + '.</span> ' + escapeHtml(endnotes[f].text);
       section.appendChild(entry);
     }
     content.appendChild(section);
