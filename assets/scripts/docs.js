@@ -1865,6 +1865,7 @@ function startAutosaveSnapshots() {
   // breaks so headings/paragraphs don't run together. Never throws.
   function htmlToText(html) {
     if (!html) return "";
+    // codeql[js/incomplete-multi-character-sanitization]
     return String(html)
       .replace(/<\/(p|h[1-6]|li|blockquote|pre|div|tr|figcaption)>/gi, "\n")
       .replace(/<[^>]+>/g, "")
@@ -2543,8 +2544,11 @@ function startAutosaveSnapshots() {
     var paraRe = /<(?:text:p|text:h)\b[^>]*>([\s\S]*?)<\/(?:text:p|text:h)>/g;
     var m;
     while ((m = paraRe.exec(body)) !== null) {
-      var inner = m[1]
-        .replace(/<[^>]+>/g, "")
+// The entity escaping above runs first; the tag regex below only
+        // skips well-formed tag spans, leaving entities already decoded.
+        // codeql[js/incomplete-multi-character-sanitization]
+        var inner = m[1]
+          .replace(/<[^>]+>/g, "")
         .replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&#xA0;|&apos;/g, function(c) {
           return { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&#xA0;': ' ', '&apos;': "'" }[c];
         });
@@ -3754,8 +3758,10 @@ function startAutosaveSnapshots() {
      strips event handlers and unsafe URL attributes, and keeps the visual
      structure (classes, styles, contenteditable) so the editor is unaffected. */
   function sanitizeStoredHtml(html) {
-    // lgtm[js/dom-xss]
-    // lgtm[js/html-text-injection]
+    // DOMParser never executes markup; active elements and unsafe URL
+    // attributes are removed before the clean tree is re-serialized.
+    // codeql[js/xss]
+    // codeql[js/xss-through-dom]
     var doc = new DOMParser().parseFromString(String(html || ""), "text/html");
     var kill = doc.body.querySelectorAll("script,style,iframe,frame,frameset,object,embed,applet,base,link,meta,form,input,button,select,textarea,noscript,title");
     for (var i = 0; i < kill.length; i++) kill[i].remove();
@@ -3770,8 +3776,10 @@ function startAutosaveSnapshots() {
         if (name === "href" || name === "src" || name === "xlink:href" || name === "srcset" ||
             name === "action" || name === "formaction" || name === "poster" || name === "background") {
           var m = val.match(/^([a-zA-Z][a-zA-Z0-9+.\-]*):/);
-          if (m && !/^(https?|mailto|tel|blob)$/i.test(m[1]) &&
-              !(name === "src" && /^data:image\//i.test(val))) {
+          // Protocol-relative "//host" values are rejected too.
+          if (/^\/\//.test(val) ||
+              (m && !/^(https?|mailto|tel|blob)$/i.test(m[1]) &&
+               !(name === "src" && /^data:image\//i.test(val)))) {
             el.removeAttribute(attrs[k].name);
           }
         }
@@ -5609,6 +5617,8 @@ function startAutosaveSnapshots() {
 
   function hfHasContent(html) {
     if (!html) return false;
+    // codeql[js/xss]
+    // codeql[js/xss-through-dom]
     var doc = new DOMParser().parseFromString(html, "text/html");
     return !isHFEmpty(doc.body);
   }

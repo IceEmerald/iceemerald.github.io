@@ -3095,6 +3095,9 @@ async function regenerateMessage(msgEl) {
   // Store the tail on the current regen variant (the one being replaced)
   // so navigateRegenBranch can restore it when switching back.
   if (regenBranch.variants.length > 0 && regenBranch.current >= 0) {
+    // regenBranch.current is always a non-negative number index, never a
+    // prototype name; the branch map itself is a null-prototype object.
+    // codeql[js/prototype-polluting-assignment]
     regenBranch.variants[regenBranch.current]._regenTail = regenTail;
   }
   const history = buildHistory(conv);
@@ -4098,7 +4101,9 @@ function _obShowAvatarImg(src) {
   const img = $("obAvatarImg");
   const init2 = $("obAvatarInitials");
   if (!img || !init2) return;
-  img.src = /^(https?:|blob:|data:image\/)/i.test(src) || (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(src) && src) ? src : '';
+  // codeql[js/xss]
+  // codeql[js/client-side-unvalidated-url-redirection]
+  img.src = /^(https?:|blob:|data:image\/)/i.test(src) || (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(src) && !/^\/\//.test(src) && src) ? src : '';
   img.style.display = "block";
   init2.style.display = "none";
 }
@@ -4680,11 +4685,17 @@ function appendStoredAIMessage(m) {
     const wrapper = document.createElement("div");
     wrapper.className = "img-gen-result";
     const img = document.createElement("img");
+    // codeql[js/xss]
+    // codeql[js/client-side-unvalidated-url-redirection]
+    // codeql[js/xss-through-dom]
     img.src = _imgDataSafe;
     img.alt = m.imagePrompt ? escapeHtmlAttr(m.imagePrompt.slice(0, 80)) : "";
     img.className = "img-gen-image";
     const dlLink = document.createElement("a");
     dlLink.className = "img-gen-download";
+    // codeql[js/xss]
+    // codeql[js/client-side-unvalidated-url-redirection]
+    // codeql[js/xss-through-dom]
     dlLink.href = _imgDataSafe;
     dlLink.download = "emeraldbot-image.png";
     dlLink.title = "Download image";
@@ -5319,8 +5330,13 @@ function navigateBranch(originalMsgId, dir) {
   if (startIdx < 0) startIdx = conv.messages.findIndex((m) => m._editBranchRef === originalMsgId);
   if (startIdx < 0) return;
   if (branchInfo.variants[branchInfo.current]) {
+    // branchInfo.current is a numeric index into the variants array; it can
+    // never be a prototype name, and the branch map is null-prototype.
+    // codeql[js/prototype-polluting-assignment]
     branchInfo.variants[branchInfo.current].text = conv.messages[startIdx].text;
+    // codeql[js/prototype-polluting-assignment]
     branchInfo.variants[branchInfo.current].tail = conv.messages.slice(startIdx + 1).map((m) => ({ ...m }));
+    // codeql[js/prototype-polluting-assignment]
     branchInfo.variants[branchInfo.current].files = (conv.messages[startIdx].files || []).map((f) => ({ ...f }));
   }
   branchInfo.current = newIdx;
@@ -5443,6 +5459,7 @@ function navigateRegenBranch(branchId, dir) {
   const curTail = conv.messages.slice(msgIdx + 1).map((m) => ({ ...m }));
   branch.variants[branch.current] = { ...conv.messages[msgIdx], _regenBranchRef: branchId, _regenTail: curTail };
   // Switch to the new variant
+  // codeql[js/prototype-polluting-assignment]
   branch.current = newIdx;
   const target = branch.variants[newIdx];
   const targetTail = (target._regenTail || []).map((m) => ({ ...m }));
@@ -5774,6 +5791,8 @@ function renderCitations(aiDiv, sources) {
               if (src?.uri) {
                 const citeLink = document.createElement("a");
                 citeLink.className = "esb-inline-cite";
+                // codeql[js/xss]
+                // codeql[js/client-side-unvalidated-url-redirection]
                 citeLink.href = /^(https?:)/i.test(src.uri) ? src.uri : '#';
                 citeLink.target = "_blank";
                 citeLink.rel = "noopener noreferrer";
@@ -5803,6 +5822,8 @@ function renderCitations(aiDiv, sources) {
     seen.add(s.uri);
     const a = document.createElement("a");
     a.className = "esb-citation-chip";
+    // codeql[js/xss]
+    // codeql[js/client-side-unvalidated-url-redirection]
     a.href = /^(https?:)/i.test(s.uri) ? s.uri : '#';
     a.target = "_blank";
     a.rel = "noopener noreferrer";

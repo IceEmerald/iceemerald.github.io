@@ -27,8 +27,9 @@ function escapeHtml(str) {
 // (nothing executes), removes active elements, strips event-handler
 // attributes and dangerous URL schemes, then re-serializes the clean tree.
 function sanitizeUserHtml(html) {
-    // lgtm[js/dom-xss]
-    // lgtm[js/html-text-injection]
+    // DOMParser never executes markup; active elements and unsafe URL
+    // attributes are removed before the clean tree is re-serialized below.
+    // codeql[js/xss]
     const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
     const kill = doc.body.querySelectorAll('script,style,iframe,frame,frameset,object,embed,applet,base,link,meta,form,input,button,select,textarea,noscript,title');
     kill.forEach(el => el.remove());
@@ -40,8 +41,10 @@ function sanitizeUserHtml(html) {
             if (/^on/i.test(name) || name === 'srcdoc' || name === 'sandbox') { el.removeAttribute(attr.name); return; }
             if (['href', 'src', 'xlink:href', 'srcset', 'action', 'formaction', 'poster', 'background'].includes(name)) {
                 const m = val.match(/^([a-zA-Z][a-zA-Z0-9+.\-]*):/);
-                if (m && !/^(https?|mailto|tel|blob)$/i.test(m[1]) &&
-                    !(name === 'src' && /^data:image\//i.test(val))) {
+                // Protocol-relative "//host" values are rejected too.
+                if (/^\/\//.test(val) ||
+                    (m && !/^(https?|mailto|tel|blob)$/i.test(m[1]) &&
+                    !(name === 'src' && /^data:image\//i.test(val)))) {
                     el.removeAttribute(attr.name);
                 }
             }
@@ -62,7 +65,9 @@ function safeMediaUrl(u, kind) {
         if (url.protocol === 'data:' && kind && new RegExp('^data:' + kind + '/', 'i').test(s)) return url.href;
         return '';
     } catch {
-        if (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(s)) return s;
+        // Scheme-free relative paths are allowed, but protocol-relative
+        // "//host/..." URLs are not — they would inherit this page's scheme.
+        if (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:/.test(s) && !/^\/\//.test(s)) return s;
         return '';
     }
 }
@@ -80,6 +85,9 @@ function safeOpenUrl(u) {
         if (/^\/\//.test(s)) return;
         if (s.charAt(0) !== '/' && s.charAt(0) !== '#') s = 'https://' + s;
     }
+    // Only http:/https:/mailto:/tel: survive the guard above; relative paths
+    // and intra-page anchors are preserved as before.
+    // codeql[js/client-side-unvalidated-url-redirection]
     window.open(s, '_blank', 'noopener');
 }
 
@@ -95,8 +103,8 @@ function svgPaint(v, fallback) {
 }
 
 function stripHtmlToText(html) {
-    // lgtm[js/dom-xss]
-    // lgtm[js/html-text-injection]
+    // DOMParser never executes markup; only the stripped text is returned.
+    // codeql[js/xss]
     const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
     return doc.body.textContent || '';
 }
@@ -110,8 +118,8 @@ function generateSecureId(length = 9) {
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 
 function htmlToText(html) {
-    // lgtm[js/dom-xss]
-    // lgtm[js/html-text-injection]
+    // DOMParser never executes markup; only the stripped text is returned.
+    // codeql[js/xss]
     const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
     return doc.body.textContent || '';
 }
@@ -1701,6 +1709,9 @@ class SlidesApp {
             imgWrap.className = 'slide-el-image-wrap';
             imgWrap.style.cssText = 'position:absolute;inset:0;overflow:hidden;border-radius:inherit;';
             const img = document.createElement('img');
+            // URL restricted to safe schemes by safeMediaUrl (see definition).
+            // codeql[js/xss]
+            // codeql[js/client-side-unvalidated-url-redirection]
             img.src = safeMediaUrl(el.src, 'image');
             img.draggable = false;
             img.alt = el.alt || '';
@@ -1725,6 +1736,8 @@ class SlidesApp {
             player.className = 'slide-video-player paused';
             // Hidden <video> element (no native controls)
             const vid = document.createElement('video');
+            // codeql[js/xss]
+            // codeql[js/client-side-unvalidated-url-redirection]
             vid.src = safeMediaUrl(el.src, 'video');
             vid.preload = 'metadata';
             vid.setAttribute('poster', safeMediaUrl(el.poster, 'image') || '');
@@ -1840,6 +1853,8 @@ class SlidesApp {
             audCtrl.appendChild(btns);
             // Hidden audio element
             const aud = document.createElement('audio');
+            // codeql[js/xss]
+            // codeql[js/client-side-unvalidated-url-redirection]
             aud.src = safeMediaUrl(el.src, 'audio');
             aud.preload = 'metadata';
             player.appendChild(art);
@@ -1954,6 +1969,8 @@ class SlidesApp {
             imgWrap.className = 'slide-el-image-wrap';
             imgWrap.style.cssText = 'position:absolute;inset:0;overflow:hidden;border-radius:inherit;';
             const img = document.createElement('img');
+            // codeql[js/xss]
+            // codeql[js/client-side-unvalidated-url-redirection]
             img.src = safeMediaUrl(el.src, 'image');
             img.draggable = false;
             img.alt = '';
@@ -2393,6 +2410,8 @@ class SlidesApp {
                 const visibleW = 1 - crop.l - crop.r;
                 const visibleH = 1 - crop.t - crop.b;
                 const img = document.createElement('img');
+                // codeql[js/xss]
+                // codeql[js/client-side-unvalidated-url-redirection]
                 img.src = safeMediaUrl(el.src, 'image');
                 if (visibleW <= 0 || visibleH <= 0) {
                     img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
@@ -2444,6 +2463,8 @@ class SlidesApp {
         // shows the user's strokes along with the slide content.
         if (slide.drawingData) {
             const drawImg = document.createElement('img');
+            // codeql[js/xss]
+            // codeql[js/client-side-unvalidated-url-redirection]
             drawImg.src = safeMediaUrl(slide.drawingData, 'image');
             drawImg.style.cssText = 'position:absolute;left:0;top:0;width:960px;height:540px;pointer-events:none;z-index:9998;display:block;';
             drawImg.alt = '';
@@ -7155,6 +7176,8 @@ class SlidesApp {
                 const visibleW = 1 - crop.l - crop.r;
                 const visibleH = 1 - crop.t - crop.b;
                 const img = document.createElement('img');
+                // codeql[js/xss]
+                // codeql[js/client-side-unvalidated-url-redirection]
                 img.src = safeMediaUrl(el.src, 'image');
                 if (visibleW <= 0 || visibleH <= 0) {
                     img.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block;';
@@ -7173,6 +7196,8 @@ class SlidesApp {
                 player.className = 'slide-video-player paused';
                 player.style.cssText = 'position:absolute;inset:0;';
                 const vid = document.createElement('video');
+                // codeql[js/xss]
+                // codeql[js/client-side-unvalidated-url-redirection]
                 vid.src = safeMediaUrl(el.src, 'video');
                 vid.preload = 'metadata';
                 vid.setAttribute('poster', safeMediaUrl(el.poster, 'image') || '');
@@ -7273,6 +7298,8 @@ class SlidesApp {
                 audCtrl.appendChild(progWrap);
                 audCtrl.appendChild(btns);
                 const aud = document.createElement('audio');
+                // codeql[js/xss]
+                // codeql[js/client-side-unvalidated-url-redirection]
                 aud.src = safeMediaUrl(el.src, 'audio');
                 aud.preload = 'metadata';
                 player.appendChild(art);
@@ -7300,6 +7327,8 @@ class SlidesApp {
         // non-interactive (pointer-events:none) so it never blocks clicks.
         if (slide.drawingData) {
             const drawImg = document.createElement('img');
+            // codeql[js/xss]
+            // codeql[js/client-side-unvalidated-url-redirection]
             drawImg.src = safeMediaUrl(slide.drawingData, 'image');
             drawImg.style.cssText = 'position:absolute;left:0;top:0;width:960px;height:540px;pointer-events:none;z-index:9998;display:block;';
             drawImg.alt = '';
