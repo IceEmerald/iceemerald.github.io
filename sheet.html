@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EmeraldSuite | Sheets</title>
+<meta name="description" content="EmeraldSuite Sheets — a complete client-side spreadsheet application. All data stays in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/x-icon" href="/assets/images/sheetsicon.webp">
+<link rel="stylesheet" href="/assets/styles/style.css">
+<link rel="stylesheet" href="/assets/styles/sheet.css">
+</head>
+<body>
+<div id="app" role="application" aria-label="EmeraldSuite spreadsheet application">
+
+  <!-- ===================== Navbar (utilizing style.css) ===================== -->
+  <header class="navbar sticky-top">
+    <div class="navcontainer nav-container">
+      <a href="/" class="logo">
+        <img src="/assets/images/sheetsicon.webp" width="30" height="30" class="icon-primary" alt="Sheets">
+        <span class="logo-text">EmeraldSuite</span>
+      </a>
+      <nav class="nav-links">
+        <button class="save-indicator" id="saveIndicator">
+          <span class="save-text" id="save-status" role="status" aria-live="polite">All changes saved</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ======= Ribbon ======= -->
+  <div id="ribbon">
+    <div id="ribbon-tabs" role="tablist" aria-label="Ribbon tabs"></div>
+    <div id="ribbon-body" role="tabpanel"></div>
+  </div>
+
+  <!-- ======= Name box + formula bar ======= -->
+  <div id="formula-row">
+    <div id="name-box-wrap">
+      <input id="name-box" type="text" aria-label="Name Box — type a cell address or range and press Enter" spellcheck="false" autocomplete="off">
+      <button id="name-box-dd" class="namebox-dd" title="Named ranges" aria-label="Named ranges list"></button>
+    </div>
+    <div class="fx-group" role="group" aria-label="Formula bar controls">
+      <button id="fx-cancel" class="iconbtn" title="Cancel (Esc)" aria-label="Cancel edit"></button>
+      <button id="fx-confirm" class="iconbtn" title="Confirm (Enter)" aria-label="Confirm edit"></button>
+      <button id="fx-insert" class="fx-btn" title="Insert Function" aria-label="Insert Function">fx</button>
+    </div>
+    <div id="formula-bar-wrap">
+      <textarea id="formula-input" rows="1" aria-label="Formula bar" spellcheck="false"></textarea>
+    </div>
+    <div class="expand-grip" id="formula-expand" title="Expand formula bar" aria-label="Expand formula bar"></div>
+  </div>
+
+  <!-- ======= Spreadsheet grid ======= -->
+  <main id="grid-area">
+    <canvas id="grid-canvas"></canvas>
+    <textarea id="cell-editor" aria-label="Cell editor" spellcheck="false"></textarea>
+    <div id="filter-btn-layer" aria-hidden="true"></div>
+    <div id="dv-btn-layer" aria-hidden="true"></div>
+    <div id="chart-layer" aria-label="Floating charts"></div>
+    <div id="fill-tip" aria-hidden="true"></div>
+    <div id="size-tip" aria-hidden="true"></div>
+    <div id="drag-hint" aria-hidden="true"></div>
+  </main>
+
+  <!-- ======= Sheet tabs ======= -->
+  <div id="sheet-tabs-bar">
+    <div class="tab-nav">
+      <button id="tab-home" class="iconbtn" title="Scroll to start" aria-label="Scroll sheet tabs to start"></button>
+      <button id="tab-prev" class="iconbtn" title="Scroll left" aria-label="Scroll sheet tabs left"></button>
+      <button id="tab-next" class="iconbtn" title="Scroll right" aria-label="Scroll sheet tabs right"></button>
+      <button id="tab-end" class="iconbtn" title="Scroll to end" aria-label="Scroll sheet tabs to end"></button>
+    </div>
+    <div id="sheet-tabs" role="tablist" aria-label="Worksheets"></div>
+    <button id="add-sheet" title="New sheet" aria-label="Add worksheet"></button>
+    <div id="tab-hscroll"></div>
+  </div>
+
+  <!-- ======= Status bar (EmeraldSuite pill) ======= -->
+  <footer id="status-bar">
+    <div class="sb-left">
+      <span id="sb-mode" class="statbar-item">Ready</span>
+      <span id="sb-perm" class="sb-perm statbar-item"></span>
+    </div>
+    <div class="sb-right">
+      <span id="sb-stats" class="statbar-item" title="Statistics for the current selection"></span>
+      <span class="sb-sep" aria-hidden="true"></span>
+      <button id="sb-zoom-out" class="iconbtn statbar-item" title="Zoom out" aria-label="Zoom out"></button>
+      <span class="statbar-sep" aria-hidden="true"></span>
+      <input id="sb-zoom" type="range" min="10" max="400" step="5" value="100" aria-label="Zoom level">
+      <button id="sb-zoom-pct" class="statbar-toggle" title="Reset zoom to 100%">100%</button>
+    </div>
+  </footer>
+</div>
+
+<!-- Overlays -->
+<div id="find-panel" role="dialog" aria-label="Find and Replace" hidden></div>
+<div id="modal-root"></div>
+<div id="popup-root"></div>
+<div id="toast-root" aria-live="polite"></div>
+<div id="print-root" aria-hidden="true"></div>
+<textarea id="clip-helper" aria-hidden="true" tabindex="-1"></textarea>
+
+<!-- SheetJS (XLSX import/export) — optional; the app degrades gracefully if unavailable -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" crossorigin="anonymous" onerror="window.__XLSX_CDN_FAIL=true"></script>
+<!-- JSZip — used only to read conditional formatting from imported .xlsx files; optional -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" onerror="window.__JSZIP_CDN_FAIL=true"></script>
+<script src="/assets/scripts/sheet.js"></script>
+</body>
+</html>
