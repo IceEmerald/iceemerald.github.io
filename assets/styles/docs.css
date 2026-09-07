@@ -1065,18 +1065,14 @@ body {
 }
 
 /* Find highlight marks */
-/* TRANSITION ALIASES: ".zdocs-*" selectors below temporarily keep the old
-   class names working for content saved before the emerald rebrand. */
-.page-content mark.emdocs-mark,
-.page-content mark.zdocs-mark {
+.page-content mark.emdocs-mark {
   background: var(--mark-bg);
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
 }
 
-.page-content mark.emdocs-mark.current,
-.page-content mark.zdocs-mark.current {
+.page-content mark.emdocs-mark.current {
   background: var(--mark-current);
   color: #fff;
 }
@@ -1685,8 +1681,7 @@ body {
 }
 
 /* ===================== Page Break element ===================== */
-.page-content .emdocs-page-break,
-.page-content .zdocs-page-break {
+.page-content .emdocs-page-break {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1698,8 +1693,7 @@ body {
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.page-content .emdocs-page-break:hover,
-.page-content .zdocs-page-break:hover {
+.page-content .emdocs-page-break:hover {
   color: var(--ui-accent);
   border-top-color: var(--ui-accent-border);
   border-bottom-color: var(--ui-accent-border);
@@ -1708,24 +1702,21 @@ body {
   position: relative;
 }
 
-.page-content .emdocs-page-break::before,
-.page-content .zdocs-page-break::before {
+.page-content .emdocs-page-break::before {
   content: "";
   flex: 1;
   border-top: 1px dashed var(--border-strong);
   margin-top: 2px;
 }
 
-.page-content .emdocs-page-break::after,
-.page-content .zdocs-page-break::after {
+.page-content .emdocs-page-break::after {
   content: "";
   flex: 1;
   border-top: 1px dashed var(--border-strong);
   margin-top: 2px;
 }
 
-.page-content .emdocs-page-break .pb-label,
-.page-content .zdocs-page-break .pb-label {
+.page-content .emdocs-page-break .pb-label {
   flex: 0 0 auto;
 }
 
@@ -3384,8 +3375,7 @@ body {
   .page[data-thumb="1"] { display: none !important; }
   .page::before { display: none; }
   .page-badge { display: none !important; }
-.emdocs-page-break,
-  .zdocs-page-break { display: none !important; }
+.emdocs-page-break { display: none !important; }
   .section-break { display: none !important; }
   /* Header/footer strips print as plain text — no editing frames. */
   .page-header, .page-footer {
@@ -3398,9 +3388,7 @@ body {
   }
   /* Preserve colors for tracked changes, highlights, etc. */
 ins.emdocs-ins,
-  ins.zdocs-ins,
   del.emdocs-del,
-  del.zdocs-del,
   mark,
   .equation,
   .smartart,
@@ -3408,8 +3396,7 @@ ins.emdocs-ins,
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-mark.emdocs-mark,
-  mark.zdocs-mark { background: transparent !important; color: inherit !important; }
+mark.emdocs-mark { background: transparent !important; color: inherit !important; }
 }
 
 /* ===================== Responsive ===================== */
@@ -3886,25 +3873,20 @@ sup.footnote-ref:hover, sup.endnote-ref:hover { text-decoration: underline; }
 }
 
 /* ---- Track changes marks (inline) ---- */
-ins.emdocs-ins,
-ins.zdocs-ins {
+ins.emdocs-ins {
   background: rgba(35, 154, 77, 0.16);
   color: #1a7d3d;
   text-decoration: none;
   border-bottom: 1px solid rgba(35, 154, 77, 0.4);
 }
-del.emdocs-del,
-del.zdocs-del {
+del.emdocs-del {
   background: rgba(217, 48, 37, 0.14);
   color: #b91c1c;
   text-decoration: line-through;
 }
 ins.emdocs-ins,
-ins.zdocs-ins,
-del.emdocs-del,
-del.zdocs-del { border-radius: 2px; padding: 0 1px; }
-.emdocs-change-marker,
-.zdocs-change-marker {
+del.emdocs-del { border-radius: 2px; padding: 0 1px; }
+.emdocs-change-marker {
   display: inline-block;
   width: 6px;
   height: 6px;
@@ -3914,12 +3896,10 @@ del.zdocs-del { border-radius: 2px; padding: 0 1px; }
   vertical-align: middle;
   cursor: pointer;
 }
-.emdocs-change-marker.del,
-.zdocs-change-marker.del { background: #b91c1c; }
+.emdocs-change-marker.del { background: #b91c1c; }
 
 /* ---- Bookmark anchors (invisible markers in text) ---- */
-a.emdocs-bookmark,
-a.zdocs-bookmark {
+a.emdocs-bookmark {
   display: inline;
   border-bottom: 2px dotted var(--ui-accent-border);
   background: var(--ui-accent-soft);
@@ -3927,18 +3907,15 @@ a.zdocs-bookmark {
   padding: 0 2px;
   cursor: pointer;
 }
-a.emdocs-bookmark:hover,
-a.zdocs-bookmark:hover { background: var(--ui-accent-selected); }
-a.emdocs-internal-link,
-a.zdocs-internal-link {
+a.emdocs-bookmark:hover { background: var(--ui-accent-selected); }
+a.emdocs-internal-link {
   color: var(--ui-accent);
   text-decoration: underline;
   text-decoration-color: var(--ui-accent-border);
   text-underline-offset: 2px;
   cursor: pointer;
 }
-a.emdocs-internal-link:hover,
-a.zdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
+a.emdocs-internal-link:hover { text-decoration-color: var(--ui-accent); }
 
 /* ---- Cover page styles ---- */
 .cover-page {
@@ -4718,19 +4695,16 @@ body.show-rulers .document-rulers {
 }
 
 /* Better heading anchor links */
-a.emdocs-internal-link,
-a.zdocs-internal-link {
+a.emdocs-internal-link {
   position: relative;
   padding: 0 2px;
   border-radius: 2px;
   transition: background 0.15s;
 }
-a.emdocs-internal-link:hover,
-a.zdocs-internal-link:hover {
+a.emdocs-internal-link:hover {
   background: var(--ui-accent-soft);
 }
-a.emdocs-internal-link::after,
-a.zdocs-internal-link::after {
+a.emdocs-internal-link::after {
   content: "¶";
   position: absolute;
   left: -14px;
@@ -4740,14 +4714,12 @@ a.zdocs-internal-link::after {
   opacity: 0;
   transition: opacity 0.15s;
 }
-a.emdocs-internal-link:hover::after,
-a.zdocs-internal-link:hover::after {
+a.emdocs-internal-link:hover::after {
   opacity: 0.7;
 }
 
 /* Bookmark anchor pulse on jump */
-a.emdocs-bookmark.flash,
-a.zdocs-bookmark.flash {
+a.emdocs-bookmark.flash {
   animation: bookmarkFlash 0.8s ease-out;
 }
 @keyframes bookmarkFlash {
@@ -6079,8 +6051,7 @@ sup.comment-ref.resolved .comment-bubble {
 /* Word/Google-Docs style marks: colored TEXT + a thin 1px underline, no
    background block — the old filled background made tracked text render
    as a thick green band. */
-.track-on ins.emdocs-ins,
-.track-on ins.zdocs-ins {
+.track-on ins.emdocs-ins {
   background: transparent;
   color: #1a7d3d;
   text-decoration: underline;
@@ -6088,8 +6059,7 @@ sup.comment-ref.resolved .comment-bubble {
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
-.track-on del.emdocs-del,
-.track-on del.zdocs-del {
+.track-on del.emdocs-del {
   background: transparent;
   color: #b91c1c;
   text-decoration: line-through;

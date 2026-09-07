@@ -24,16 +24,11 @@
   var PAGES_WRAPPER_ID = "pagesWrapper";
   var CARET_BLOCK_ATTR = "data-caret-block";
   var CARET_OFFSET_ATTR = "data-caret-offset";
-  // LEGACY single-document key (pre-multi-document builds). This exact string
-  // is frozen: it is only ever READ to migrate old data into emeralddocs_*
-  // keys, never written to. Do not rename.
-  var STORAGE_KEY = "zdocs.document.v3";
   // Multi-document storage: one index of metadata + one key per document,
   // mirroring the Slides app (emeraldslides_index / emeraldslides_pres_<id>).
   var DOC_INDEX_KEY = "emeralddocs_index";
   function docDataKey(id) { return "emeralddocs_doc_" + id; }
   // THEME_KEY removed — dark mode is no longer supported.
-  var LEGACY_VERSIONS_KEY = "zdocs.versions"; // LEGACY — read-only migration source. Do not rename.
   function versionsKey(id) { return "emeralddocs.versions." + id; }
   var MARGINS_KEY = "emeralddocs.margins";
   var GOAL_KEY = "emeralddocs.goal";
@@ -78,7 +73,6 @@
   var currentTitle = "Untitled Document";
   var _welcomeRenderToken = 0;
   var _deleteTargetId = null;
-  var _legacyMigratedId = null; // id of the document created from the legacy single-document key
 
   /* ---------------- DOM helpers ---------------- */
   function $(id) { return document.getElementById(id); }
@@ -1819,13 +1813,6 @@ function startAutosaveSnapshots() {
     } catch (e) {}
   }
 
-  // Stored documents from builds before the emerald rebrand may still carry
-  // the old "zdocs-*" class names inside their saved HTML. Rewrite them on
-  // load so the editor, pagination and click handlers work on one class set.
-  function legacyClassRewrite(html) {
-    return typeof html === "string" ? html.replace(/zdocs-/g, "emdocs-") : html;
-  }
-
   async function loadDocData(id) {
     try {
       var data = null;
@@ -1836,11 +1823,6 @@ function startAutosaveSnapshots() {
       if (!data) {
         var raw = localStorage.getItem(docDataKey(id));
         if (raw) data = JSON.parse(raw);
-      }
-      if (data) {
-        data.content = legacyClassRewrite(data.content);
-        data.header = legacyClassRewrite(data.header);
-        data.footer = legacyClassRewrite(data.footer);
       }
       return data;
     } catch (e) { return null; }
@@ -1991,13 +1973,6 @@ function startAutosaveSnapshots() {
       // fallback to localStorage
       raw = localStorage.getItem(versionsKey(currentDocId));
       if (raw) return JSON.parse(raw) || [];
-      // Legacy fallback: documents migrated from the old single-document
-      // builds adopt the old global version list until they create their own.
-      if (currentDocId === _legacyMigratedId) {
-        raw = localStorage.getItem(LEGACY_VERSIONS_KEY);
-        if (raw) return JSON.parse(raw) || [];
-        if (idbAvailable()) return idb.getJSONSync(LEGACY_VERSIONS_KEY) || [];
-      }
       return [];
     } catch (e) { return []; }
   }
@@ -2013,7 +1988,7 @@ function startAutosaveSnapshots() {
     var page = createPage();
     wrapper.appendChild(page);
     var content = getContent(page);
-    content.innerHTML = sanitizeStoredHtml(legacyClassRewrite(v.content)) || "";
+    content.innerHTML = sanitizeStoredHtml(v.content) || "";
     if (content.children.length === 0) {
       var p = document.createElement("p");
       p.innerHTML = "<br>";
@@ -2318,48 +2293,6 @@ function startAutosaveSnapshots() {
       scheduleAutosave(); // persists title + updates index meta
     }
   }
-
-  /* ---------------- Legacy migration (single → multi document) ----------------
-     Old builds stored one document at STORAGE_KEY. If it exists and holds real
-     content, adopt it as the first card on the welcome screen. Completely empty
-     untitled leftovers are ignored so new users get a clean welcome screen. */
-  async function migrateLegacyDocument() {
-    var legacy = null;
-    if (window.EmeraldIDBStorage) {
-      legacy = await window.EmeraldIDBStorage.getJSON(STORAGE_KEY);
-      if (!legacy) legacy = await window.EmeraldIDBStorage.migrateLocalJSON(STORAGE_KEY);
-    }
-    if (!legacy) {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) { try { legacy = JSON.parse(raw); } catch (e) {} }
-    }
-    if (!legacy) return;
-
-    var text = htmlToText(legacy.content);
-    var isEmpty = !text && (!legacy.title || legacy.title === "Untitled Document");
-    if (isEmpty) return; // nothing meaningful to carry over
-
-    var id = makeDocId();
-    _legacyMigratedId = id;
-    var title = legacy.title || "Untitled Document";
-    documents.unshift({
-      id: id,
-      title: title,
-      updatedAt: legacy.savedAt || Date.now(),
-      wordCount: text ? text.split(/\s+/).filter(Boolean).length : 0,
-    });
-    await saveIndex();
-    await writeDocData({
-      id: id,
-      title: title,
-      content: legacyClassRewrite(legacy.content) || "<p><br></p>",
-      savedAt: legacy.savedAt || Date.now(),
-      theme: legacy.theme || theme,
-      header: legacy.header || "",
-      footer: legacy.footer || "",
-    });
-  }
-
 
   /* ---------------- Welcome screen (home) ---------------- */
   function showWelcomeScreen(show) {
@@ -6223,11 +6156,9 @@ function startAutosaveSnapshots() {
     loadFootnotes();
     loadEndnotes();
 
-    // Multi-document model: load the index, adopt a legacy single document
-    // if one exists, then land on the welcome screen unless a specific
-    // document is requested via ?owned=<docId>.
+    // Multi-document model: load the index, then land on the welcome screen
+    // unless a specific document is requested via ?owned=<docId>.
     await loadIndex();
-    try { await migrateLegacyDocument(); } catch (e) {}
     showWelcomeScreen(true);
 
     var ownedParam = null;
