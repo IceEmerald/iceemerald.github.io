@@ -1982,7 +1982,7 @@ let WB = null;
 const UI = {};            // DOM refs (populated in boot)
 const R = { canvas: null, ctx: null, dpr: 1, w: 0, h: 0, layout: null }; // renderer
 const SEL = { ranges: [], active: { r: 0, c: 0 }, activeIdx: 0, sheetId: null };
-const VIEW = { zoom: 1, showFormulaBar: true, showHeadings: true, showFormulas: false, collapsed: false };
+const VIEW = { zoom: 1, showFormulaBar: true, showHeadings: true, showFormulas: false };
 const Clip = { cells: null, cut: null, marquee: null, formats: null, src: null, text: null };   // clipboard state (src = source origin, text = system fingerprint)
 const Edit = { active: false, r: 0, c: 0, cursorMode: false, fromFormulaBar: false, refMode: false, origText: '', lastRef: null };
 const Mouse = { mode: null, startCell: null, anchor: null, baseSel: null, data: null };
@@ -2555,7 +2555,7 @@ function updateSaveStatus() {
   const txt = btn.querySelector('.save-text') || btn;
   const st = Persistence.state;
   btn.classList.remove('saving', 'saved', 'dirty', 'error');
-  if (st === 'saving' || st === 'dirty') { txt.textContent = 'Saving...'; btn.classList.add('saving'); }
+  if (st === 'saving' || st === 'dirty') { txt.textContent = 'Saving…'; btn.classList.add('saving'); }
   else if (st === 'error') { txt.textContent = 'Save failed'; btn.classList.add('error'); }
   else { txt.textContent = 'All changes saved'; btn.classList.add('saved'); }
 }
@@ -9993,6 +9993,17 @@ function openFormatCellsDialog() {
   setTimeout(() => { const nb = content.querySelector('#fc-bgnone'); if (nb) nb.addEventListener('click', () => { content.querySelector('#fc-bg').value = '#ffffff'; content.querySelector('#fc-bg').dataset.none = '1'; content.querySelector('#fc-bg').dataset.touched = '1'; }); const bgIn = content.querySelector('#fc-bg'); bgIn.addEventListener('input', () => { bgIn.dataset.touched = '1'; bgIn.dataset.none = ''; }); }, 0);
 }
 const FONT_LIST = ['Calibri', 'Segoe UI', 'Arial', 'Georgia', 'Times New Roman', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Courier New', 'Consolas', 'Impact', 'Comic Sans MS'];
+const RIBBON_FONT_GROUPS = [
+  ['Sans-Serif', ['Calibri', 'Segoe UI', 'Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Nunito', 'Ubuntu', 'Raleway', 'Oswald', 'Work Sans', 'DM Sans', 'Impact']],
+  ['Serif', ['Georgia', 'Times New Roman', 'Merriweather', 'Lora', 'Libre Baskerville', 'DM Serif Display', 'Crimson Text']],
+  ['Monospace', ['Courier New', 'Consolas', 'Fira Code', 'IBM Plex Mono', 'Courier Prime']],
+  ['Handwriting', ['Comic Sans MS', 'Caveat', 'Dancing Script', 'Pacifico', 'Lobster', 'Permanent Marker']]
+];
+const RIBBON_FONTS = [];
+for (const [head, names] of RIBBON_FONT_GROUPS) {
+  RIBBON_FONTS.push({ head });
+  for (const n of names) RIBBON_FONTS.push({ value: n, dataLabel: n, html: esc(n), style: 'font-family:' + n + ',sans-serif;' });
+}
 
 /* ---------------- Insert Function dialog ---------------- */
 const RECENT_FUNCS = [];
@@ -10456,33 +10467,45 @@ function buildRibbon() {
   const tabsBar = $('#ribbon-tabs');
   const body = $('#ribbon-body');
   tabsBar.innerHTML = '';
+  body.innerHTML = '';
   closeMsMenus();
+  tabsBar.appendChild(el('<span class="ribbon-tab-indicator" aria-hidden="true"></span>'));
   tabsBar.appendChild(el('<span class="rb-tabs-sep" aria-hidden="true"></span>'));
   const cfg = ribbonConfig();
   for (const tabName in cfg) {
-    const btn = el('<button class="ribbon-tab' + (tabName === activeRibbonTab ? ' active' : '') + '" role="tab" aria-selected="' + (tabName === activeRibbonTab) + '">' + tabName + '</button>');
+    const btn = el('<button class="ribbon-tab' + (tabName === activeRibbonTab ? ' active' : '') + '" role="tab" data-tab="' + tabName.toLowerCase() + '" aria-selected="' + (tabName === activeRibbonTab) + '">' + tabName + '</button>');
     btn.addEventListener('click', () => {
       if (activeRibbonTab === tabName) return;
       activeRibbonTab = tabName;
-      buildRibbon();
+      tabsBar.querySelectorAll('.ribbon-tab').forEach(t => {
+        const on = t === btn;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on);
+      });
+      positionRibbonIndicator();
+      buildRibbonBody();
       const rb = $('#ribbon-body');
       if (rb && !SmoothScroll.reduced) { rb.classList.remove('rb-swap'); void rb.offsetWidth; rb.classList.add('rb-swap'); }
     });
     tabsBar.appendChild(btn);
   }
-  const collapse = el('<button id="ribbon-collapse" title="Collapse the ribbon">' + icon('chevUp') + '</button>');
-  collapse.addEventListener('click', () => {
-    VIEW.collapsed = !VIEW.collapsed;
-    $('#ribbon').classList.toggle('collapsed', VIEW.collapsed);
-    collapse.innerHTML = icon(VIEW.collapsed ? 'chevDown' : 'chevUp');
-    resizeCanvas();
-  });
-  tabsBar.appendChild(collapse);
+  const act = el('<div class="ribbon-tabs-right"><button class="ribbon-tab-action" title="Export the active sheet as CSV" type="button">' + icon('csv') + '<span>Export</span></button></div>');
+  act.querySelector('.ribbon-tab-action').addEventListener('click', () => exportCsv());
+  tabsBar.appendChild(act);
+  buildRibbonBody();
+  updateRibbonState();
+  updateUndoRedoUI();
+  positionRibbonIndicator();
+}
+function buildRibbonBody() {
+  const body = $('#ribbon-body');
+  if (!body) return;
   body.innerHTML = '';
+  const cfg = ribbonConfig();
   const groups = cfg[activeRibbonTab] || [];
   for (const g of groups) {
-    const gEl = el('<div class="rb-group"><div class="rb-group-label">' + esc(g.label) + '</div><div class="rb-controls"></div></div>');
-    const ctr = gEl.querySelector('.rb-controls');
+    const gEl = el('<div class="ribbon-group"><div class="group-label">' + esc(g.label) + '</div><div class="ribbon-controls"></div></div>');
+    const ctr = gEl.querySelector('.ribbon-controls');
     for (const item of g.items) {
       ctr.appendChild(buildRibbonItem(item));
     }
@@ -10491,10 +10514,20 @@ function buildRibbon() {
   updateRibbonState();
   updateUndoRedoUI();
 }
+function positionRibbonIndicator() {
+  const ind = $('#ribbon-tabs .ribbon-tab-indicator');
+  const active = $('#ribbon-tabs .ribbon-tab.active');
+  if (!ind || !active) return;
+  const left = active.offsetLeft;
+  const width = active.offsetWidth;
+  ind.style.width = width + 'px';
+  ind.style.transform = 'translateX(' + left + 'px)';
+  ind.classList.add('visible');
+}
 function buildRibbonItem(item) {
   if (item.custom) return buildCustomRibbonControl(item);
   const big = !item.small;
-  const btn = el('<button class="rbtn' + (big ? '' : ' wide') + (item.split ? ' split' : '') + '" title="' + esc(item.title || item.label) + '" aria-label="' + esc(item.title || item.label) + '">' + icon(item.icon) + (big ? '<small>' + esc(item.label) + '</small>' : '') + '</button>');
+  const btn = el('<button class="ribbon-btn' + (big ? '' : ' ribbon-btn-icon') + (item.split ? ' split' : '') + '" title="' + esc(item.title || item.label) + '" aria-label="' + esc(item.title || item.label) + '">' + icon(item.icon) + (big ? '<span>' + esc(item.label) + '</span>' : '') + '</button>');
   if (item.action) {
     btn.addEventListener('click', e => {
       if (item.menu && e.offsetX > btn.clientWidth - 12 && item.split) { openRibbonMenu(item.menu, btn); return; }
@@ -10586,7 +10619,11 @@ function msDropdownCtrl(opts) {
   const btn = el('<button type="button" class="ms-dropdown-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(opts.title || '') + '" style="' + (opts.minWidth ? 'min-width:' + opts.minWidth + 'px;' : '') + '">' + opts.render(opts.value()) + '</button>');
   const menu = el('<div class="ms-dropdown-menu' + (opts.menuClass ? ' ' + opts.menuClass : '') + '"' + (opts.maxHeight ? ' style="max-height:' + opts.maxHeight + 'px"' : '') + '></div>');
   for (const it of opts.items) {
-    const row = el('<div class="ms-dropdown-item" data-value="' + esc(it.value) + '">' + (it.html || esc(it.label)) + '</div>');
+    if (it.head) {
+      menu.appendChild(el('<div class="ms-dropdown-item" style="font-size:10px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.06em;cursor:default;pointer-events:none;padding:4px 8px 2px 12px;">' + esc(it.head) + '</div>'));
+      continue;
+    }
+    const row = el('<div class="ms-dropdown-item" data-value="' + esc(it.value) + '"' + (it.dataLabel ? ' data-label="' + esc(it.dataLabel) + '"' : '') + (it.style ? ' style="' + it.style + '"' : '') + '>' + (it.html || esc(it.label)) + '</div>');
     row.addEventListener('click', () => { opts.pick(it.value); closeMsMenus(); });
     menu.appendChild(row);
   }
@@ -10632,22 +10669,22 @@ function buildCustomRibbonControl(item) {
   switch (item.custom) {
     case 'fontFamily': {
       return msDropdownCtrl({
-        minWidth: 112,
+        minWidth: 110,
         title: 'Font',
         maxHeight: 280,
         value: () => { const sh = activeSheet(); const cell = sh.cells.get(key(SEL.active.r, SEL.active.c)); return (cell && cell.s && cell.s.fontFamily) || DEF.fontFamily; },
         render: v => '<span class="dropdown-value">' + esc(v) + '</span>',
-        items: FONT_LIST.map(f => ({ value: f, label: f })),
+        items: RIBBON_FONTS.map(f => f.head ? { head: f.head } : { value: f.value, dataLabel: f.dataLabel, html: f.html, style: f.style }),
         pick: v => applyStyleToSelection({ fontFamily: v })
       });
     }
     case 'fontSize': {
       return msDropdownCtrl({
-        minWidth: 64,
+        minWidth: 60,
         title: 'Font size',
         value: () => { const sh = activeSheet(); const cell = sh.cells.get(key(SEL.active.r, SEL.active.c)); return (cell && cell.s && cell.s.fontSize ? cell.s.fontSize : DEF.fontPt) + ''; },
         render: v => '<span class="dropdown-value">' + esc(v) + '</span>',
-        items: [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36, 48, 72].map(s => ({ value: s + '', label: s + '' })),
+        items: [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map(s => ({ value: s + '', dataLabel: s + '', label: s + '' })),
         pick: v => applyStyleToSelection({ fontSize: +v })
       });
     }
@@ -10702,7 +10739,7 @@ function buildCustomRibbonControl(item) {
     }
     case 'fillColor': {
       return msDropdownCtrl({
-        minWidth: 92,
+        minWidth: 90,
         title: 'Highlight color',
         menuClass: 'color-list-menu',
         value: () => {
@@ -10771,7 +10808,7 @@ function updateRibbonState() {
   const body = $('#ribbon-body');
   if (!body) return;
   const sh = activeSheet();
-  body.querySelectorAll('.rbtn[data-toggle]').forEach(btn => {
+  body.querySelectorAll('.ribbon-btn[data-toggle]').forEach(btn => {
     const item = btn._item;
     if (!item) return;
     let on = false;
@@ -10785,12 +10822,12 @@ function updateRibbonState() {
         on = anyOn;
       }
     }
-    btn.classList.toggle('on', on);
+    btn.classList.toggle('active', on);
   });
   body.querySelectorAll('[data-rbsync]').forEach(c => { if (c._sync) try { c._sync(); } catch (e) {} });
   body.querySelectorAll('select[_sync]').forEach(s => { if (s._sync) try { s._sync(); } catch (e) {} });
   const filterBtn = body.querySelector('[title="Toggle filter"]');
-  if (filterBtn) filterBtn.classList.toggle('on', !!sh.filter);
+  if (filterBtn) filterBtn.classList.toggle('active', !!sh.filter);
 }
 
 /* ---------------- view toggles / zoom ---------------- */
@@ -11680,7 +11717,6 @@ function bootChrome() {
   $('#sb-zoom').value = Math.round(VIEW.zoom * 100);
   $('#sb-zoom-pct').textContent = Math.round(VIEW.zoom * 100) + '%';
   $('#formula-row').style.display = VIEW.showFormulaBar ? '' : 'none';
-  $('#ribbon').classList.toggle('collapsed', !!VIEW.collapsed);
   updateUndoRedoUI();
 }
 function resizeCanvas() {
@@ -11744,7 +11780,8 @@ function setupChrome() {
   $('#sb-zoom-out').innerHTML = icon('zoomOut');
   $('#sb-zoom-out').addEventListener('click', () => animateZoom(VIEW.zoom / 1.15));
   setupEditorEvents();
-  window.addEventListener('resize', rafThrottle(resizeCanvas));
+  window.addEventListener('resize', rafThrottle(() => { resizeCanvas(); positionRibbonIndicator(); }));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => positionRibbonIndicator());
   document.addEventListener('mousedown', e => {
     if (Edit.active && !Edit.refMode) {
       const t = e.target;

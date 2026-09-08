@@ -11,7 +11,7 @@
   --accent-tint-2: #cde5d7;
   --sel-fill: rgba(33, 115, 70, 0.12);
   --hdr-sel: #bfd9cb;
-  --chrome: #f3f2f1;
+  --chrome: #f5f5f5;
   --chrome-2: #edebe9;
   --chrome-3: #e1dfdd;
   --line: #d4d4d4;
@@ -99,12 +99,6 @@ button { cursor: default; }
 #wb-title:hover { border-color: rgba(255,255,255,.35); background: rgba(255,255,255,.08); }
 #wb-title:focus { border-color: rgba(255,255,255,.8); background: rgba(255,255,255,.12); }
 .wb-sub { display: flex; gap: 10px; align-items: baseline; padding-left: 7px; font-size: 11px; color: rgba(255,255,255,.85); }
-#save-status { white-space: nowrap; }
-#save-status.saving::before, #save-status.dirty::before {
-  content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-  margin-right: 5px; vertical-align: 1px; background: #ffd66b;
-}
-#save-status.saved::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; background: #9fe3b9; }
 .linklike {
   background: none; border: none; color: inherit; padding: 0;
   text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
@@ -138,15 +132,17 @@ button { cursor: default; }
 .ribbon-tab:hover { background: var(--chrome-2); }
 .ribbon-tab.active { background: var(--paper); color: var(--accent-dark); font-weight: 600; }
 .ribbon-tab.active::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2.5px; background: var(--accent); border-radius: 2px 2px 0 0; }
-#ribbon-collapse {
-  position: absolute; right: 6px; top: 4px; width: 22px; height: 22px; border: none; background: transparent;
-  border-radius: 3px; color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center;
+.ribbon-tabs-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
-#ribbon-collapse:hover { background: var(--chrome-2); }
 #ribbon-body { height: var(--ribbon-body-h); display: flex; align-items: stretch; overflow-x: auto; overflow-y: hidden; background: var(--paper); }
 #ribbon-body::-webkit-scrollbar { height: 8px; }
 #ribbon-body::-webkit-scrollbar-thumb { background: var(--chrome-3); border-radius: 4px; }
-#ribbon.collapsed #ribbon-body { display: none; }
 .rb-group {
   display: flex; flex-direction: column; justify-content: flex-start;
   padding: 5px 9px 3px; border-right: 1px solid var(--line-soft); flex: none;
@@ -668,10 +664,6 @@ button { cursor: default; }
 #wb-title { transition: background .15s, border-color .15s; }
 #wb-title:hover { background: rgba(255,255,255,.08); }
 
-/* Saving pulse on the status chip */
-#save-status.saving { animation: savePulse 1.1s ease-in-out infinite; }
-@keyframes savePulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-
 /* Ribbon tabs: ink underline grows in */
 .ribbon-tab { position: relative; transition: background .12s, color .12s; }
 .ribbon-tab::after { content: ""; position: absolute; left: 50%; right: 50%; bottom: 0; height: 2.5px; background: var(--accent); border-radius: 2px 2px 0 0; opacity: 0; transition: left .16s ease-out, right .16s ease-out, opacity .12s; }
@@ -887,13 +879,6 @@ button { cursor: default; }
 /* ---- Name box dropdown chevron ---- */
 .namebox-dd { color: var(--ink-3); transition: background .1s, color .1s; }
 .namebox-dd:hover { background: var(--chrome-2); color: var(--accent-dark); }
-
-/* ---- Ribbon collapse button ---- */
-#ribbon-collapse { border-radius: 3px; }
-#ribbon-collapse:hover { color: var(--accent-dark); }
-
-/* ---- Save chip: saved state subtle green dot before text ---- */
-#save-status { transition: color .2s; }
 
 /* ---- Find panel input focus ---- */
 #find-panel input:focus { box-shadow: 0 0 0 1.5px var(--accent-tint-2); }
@@ -1899,7 +1884,7 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
 
 /* Save indicator pill — byte-identical to docs.css / slides.css */
 .save-indicator {
-  font-family: var(--font-ui);
+  font-family: revert;
   background: rgba(35, 154, 77, 0.2);
   border: 1px solid rgba(35, 154, 77, 0.3);
   color: rgb(35, 154, 77);
@@ -1937,7 +1922,8 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px;
+  height: auto;
   padding: 0 12px;
   margin: 0 12px 8px;
   background: transparent;
@@ -1985,32 +1971,63 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
   animation: none;
 }
 #ribbon-tabs .ribbon-tab:hover { color: rgba(44, 62, 80, .95); }
-#ribbon-tabs .ribbon-tab:not(.active):hover::after { opacity: 1; transform: scaleX(1); }
+#ribbon-tabs .ribbon-tab:not(.active):not([data-tab="file"]):hover::after { opacity: 1; transform: scaleX(1); }
+#ribbon-tabs .ribbon-tab[data-tab="file"]::before {
+  content: "";
+  position: absolute;
+  inset: -4px -2px -2px;
+  background: rgba(136, 136, 136, .16);
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(.92);
+  transition: opacity .2s, transform .2s cubic-bezier(.4, 0, .2, 1);
+  z-index: -1;
+}
+#ribbon-tabs .ribbon-tab[data-tab="file"]:hover::before { opacity: 1; transform: scale(1); }
 #ribbon-tabs .ribbon-tab.active { background: transparent; color: var(--ui-accent); font-weight: 600; }
-#ribbon-tabs .ribbon-tab.active::after { background: var(--ui-accent); opacity: 1; transform: scaleX(1); }
-#ribbon-collapse {
-  position: static;
-  margin-left: auto;
-  align-self: flex-end;
-  margin-bottom: 4px;
-  flex: none;
-  width: 32px;
-  height: 26px;
-  border: 1px solid rgba(0, 0, 0, .08);
-  background: rgba(255, 255, 255, .9);
-  border-radius: 8px;
-  color: #6b7280;
+#ribbon-tabs .ribbon-tab.active::after { background: var(--ui-accent); opacity: 0; transform: scaleX(0); }
+/* Sliding underline indicator (moves between tabs, like Docs/Slides) */
+#ribbon-tabs .ribbon-tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 0;
+  background: var(--ui-accent);
+  border-radius: 5px;
+  pointer-events: none;
+  z-index: 1;
+  transition: transform .35s cubic-bezier(.4, 0, .2, 1), width .35s cubic-bezier(.4, 0, .2, 1), opacity .2s;
+  will-change: transform, width;
+  opacity: 0;
+}
+#ribbon-tabs .ribbon-tab-indicator.visible { opacity: 1; }
+#ribbon-tabs .ribbon-tabs-right { margin-left: auto; }
+.ribbon-tab-action {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  transition: background .16s ease, color .16s ease, border-color .16s ease;
+  gap: 5px;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, .06);
+  border-radius: 8px;
+  color: #636363;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: .18s;
+  white-space: nowrap;
+  line-height: 1;
 }
-#ribbon-collapse:hover { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
-#ribbon-collapse svg { width: 14px; height: 14px; }
+.ribbon-tab-action:hover { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); box-shadow: 0 2px 8px var(--ui-accent-soft); }
+.ribbon-tab-action:active { transform: translateY(1px); }
+.ribbon-tab-action svg { flex-shrink: 0; width: 14px; height: 14px; }
 
 /* ---------- Ribbon card ---------- */
 #ribbon-body {
-  min-height: 100px;
+  min-height: 104px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -2030,9 +2047,8 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
 #ribbon-body::-webkit-scrollbar { height: 8px; }
 #ribbon-body::-webkit-scrollbar-track { background: transparent; }
 #ribbon-body::-webkit-scrollbar-thumb { background: var(--chrome-3); border-radius: 4px; }
-#ribbon.collapsed #ribbon-body { display: none; }
 
-.rb-group {
+.ribbon-group {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -2044,9 +2060,9 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
   min-width: max-content;
   position: static;
 }
-.rb-group::after { display: none; }
-.rb-group:last-child { border-right: none; padding-right: 0; margin-right: 0; }
-.rb-group-label {
+.ribbon-group::after { display: none; }
+.ribbon-group:last-child { border-right: none; padding-right: 0; margin-right: 0; }
+.group-label {
   text-align: center;
   font: 600 10px/1.2 "DM Sans", sans-serif;
   color: #9ca3af;
@@ -2055,17 +2071,16 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
   white-space: nowrap;
   margin: 0 0 4px;
 }
-.rb-controls { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; min-width: max-content; }
+.ribbon-controls { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; min-width: max-content; }
 .rb-sep { width: 1px; background: rgba(0, 0, 0, .07); margin: 4px 3px; flex: none; }
 .rb-stack { display: flex; flex-direction: row; gap: 2px; justify-content: center; align-items: center; height: auto; }
-.rb-stack .rbtn { width: auto; min-width: 32px; height: auto; padding: 4px 6px; flex-direction: row; gap: 0; justify-content: center; border-radius: 6px; }
-.rb-stack .rbtn svg { width: 16px; height: 16px; }
-.rb-stack .rbtn small { display: none; }
+.rb-stack .ribbon-btn { width: auto; min-width: 32px; height: auto; padding: 4px 6px; flex-direction: row; gap: 0; justify-content: center; border-radius: 6px; }
+.rb-stack .ribbon-btn svg { width: 16px; height: 16px; }
 .font-controls { display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; }
-.font-controls .rbtn { min-width: 32px; padding: 4px 6px; }
+.font-controls .ribbon-btn { min-width: 32px; padding: 4px 6px; }
 
-/* ---------- Ribbon buttons ---------- */
-.rbtn {
+/* ---------- Ribbon buttons (same structure as docs/slides) ---------- */
+.ribbon-btn {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -2083,20 +2098,29 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
+  cursor: pointer;
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   transition: background .2s, border-color .2s, color .2s, box-shadow .2s;
 }
-.rbtn:hover { background: rgba(255, 255, 255, .9); border-color: var(--ui-accent-border); color: rgb(44, 62, 80); box-shadow: rgba(0, 0, 0, .08) 0 2px 6px; }
-.rbtn:active { transform: translateY(1px); }
-.rbtn.on { background: rgba(35, 154, 77, .15); color: var(--ui-accent-strong); border-color: var(--ui-accent-border); box-shadow: inset 0 0 0 1px var(--ui-accent-border), rgba(35, 154, 77, .25) 0 2px 8px; }
-.rbtn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
-.rbtn small { font: 500 10px/1.2 "DM Sans", sans-serif; color: inherit; white-space: nowrap; }
-.rbtn.wide { flex-direction: row; height: auto; min-width: 28px; gap: 0; padding: 5px 8px; border-radius: 6px; }
-.rbtn.wide svg { width: 16px; height: 16px; }
-.rbtn.tall-narrow { padding: 6px 8px; min-width: 34px; }
-.rbtn.split::after { content: "▾"; font-size: 9px; margin-top: -2px; color: var(--ui-faint); }
-.rbtn.wide.split::after { margin-top: 0; margin-left: 3px; }
+.ribbon-btn:hover { background: rgba(255, 255, 255, .9); border-color: var(--ui-accent-border); color: rgb(44, 62, 80); box-shadow: rgba(0, 0, 0, .08) 0 2px 6px; }
+.ribbon-btn:active { transform: translateY(1px); }
+.ribbon-btn.active { background: rgba(35, 154, 77, .15); color: var(--ui-accent-strong); border-color: var(--ui-accent-border); box-shadow: inset 0 0 0 1px var(--ui-accent-border), rgba(35, 154, 77, .25) 0 2px 8px; }
+.ribbon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.ribbon-btn span { font: 500 10px/1.2 "DM Sans", sans-serif; color: inherit; white-space: nowrap; }
+.ribbon-btn-icon {
+  flex-direction: row;
+  height: auto;
+  min-width: 28px;
+  gap: 0;
+  padding: 5px 8px;
+  border-radius: 6px;
+}
+.ribbon-btn-icon svg { width: 16px; height: 16px; }
+.ribbon-btn-icon span { font-size: 12px; }
+.ribbon-btn.tall-narrow { padding: 6px 8px; min-width: 34px; }
+.ribbon-btn.split::after { content: "▾"; font-size: 9px; margin-top: -2px; color: var(--ui-faint); }
+.ribbon-btn-icon.split::after { margin-top: 0; margin-left: 3px; }
 .rbtn-col {
   display: inline-flex;
   align-items: center;
@@ -2206,6 +2230,10 @@ select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-
   0% { opacity: 0; transform: translateY(-8px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+.color-grid-menu { min-width: 200px !important; padding: 10px !important; }
+.color-list-menu { min-width: 180px !important; max-height: 240px !important; overflow-y: auto !important; padding: 0 !important; }
+.color-list-menu .ms-dropdown-item { padding: 10px 16px; font-size: 13px; }
+.color-list-menu .ms-dropdown-item .color-preview { box-shadow: none; }
 
 /* ---------- Ribbon custom controls ---------- */
 .rb-color-btn {
